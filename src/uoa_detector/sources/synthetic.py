@@ -1,13 +1,18 @@
 """Scriptable in-memory flow sources for tests and the CLI smoke run.
 
-  - ``SyntheticFlowSource`` (Phase 1): emits canonical ``OptionsPrint`` events.
-    Retained for back-compat with the Phase 1 integration test harness; will
-    be migrated to a thin shim over ``SyntheticRawFlowSource`` + ``SourceFusion``
-    in Phase 2.3.4.
+Phase 2.3.4 retired the ``SyntheticFlowSource`` Phase-1 class (which emitted
+canonical ``OptionsPrint``s pre-fusion). The pipeline now consumes
+``RawFlowSource``s through ``SourceFusion``, so this module exposes:
 
-  - ``SyntheticRawFlowSource`` (Phase 2.3.3): emits ``RawPrint`` events
-    through the ``RawFlowSource`` Protocol. Used to drive ``SourceFusion``
-    in tests.
+  - ``SyntheticRawFlowSource``: in-memory source emitting scripted
+    ``RawPrint`` events through the ``RawFlowSource`` Protocol.
+  - ``StallingRawFlowSource``: test-only — emits N events then parks
+    forever on an ``asyncio.Event`` until ``close()`` releases it.
+    Used by the stalled-source recovery test.
+  - ``to_raw_print``: helper that converts a canonical ``OptionsPrint``
+    into a ``RawPrint`` with a chosen ``source_id``. Used by Phase-1
+    scenarios that authored prints as ``OptionsPrint`` directly; new
+    scenarios should construct ``RawPrint`` directly.
 """
 
 from __future__ import annotations
@@ -19,43 +24,43 @@ from uoa_detector.domain.events import OptionsPrint
 from uoa_detector.domain.raw_print import RawPrint
 
 
-class SyntheticFlowSource:
-    """In-memory ``FlowDataSource`` (Phase 1 legacy — emits ``OptionsPrint``).
+def to_raw_print(p: OptionsPrint, source_id: str = "synthetic") -> RawPrint:
+    """Convert a canonical ``OptionsPrint`` into a ``RawPrint``.
 
-    Initialise with a sequence of ``OptionsPrint`` objects; ``stream`` yields
-    them in order with optional ``inter_event_delay`` seconds between each.
-    Implements the ``FlowDataSource`` Protocol structurally — no inheritance.
+    Used to feed Phase 1-style scenarios (which authored prints as
+    ``OptionsPrint``) through the Phase 2 ``SourceFusion`` path. The
+    conversion is field-for-field; ``source_event_id`` inherits the
+    ``OptionsPrint.event_id`` so single-source fusion preserves event-id
+    continuity for downstream systems (scenario overrides keyed by
+    ``event_id``, decision-record correlation, etc.).
     """
-
-    def __init__(
-        self,
-        events: Iterable[OptionsPrint],
-        *,
-        inter_event_delay: float = 0.0,
-    ) -> None:
-        self._events: list[OptionsPrint] = list(events)
-        self._inter_event_delay = inter_event_delay
-        self._closed = False
-
-    async def stream(self) -> AsyncIterator[OptionsPrint]:
-        """Yield each scripted event in order."""
-        for ev in self._events:
-            if self._closed:
-                return
-            if self._inter_event_delay > 0:
-                await asyncio.sleep(self._inter_event_delay)
-            yield ev
-
-    async def close(self) -> None:
-        """Mark the source as closed; subsequent ``stream`` calls produce nothing."""
-        self._closed = True
+    return RawPrint(
+        source_id=source_id,
+        source_event_id=p.event_id,
+        timestamp=p.timestamp,
+        ticker=p.ticker,
+        option_type=p.option_type,
+        strike=p.strike,
+        expiry=p.expiry,
+        dte=p.dte,
+        spot_price=p.spot_price,
+        premium_paid=p.premium_paid,
+        option_price=p.option_price,
+        bid=p.bid,
+        ask=p.ask,
+        fill_side=p.fill_side,
+        exchange=p.exchange,
+        is_iso=p.is_iso,
+        implied_volatility=p.implied_volatility,
+        open_interest=p.open_interest,
+    )
 
 
 class SyntheticRawFlowSource:
     """In-memory ``RawFlowSource`` — emits scripted ``RawPrint`` events.
 
-    Used to drive ``SourceFusion`` in tests. The ``source_id`` field is
-    publicly readable so ``SourceFusion`` can identify the feed.
+    Used to drive ``SourceFusion`` in tests and the CLI. The ``source_id``
+    field is publicly readable so ``SourceFusion`` can identify the feed.
 
     ``inter_event_delay`` (seconds, walltime) lets tests space events out so
     asyncio can interleave with stall checks. Default 0 = emit as fast as

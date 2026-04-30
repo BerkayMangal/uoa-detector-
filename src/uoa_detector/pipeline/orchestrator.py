@@ -1,5 +1,10 @@
-"""Pipeline orchestrator. Wires source → stages → scoring → penalties → labeler
-→ sizer → backtest store, emitting one structured log line per event.
+"""Pipeline orchestrator. Wires sources → fusion → stages → scoring → penalties
+→ labeler → sizer → backtest store, emitting one structured log line per event.
+
+Phase 2.3.4: ``Pipeline`` consumes one or more ``RawFlowSource``s and runs
+them through ``SourceFusion`` internally. Single-source scenarios get
+``confidence_tier='single'`` on every event with no windowing wait;
+multi-source scenarios get watermark-driven fusion per ``profile.fusion``.
 """
 
 from __future__ import annotations
@@ -14,6 +19,7 @@ from uoa_detector.calibration import CalibrationProfile, load_default_profile
 from uoa_detector.domain.events import EnrichedEvent, OptionsPrint
 from uoa_detector.domain.labels import LabelDecision
 from uoa_detector.domain.risk import PositionSize
+from uoa_detector.fusion import SourceFusion
 from uoa_detector.labeling.labeler import Labeler
 from uoa_detector.pipeline.stage import EnrichmentStage, PipelineContext
 from uoa_detector.risk.sizer import RiskSizer
@@ -23,7 +29,7 @@ from uoa_detector.scoring.penalties import PenaltyEngine
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    from uoa_detector.sources.base import FlowDataSource
+    from uoa_detector.sources.base import RawFlowSource
 
 _logger = structlog.get_logger(__name__)
 
@@ -39,20 +45,30 @@ class PipelineResult(BaseModel):
 
 
 class Pipeline:
-    """End-to-end runner. One ``Pipeline`` instance per process / scenario."""
+    """End-to-end runner. One ``Pipeline`` instance per process / scenario.
+
+    Takes one or more ``RawFlowSource``s and constructs a ``SourceFusion``
+    internally using ``profile.fusion`` settings. Single source → fast path
+    (tier='single'); multiple sources → windowed fusion.
+    """
 
     def __init__(
         self,
-        source: FlowDataSource,
+        sources: Sequence[RawFlowSource],
         stages: Sequence[EnrichmentStage],
         *,
         profile: CalibrationProfile | None = None,
         store: BacktestStore | None = None,
         context: PipelineContext | None = None,
+        force_multi_source: bool = False,
     ) -> None:
-        self._source = source
-        self._stages = list(stages)
         self._profile = profile or load_default_profile()
+        self._fusion = SourceFusion(
+            sources,
+            self._profile.fusion,
+            force_multi_source=force_multi_source,
+        )
+        self._stages = list(stages)
         self._store = store or BacktestStore()
         self._ctx = context or PipelineContext(profile=self._profile)
         self._penalty_engine = PenaltyEngine(self._profile)
@@ -70,13 +86,13 @@ class Pipeline:
         return self._ctx
 
     async def run(self) -> list[PipelineResult]:
-        """Drain the source, process each event, return all results."""
+        """Drain the fused source stream, process each event, return all results."""
         results: list[PipelineResult] = []
         try:
-            async for raw in self._source.stream():
-                results.append(await self.process_one(raw))
+            async for canonical in self._fusion.stream():
+                results.append(await self.process_one(canonical))
         finally:
-            await self._source.close()
+            await self._fusion.close()
         return results
 
     async def process_one(self, raw: OptionsPrint) -> PipelineResult:

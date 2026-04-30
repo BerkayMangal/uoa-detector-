@@ -21,7 +21,7 @@ from uoa_detector.sources.scenarios import (
     default_scenario,
     overrides_lookup,
 )
-from uoa_detector.sources.synthetic import SyntheticFlowSource
+from uoa_detector.sources.synthetic import SyntheticRawFlowSource, to_raw_print
 
 app = typer.Typer(help="UOA + Convexity Detector v5 CLI", add_completion=False)
 
@@ -74,13 +74,14 @@ async def _run_default_synthetic() -> None:
     """Drive the default scenario through the pipeline using v5_default profile."""
     profile = load_default_profile()
     steps = default_scenario()
-    prints = [s.print_ for s in steps]
-    src = SyntheticFlowSource(prints)
+    # Convert Phase-1-authored OptionsPrints into RawPrints under source_id='synthetic'.
+    raw_prints = [to_raw_print(s.print_, source_id="synthetic") for s in steps]
+    src = SyntheticRawFlowSource("synthetic", raw_prints)
 
     # Override stage runs FIRST; then the stub stages fill missing fields.
     stages = [ScenarioOverrideStage(overrides_lookup(iter(steps))), *default_stage_pipeline()]
 
-    pipeline = Pipeline(src, stages, profile=profile)
+    pipeline = Pipeline([src], stages, profile=profile)
     await pipeline.run()
 
 

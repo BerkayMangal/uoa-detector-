@@ -23,7 +23,7 @@ from uoa_detector.pipeline.orchestrator import Pipeline
 from uoa_detector.pipeline.stage import PipelineContext
 from uoa_detector.pipeline.stages import default_stage_pipeline
 from uoa_detector.pipeline.stages.m39_time_of_day import TimeOfDayStage
-from uoa_detector.sources.synthetic import SyntheticFlowSource
+from uoa_detector.sources.synthetic import SyntheticRawFlowSource, to_raw_print
 
 # Pre-market: 08:00 NY = 12:00 UTC during EDT (June). Outside every window.
 EXT_HOURS_TS_UTC = datetime(2025, 6, 11, 12, 0, tzinfo=UTC)
@@ -121,9 +121,9 @@ async def test_orchestrator_short_circuits_on_rejection(profiles_root: Path) -> 
     """End-to-end: pipeline detects rejection and skips scoring / labeling."""
     profile = _profile_with_policy(profiles_root, "reject")
     pr = build_print(ts=EXT_HOURS_TS_UTC, ticker="X")
-    src = SyntheticFlowSource([pr])
+    src = SyntheticRawFlowSource("synthetic", [to_raw_print(pr)])
 
-    pipeline = Pipeline(src, list(default_stage_pipeline()), profile=profile)
+    pipeline = Pipeline([src], list(default_stage_pipeline()), profile=profile)
     results = await pipeline.run()
 
     assert len(results) == 1
@@ -149,9 +149,9 @@ async def test_default_v5_uses_flag_policy_end_to_end() -> None:
 
     profile = load_default_profile()
     pr = build_print(ts=EXT_HOURS_TS_UTC, ticker="X")
-    src = SyntheticFlowSource([pr])
+    src = SyntheticRawFlowSource("synthetic", [to_raw_print(pr)])
 
-    pipeline = Pipeline(src, list(default_stage_pipeline()), profile=profile)
+    pipeline = Pipeline([src], list(default_stage_pipeline()), profile=profile)
     results = await pipeline.run()
 
     assert len(results) == 1
