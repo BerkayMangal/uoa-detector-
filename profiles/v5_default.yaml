@@ -63,9 +63,10 @@ dte:
 # --- Module 39 time-of-day weights ---
 # Windows are half-open [start, end) on the wall clock of the configured timezone.
 # `outside_session_weight` applies to any timestamp not covered by any window.
-# Note: outside_session_weight is 0.0 here (a deliberate change from Phase 1's
-# 0.30 — the v5 spec is silent on this value, and 0.0 is the more conservative
-# choice: "outside session = no time-of-day boost"). Override per-ticker if needed.
+# Phase 1 used 0.30 for outside-RTH (its lowest in-session weight) — preserved
+# here to maintain bit-for-bit Phase 1 reproduction. The v5 spec is silent on
+# this value; override per-ticker (e.g., to 0.0) if a more conservative outside-
+# session policy is desired.
 time_of_day:
   timezone: "America/New_York"
   windows:
@@ -74,7 +75,7 @@ time_of_day:
     - { start: "11:00", end: "14:00", weight: 1.00, label: "prime_session" }
     - { start: "14:00", end: "15:30", weight: 0.70, label: "afternoon" }
     - { start: "15:30", end: "16:00", weight: 0.30, label: "moc_loc" }
-  outside_session_weight: 0.0
+  outside_session_weight: 0.30
 
 # --- Module 38 temporal clustering ---
 cluster:

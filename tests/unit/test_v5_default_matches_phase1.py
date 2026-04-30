@@ -86,16 +86,15 @@ def test_time_of_day_windows_match_phase1_via_lookup() -> None:
         assert label == expected_label, f"label mismatch at {t}"
 
 
-def test_outside_session_weight_documented_phase2_change() -> None:
-    """outside_session_weight=0.0 in v5_default is a deliberate Phase 2 choice.
+def test_outside_session_weight_matches_phase1() -> None:
+    """outside_session_weight must reproduce Phase 1's extended_hours: 0.30.
 
-    Phase 1 used 0.30 (matching the lowest in-session weight). The v5 spec is
-    silent on outside-session weighting; 0.0 is the more conservative default.
-    Override per-ticker if a different policy is desired. This test exists to
-    make any future change to this value an explicit decision rather than a
-    silent regression.
+    The v5 spec is silent on outside-session weighting; Phase 1 chose 0.30
+    (its lowest in-session weight) and we preserve that here for bit-for-bit
+    reproduction. Override per-ticker via deep-merge if a different policy
+    is desired.
     """
-    assert math.isclose(load_default_profile().time_of_day.outside_session_weight, 0.0)
+    assert math.isclose(load_default_profile().time_of_day.outside_session_weight, 0.30)
 
 
 def test_cluster_match_phase1() -> None:

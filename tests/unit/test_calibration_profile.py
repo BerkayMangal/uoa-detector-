@@ -97,7 +97,7 @@ def test_time_of_day_weights_via_lookup(v5: CalibrationProfile) -> None:
 
     tod = v5.time_of_day
     assert tod.timezone == "America/New_York"
-    assert math.isclose(tod.outside_session_weight, 0.0)
+    assert math.isclose(tod.outside_session_weight, 0.30)
 
     # One representative point inside each window
     assert tod.lookup(_time(9, 45)) == (0.30, "open_auction")
@@ -107,10 +107,10 @@ def test_time_of_day_weights_via_lookup(v5: CalibrationProfile) -> None:
     assert tod.lookup(_time(15, 45)) == (0.30, "moc_loc")
 
     # Boundary: end is exclusive — 16:00 is outside the session
-    assert tod.lookup(_time(16, 0)) == (0.0, "outside_session")
+    assert tod.lookup(_time(16, 0)) == (0.30, "outside_session")
     # Pre-market / after-hours
-    assert tod.lookup(_time(8, 0)) == (0.0, "outside_session")
-    assert tod.lookup(_time(20, 0)) == (0.0, "outside_session")
+    assert tod.lookup(_time(8, 0)) == (0.30, "outside_session")
+    assert tod.lookup(_time(20, 0)) == (0.30, "outside_session")
 
 
 def test_cluster_params(v5: CalibrationProfile) -> None:
