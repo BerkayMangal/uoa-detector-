@@ -1,0 +1,140 @@
+# UOA + Convexity Detector v5 — default calibration profile.
+# Every value here comes directly from UOA_Convexity_Detector_v5.docx.
+# Do not edit casually — use a child profile with inherits_from: v5_default
+# and override only the leaves you mean to change (deep-merge inheritance).
+
+profile_id: v5_default
+description: "Default v5 spec values, exhaustive. Source of truth for all defaults."
+inherits_from: null
+
+# --- Combined-score formula (Part 3) ---
+scoring:
+  uoa: 0.30
+  convexity: 0.25
+  event: 0.15
+  gamma: 0.10
+  price_confirmation: 0.10
+  sector_confirmation: 0.05
+  time_of_day: 0.05
+
+# --- Early-convexity score (Part 3) ---
+early_scoring:
+  convexity: 0.40
+  cluster_density: 0.20
+  event: 0.15
+  gamma: 0.15
+  time_of_day: 0.10
+
+# --- Module 36 penalties (negative deductions) ---
+penalties:
+  post_gap_move: -0.20            # Flow after >3% gap open
+  iv_rank_high: -0.15             # IV_rank > 80
+  wide_spread: -0.15              # spread > 15% of mid
+  thin_oi: -0.20                  # OI < 100 at strike
+  flow_contradicts_price: -0.15   # call vs downtrend / put vs uptrend
+  post_event: -0.25               # within 2 sessions of catalyst
+  isolated_print: -0.10           # no repeat within 30 min
+  next_day_oi_failed: -0.20       # OI drops > 30% of trade size
+
+# --- Penalty trigger thresholds (decide whether each penalty fires) ---
+penalty_triggers:
+  gap_threshold_pct: 3.0
+  iv_rank_threshold: 80
+  spread_pct_threshold: 15.0
+  thin_oi_threshold: 100
+  isolated_window_min: 30
+  next_day_oi_drop_pct: 30.0
+  post_event_sessions: 2
+
+# --- Contradiction (counted once via penalties.flow_contradicts_price) ---
+contradiction:
+  magnitude: -0.15
+  enabled: true
+
+# --- Module 35 DTE multipliers ---
+dte:
+  bucket_0_7: 1.20
+  bucket_8_14: 1.10
+  bucket_15_30: 1.00
+  bucket_31_60: 0.85
+  bucket_60_plus: 0.70
+  leap_threshold: 90
+
+# --- Module 39 time-of-day weights (America/New_York) ---
+time_of_day:
+  open_auction: 0.30      # 09:30–10:00
+  early_session: 0.80     # 10:00–11:00
+  prime: 1.00             # 11:00–14:00
+  afternoon: 0.70         # 14:00–15:30
+  moc_loc: 0.30           # 15:30–16:00
+  extended_hours: 0.30    # outside RTH (Phase 1 convention — lowest weight)
+
+# --- Module 38 temporal clustering ---
+cluster:
+  window_minutes: 60
+  decay_minutes: 90
+  nearby_strike_count: 1        # ±1 strike on the chain grid
+  escalation_ratio: 1.20        # each successive print ≥ 1.20× previous
+  density_isolated: 0.0
+  density_two_same: 0.4
+  density_three_same: 0.8
+  density_three_escalating: 1.0
+  density_nearby_strikes: 0.6
+
+# --- Module 34 sweep / block ---
+sweep:
+  iso_bonus: 0.15
+  cross_venue_bonus: 0.10
+  cross_venue_above_ask_bonus: 0.15
+  cross_venue_window_ms: 50
+
+# --- Module 37 relative premium ---
+relative_premium:
+  high_ratio: 3.0
+  mid_ratio: 1.5
+  score_high: 1.0
+  score_mid: 0.5
+  score_low: 0.0
+  median_window_days: 30
+
+# --- Labeler thresholds (every numeric comparison the labeler makes) ---
+label_thresholds:
+  penalized_below: 0.30
+  cluster_min: 0.4
+  cluster_burst: 0.8
+  relative_premium_uoa: 0.5
+  convexity_watch_floor: 0.6
+  pre_catalyst_event_min: 0.75
+
+# --- Part 5 risk buckets (max-R per label) ---
+risk_buckets:
+  convexity_watch: 0.25
+  convexity_cluster: 0.50         # also covers CONVEXITY_BURST
+  standard_uoa: 0.75
+  sweep_uoa: 0.85
+  pre_catalyst_flow: 0.85
+  high_conviction_sequence: 1.00
+  high_conviction_initial: 0.50   # scale-in: initial entry
+  leap_positioning: 0.25
+  discard_or_log: 0.0
+
+# --- Phase 2 fusion layer ---
+fusion:
+  window_ms: 500                  # OPRA → aggregator latency budget
+  timestamp_skew_tolerance_ms: 100
+
+# --- Phase 2 missing-sub-score policy ---
+# Per the user's correction: 0.5 is NOT neutral for several sub-scores
+# (relative_premium_score = 0.5 means "above average", a positive signal).
+# Missing data defaults to 0.0 (truly no signal); time_of_day_weight raises
+# because it's always derivable from the timestamp.
+sub_score_missing_behavior:
+  uoa_score:                  { on_missing: "default", default: 0.0 }
+  convexity_score:            { on_missing: "default", default: 0.0 }
+  event_score:                { on_missing: "default", default: 0.0 }
+  gamma_score:                { on_missing: "default", default: 0.0 }
+  price_confirmation_score:   { on_missing: "default", default: 0.0 }
+  sector_confirmation_score:  { on_missing: "default", default: 0.0 }
+  time_of_day_weight:         { on_missing: "raise" }
+  cluster_density_score:      { on_missing: "default", default: 0.0 }
+  relative_premium_score:     { on_missing: "default", default: 0.0 }

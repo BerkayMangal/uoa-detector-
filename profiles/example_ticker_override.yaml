@@ -1,0 +1,19 @@
+# Example child profile demonstrating partial override + deep-merge inheritance.
+#
+# This profile inherits everything from v5_default and changes ONLY two leaves:
+#   - relative_premium.median_window_days: 30 → 60 (longer baseline for stable mid-caps)
+#   - cluster.window_minutes: 60 → 90 (slightly slower flow expected)
+#
+# Every other field — including the rest of the relative_premium block (high_ratio,
+# mid_ratio, score_high, score_mid, score_low) — is inherited unchanged from v5_default.
+# That's the deep-merge semantic: leaves merge, not whole subtrees.
+
+profile_id: example_ticker_override
+description: "Documented example of partial override + inheritance. Not used in production."
+inherits_from: v5_default
+
+relative_premium:
+  median_window_days: 60   # only this leaf changes; high_ratio etc. inherited
+
+cluster:
+  window_minutes: 90       # only this leaf changes; densities, decay, etc. inherited
