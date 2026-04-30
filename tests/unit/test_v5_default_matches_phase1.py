@@ -92,9 +92,21 @@ def test_outside_session_weight_matches_phase1() -> None:
     The v5 spec is silent on outside-session weighting; Phase 1 chose 0.30
     (its lowest in-session weight) and we preserve that here for bit-for-bit
     reproduction. Override per-ticker via deep-merge if a different policy
-    is desired.
+    is desired. The ``extended_hours_policy`` field surfaces this gap
+    explicitly; see ``test_extended_hours_policy_default``.
     """
     assert math.isclose(load_default_profile().time_of_day.outside_session_weight, 0.30)
+
+
+def test_extended_hours_policy_default() -> None:
+    """v5_default uses 'flag' policy: numerical Phase 1 behavior + visible tag.
+
+    Per Phase 2.3.1, the spec-silent extended-hours behavior is structured into
+    a typed enum so the gap is visible in every record rather than buried in a
+    single number. 'flag' is the least-surprising default — it keeps Phase 1's
+    weight semantics and adds a boolean flag to the decision record.
+    """
+    assert load_default_profile().time_of_day.extended_hours_policy == "flag"
 
 
 def test_cluster_match_phase1() -> None:

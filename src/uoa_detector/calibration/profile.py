@@ -135,11 +135,38 @@ class TimeOfDayWeights(_StrictModel):
     pre-market, after-hours). The session timezone is parameterized via
     ``timezone`` (IANA name) so half-day sessions and non-US-equity profiles
     are first-class.
+
+    **Spec-silent values**: the v5 spec defines five windows covering 09:30–16:00
+    NY equity hours and is silent on prints outside that range. Both
+    ``outside_session_weight`` and ``extended_hours_policy`` are tunables — see
+    each field's description for the documented gap and Phase 1 inheritance.
     """
 
     timezone: str = Field(min_length=1, description="IANA timezone name, e.g. 'America/New_York'.")
     windows: tuple[TimeWindow, ...] = Field(min_length=1)
-    outside_session_weight: float = Field(ge=0.0, le=1.0)
+    outside_session_weight: float = Field(
+        ge=0.0,
+        le=1.0,
+        description=(
+            "Spec-silent value. Default 0.30 inherited from Phase 1 (matches its "
+            "lowest in-session weight) but the v5 spec defines no behavior for "
+            "prints outside the configured windows. Treat as a tunable that the "
+            "user should review per use case — see also ``extended_hours_policy``."
+        ),
+    )
+    extended_hours_policy: Literal["weight", "flag", "reject"] = Field(
+        default="flag",
+        description=(
+            "How Module 39 handles a print whose timestamp falls outside every "
+            "configured window. 'weight' applies outside_session_weight silently "
+            "(Phase 1 behavior). 'flag' applies outside_session_weight AND sets "
+            "event.flags['extended_hours']=True for downstream filtering. "
+            "'reject' drops the print entirely — no scoring, no labeling, no "
+            "sizing — and records the rejection on event.rejection. Default "
+            "'flag' preserves the numerical behavior while making the gap "
+            "visible in every record."
+        ),
+    )
 
     @field_validator("timezone")
     @classmethod

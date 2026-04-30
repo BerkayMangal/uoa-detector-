@@ -19,6 +19,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from uoa_detector.domain.agreement import ScoreAdjustment, SourceAgreement
+from uoa_detector.domain.rejection import RejectedEvent
 
 FillSide = Literal["above_ask", "at_ask", "midpoint", "at_bid", "below_bid", "unknown"]
 OptionType = Literal["call", "put"]
@@ -154,6 +155,17 @@ class EnrichedEvent(BaseModel):
     # synthetic decay event so the labeler can downgrade CONVEXITY_CLUSTER
     # back to CONVEXITY_WATCH after the configured timeout.
     cluster_decayed: bool = False
+
+    # Phase 2.3.1: structured rejection marker. When set, the pipeline
+    # orchestrator skips all remaining enrichment, scoring, penalties,
+    # labeling, and sizing — the event is dropped from the labeled signal
+    # stream but persists in the decision record for audit.
+    rejection: RejectedEvent | None = None
+
+    # Phase 2.3.1: free-form boolean flags, populated by stages and surfaced
+    # in the decision record (e.g., ``{"extended_hours": True}``). Kept narrow
+    # — for typed sub-scores use the named fields above.
+    flags: dict[str, bool] = Field(default_factory=dict)
 
     @property
     def print(self) -> OptionsPrint:

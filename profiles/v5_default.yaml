@@ -62,11 +62,14 @@ dte:
 
 # --- Module 39 time-of-day weights ---
 # Windows are half-open [start, end) on the wall clock of the configured timezone.
-# `outside_session_weight` applies to any timestamp not covered by any window.
-# Phase 1 used 0.30 for outside-RTH (its lowest in-session weight) — preserved
-# here to maintain bit-for-bit Phase 1 reproduction. The v5 spec is silent on
-# this value; override per-ticker (e.g., to 0.0) if a more conservative outside-
-# session policy is desired.
+# `outside_session_weight` and `extended_hours_policy` are SPEC-SILENT values:
+# the v5 spec defines five windows covering 09:30–16:00 NY equity hours and
+# says nothing about pre-market / after-hours. Phase 1 used 0.30; we preserve
+# that here for bit-for-bit reproduction but make the gap visible via
+# extended_hours_policy="flag" (default) so every extended-hours signal is
+# tagged in the decision record. Override per-ticker / per-regime if your use
+# case wants different behavior (e.g., "reject" for futures-options strategies
+# that should not trade outside RTH).
 time_of_day:
   timezone: "America/New_York"
   windows:
@@ -75,7 +78,8 @@ time_of_day:
     - { start: "11:00", end: "14:00", weight: 1.00, label: "prime_session" }
     - { start: "14:00", end: "15:30", weight: 0.70, label: "afternoon" }
     - { start: "15:30", end: "16:00", weight: 0.30, label: "moc_loc" }
-  outside_session_weight: 0.30
+  outside_session_weight: 0.30   # Phase 1 default — spec is silent on extended hours; review per use case.
+  extended_hours_policy: "flag"  # weight | flag | reject — see profile.py field docs
 
 # --- Module 38 temporal clustering ---
 cluster:
