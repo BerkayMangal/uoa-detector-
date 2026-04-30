@@ -6,7 +6,7 @@ import math
 
 import pytest
 
-from uoa_detector.config import default_config
+from uoa_detector.calibration import load_default_profile
 from uoa_detector.domain.labels import SignalLabel
 from uoa_detector.domain.risk import RiskBucket
 from uoa_detector.risk.sizer import RiskSizer
@@ -35,13 +35,13 @@ _EXPECTED_R: dict[SignalLabel, float] = {
 
 @pytest.mark.parametrize(("label", "expected_r"), list(_EXPECTED_R.items()))
 def test_each_label_maps_to_correct_r(label: SignalLabel, expected_r: float) -> None:
-    sizer = RiskSizer(default_config())
+    sizer = RiskSizer(load_default_profile())
     size = sizer.size_for(label)
     assert math.isclose(size.max_r, expected_r, abs_tol=1e-9)
 
 
 def test_high_conviction_sequence_uses_scale_in_with_initial_50pct() -> None:
-    size = RiskSizer(default_config()).size_for(SignalLabel.HIGH_CONVICTION_SEQUENCE)
+    size = RiskSizer(load_default_profile()).size_for(SignalLabel.HIGH_CONVICTION_SEQUENCE)
     assert size.scale_in is True
     assert size.initial_r is not None
     assert math.isclose(size.initial_r, 0.50, abs_tol=1e-9)
@@ -49,7 +49,7 @@ def test_high_conviction_sequence_uses_scale_in_with_initial_50pct() -> None:
 
 
 def test_other_labels_do_not_scale_in() -> None:
-    sizer = RiskSizer(default_config())
+    sizer = RiskSizer(load_default_profile())
     for label in SignalLabel:
         if label == SignalLabel.HIGH_CONVICTION_SEQUENCE:
             continue
@@ -59,7 +59,7 @@ def test_other_labels_do_not_scale_in() -> None:
 
 
 def test_buckets_for_tradeable_labels() -> None:
-    sizer = RiskSizer(default_config())
+    sizer = RiskSizer(load_default_profile())
     pairs: list[tuple[SignalLabel, RiskBucket]] = [
         (SignalLabel.CONVEXITY_WATCH, RiskBucket.CONVEXITY_WATCH),
         (SignalLabel.CONVEXITY_CLUSTER, RiskBucket.CONVEXITY_CLUSTER),

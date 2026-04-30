@@ -1,91 +1,73 @@
-"""Full v5 labeler — 17 labels, decision-tree style.
+"""Full v5 labeler — Phase 2 calibrated.
 
-Precedence (top wins; precedence below the first four discard/short-circuit
-gates is derived from the spec's risk-bucket hierarchy and the Detection
-Sequence in Part 7, since the spec does not enumerate it explicitly).
-This precedence is flagged in the Phase 1 summary as a documented
-interpretation.
+Every numeric comparison reads from ``profile.label_thresholds.*`` or
+``profile.dte.leap_threshold``. Zero numerical literals in this file.
 
-1.  ``LEAP_POSITIONING``                 — DTE > 90 (separate scoring track)
+Precedence (top wins):
+1.  ``LEAP_POSITIONING``                 — DTE > profile.dte.leap_threshold
 2.  ``POST_EVENT_NOISE``                 — within 2 sessions of catalyst
-3.  ``PENALIZED_BELOW_THRESHOLD``        — combined_score_post_penalty < 0.30
+3.  ``PENALIZED_BELOW_THRESHOLD``        — combined < profile.label_thresholds.penalized_below
 4.  ``LIKELY_CLOSING_OR_NOISE``          — next_day_oi_confirmed is False
 5.  ``HIGH_CONVICTION_SEQUENCE``         — cluster + sweep/large-UOA + price confirm
 6.  ``CONFIRMED_OPENING_FLOW``           — next_day_oi_confirmed is True (upgrade)
-7.  ``PRE_CATALYST_FLOW``                — cluster + event ≤ 7d + IV rising mod + spot not moved
-8.  ``SWEEP_UOA``                        — sweep_classification in {sweep, iso} + UOA threshold
-9.  ``STANDARD_UOA``                     — above-ask + relative_premium ≥ 0.5
+7.  ``PRE_CATALYST_FLOW``                — cluster + event + spot not moved
+8.  ``SWEEP_UOA``                        — sweep_classification in {sweep, iso}
+9.  ``STANDARD_UOA``                     — above-ask + relative_premium ≥ threshold
 10. ``OPTIONS_EQUITY_TAPE_CONFIRMATION`` — has_dark_pool_confirmation
 11. ``SECTOR_FLOW_CLUSTER``              — has_sector_confirmation
 12. ``GAMMA_ACCELERATION_RISK``          — is_gamma_acceleration flag
-13. ``CONVEXITY_BURST``                  — cluster_density_score ≥ 0.8
-14. ``CONVEXITY_CLUSTER``                — cluster_density_score ≥ 0.4
-15. ``OPENING_UNCONFIRMED``              — opening/closing ambiguous, next_day_oi_confirmed is None
-16. ``CONVEXITY_WATCH``                  — convexity_score ≥ 0.6, no cluster yet
+13. ``CONVEXITY_BURST``                  — cluster_density_score ≥ cluster_burst
+14. ``CONVEXITY_CLUSTER``                — cluster_density_score ≥ cluster_min
+                                           (downgraded to CONVEXITY_WATCH if cluster_decayed)
+15. ``OPENING_UNCONFIRMED``              — opening/closing pending T+1
+16. ``CONVEXITY_WATCH``                  — convexity_score ≥ convexity_watch_floor
 17. ``IGNORE_NOISE``                     — fallback
 """
 
 from __future__ import annotations
 
-from uoa_detector.config import AppConfig, default_config
+from uoa_detector.calibration import CalibrationProfile, load_default_profile
 from uoa_detector.domain.events import EnrichedEvent
 from uoa_detector.domain.labels import LabelDecision, SignalLabel
 from uoa_detector.errors import LabelDecisionError
 
-# Sub-thresholds used inside the label tree. Numeric values for label triggers
-# come straight from the v5 spec where the spec enumerates them; the few that
-# the spec does not enumerate (e.g., the convexity_score floor for
-# CONVEXITY_WATCH) are kept here as named constants so they're easy to find.
-_CLUSTER_BURST = 0.8  # spec Module 38: 3+ prints same strike → 0.8; escalating → 1.0
-_CLUSTER_MIN = 0.4  # spec Module 38: 2 prints same strike/expiry → 0.4
-_RELATIVE_PREMIUM_UOA = 0.5  # spec Part 4 STANDARD_UOA trigger
-_CONVEXITY_WATCH_FLOOR = 0.6  # not enumerated; sensible "convexity present" floor
-_PRE_CATALYST_EVENT_MIN = 0.75  # spec: event within 7 days → event_score 0.75
-
 
 class Labeler:
-    """Turn an enriched, fully-scored event into a ``LabelDecision``.
+    """Profile-driven labeler. All thresholds come from ``profile.label_thresholds``."""
 
-    Call ``decide(event)`` AFTER the scoring engine has populated
-    ``combined_score_post_penalty`` and the penalty engine has run.
-    """
-
-    def __init__(self, config: AppConfig | None = None) -> None:
-        self._config = config or default_config()
+    def __init__(self, profile: CalibrationProfile | None = None) -> None:
+        self._profile = profile or load_default_profile()
 
     def decide(self, event: EnrichedEvent) -> LabelDecision:
-        """Return the label and a one-line human-readable reason.
-
-        Decision gates run in the precedence order documented in the module
-        docstring. The first match wins.
-        """
-        cfg = self._config
+        """Return the label and a one-line human-readable reason."""
+        cfg = self._profile
+        t = cfg.label_thresholds
         pr = event.print_
         post_score = event.combined_score_post_penalty
 
         # 1) LEAP short-circuit — separate book.
-        if pr.dte > cfg.dte.leap_dte_threshold:
+        if pr.dte > cfg.dte.leap_threshold:
             return LabelDecision(
                 label=SignalLabel.LEAP_POSITIONING,
-                reason=f"DTE {pr.dte} > {cfg.dte.leap_dte_threshold} (LEAP track, 0.25R max)",
+                reason=f"DTE {pr.dte} > {cfg.dte.leap_threshold} (LEAP track)",
             )
 
         # 2) POST_EVENT_NOISE — heavy IV crush risk.
         if event.is_post_event:
             return LabelDecision(
                 label=SignalLabel.POST_EVENT_NOISE,
-                reason="Within 2 sessions of catalyst — IV crush likely",
+                reason="Within configured sessions of catalyst — IV crush likely",
             )
 
         # 3) PENALIZED_BELOW_THRESHOLD — log-only.
         if post_score is None:
             msg = "Labeler called before scoring engine populated combined_score_post_penalty"
             raise LabelDecisionError(msg)
-        if post_score < cfg.thresholds.penalized_below:
+        if post_score < t.penalized_below:
             return LabelDecision(
                 label=SignalLabel.PENALIZED_BELOW_THRESHOLD,
                 reason=(
-                    f"combined_score {post_score:.3f} < {cfg.thresholds.penalized_below}"
+                    f"combined_score {post_score:.3f} < {t.penalized_below}"
                     f" (penalties={len(event.applied_penalties)})"
                 ),
             )
@@ -98,7 +80,7 @@ class Labeler:
             )
 
         # 5) HIGH_CONVICTION_SEQUENCE: cluster + sweep/large-UOA + price confirmation.
-        cluster_present = (event.cluster_density_score or 0.0) >= _CLUSTER_MIN
+        cluster_present = (event.cluster_density_score or 0.0) >= t.cluster_min
         sweep_or_large_uoa = self._is_sweep_or_large_uoa(event)
         if cluster_present and sweep_or_large_uoa and event.has_price_confirmation:
             return LabelDecision(
@@ -113,17 +95,15 @@ class Labeler:
                 reason="Next-day OI confirmed opening interest near trade size",
             )
 
-        # 7) PRE_CATALYST_FLOW — cluster + event ≤ 7d + spot has not yet moved.
-        # The "spot has not moved" condition is approximated in Phase 1 by the
-        # ABSENCE of post-gap and price_direction not strongly aligned.
+        # 7) PRE_CATALYST_FLOW — cluster + imminent event + spot not yet moved.
         if (
             cluster_present
-            and (event.event_score or 0.0) >= _PRE_CATALYST_EVENT_MIN
+            and (event.event_score or 0.0) >= t.pre_catalyst_event_min
             and not event.is_post_gap
         ):
             return LabelDecision(
                 label=SignalLabel.PRE_CATALYST_FLOW,
-                reason="Cluster + catalyst within 7 days + spot not yet moved",
+                reason="Cluster + catalyst within configured window + spot not yet moved",
             )
 
         # 8) SWEEP_UOA — sweep or ISO classified.
@@ -133,10 +113,10 @@ class Labeler:
                 reason=f"{event.sweep_classification.upper()} classified — high urgency",
             )
 
-        # 9) STANDARD_UOA — above-ask + relative_premium ≥ 0.5.
+        # 9) STANDARD_UOA — above-ask + relative_premium ≥ threshold.
         if (
             pr.fill_side in {"above_ask", "at_ask"}
-            and (event.relative_premium_score or 0.0) >= _RELATIVE_PREMIUM_UOA
+            and (event.relative_premium_score or 0.0) >= t.relative_premium_uoa
         ):
             return LabelDecision(
                 label=SignalLabel.STANDARD_UOA,
@@ -150,7 +130,7 @@ class Labeler:
                 reason="Dark-pool tape confirms options-flow direction",
             )
 
-        # 11) SECTOR_FLOW_CLUSTER — peer flow within 30–90 min.
+        # 11) SECTOR_FLOW_CLUSTER — peer flow within configured window.
         if event.has_sector_confirmation:
             return LabelDecision(
                 label=SignalLabel.SECTOR_FLOW_CLUSTER,
@@ -164,32 +144,48 @@ class Labeler:
                 reason="Dealer gamma acceleration risk near strike",
             )
 
-        # 13) CONVEXITY_BURST — 3+ escalating prints / cluster_density ≥ 0.8.
-        if (event.cluster_density_score or 0.0) >= _CLUSTER_BURST:
+        # 13) CONVEXITY_BURST — escalating cluster.
+        if (event.cluster_density_score or 0.0) >= t.cluster_burst:
             return LabelDecision(
                 label=SignalLabel.CONVEXITY_BURST,
-                reason=f"cluster_density_score {event.cluster_density_score:.2f} ≥ {_CLUSTER_BURST}",
+                reason=(
+                    f"cluster_density_score {event.cluster_density_score:.2f} "
+                    f"≥ {t.cluster_burst}"
+                ),
             )
 
-        # 14) CONVEXITY_CLUSTER — 2+ same-direction prints same strike/expiry.
+        # 14) CONVEXITY_CLUSTER (or CONVEXITY_WATCH if decayed)
         if cluster_present:
+            if event.cluster_decayed:
+                return LabelDecision(
+                    label=SignalLabel.CONVEXITY_WATCH,
+                    reason=(
+                        "Cluster decayed (no qualifying prints within configured timeout) "
+                        "— downgraded to CONVEXITY_WATCH"
+                    ),
+                )
             return LabelDecision(
                 label=SignalLabel.CONVEXITY_CLUSTER,
-                reason=f"cluster_density_score {event.cluster_density_score:.2f} ≥ {_CLUSTER_MIN}",
+                reason=(
+                    f"cluster_density_score {event.cluster_density_score:.2f} "
+                    f"≥ {t.cluster_min}"
+                ),
             )
 
-        # 15) OPENING_UNCONFIRMED — flow flagged opening but T+1 OI not yet checked.
+        # 15) OPENING_UNCONFIRMED
         if event.next_day_oi_confirmed is None and self._is_opening_pending(event):
             return LabelDecision(
                 label=SignalLabel.OPENING_UNCONFIRMED,
                 reason="Opening vs. closing pending next-day OI verification",
             )
 
-        # 16) CONVEXITY_WATCH — convexity present but not yet clustered.
-        if (event.convexity_score or 0.0) >= _CONVEXITY_WATCH_FLOOR:
+        # 16) CONVEXITY_WATCH
+        if (event.convexity_score or 0.0) >= t.convexity_watch_floor:
             return LabelDecision(
                 label=SignalLabel.CONVEXITY_WATCH,
-                reason=f"convexity_score {event.convexity_score:.2f} present, no cluster yet",
+                reason=(
+                    f"convexity_score {event.convexity_score:.2f} present, no cluster yet"
+                ),
             )
 
         # 17) Default
@@ -198,23 +194,17 @@ class Labeler:
             reason="No qualifying conditions matched",
         )
 
-    @staticmethod
-    def _is_sweep_or_large_uoa(event: EnrichedEvent) -> bool:
-        """True if Module 34/STANDARD_UOA criteria for the HCS gate are met."""
+    def _is_sweep_or_large_uoa(self, event: EnrichedEvent) -> bool:
+        """True if Module 34 / STANDARD_UOA criteria for the HCS gate are met."""
         if event.sweep_classification in {"sweep", "iso"}:
             return True
         pr = event.print_
         return (
             pr.fill_side in {"above_ask", "at_ask"}
-            and (event.relative_premium_score or 0.0) >= _RELATIVE_PREMIUM_UOA
+            and (event.relative_premium_score or 0.0) >= self._profile.label_thresholds.relative_premium_uoa
         )
 
     @staticmethod
     def _is_opening_pending(event: EnrichedEvent) -> bool:
-        """Heuristic for OPENING_UNCONFIRMED in Phase 1.
-
-        Phase 2 will replace this with the Module 27 stage's explicit output.
-        For now we treat any aggressive fill that hasn't triggered another
-        label as a pending-opening candidate.
-        """
+        """Heuristic for OPENING_UNCONFIRMED until Module 27 lands in Phase 3."""
         return event.print_.fill_side in {"above_ask", "at_ask"}

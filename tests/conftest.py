@@ -8,14 +8,15 @@ from typing import Literal
 
 import pytest
 
-from uoa_detector.config import AppConfig, default_config
+from uoa_detector.calibration import CalibrationProfile, load_default_profile
+from uoa_detector.domain.agreement import single_source_agreement
 from uoa_detector.domain.events import EnrichedEvent, OptionsPrint
 
 
 @pytest.fixture
-def cfg() -> AppConfig:
-    """Default v5 config."""
-    return default_config()
+def profile() -> CalibrationProfile:
+    """Default v5 calibration profile (loaded from profiles/v5_default.yaml)."""
+    return load_default_profile()
 
 
 @pytest.fixture
@@ -44,8 +45,13 @@ def build_print(
     is_iso: bool = False,
     open_interest: int = 1500,
     exchange: str = "CBOE",
+    source_id: str = "synthetic",
 ) -> OptionsPrint:
-    """Build a default options print for tests; override fields as needed."""
+    """Build a default options print for tests; override fields as needed.
+
+    Defaults to a single-source agreement so existing Phase 1 tests keep working
+    without per-call boilerplate.
+    """
     if ts is None:
         ts = datetime(2025, 6, 11, 15, 30, tzinfo=UTC)
     return OptionsPrint(
@@ -66,6 +72,7 @@ def build_print(
         exchange=exchange,
         is_iso=is_iso,
         open_interest=open_interest,
+        source_agreement=single_source_agreement(source_id, exchange),
     )
 
 

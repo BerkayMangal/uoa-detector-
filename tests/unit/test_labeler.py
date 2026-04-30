@@ -7,7 +7,7 @@ short-circuit gates (LEAP > POST_EVENT > PENALIZED > others).
 from __future__ import annotations
 
 from tests.conftest import build_enriched, build_print
-from uoa_detector.config import default_config
+from uoa_detector.calibration import load_default_profile
 from uoa_detector.domain.events import AppliedPenalty
 from uoa_detector.domain.labels import SignalLabel
 from uoa_detector.labeling.labeler import Labeler
@@ -15,7 +15,7 @@ from uoa_detector.labeling.labeler import Labeler
 
 def _label(event) -> SignalLabel:  # type: ignore[no-untyped-def]
     """Run the labeler with default config and return the chosen label."""
-    return Labeler(default_config()).decide(event).label
+    return Labeler(load_default_profile()).decide(event).label
 
 
 def _score(event, pre: float, post: float) -> None:  # type: ignore[no-untyped-def]

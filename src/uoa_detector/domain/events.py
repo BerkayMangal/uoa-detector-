@@ -1,4 +1,14 @@
-"""Core event models: ``OptionsPrint`` (raw) and ``EnrichedEvent`` (pipeline state)."""
+"""Core event models: ``OptionsPrint`` (canonical) and ``EnrichedEvent`` (pipeline state).
+
+Phase 2 changes:
+  - ``OptionsPrint.source_agreement`` is now a required field (single-source
+    paths use ``single_source_agreement(source_id)``).
+  - ``EnrichedEvent.is_escalating_cluster`` → ``escalating_cluster`` (renamed
+    per Phase 2 naming standard — no ``is_`` prefix).
+  - ``EnrichedEvent.score_adjustments: list[ScoreAdjustment]`` — additive
+    sub-score adjustments produced by stages like Module 34, applied inside
+    the scoring engine rather than mutating sub-scores directly.
+"""
 
 from __future__ import annotations
 
@@ -8,15 +18,19 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from uoa_detector.domain.agreement import ScoreAdjustment, SourceAgreement
+
 FillSide = Literal["above_ask", "at_ask", "midpoint", "at_bid", "below_bid", "unknown"]
 OptionType = Literal["call", "put"]
 SweepClassification = Literal["block", "sweep", "iso"]
 
 
 class OptionsPrint(BaseModel):
-    """A single normalized options print as emitted by a ``FlowDataSource``.
+    """The canonical, fusion-reconciled options print fed into the pipeline.
 
-    Sources may carry richer fields, but every adapter MUST populate at least these.
+    Constructed by ``SourceFusion`` from one or more ``RawPrint`` observations.
+    Every print carries a ``SourceAgreement`` describing how feeds agreed —
+    single-source mode produces ``confidence_tier="single"`` with zero skew.
     Decimal is used for prices/premiums; floats are reserved for scores and IV.
     """
 
@@ -39,6 +53,9 @@ class OptionsPrint(BaseModel):
     exchange: str
     is_iso: bool = False
     open_interest: int = Field(ge=0)
+
+    # Phase 2: required first-class metadata
+    source_agreement: SourceAgreement
 
     @field_validator("timestamp")
     @classmethod
@@ -70,9 +87,10 @@ class AppliedPenalty(BaseModel):
 class EnrichedEvent(BaseModel):
     """Mutable pipeline state. Stages populate sub-score fields in-place.
 
-    Each sub-score is ``None`` until the responsible stage has run. The scoring
-    engine raises ``MissingSubScoreError`` rather than silently treating a missing
-    score as zero.
+    Each sub-score is ``None`` until the responsible stage has run. Phase 2's
+    scoring engine consults ``profile.sub_score_missing_behavior`` to decide
+    whether ``None`` raises (bug indicator) or substitutes a configured
+    default (data-gap policy). See ``scoring/combined.py``.
     """
 
     model_config = ConfigDict(extra="forbid", arbitrary_types_allowed=False)
@@ -89,6 +107,10 @@ class EnrichedEvent(BaseModel):
     time_of_day_weight: float | None = None
     cluster_density_score: float | None = None
     relative_premium_score: float | None = None
+
+    # Phase 2: additive adjustments produced by stages (e.g., Module 34 sweep bonus).
+    # Applied inside the scoring engine; the original sub-score is preserved.
+    score_adjustments: list[ScoreAdjustment] = Field(default_factory=list)
 
     # Multiplier (Module 35) — applied inside the scoring engine to convexity & gamma
     dte_multiplier_applied: float | None = None
@@ -112,13 +134,21 @@ class EnrichedEvent(BaseModel):
     combined_score_pre_penalty: float | None = None
     combined_score_post_penalty: float | None = None
 
-    # Convenience: stages may stash auxiliary signals here for later stages.
-    # Kept narrow and typed; do NOT use as a generic dump bucket.
+    # Phase 2 missing-data tracking — populated by the scoring engine when
+    # a sub-score was None and policy was on_missing="default".
+    missing_sub_scores: list[str] = Field(default_factory=list)
+
+    # Auxiliary signals used by stages and labeler. Kept narrow and typed.
     has_price_confirmation: bool = False  # Module 23 → labeler / HCS test
-    has_sector_confirmation: bool = False  # Module 25 → label SECTOR_FLOW_CLUSTER
+    has_sector_confirmation: bool = False  # Module 25 → SECTOR_FLOW_CLUSTER
     has_dark_pool_confirmation: bool = False  # Module 26 → OPTIONS_EQUITY_TAPE_CONFIRMATION
     is_gamma_acceleration: bool = False  # Module 21 GAMMA_ACCELERATION_RISK flag
-    is_escalating_cluster: bool = False  # Module 38 escalating-size flag
+    escalating_cluster: bool = False  # Module 38 escalating-size flag (Phase 2 rename)
+
+    # Phase 2 cluster decay — set by ClusterDecayWatcher when it emits a
+    # synthetic decay event so the labeler can downgrade CONVEXITY_CLUSTER
+    # back to CONVEXITY_WATCH after the configured timeout.
+    cluster_decayed: bool = False
 
     @property
     def print(self) -> OptionsPrint:

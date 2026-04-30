@@ -15,6 +15,7 @@ from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Literal
 
+from uoa_detector.domain.agreement import single_source_agreement
 from uoa_detector.domain.events import EnrichedEvent, OptionsPrint
 from uoa_detector.pipeline.stage import PipelineContext
 
@@ -24,8 +25,8 @@ class ScenarioStep:
     """One scenario step: a print plus expected outcomes for assertions.
 
     Sub-score overrides are applied by the scenario harness in tests/CLI to
-    pre-populate fields the Phase 1 stub stages can't yet compute. They mimic
-    what the Phase 2 stages will eventually produce.
+    pre-populate fields the stub stages can't yet compute. They mimic what
+    the fully-implemented stages eventually produce.
     """
 
     print_: OptionsPrint
@@ -58,6 +59,7 @@ def _make_print(
     is_iso: bool = False,
     open_interest: int = 1500,
     exchange: str = "CBOE",
+    source_id: str = "synthetic",
 ) -> OptionsPrint:
     expiry = ts.date() + timedelta(days=dte)
     return OptionsPrint(
@@ -78,6 +80,7 @@ def _make_print(
         exchange=exchange,
         is_iso=is_iso,
         open_interest=open_interest,
+        source_agreement=single_source_agreement(source_id, exchange),
     )
 
 

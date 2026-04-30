@@ -9,7 +9,7 @@ from typing import Protocol, runtime_checkable
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from uoa_detector.config import AppConfig, default_config
+from uoa_detector.calibration import CalibrationProfile, load_default_profile
 from uoa_detector.domain.events import EnrichedEvent
 
 
@@ -20,13 +20,14 @@ def _utc_now() -> datetime:
 class PipelineContext(BaseModel):
     """Shared mutable state across stages within a single pipeline run.
 
-    Kept deliberately small in Phase 1. Stages that need richer context (e.g.,
-    Module 25 sector mappings, Module 38 cluster history) should pull from here.
+    The active ``CalibrationProfile`` lives here so every stage reads the
+    same numbers; profile hot-swap is handled by the orchestrator at the
+    boundary between events, not mid-event.
     """
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    config: AppConfig = Field(default_factory=default_config)
+    profile: CalibrationProfile = Field(default_factory=load_default_profile)
 
     # Injected clock — frozen in tests via ``freezegun`` or a callable override.
     clock: Callable[[], datetime] = Field(default=_utc_now)

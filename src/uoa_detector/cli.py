@@ -13,7 +13,7 @@ import sys
 import structlog
 import typer
 
-from uoa_detector.config import default_config
+from uoa_detector.calibration import load_default_profile
 from uoa_detector.pipeline.orchestrator import Pipeline
 from uoa_detector.pipeline.stages import default_stage_pipeline
 from uoa_detector.sources.scenarios import (
@@ -60,19 +60,19 @@ def run(
     _configure_logging()
 
     if source != "synthetic":
-        # Phase 2 will register polygon / unusual_whales / csv_replay here.
-        msg = f"Phase 1 supports only --source synthetic; got {source!r}"
+        # Later phases will register polygon / unusual_whales / csv_replay here.
+        msg = f"Only --source synthetic is supported in this build; got {source!r}"
         raise typer.BadParameter(msg, param_hint="--source")
     if scenario != "default":
-        msg = f"Phase 1 ships only the 'default' scenario; got {scenario!r}"
+        msg = f"Only the 'default' scenario is supported in this build; got {scenario!r}"
         raise typer.BadParameter(msg, param_hint="--scenario")
 
     asyncio.run(_run_default_synthetic())
 
 
 async def _run_default_synthetic() -> None:
-    """Drive the default scenario through the Phase 1 pipeline."""
-    cfg = default_config()
+    """Drive the default scenario through the pipeline using v5_default profile."""
+    profile = load_default_profile()
     steps = default_scenario()
     prints = [s.print_ for s in steps]
     src = SyntheticFlowSource(prints)
@@ -80,7 +80,7 @@ async def _run_default_synthetic() -> None:
     # Override stage runs FIRST; then the stub stages fill missing fields.
     stages = [ScenarioOverrideStage(overrides_lookup(iter(steps))), *default_stage_pipeline()]
 
-    pipeline = Pipeline(src, stages, config=cfg)
+    pipeline = Pipeline(src, stages, profile=profile)
     await pipeline.run()
 
 

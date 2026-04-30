@@ -10,7 +10,7 @@ import structlog
 from pydantic import BaseModel, ConfigDict
 
 from uoa_detector.backtest.store import BacktestStore
-from uoa_detector.config import AppConfig, default_config
+from uoa_detector.calibration import CalibrationProfile, load_default_profile
 from uoa_detector.domain.events import EnrichedEvent, OptionsPrint
 from uoa_detector.domain.labels import LabelDecision
 from uoa_detector.domain.risk import PositionSize
@@ -46,18 +46,18 @@ class Pipeline:
         source: FlowDataSource,
         stages: Sequence[EnrichmentStage],
         *,
-        config: AppConfig | None = None,
+        profile: CalibrationProfile | None = None,
         store: BacktestStore | None = None,
         context: PipelineContext | None = None,
     ) -> None:
         self._source = source
         self._stages = list(stages)
-        self._config = config or default_config()
+        self._profile = profile or load_default_profile()
         self._store = store or BacktestStore()
-        self._ctx = context or PipelineContext(config=self._config)
-        self._penalty_engine = PenaltyEngine(self._config)
-        self._labeler = Labeler(self._config)
-        self._sizer = RiskSizer(self._config)
+        self._ctx = context or PipelineContext(profile=self._profile)
+        self._penalty_engine = PenaltyEngine(self._profile)
+        self._labeler = Labeler(self._profile)
+        self._sizer = RiskSizer(self._profile)
 
     @property
     def store(self) -> BacktestStore:
@@ -70,11 +70,7 @@ class Pipeline:
         return self._ctx
 
     async def run(self) -> list[PipelineResult]:
-        """Drain the source, process each event, return all results.
-
-        Suitable for batch / synthetic runs. Live use will wrap each event
-        in a try/except and a metric instead of materializing a list.
-        """
+        """Drain the source, process each event, return all results."""
         results: list[PipelineResult] = []
         try:
             async for raw in self._source.stream():
@@ -95,7 +91,7 @@ class Pipeline:
         self._penalty_engine.apply(event)
 
         # 3) Scoring engine
-        compute_combined_score(event, self._config)
+        compute_combined_score(event, self._profile)
 
         # 4) Labeler
         decision = self._labeler.decide(event)

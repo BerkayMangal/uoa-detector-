@@ -1,62 +1,44 @@
-"""Module 36 — Explicit Score Penalties (FULL implementation).
+"""Module 36 — Explicit Score Penalties (Phase 2 calibrated).
 
-Eight penalty conditions, exact values from the v5 spec:
-
-============================================================  ========
-Condition                                                     Penalty
-============================================================  ========
-Flow appears after large gap move (>3% open)                   −0.20
-IV_rank already >80 at signal time                             −0.15
-Bid/ask spread >15% of mid                                     −0.15
-Open interest <100 at strike (thin chain)                      −0.20
-Flow direction contradicts price action                        −0.15
-Post-earnings flow (within 2 sessions of print)                −0.25
-Single isolated print — no repeat within 30 min                −0.10
-Next-day OI does not confirm (OI drops >30% of trade size)     −0.20
-============================================================  ========
-
-The engine populates ``event.applied_penalties`` and sets
-``event.contradiction_penalty_applied = True`` when the contradiction
-condition fires. Each penalty is recorded as exactly one
-``AppliedPenalty`` entry — no double-counting.
+All eight v5 conditions, with thresholds and deduction values read from the
+active ``CalibrationProfile``. No hardcoded numbers.
 """
 
 from __future__ import annotations
 
 from decimal import Decimal
 
-from uoa_detector.config import AppConfig, default_config
+from uoa_detector.calibration import CalibrationProfile, load_default_profile
 from uoa_detector.domain.events import AppliedPenalty, EnrichedEvent
 
 _HUNDRED = Decimal("100")
+_TWO = Decimal("2")
 
 
 class PenaltyEngine:
     """Applies all eight Module 36 penalty conditions to an enriched event.
 
-    Inputs come from the event itself (booleans set by upstream stages plus
-    the underlying print's static fields). External signals like IV rank, gap
-    presence, post-event-ness, and next-day OI confirmation are surfaced via
-    the boolean flags on ``EnrichedEvent``.
+    The profile drives both the trigger thresholds (``profile.penalty_triggers``)
+    and the deduction values (``profile.penalties``).
     """
 
-    def __init__(self, config: AppConfig | None = None) -> None:
-        self._config = config or default_config()
+    def __init__(self, profile: CalibrationProfile | None = None) -> None:
+        self._profile = profile or load_default_profile()
 
     def apply(self, event: EnrichedEvent, *, iv_rank: float | None = None) -> EnrichedEvent:
         """Evaluate each penalty condition and append matches to ``event``.
 
-        :param iv_rank: Optional 0–100 IV rank scalar from the IV exhaustion
+        :param iv_rank: Optional 0–100 IV rank scalar from the IV-exhaustion
             module. ``None`` means "not measured" — the penalty is skipped.
         """
-        cfg = self._config
+        cfg = self._profile
         p = cfg.penalties
-        t = cfg.thresholds
+        t = cfg.penalty_triggers
         pr = event.print_
 
         penalties: list[AppliedPenalty] = []
 
-        # 1) Post-gap move (>3% open). Driven by the M23 stage flagging is_post_gap.
+        # 1) Post-gap move (>X% open). Driven by upstream stage's is_post_gap.
         if event.is_post_gap:
             penalties.append(
                 AppliedPenalty(
@@ -66,7 +48,7 @@ class PenaltyEngine:
                 )
             )
 
-        # 2) IV rank > 80
+        # 2) IV rank above threshold
         if iv_rank is not None and iv_rank > t.iv_rank_threshold:
             penalties.append(
                 AppliedPenalty(
@@ -76,8 +58,8 @@ class PenaltyEngine:
                 )
             )
 
-        # 3) Wide bid/ask spread (> 15% of mid). Decimal math; guard zero mid.
-        mid = (pr.bid + pr.ask) / Decimal(2)
+        # 3) Wide bid/ask spread (> X% of mid). Decimal math; guard zero mid.
+        mid = (pr.bid + pr.ask) / _TWO
         if mid > 0:
             spread_pct = ((pr.ask - pr.bid) / mid) * _HUNDRED
             if spread_pct > Decimal(str(t.spread_pct_threshold)):
@@ -89,7 +71,7 @@ class PenaltyEngine:
                     )
                 )
 
-        # 4) Thin OI (<100 at strike)
+        # 4) Thin OI
         if pr.open_interest < t.thin_oi_threshold:
             penalties.append(
                 AppliedPenalty(
@@ -99,8 +81,7 @@ class PenaltyEngine:
                 )
             )
 
-        # 5) Flow direction contradicts price action.
-        # Calls with downtrend, or puts with uptrend.
+        # 5) Flow direction contradicts price action
         contradicts = False
         if (pr.option_type == "call" and event.price_direction == "down") or (pr.option_type == "put" and event.price_direction == "up"):
             contradicts = True
@@ -116,7 +97,7 @@ class PenaltyEngine:
                 )
             )
 
-        # 6) Post-event flow (within 2 sessions)
+        # 6) Post-event flow
         if event.is_post_event:
             penalties.append(
                 AppliedPenalty(
@@ -126,7 +107,7 @@ class PenaltyEngine:
                 )
             )
 
-        # 7) Isolated print (no repeat within 30 min)
+        # 7) Isolated print (no repeat within isolated_window_min)
         if event.is_isolated_print:
             penalties.append(
                 AppliedPenalty(
@@ -136,8 +117,7 @@ class PenaltyEngine:
                 )
             )
 
-        # 8) Next-day OI does not confirm (drops >30% of trade size).
-        # Only fires on explicit failure; None means "not yet evaluated".
+        # 8) Next-day OI failed
         if event.next_day_oi_confirmed is False:
             penalties.append(
                 AppliedPenalty(

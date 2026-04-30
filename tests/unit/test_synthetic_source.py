@@ -7,6 +7,7 @@ from decimal import Decimal
 
 import pytest
 
+from uoa_detector.domain.agreement import single_source_agreement
 from uoa_detector.domain.events import OptionsPrint
 from uoa_detector.sources.base import FlowDataSource
 from uoa_detector.sources.synthetic import SyntheticFlowSource
@@ -32,6 +33,7 @@ def _make_print(idx: int) -> OptionsPrint:
         exchange="CBOE",
         is_iso=False,
         open_interest=1500,
+        source_agreement=single_source_agreement("synthetic", "CBOE"),
     )
 
 

@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import pytest
 
-from uoa_detector.config import default_config
+from uoa_detector.calibration import load_default_profile
 from uoa_detector.domain.labels import SignalLabel
 from uoa_detector.pipeline.orchestrator import Pipeline
 from uoa_detector.pipeline.stages import default_stage_pipeline
@@ -23,12 +23,12 @@ from uoa_detector.sources.synthetic import SyntheticFlowSource
 
 @pytest.mark.asyncio
 async def test_default_scenario_produces_all_expected_labels() -> None:
-    cfg = default_config()
+    profile = load_default_profile()
     steps = default_scenario()
     src = SyntheticFlowSource([s.print_ for s in steps])
 
     stages = [ScenarioOverrideStage(overrides_lookup(iter(steps))), *default_stage_pipeline()]
-    pipeline = Pipeline(src, stages, config=cfg)
+    pipeline = Pipeline(src, stages, profile=profile)
 
     results = await pipeline.run()
 
@@ -45,11 +45,11 @@ async def test_default_scenario_produces_all_expected_labels() -> None:
 @pytest.mark.asyncio
 async def test_default_scenario_covers_the_eight_required_labels() -> None:
     """Task spec: the default scenario must exercise these eight labels."""
-    cfg = default_config()
+    profile = load_default_profile()
     steps = default_scenario()
     src = SyntheticFlowSource([s.print_ for s in steps])
     stages = [ScenarioOverrideStage(overrides_lookup(iter(steps))), *default_stage_pipeline()]
-    pipeline = Pipeline(src, stages, config=cfg)
+    pipeline = Pipeline(src, stages, profile=profile)
 
     await pipeline.run()
     seen = {row.label for row in pipeline.store.all()}
@@ -72,11 +72,11 @@ async def test_score_monotonicity_implied_by_scenario() -> None:
     """The HCS step has the strongest sub-scores; its post-penalty score
     should exceed every non-LEAP, non-PENALIZED row.
     """
-    cfg = default_config()
+    profile = load_default_profile()
     steps = default_scenario()
     src = SyntheticFlowSource([s.print_ for s in steps])
     stages = [ScenarioOverrideStage(overrides_lookup(iter(steps))), *default_stage_pipeline()]
-    pipeline = Pipeline(src, stages, config=cfg)
+    pipeline = Pipeline(src, stages, profile=profile)
     await pipeline.run()
 
     rows = pipeline.store.all()
@@ -97,16 +97,16 @@ async def test_score_monotonicity_implied_by_scenario() -> None:
 
     # Penalized must be strictly below the spec's 0.30 threshold
     assert penalized.combined_score_post_penalty is not None
-    assert penalized.combined_score_post_penalty < cfg.thresholds.penalized_below
+    assert penalized.combined_score_post_penalty < profile.label_thresholds.penalized_below
 
 
 @pytest.mark.asyncio
 async def test_backtest_store_to_dataframe_round_trips() -> None:
-    cfg = default_config()
+    profile = load_default_profile()
     steps = default_scenario()
     src = SyntheticFlowSource([s.print_ for s in steps])
     stages = [ScenarioOverrideStage(overrides_lookup(iter(steps))), *default_stage_pipeline()]
-    pipeline = Pipeline(src, stages, config=cfg)
+    pipeline = Pipeline(src, stages, profile=profile)
     await pipeline.run()
 
     df = pipeline.store.to_dataframe()
@@ -131,11 +131,11 @@ async def test_backtest_store_to_dataframe_round_trips() -> None:
 @pytest.mark.asyncio
 async def test_dte_multiplier_recorded_per_event() -> None:
     """Every stored row gets a DTE multiplier; the LEAP row gets 0.70."""
-    cfg = default_config()
+    profile = load_default_profile()
     steps = default_scenario()
     src = SyntheticFlowSource([s.print_ for s in steps])
     stages = [ScenarioOverrideStage(overrides_lookup(iter(steps))), *default_stage_pipeline()]
-    pipeline = Pipeline(src, stages, config=cfg)
+    pipeline = Pipeline(src, stages, profile=profile)
     await pipeline.run()
 
     for row in pipeline.store.all():
@@ -143,4 +143,4 @@ async def test_dte_multiplier_recorded_per_event() -> None:
         assert row.dte_multiplier_applied > 0
 
     leap_row = next(r for r in pipeline.store.all() if r.label == SignalLabel.LEAP_POSITIONING)
-    assert leap_row.dte_multiplier_applied == cfg.dte.bucket_60_plus  # 0.70 for DTE>60
+    assert leap_row.dte_multiplier_applied == profile.dte.bucket_60_plus  # 0.70 for DTE>60
