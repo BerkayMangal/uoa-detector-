@@ -160,6 +160,8 @@ def test_risk_buckets_match_phase1() -> None:
     assert math.isclose(r.high_conviction_initial, 0.50)
     assert math.isclose(r.leap_positioning, 0.25)
     assert math.isclose(r.discard_or_log, 0.0)
+    # Phase 2.3.2a — REJECTED bucket; structurally distinct from discard.
+    assert math.isclose(r.rejected, 0.0)
 
 
 def test_penalty_triggers_match_phase1() -> None:

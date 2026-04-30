@@ -308,6 +308,9 @@ class RiskBuckets(_StrictModel):
     high_conviction_initial: float  # scale-in initial entry
     leap_positioning: float
     discard_or_log: float
+    # Phase 2.3.2a — separate bucket from DISCARD so backtest analysis can
+    # distinguish "evaluated, no signal" from "not evaluated, out of scope".
+    rejected: float
 
 
 # ---------------------------------------------------------------------------

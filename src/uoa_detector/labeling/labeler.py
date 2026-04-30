@@ -4,6 +4,11 @@ Every numeric comparison reads from ``profile.label_thresholds.*`` or
 ``profile.dte.leap_threshold``. Zero numerical literals in this file.
 
 Precedence (top wins):
+0.  ``REJECTED``                         — event.rejection set by an upstream
+                                            stage (Phase 2.3.2a). Distinct from
+                                            IGNORE_NOISE: REJECTED = not evaluated
+                                            by policy; IGNORE_NOISE = evaluated,
+                                            no signal.
 1.  ``LEAP_POSITIONING``                 — DTE > profile.dte.leap_threshold
 2.  ``POST_EVENT_NOISE``                 — within 2 sessions of catalyst
 3.  ``PENALIZED_BELOW_THRESHOLD``        — combined < profile.label_thresholds.penalized_below
@@ -43,6 +48,21 @@ class Labeler:
         cfg = self._profile
         t = cfg.label_thresholds
         pr = event.print_
+
+        # 0) REJECTED — checked FIRST. A rejected event must not be evaluated
+        # for any other label. The orchestrator skips penalty/scoring for
+        # rejected events, so combined_score_post_penalty will be None;
+        # downstream gates that read it would crash. This gate runs before
+        # any score-dependent check.
+        if event.rejection is not None:
+            return LabelDecision(
+                label=SignalLabel.REJECTED,
+                reason=(
+                    f"Rejected by {event.rejection.rejected_by_stage}: "
+                    f"{event.rejection.reason}"
+                ),
+            )
+
         post_score = event.combined_score_post_penalty
 
         # 1) LEAP short-circuit — separate book.

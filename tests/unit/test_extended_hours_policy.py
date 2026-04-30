@@ -128,8 +128,8 @@ async def test_orchestrator_short_circuits_on_rejection(profiles_root: Path) -> 
 
     assert len(results) == 1
     result = results[0]
-    # Sentinel decision uses IGNORE_NOISE; reason carries the rejection.
-    assert result.decision.label == SignalLabel.IGNORE_NOISE
+    # Phase 2.3.2a: rejected events get the dedicated REJECTED label.
+    assert result.decision.label == SignalLabel.REJECTED
     assert "Rejected by m39_time_of_day" in result.decision.reason
     # Zero-R PositionSize for rejected events.
     assert result.size.max_r == 0.0

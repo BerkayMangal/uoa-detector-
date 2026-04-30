@@ -49,5 +49,11 @@ class RiskSizer:
         if label == SignalLabel.LEAP_POSITIONING:
             return PositionSize(bucket=RiskBucket.LEAP_POSITIONING, max_r=r.leap_positioning)
 
+        # Phase 2.3.2a — REJECTED is its own bucket (separate from DISCARD) so
+        # backtest analysis can distinguish "evaluated, no signal" (DISCARD) from
+        # "not evaluated, out of scope" (REJECTED).
+        if label == SignalLabel.REJECTED:
+            return PositionSize(bucket=RiskBucket.REJECTED, max_r=r.rejected)
+
         # All other labels are flags / log-only / additive — no direct sizing.
         return PositionSize(bucket=RiskBucket.DISCARD, max_r=r.discard_or_log)

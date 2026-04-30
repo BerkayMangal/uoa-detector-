@@ -129,6 +129,7 @@ risk_buckets:
   high_conviction_initial: 0.50   # scale-in: initial entry
   leap_positioning: 0.25
   discard_or_log: 0.0
+  rejected: 0.0                   # Phase 2.3.2a: separate from discard for backtest analysis
 
 # --- Phase 2 fusion layer ---
 fusion:

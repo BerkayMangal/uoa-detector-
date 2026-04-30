@@ -12,7 +12,7 @@ from pydantic import BaseModel, ConfigDict
 from uoa_detector.backtest.store import BacktestStore
 from uoa_detector.calibration import CalibrationProfile, load_default_profile
 from uoa_detector.domain.events import EnrichedEvent, OptionsPrint
-from uoa_detector.domain.labels import LabelDecision, SignalLabel
+from uoa_detector.domain.labels import LabelDecision
 from uoa_detector.domain.risk import PositionSize
 from uoa_detector.labeling.labeler import Labeler
 from uoa_detector.pipeline.stage import EnrichmentStage, PipelineContext
@@ -83,12 +83,12 @@ class Pipeline:
         """Run one print through the full pipeline.
 
         If any enrichment stage sets ``event.rejection`` (e.g., Module 39 under
-        the ``reject`` extended-hours policy), the orchestrator short-circuits:
-        no further enrichment, no penalty engine, no scoring, no labeler, no
-        sizer. The event is recorded in the backtest store with a sentinel
-        ``IGNORE_NOISE`` label whose ``reason`` carries the rejection details
-        and a zero-R ``PositionSize``. The full ``RejectedEvent`` is preserved
-        on ``event.rejection`` for the decision record / audit.
+        the ``reject`` extended-hours policy), the orchestrator skips remaining
+        enrichment, the penalty engine, and the scoring engine — but still
+        calls the labeler, which returns ``REJECTED`` at its precedence-step-0
+        gate. The risk sizer then maps ``REJECTED`` to its dedicated bucket
+        with zero R. The full ``RejectedEvent`` is preserved on
+        ``event.rejection`` for the decision record / audit.
         """
         event = EnrichedEvent(print=raw)
 
@@ -98,16 +98,15 @@ class Pipeline:
             if event.rejection is not None:
                 break
 
-        if event.rejection is not None:
-            return self._handle_rejection(event)
+        rejected = event.rejection is not None
 
-        # 2) Penalty engine (must run BEFORE scoring so combined-score-post is correct)
-        self._penalty_engine.apply(event)
+        if not rejected:
+            # 2) Penalty engine (must run BEFORE scoring so combined-score-post is correct)
+            self._penalty_engine.apply(event)
+            # 3) Scoring engine
+            compute_combined_score(event, self._profile)
 
-        # 3) Scoring engine
-        compute_combined_score(event, self._profile)
-
-        # 4) Labeler
+        # 4) Labeler — handles REJECTED at step 0 if event.rejection is set.
         decision = self._labeler.decide(event)
 
         # 5) Risk sizer
@@ -116,12 +115,14 @@ class Pipeline:
         # 6) Persist
         self._store.add(event, decision, size)
 
-        # 7) Push event into the rolling buffer for the next event's clustering
-        self._ctx.recent_events.append(event)
+        # 7) Rolling-buffer membership: rejected events do NOT influence
+        # Module 38 cluster counting since they were never scored.
+        if not rejected:
+            self._ctx.recent_events.append(event)
 
         # 8) One structured log line per event
         _logger.info(
-            "signal",
+            "signal_rejected" if rejected else "signal",
             ts=raw.timestamp.isoformat(),
             ticker=raw.ticker,
             option_type=raw.option_type,
@@ -135,35 +136,6 @@ class Pipeline:
             ),
             max_r=size.max_r,
             reason=decision.reason,
-        )
-
-        return PipelineResult(event=event, decision=decision, size=size)
-
-    def _handle_rejection(self, event: EnrichedEvent) -> PipelineResult:
-        """Short-circuit path for an event whose ``rejection`` field is set.
-
-        Skips penalty/scoring/labeling/sizing. Records a sentinel decision so
-        the backtest store still has one row per print; the rejection record
-        on ``event.rejection`` carries the full reason for audit.
-
-        Note: rejected events do NOT enter ``ctx.recent_events`` — they should
-        not influence Module 38 cluster counting since they were never scored.
-        """
-        assert event.rejection is not None  # invariant: caller checked
-        rejection = event.rejection
-        decision = LabelDecision(
-            label=SignalLabel.IGNORE_NOISE,
-            reason=f"Rejected by {rejection.rejected_by_stage}: {rejection.reason}",
-        )
-        size = self._sizer.size_for(decision.label)
-        self._store.add(event, decision, size)
-
-        _logger.info(
-            "signal_rejected",
-            ts=event.print_.timestamp.isoformat(),
-            ticker=event.print_.ticker,
-            stage=rejection.rejected_by_stage,
-            reason=rejection.reason,
         )
 
         return PipelineResult(event=event, decision=decision, size=size)

@@ -1,7 +1,7 @@
-"""Unit tests for the 17-label decision tree.
+"""Unit tests for the 18-label decision tree.
 
 At least one positive case per label, plus precedence checks for the
-short-circuit gates (LEAP > POST_EVENT > PENALIZED > others).
+short-circuit gates (REJECTED > LEAP > POST_EVENT > PENALIZED > others).
 """
 
 from __future__ import annotations
@@ -25,6 +25,36 @@ def _score(event, pre: float, post: float) -> None:  # type: ignore[no-untyped-d
 
 
 # --- Short-circuit gates (precedence) ----------------------------------------
+
+
+def test_rejected_beats_leap_and_everything_else() -> None:
+    """Phase 2.3.2a: REJECTED is checked at step 0, before every other gate.
+
+    Even with conditions that would otherwise trigger LEAP_POSITIONING (which
+    is itself a short-circuit), an event whose ``rejection`` field is set
+    must label as REJECTED.
+    """
+    from datetime import UTC
+    from datetime import datetime as _dt
+
+    from uoa_detector.domain.rejection import RejectedEvent
+
+    pr = build_print(dte=180)  # would trigger LEAP otherwise
+    event = build_enriched(print_=pr)
+    event.is_post_event = True  # would trigger POST_EVENT_NOISE
+    event.applied_penalties.append(
+        AppliedPenalty(name="thin_oi", value=-0.20, reason="x")
+    )
+    # No score is stamped; rejected events skip scoring. The labeler's
+    # REJECTED gate must run before the post_score check.
+    event.rejection = RejectedEvent(
+        reason="extended_hours: extended_hours_policy='reject'",
+        rejected_by_stage="m39_time_of_day",
+        rejected_at=_dt(2025, 6, 11, 12, 0, tzinfo=UTC),
+    )
+    decision = Labeler(load_default_profile()).decide(event)
+    assert decision.label == SignalLabel.REJECTED
+    assert "Rejected by m39_time_of_day" in decision.reason
 
 
 def test_leap_beats_everything_including_post_event_and_penalized() -> None:
@@ -180,9 +210,14 @@ def test_ignore_noise_default() -> None:
     assert _label(event) == SignalLabel.IGNORE_NOISE
 
 
-# --- Coverage of all 17 labels ----------------------------------------------
+# --- Coverage of all 18 labels (17 spec labels + REJECTED) ------------------
 
 
-def test_all_seventeen_labels_have_a_test_above() -> None:
-    """Sanity check: the SignalLabel enum has exactly 17 entries."""
-    assert len(list(SignalLabel)) == 17
+def test_all_eighteen_labels_have_a_test_above() -> None:
+    """Sanity check: SignalLabel has exactly 18 entries (17 v5 spec + REJECTED).
+
+    REJECTED was added in Phase 2.3.2a as a structurally-distinct label from
+    IGNORE_NOISE. See tests/unit/test_extended_hours_policy.py and
+    tests/unit/test_labeler.py::test_rejected_beats_leap_and_everything_else.
+    """
+    assert len(list(SignalLabel)) == 18

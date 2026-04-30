@@ -164,6 +164,7 @@ def test_risk_buckets(v5: CalibrationProfile) -> None:
     assert math.isclose(r.high_conviction_initial, 0.50)
     assert math.isclose(r.leap_positioning, 0.25)
     assert math.isclose(r.discard_or_log, 0.0)
+    assert math.isclose(r.rejected, 0.0)  # Phase 2.3.2a: distinct from discard_or_log
 
 
 def test_fusion_defaults(v5: CalibrationProfile) -> None:
@@ -255,7 +256,7 @@ def test_invalid_weights_sum_rejected() -> None:
             "convexity_watch": 0.25, "convexity_cluster": 0.5, "standard_uoa": 0.75,
             "sweep_uoa": 0.85, "pre_catalyst_flow": 0.85,
             "high_conviction_sequence": 1.0, "high_conviction_initial": 0.5,
-            "leap_positioning": 0.25, "discard_or_log": 0.0,
+            "leap_positioning": 0.25, "discard_or_log": 0.0, "rejected": 0.0,
         },
         "fusion": {"window_ms": 500, "timestamp_skew_tolerance_ms": 100},
         "sub_score_missing_behavior": {

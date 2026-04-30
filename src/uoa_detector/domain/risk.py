@@ -19,6 +19,11 @@ class RiskBucket(StrEnum):
     HIGH_CONVICTION_SEQUENCE = "HIGH_CONVICTION_SEQUENCE"
     LEAP_POSITIONING = "LEAP_POSITIONING"
 
+    # Phase 2.3.2a — distinct from DISCARD: REJECTED means the system did NOT
+    # evaluate the print (out of scope by policy), whereas DISCARD covers
+    # IGNORE_NOISE et al. (evaluated, no actionable signal).
+    REJECTED = "REJECTED"
+
 
 class PositionSize(BaseModel):
     """Sized position output. ``max_r`` is the full target; ``initial_r`` is the

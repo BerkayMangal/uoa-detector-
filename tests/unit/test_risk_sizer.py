@@ -30,6 +30,8 @@ _EXPECTED_R: dict[SignalLabel, float] = {
     SignalLabel.OPTIONS_EQUITY_TAPE_CONFIRMATION: 0.0,
     SignalLabel.CONFIRMED_OPENING_FLOW: 0.0,
     SignalLabel.GAMMA_ACCELERATION_RISK: 0.0,
+    # Phase 2.3.2a — REJECTED has its own bucket (max_r=0, but distinct from DISCARD)
+    SignalLabel.REJECTED: 0.0,
 }
 
 
@@ -72,6 +74,21 @@ def test_buckets_for_tradeable_labels() -> None:
     ]
     for label, expected_bucket in pairs:
         assert sizer.size_for(label).bucket == expected_bucket
+
+
+def test_rejected_uses_distinct_bucket_not_discard() -> None:
+    """Phase 2.3.2a: REJECTED must map to RiskBucket.REJECTED, not DISCARD.
+
+    This is the whole point of separating the two — backtest analysis can
+    distinguish 'evaluated, no signal' (DISCARD) from 'not evaluated, out
+    of scope' (REJECTED).
+    """
+    sizer = RiskSizer(load_default_profile())
+    rejected = sizer.size_for(SignalLabel.REJECTED)
+    discard = sizer.size_for(SignalLabel.IGNORE_NOISE)
+    assert rejected.bucket == RiskBucket.REJECTED
+    assert discard.bucket == RiskBucket.DISCARD
+    assert rejected.bucket != discard.bucket
 
 
 def test_every_label_in_enum_is_covered_by_expected_table() -> None:
