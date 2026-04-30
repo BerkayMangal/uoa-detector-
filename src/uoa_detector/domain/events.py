@@ -112,6 +112,11 @@ class EnrichedEvent(BaseModel):
     # Applied inside the scoring engine; the original sub-score is preserved.
     score_adjustments: list[ScoreAdjustment] = Field(default_factory=list)
 
+    # Phase 2: which time-of-day window the event fell into (e.g., "prime_session"
+    # or "outside_session"). Populated by Module 39; surfaced in the decision
+    # record for downstream filtering.
+    time_window_label: str | None = None
+
     # Multiplier (Module 35) — applied inside the scoring engine to convexity & gamma
     dte_multiplier_applied: float | None = None
 

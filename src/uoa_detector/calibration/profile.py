@@ -7,9 +7,11 @@ parent at leaf level only). Loaded from YAML by the resolver/loader.
 
 from __future__ import annotations
 
+from datetime import time
 from typing import Literal
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class _StrictModel(BaseModel):
@@ -109,15 +111,87 @@ class DTEMultipliers(_StrictModel):
 # Time-of-day weights (Module 39)
 # ---------------------------------------------------------------------------
 
-class TimeOfDayWeights(_StrictModel):
-    """Module 39 time-of-day weights (EST/EDT America/New_York)."""
+class TimeWindow(_StrictModel):
+    """One contiguous time-of-day window: half-open ``[start, end)``."""
 
-    open_auction: float  # 09:30–10:00
-    early_session: float  # 10:00–11:00
-    prime: float  # 11:00–14:00
-    afternoon: float  # 14:00–15:30
-    moc_loc: float  # 15:30–16:00
-    extended_hours: float  # outside 09:30–16:00
+    start: time
+    end: time
+    weight: float = Field(ge=0.0, le=1.0)
+    label: str = Field(min_length=1, description="Stable name for the decision record.")
+
+    @model_validator(mode="after")
+    def _check_well_formed(self) -> TimeWindow:
+        if self.start >= self.end:
+            msg = f"window {self.label!r}: start {self.start} must be < end {self.end}"
+            raise ValueError(msg)
+        return self
+
+
+class TimeOfDayWeights(_StrictModel):
+    """Module 39 time-of-day weights — list of contiguous windows + outside default.
+
+    The windows define the trading session for weighting purposes. Anything
+    falling outside every window receives ``outside_session_weight`` (e.g.,
+    pre-market, after-hours). The session timezone is parameterized via
+    ``timezone`` (IANA name) so half-day sessions and non-US-equity profiles
+    are first-class.
+    """
+
+    timezone: str = Field(min_length=1, description="IANA timezone name, e.g. 'America/New_York'.")
+    windows: tuple[TimeWindow, ...] = Field(min_length=1)
+    outside_session_weight: float = Field(ge=0.0, le=1.0)
+
+    @field_validator("timezone")
+    @classmethod
+    def _validate_timezone(cls, v: str) -> str:
+        try:
+            ZoneInfo(v)
+        except ZoneInfoNotFoundError as e:
+            msg = f"unknown timezone {v!r}"
+            raise ValueError(msg) from e
+        return v
+
+    @field_validator("windows")
+    @classmethod
+    def _validate_window_labels_unique(
+        cls, v: tuple[TimeWindow, ...],
+    ) -> tuple[TimeWindow, ...]:
+        labels = [w.label for w in v]
+        if len(set(labels)) != len(labels):
+            msg = f"duplicate window labels: {labels}"
+            raise ValueError(msg)
+        return v
+
+    @model_validator(mode="after")
+    def _check_no_gaps_or_overlaps(self) -> TimeOfDayWeights:
+        # Sort by start time and check each adjacent pair.
+        sorted_windows = sorted(self.windows, key=lambda w: w.start)
+        for i in range(len(sorted_windows) - 1):
+            current, nxt = sorted_windows[i], sorted_windows[i + 1]
+            if nxt.start < current.end:
+                msg = (
+                    f"windows overlap: {current.label!r} ends {current.end} "
+                    f"but {nxt.label!r} starts {nxt.start}"
+                )
+                raise ValueError(msg)
+            if nxt.start > current.end:
+                msg = (
+                    f"gap between windows: {current.label!r} ends {current.end} "
+                    f"but {nxt.label!r} starts {nxt.start}"
+                )
+                raise ValueError(msg)
+        return self
+
+    def lookup(self, t: time) -> tuple[float, str]:
+        """Return ``(weight, label)`` for time ``t``.
+
+        If ``t`` falls outside every window, returns ``(outside_session_weight,
+        "outside_session")``.
+        """
+        for w in self.windows:
+            if w.start <= t < w.end:
+                return w.weight, w.label
+        return self.outside_session_weight, "outside_session"
 
 
 # ---------------------------------------------------------------------------

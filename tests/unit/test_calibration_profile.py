@@ -91,13 +91,26 @@ def test_dte_multipliers(v5: CalibrationProfile) -> None:
     assert d.leap_threshold == 90
 
 
-def test_time_of_day_weights(v5: CalibrationProfile) -> None:
-    w = v5.time_of_day
-    assert math.isclose(w.open_auction, 0.30)
-    assert math.isclose(w.early_session, 0.80)
-    assert math.isclose(w.prime, 1.00)
-    assert math.isclose(w.afternoon, 0.70)
-    assert math.isclose(w.moc_loc, 0.30)
+def test_time_of_day_weights_via_lookup(v5: CalibrationProfile) -> None:
+    """v5_default reproduces the spec's window weights via the new lookup API."""
+    from datetime import time as _time
+
+    tod = v5.time_of_day
+    assert tod.timezone == "America/New_York"
+    assert math.isclose(tod.outside_session_weight, 0.0)
+
+    # One representative point inside each window
+    assert tod.lookup(_time(9, 45)) == (0.30, "open_auction")
+    assert tod.lookup(_time(10, 30)) == (0.80, "early_session")
+    assert tod.lookup(_time(12, 0)) == (1.00, "prime_session")
+    assert tod.lookup(_time(15, 0)) == (0.70, "afternoon")
+    assert tod.lookup(_time(15, 45)) == (0.30, "moc_loc")
+
+    # Boundary: end is exclusive — 16:00 is outside the session
+    assert tod.lookup(_time(16, 0)) == (0.0, "outside_session")
+    # Pre-market / after-hours
+    assert tod.lookup(_time(8, 0)) == (0.0, "outside_session")
+    assert tod.lookup(_time(20, 0)) == (0.0, "outside_session")
 
 
 def test_cluster_params(v5: CalibrationProfile) -> None:
@@ -208,8 +221,15 @@ def test_invalid_weights_sum_rejected() -> None:
             "bucket_31_60": 0.85, "bucket_60_plus": 0.7, "leap_threshold": 90,
         },
         "time_of_day": {
-            "open_auction": 0.3, "early_session": 0.8, "prime": 1.0,
-            "afternoon": 0.7, "moc_loc": 0.3, "extended_hours": 0.3,
+            "timezone": "America/New_York",
+            "windows": [
+                {"start": "09:30", "end": "10:00", "weight": 0.30, "label": "open_auction"},
+                {"start": "10:00", "end": "11:00", "weight": 0.80, "label": "early_session"},
+                {"start": "11:00", "end": "14:00", "weight": 1.00, "label": "prime_session"},
+                {"start": "14:00", "end": "15:30", "weight": 0.70, "label": "afternoon"},
+                {"start": "15:30", "end": "16:00", "weight": 0.30, "label": "moc_loc"},
+            ],
+            "outside_session_weight": 0.0,
         },
         "cluster": {
             "window_minutes": 60, "decay_minutes": 90, "nearby_strike_count": 1,

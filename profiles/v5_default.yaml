@@ -60,14 +60,21 @@ dte:
   bucket_60_plus: 0.70
   leap_threshold: 90
 
-# --- Module 39 time-of-day weights (America/New_York) ---
+# --- Module 39 time-of-day weights ---
+# Windows are half-open [start, end) on the wall clock of the configured timezone.
+# `outside_session_weight` applies to any timestamp not covered by any window.
+# Note: outside_session_weight is 0.0 here (a deliberate change from Phase 1's
+# 0.30 — the v5 spec is silent on this value, and 0.0 is the more conservative
+# choice: "outside session = no time-of-day boost"). Override per-ticker if needed.
 time_of_day:
-  open_auction: 0.30      # 09:30–10:00
-  early_session: 0.80     # 10:00–11:00
-  prime: 1.00             # 11:00–14:00
-  afternoon: 0.70         # 14:00–15:30
-  moc_loc: 0.30           # 15:30–16:00
-  extended_hours: 0.30    # outside RTH (Phase 1 convention — lowest weight)
+  timezone: "America/New_York"
+  windows:
+    - { start: "09:30", end: "10:00", weight: 0.30, label: "open_auction" }
+    - { start: "10:00", end: "11:00", weight: 0.80, label: "early_session" }
+    - { start: "11:00", end: "14:00", weight: 1.00, label: "prime_session" }
+    - { start: "14:00", end: "15:30", weight: 0.70, label: "afternoon" }
+    - { start: "15:30", end: "16:00", weight: 0.30, label: "moc_loc" }
+  outside_session_weight: 0.0
 
 # --- Module 38 temporal clustering ---
 cluster:
