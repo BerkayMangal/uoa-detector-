@@ -182,6 +182,19 @@ def test_fusion_phase2_defaults() -> None:
     assert f.timestamp_skew_tolerance_ms == 100
 
 
+def test_fusion_tier_thresholds_phase2_defaults() -> None:
+    """tier_thresholds default per Phase 2.3.2 user spec.
+
+    SPEC-SILENT values — the v5 spec doesn't define multi-source agreement
+    semantics. These are the prompt's stated defaults; document the gap so
+    a future change is an explicit decision.
+    """
+    t = load_default_profile().fusion.tier_thresholds
+    assert t.unanimous_min_sources == 2
+    assert math.isclose(t.majority_fraction, 0.5)
+    assert math.isclose(t.premium_disagreement_tolerance_pct, 0.05)
+
+
 def test_sub_score_missing_behavior_uses_zero_not_half() -> None:
     """Per the user correction: missing data is 0.0 (no signal), not 0.5."""
     b = load_default_profile().sub_score_missing_behavior

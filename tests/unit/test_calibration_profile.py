@@ -171,6 +171,10 @@ def test_fusion_defaults(v5: CalibrationProfile) -> None:
     f = v5.fusion
     assert f.window_ms == 500
     assert f.timestamp_skew_tolerance_ms == 100
+    # Phase 2.3.2 confidence-tier resolution thresholds
+    assert f.tier_thresholds.unanimous_min_sources == 2
+    assert math.isclose(f.tier_thresholds.majority_fraction, 0.5)
+    assert math.isclose(f.tier_thresholds.premium_disagreement_tolerance_pct, 0.05)
 
 
 def test_sub_score_missing_behavior_defaults_to_zero_not_half(v5: CalibrationProfile) -> None:
@@ -258,7 +262,15 @@ def test_invalid_weights_sum_rejected() -> None:
             "high_conviction_sequence": 1.0, "high_conviction_initial": 0.5,
             "leap_positioning": 0.25, "discard_or_log": 0.0, "rejected": 0.0,
         },
-        "fusion": {"window_ms": 500, "timestamp_skew_tolerance_ms": 100},
+        "fusion": {
+            "window_ms": 500,
+            "timestamp_skew_tolerance_ms": 100,
+            "tier_thresholds": {
+                "unanimous_min_sources": 2,
+                "majority_fraction": 0.5,
+                "premium_disagreement_tolerance_pct": 0.05,
+            },
+        },
         "sub_score_missing_behavior": {
             n: {"on_missing": "default", "default": 0.0}
             for n in (

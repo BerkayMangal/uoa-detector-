@@ -135,6 +135,13 @@ risk_buckets:
 fusion:
   window_ms: 500                  # OPRA → aggregator latency budget
   timestamp_skew_tolerance_ms: 100
+  # Phase 2.3.2 confidence-tier resolution. SPEC-SILENT values — see
+  # TierThresholds field docs in calibration/profile.py for the resolution
+  # algorithm and the rationale for each default.
+  tier_thresholds:
+    unanimous_min_sources: 2          # need ≥2 sources for "unanimous"
+    majority_fraction: 0.5            # >50% agreement → "majority"
+    premium_disagreement_tolerance_pct: 0.05   # within 5% of median = agree
 
 # --- Phase 2 missing-sub-score policy ---
 # Per the user's correction: 0.5 is NOT neutral for several sub-scores

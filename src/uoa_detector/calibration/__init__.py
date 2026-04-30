@@ -21,6 +21,7 @@ from uoa_detector.calibration.profile import (
     SubScoreMissingBehavior,
     SubScoreMissingPolicy,
     SweepParams,
+    TierThresholds,
     TimeOfDayWeights,
     TimeWindow,
 )
@@ -43,6 +44,7 @@ __all__ = [
     "SubScoreMissingBehavior",
     "SubScoreMissingPolicy",
     "SweepParams",
+    "TierThresholds",
     "TimeOfDayWeights",
     "TimeWindow",
     "load_default_profile",

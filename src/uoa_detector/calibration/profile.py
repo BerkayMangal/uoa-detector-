@@ -317,6 +317,57 @@ class RiskBuckets(_StrictModel):
 # Fusion layer (Phase 2)
 # ---------------------------------------------------------------------------
 
+class TierThresholds(_StrictModel):
+    """Confidence-tier resolution thresholds for ``SourceAgreement.confidence_tier``.
+
+    Tier resolution order (Phase 2.3.2 — user-specified):
+      1. ``len(sources_seen) == 1`` → ``"single"`` (single-source path).
+      2. All sources agree on judged fields → ``"unanimous"`` (requires
+         ``len(sources_seen) >= unanimous_min_sources``).
+      3. ``agreement_fraction >= majority_fraction`` → ``"majority"``.
+      4. Otherwise → ``"conflicted"``.
+
+    "Agreement" is judged on:
+      - ``(strike, expiry, option_type)`` always (also bucket-key invariants).
+      - ``premium_paid`` within ``premium_disagreement_tolerance_pct`` of the
+        median across reporting sources.
+      - ``sweep_classification`` if the source reports it (matches the modal
+        value across reporting sources).
+
+    Fields not all sources report (e.g., ISO flag, OI) do NOT count toward
+    disagreement — only sources that report a field contribute to its agreement
+    calculation.
+    """
+
+    unanimous_min_sources: int = Field(
+        ge=2,
+        description=(
+            "Minimum number of sources for the result to be eligible for the "
+            "'unanimous' tier. Default 2: with only 1 source, tier is 'single' "
+            "regardless. Raise to 3+ for stricter unanimous requirement."
+        ),
+    )
+    majority_fraction: float = Field(
+        ge=0.5,
+        le=1.0,
+        description=(
+            "Fraction of sources that must agree (on judged fields) for the "
+            "'majority' tier. The agreement check is ``fraction >= "
+            "majority_fraction`` so 0.5 means '>=50% (i.e., at least half) "
+            "agree'. Setting > 0.5 enforces strict majority."
+        ),
+    )
+    premium_disagreement_tolerance_pct: float = Field(
+        ge=0.0,
+        le=1.0,
+        description=(
+            "Premium values within this fraction of the median premium count "
+            "as 'agreeing'. E.g., 0.05 = within 5%% of median. Spec-silent "
+            "value — see Phase 2.3.2 prompt for rationale."
+        ),
+    )
+
+
 class FusionParams(_StrictModel):
     """SourceFusion windowing parameters."""
 
@@ -325,6 +376,9 @@ class FusionParams(_StrictModel):
     )
     timestamp_skew_tolerance_ms: int = Field(
         description="Max wall-clock skew between feeds before classification_disagreement.",
+    )
+    tier_thresholds: TierThresholds = Field(
+        description="Confidence-tier resolution thresholds — see TierThresholds.",
     )
 
 
