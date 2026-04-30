@@ -1,0 +1,74 @@
+[project]
+name = "uoa-detector"
+version = "0.1.0"
+description = "UOA + Convexity Detector v5 — options-flow signal detection system."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "pydantic>=2.7",
+    "pydantic-settings>=2.3",
+    "structlog>=24.1",
+    "pandas>=2.2",
+    "typer>=0.12",
+]
+
+[project.scripts]
+uoa-detector = "uoa_detector.cli:app"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.2",
+    "pytest-asyncio>=0.23",
+    "freezegun>=1.5",
+    "ruff>=0.5",
+    "mypy>=1.10",
+    "pandas-stubs>=2.2",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/uoa_detector"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = [
+    "E", "F", "W",   # pycodestyle / pyflakes
+    "I",             # isort
+    "B",             # bugbear
+    "UP",            # pyupgrade
+    "N",             # pep8-naming
+    "SIM",           # simplify
+    "RUF",           # ruff-specific
+]
+ignore = [
+    "E501",  # line length handled by formatter
+    "RUF002",  # ambiguous Unicode in docstrings — intentional (matches spec typography)
+    "RUF003",  # ambiguous Unicode in comments — intentional (matches spec typography)
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["B", "N802"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+disallow_untyped_decorators = false
+plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+module = "freezegun.*"
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+addopts = "-ra"

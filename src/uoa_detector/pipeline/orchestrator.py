@@ -1,0 +1,130 @@
+"""Pipeline orchestrator. Wires source → stages → scoring → penalties → labeler
+→ sizer → backtest store, emitting one structured log line per event.
+"""
+
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+import structlog
+from pydantic import BaseModel, ConfigDict
+
+from uoa_detector.backtest.store import BacktestStore
+from uoa_detector.config import AppConfig, default_config
+from uoa_detector.domain.events import EnrichedEvent, OptionsPrint
+from uoa_detector.domain.labels import LabelDecision
+from uoa_detector.domain.risk import PositionSize
+from uoa_detector.labeling.labeler import Labeler
+from uoa_detector.pipeline.stage import EnrichmentStage, PipelineContext
+from uoa_detector.risk.sizer import RiskSizer
+from uoa_detector.scoring.combined import compute_combined_score
+from uoa_detector.scoring.penalties import PenaltyEngine
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+    from uoa_detector.sources.base import FlowDataSource
+
+_logger = structlog.get_logger(__name__)
+
+
+class PipelineResult(BaseModel):
+    """One fully-processed event: the enriched state plus its label and size."""
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    event: EnrichedEvent
+    decision: LabelDecision
+    size: PositionSize
+
+
+class Pipeline:
+    """End-to-end runner. One ``Pipeline`` instance per process / scenario."""
+
+    def __init__(
+        self,
+        source: FlowDataSource,
+        stages: Sequence[EnrichmentStage],
+        *,
+        config: AppConfig | None = None,
+        store: BacktestStore | None = None,
+        context: PipelineContext | None = None,
+    ) -> None:
+        self._source = source
+        self._stages = list(stages)
+        self._config = config or default_config()
+        self._store = store or BacktestStore()
+        self._ctx = context or PipelineContext(config=self._config)
+        self._penalty_engine = PenaltyEngine(self._config)
+        self._labeler = Labeler(self._config)
+        self._sizer = RiskSizer(self._config)
+
+    @property
+    def store(self) -> BacktestStore:
+        """The backtest store this pipeline writes to."""
+        return self._store
+
+    @property
+    def context(self) -> PipelineContext:
+        """The shared ``PipelineContext`` (exposed mainly for tests)."""
+        return self._ctx
+
+    async def run(self) -> list[PipelineResult]:
+        """Drain the source, process each event, return all results.
+
+        Suitable for batch / synthetic runs. Live use will wrap each event
+        in a try/except and a metric instead of materializing a list.
+        """
+        results: list[PipelineResult] = []
+        try:
+            async for raw in self._source.stream():
+                results.append(await self.process_one(raw))
+        finally:
+            await self._source.close()
+        return results
+
+    async def process_one(self, raw: OptionsPrint) -> PipelineResult:
+        """Run one print through the full pipeline."""
+        event = EnrichedEvent(print=raw)
+
+        # 1) Enrichment stages
+        for stage in self._stages:
+            event = await stage.enrich(event, self._ctx)
+
+        # 2) Penalty engine (must run BEFORE scoring so combined-score-post is correct)
+        self._penalty_engine.apply(event)
+
+        # 3) Scoring engine
+        compute_combined_score(event, self._config)
+
+        # 4) Labeler
+        decision = self._labeler.decide(event)
+
+        # 5) Risk sizer
+        size = self._sizer.size_for(decision.label)
+
+        # 6) Persist
+        self._store.add(event, decision, size)
+
+        # 7) Push event into the rolling buffer for the next event's clustering
+        self._ctx.recent_events.append(event)
+
+        # 8) One structured log line per event
+        _logger.info(
+            "signal",
+            ts=raw.timestamp.isoformat(),
+            ticker=raw.ticker,
+            option_type=raw.option_type,
+            strike=str(raw.strike),
+            dte=raw.dte,
+            label=decision.label.value,
+            combined_score=(
+                round(event.combined_score_post_penalty, 4)
+                if event.combined_score_post_penalty is not None
+                else None
+            ),
+            max_r=size.max_r,
+            reason=decision.reason,
+        )
+
+        return PipelineResult(event=event, decision=decision, size=size)
