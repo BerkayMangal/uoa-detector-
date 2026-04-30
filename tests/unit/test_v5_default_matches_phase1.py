@@ -182,6 +182,16 @@ def test_fusion_phase2_defaults() -> None:
     assert f.timestamp_skew_tolerance_ms == 100
 
 
+def test_fusion_watermark_tunables_phase2_defaults() -> None:
+    """Phase 2.3.3 watermark tunables. SPEC-SILENT — surfaced as explicit
+    knobs so the 'one slow source blocks everything' failure mode is
+    operator-controllable rather than a buried constant.
+    """
+    f = load_default_profile().fusion
+    assert f.stalled_source_timeout_ms == 2000
+    assert f.allowed_lateness_ms == 200
+
+
 def test_fusion_tier_thresholds_phase2_defaults() -> None:
     """tier_thresholds default per Phase 2.3.2 user spec.
 

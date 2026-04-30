@@ -171,6 +171,9 @@ def test_fusion_defaults(v5: CalibrationProfile) -> None:
     f = v5.fusion
     assert f.window_ms == 500
     assert f.timestamp_skew_tolerance_ms == 100
+    # Phase 2.3.3 watermark tunables
+    assert f.stalled_source_timeout_ms == 2000
+    assert f.allowed_lateness_ms == 200
     # Phase 2.3.2 confidence-tier resolution thresholds
     assert f.tier_thresholds.unanimous_min_sources == 2
     assert math.isclose(f.tier_thresholds.majority_fraction, 0.5)
@@ -265,6 +268,8 @@ def test_invalid_weights_sum_rejected() -> None:
         "fusion": {
             "window_ms": 500,
             "timestamp_skew_tolerance_ms": 100,
+            "stalled_source_timeout_ms": 2000,
+            "allowed_lateness_ms": 200,
             "tier_thresholds": {
                 "unanimous_min_sources": 2,
                 "majority_fraction": 0.5,

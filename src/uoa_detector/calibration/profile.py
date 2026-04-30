@@ -369,13 +369,43 @@ class TierThresholds(_StrictModel):
 
 
 class FusionParams(_StrictModel):
-    """SourceFusion windowing parameters."""
+    """SourceFusion windowing parameters (event-time + watermark semantics)."""
 
     window_ms: int = Field(
-        description="Sliding-window duration for cross-source print reconciliation.",
+        gt=0,
+        description=(
+            "Maximum span in event-time milliseconds within which prints are "
+            "considered the same fusion bucket. Two prints with the same key "
+            "fuse iff their event-time span (max-min across the bucket "
+            "including both) is < window_ms."
+        ),
     )
     timestamp_skew_tolerance_ms: int = Field(
-        description="Max wall-clock skew between feeds before classification_disagreement.",
+        ge=0,
+        description=(
+            "Max wall-clock skew between feeds before classification_disagreement "
+            "is flagged on the SourceAgreement (independent of bucket-fit decisions)."
+        ),
+    )
+    stalled_source_timeout_ms: int = Field(
+        gt=0,
+        description=(
+            "If a source produces no events for this many ms (walltime), its "
+            "watermark is force-advanced to (walltime - allowed_lateness_ms) so "
+            "one slow or dead source cannot block the global watermark, and "
+            "buckets that have aged out can close. Spec-silent: the v5 doc "
+            "doesn't define this — Phase 2.3.3 surfaces it as an explicit tunable."
+        ),
+    )
+    allowed_lateness_ms: int = Field(
+        ge=0,
+        description=(
+            "When force-advancing a stalled source's watermark, the watermark "
+            "is set to (walltime - allowed_lateness_ms). This intentionally "
+            "leaves room for slightly-late events to still be within global_wm. "
+            "Tradeoff: larger values = more lateness tolerated, longer waits "
+            "before stalled buckets close. Spec-silent."
+        ),
     )
     tier_thresholds: TierThresholds = Field(
         description="Confidence-tier resolution thresholds — see TierThresholds.",
