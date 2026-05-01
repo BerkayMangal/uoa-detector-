@@ -524,3 +524,23 @@ class CalibrationProfile(_StrictModel):
                 raise ValueError(msg)
 
         return self
+
+    def content_hash(self) -> str:
+        """SHA-256 of the profile's canonical-JSON serialization.
+
+        Used in the ``SignalDecisionRecord`` so the operator can reconcile
+        a stored decision against the exact profile that produced it.
+        Profiles with the same field values produce the same hash regardless
+        of in-memory object identity. Sort_keys=True ensures field order
+        doesn't affect the hash.
+        """
+        import hashlib
+
+        canonical = self.model_dump_json(by_alias=False)
+        # model_dump_json output is non-deterministic across Pydantic versions
+        # only in formatting; sort by re-loading and re-dumping with sorted keys.
+        import json
+
+        parsed = json.loads(canonical)
+        canonical_sorted = json.dumps(parsed, sort_keys=True, separators=(",", ":"))
+        return hashlib.sha256(canonical_sorted.encode("utf-8")).hexdigest()

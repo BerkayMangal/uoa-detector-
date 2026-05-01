@@ -10,6 +10,7 @@ multi-source scenarios get watermark-driven fusion per ``profile.fusion``.
 from __future__ import annotations
 
 import asyncio
+import time
 from typing import TYPE_CHECKING
 
 import structlog
@@ -22,6 +23,12 @@ from uoa_detector.domain.labels import LabelDecision
 from uoa_detector.domain.risk import PositionSize
 from uoa_detector.fusion import SourceFusion
 from uoa_detector.labeling.labeler import Labeler
+from uoa_detector.observability import (
+    DecisionRecordWriter,
+    SignalDecisionRecord,
+    StageExecutionEntry,
+    build_decision_record,
+)
 from uoa_detector.pipeline.cluster_decay import ClusterDecayWatcher
 from uoa_detector.pipeline.stage import EnrichmentStage, PipelineContext
 from uoa_detector.risk.sizer import RiskSizer
@@ -44,6 +51,10 @@ class PipelineResult(BaseModel):
     event: EnrichedEvent
     decision: LabelDecision
     size: PositionSize
+    # Phase 2.7: every result carries a SignalDecisionRecord so observers can
+    # serialize, log, or persist as they choose. The record is populated by
+    # process_one regardless of whether a writer is attached.
+    record: SignalDecisionRecord | None = None
 
 
 class Pipeline:
@@ -65,6 +76,7 @@ class Pipeline:
         force_multi_source: bool = False,
         decay_watcher_enabled: bool = True,
         decay_check_interval_s: float = 60.0,
+        decision_record_writer: DecisionRecordWriter | None = None,
     ) -> None:
         self._profile = profile or load_default_profile()
         self._fusion = SourceFusion(
@@ -80,6 +92,7 @@ class Pipeline:
         self._sizer = RiskSizer(self._profile)
         self._decay_watcher_enabled = decay_watcher_enabled
         self._decay_check_interval_s = decay_check_interval_s
+        self._writer = decision_record_writer
 
     @property
     def store(self) -> BacktestStore:
@@ -120,6 +133,8 @@ class Pipeline:
                 except (TimeoutError, asyncio.CancelledError):
                     watcher_task.cancel()
             await self._fusion.close()
+            if self._writer is not None:
+                self._writer.close()
         return results
 
     async def process_one(self, raw: OptionsPrint) -> PipelineResult:
@@ -134,10 +149,20 @@ class Pipeline:
         ``event.rejection`` for the decision record / audit.
         """
         event = EnrichedEvent(print=raw)
+        stage_executions: list[StageExecutionEntry] = []
 
         # 1) Enrichment stages — break early on rejection.
+        # Per-stage walltime captured for the decision record.
         for stage in self._stages:
+            t0 = time.perf_counter()
             event = await stage.enrich(event, self._ctx)
+            latency_ms = (time.perf_counter() - t0) * 1000.0
+            stage_executions.append(
+                StageExecutionEntry(
+                    stage_name=stage.name,
+                    latency_ms=latency_ms,
+                ),
+            )
             if event.rejection is not None:
                 break
 
@@ -179,6 +204,24 @@ class Pipeline:
             ),
             max_r=size.max_r,
             reason=decision.reason,
+        )
+
+        # 9) Build decision record + dispatch to writer if attached.
+        record = build_decision_record(
+            event=event,
+            profile=self._profile,
+            decision=decision,
+            size=size,
+            stage_executions=stage_executions,
+        )
+        if self._writer is not None:
+            self._writer.write(record)
+
+        return PipelineResult(
+            event=event,
+            decision=decision,
+            size=size,
+            record=record,
         )
 
         return PipelineResult(event=event, decision=decision, size=size)
