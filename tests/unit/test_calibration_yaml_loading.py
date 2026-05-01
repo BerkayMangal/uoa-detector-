@@ -143,16 +143,23 @@ def test_loaded_profile_is_a_calibration_profile(profiles_root: Path) -> None:
 
 def test_warning_logged_for_commonly_tuned_missing(
     profiles_root: Path,
-    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
-    """Non-default profile that doesn't override a 'commonly tuned' field warns."""
+    """Non-default profile that doesn't override a 'commonly tuned' field warns.
+
+    Uses ``caplog`` rather than ``capsys`` because structlog may be wired to
+    Python's stdlib logger (in which case the message goes through caplog)
+    or directly to a stream (capsys territory). caplog captures the message
+    regardless of structlog's processor configuration.
+    """
     child = profiles_root / "tickers" / "NOTUNE.yaml"
     child.write_text(
         "profile_id: notune\ndescription: x\ninherits_from: v5_default\n"
     )
-    load_profile(child, profiles_dir=profiles_root)
-    captured = capsys.readouterr()
-    text = captured.out + captured.err
-    # structlog emits the warning to stdout via its default writer.
+    with caplog.at_level("WARNING"):
+        load_profile(child, profiles_dir=profiles_root)
+
+    messages = [rec.getMessage() for rec in caplog.records]
+    text = " ".join(messages)
     assert "profile_missing_commonly_tuned_field" in text
     assert "median_window_days" in text or "window_minutes" in text
