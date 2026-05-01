@@ -8,8 +8,29 @@ When that happens, the labeler downgrades a CONVEXITY_CLUSTER signal to
 CONVEXITY_WATCH on subsequent labeling passes for that key, because the
 event's ``cluster_decayed`` flag will be True.
 
-Design
-------
+# TODO(phase-3): refactor to pull-based decay check using
+# event.print.timestamp as the clock; remove the asyncio task and the
+# walltime-driven check_interval_s loop entirely.
+#
+# Current design is walltime-driven: the asyncio task wakes every
+# check_interval_s walltime seconds and asks "is now - most_recent.event_time
+# >= decay_minutes?". This works in live mode (walltime ~ event-time) and
+# in unit tests (which inject ctx.clock to fake walltime). It breaks in
+# backtest replay where walltime collapses to seconds while event-time
+# spans months — the asyncio task either never fires or fires at the
+# wrong moments.
+#
+# Phase 3 should turn this into a stage that runs on every event and
+# checks decay using event.print.timestamp as the clock — no background
+# task, no walltime dependency, identical behaviour in live and replay.
+# The decay_once() method already does the right thing if called with
+# ctx.clock returning event-time; the asyncio loop is the part that
+# doesn't generalise. Keep the unit tests (they pin ctx.clock to a
+# specific datetime, so they'd survive the refactor) and rewrite the
+# orchestrator wiring to be a stage rather than a create_task.
+
+Design (Phase 2)
+----------------
 The watcher is a periodic asyncio task. Every ``check_interval_s`` walltime
 seconds it scans all open ``ctx.cluster_buffers`` and, for each buffer
 whose most-recent event's timestamp (event-time) is older than the
