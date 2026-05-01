@@ -106,7 +106,7 @@ def test_hot_swap_via_reload(profiles_root: Path) -> None:
 def test_missing_default_raises(tmp_path: Path) -> None:
     empty = tmp_path / "empty"
     empty.mkdir()
-    with pytest.raises(ConfigurationError, match="default profile not found"):
+    with pytest.raises(ConfigurationError, match="failed to load default profile"):
         CalibrationResolver(empty)
 
 
