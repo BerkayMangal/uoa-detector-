@@ -110,6 +110,46 @@ def test_missing_default_raises(tmp_path: Path) -> None:
         CalibrationResolver(empty)
 
 
+def test_missing_default_raises_ambiguously(tmp_path: Path) -> None:
+    """Bootstrap failure currently doesn't distinguish missing-file from
+    malformed-YAML from validator-rejection in the exception. Phase 3 will
+    wrap underlying causes via ``__cause__`` (see TODO in
+    ``CalibrationResolver.__init__``). This test pins the current
+    (limited) contract so the Phase 3 widening doesn't go unnoticed —
+    when somebody adds ``raise ... from underlying_exc`` in ``reload()``
+    and propagates the cause through ``__init__``, this assertion will
+    fail and prompt them to update the test (and any callers relying on
+    the cause-collapsed behaviour).
+
+    Three failure modes that all currently produce the same exception with
+    no ``__cause__``:
+      - default file missing (this test exercises that one)
+      - default file contains malformed YAML
+      - default file parses as YAML but fails Pydantic validation
+
+    Operationally these need different user actions ('create the file' vs
+    'fix the syntax' vs 'fix the values'). Right now the only signal is
+    the ``calibration_resolver_reload_aborted`` log line's ``reason``
+    field, which is fine for human operators but not for programmatic
+    callers.
+    """
+    empty = tmp_path / "empty"
+    empty.mkdir()
+    with pytest.raises(ConfigurationError) as exc_info:
+        CalibrationResolver(empty)
+
+    # Document the contract gap: __cause__ is None because reload() catches
+    # the underlying exception broadly and __init__ raises a fresh one
+    # without `from`. Phase 3 fix will replace this assertion with one
+    # that asserts __cause__ IS the underlying FileNotFoundError /
+    # YAMLError / ValidationError, depending on the failure mode.
+    assert exc_info.value.__cause__ is None, (
+        "If __cause__ is now populated, the Phase 3 fix has landed — "
+        "rewrite this test to assert the specific underlying type, and "
+        "remove the corresponding TODO in CalibrationResolver.__init__."
+    )
+
+
 def test_broken_child_profile_does_not_kill_reload(profiles_root: Path) -> None:
     """A bad ticker profile is dropped with a warning; default still loads."""
     (profiles_root / "tickers" / "BROKEN.yaml").write_text(

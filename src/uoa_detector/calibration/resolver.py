@@ -44,6 +44,18 @@ class CalibrationResolver:
         # reload() returns False on failure rather than raising so subsequent
         # reloads never crash the pipeline; the bootstrap path must explicitly
         # convert that into a hard error.
+        #
+        # TODO(phase-3): wrap underlying load failures via
+        #   ``raise ConfigurationError(...) from e``
+        # so callers can distinguish FileNotFoundError vs YAMLError vs
+        # ValidationError via ``exc.__cause__``. The current implementation
+        # collapses all three causes into one message, which is fine for the
+        # detector's own use but loses the fidelity an operations dashboard
+        # would want ("create the file" vs "fix the syntax" vs "fix the
+        # values" — three different user actions). The fix lives in
+        # ``reload()`` (where the broad ``except Exception`` is) and needs a
+        # one-line addition here once ``reload()`` returns the underlying
+        # cause alongside its bool.
         if not self.reload():
             msg = (
                 f"failed to load default profile {default_profile_filename!r} "
