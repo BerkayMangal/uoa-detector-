@@ -1,0 +1,52 @@
+ticker,sector,market_cap_usd_b_approx,options_volume_30d_avg_approx,notes
+PLTR,tech_software,~50,~250000,large but high gamma activity; flag for tier review
+SOFI,fintech,~10,~80000,
+RBLX,tech_gaming,~25,~60000,upper edge of tier
+ROKU,tech_streaming,~10,~45000,
+COIN,fintech_crypto,~50,~180000,upper edge; high gamma flow
+HOOD,fintech_brokerage,~12,~70000,
+AFRM,fintech_lending,~7,~40000,
+UPST,fintech_lending,~3,~35000,
+CHWY,consumer_ecommerce,~12,~30000,
+W,consumer_ecommerce,~6,~25000,
+ETSY,consumer_ecommerce,~8,~30000,
+PINS,tech_social,~20,~40000,
+SNAP,tech_social,~17,~95000,
+DASH,tech_gig,~50,~50000,upper edge
+ABNB,tech_travel,~80,~70000,large; flag for tier review
+LYFT,tech_gig,~5,~35000,
+EXPE,consumer_travel,~17,~25000,
+RIVN,auto_ev,~12,~85000,
+LCID,auto_ev,~10,~70000,
+NIO,auto_ev,~12,~60000,ADR — flag for review per exclusion list
+XPEV,auto_ev,~9,~45000,ADR — flag for review per exclusion list
+PLUG,energy_hydrogen,~3,~100000,high retail activity
+FCEL,energy_hydrogen,~1,~30000,below market cap floor — flag for tier review
+MARA,crypto_mining,~5,~150000,high gamma activity
+RIOT,crypto_mining,~3,~110000,
+CLSK,crypto_mining,~3,~50000,
+HUT,crypto_mining,~2,~25000,
+CIFR,crypto_mining,~2,~20000,below volume floor — flag
+WULF,crypto_mining,~2,~20000,below volume floor — flag
+APP,tech_adtech,~80,~45000,upper edge
+ROOT,fintech_insurance,~2,~20000,below volume floor — flag
+LMND,fintech_insurance,~3,~25000,
+OPEN,real_estate_tech,~2,~30000,
+Z,real_estate_tech,~13,~25000,
+RDFN,real_estate_tech,~2,~20000,
+DKNG,gaming_betting,~17,~80000,
+PENN,gaming_betting,~3,~25000,
+CHGG,edtech,~1,~20000,below market cap floor — flag
+DUOL,edtech,~14,~25000,
+COUR,edtech,~3,~20000,
+TWLO,tech_communications,~10,~40000,
+DOCU,tech_saas,~12,~30000,
+HUBS,tech_saas,~30,~25000,upper edge
+TEAM,tech_saas,~50,~30000,upper edge
+NET,tech_saas,~30,~50000,upper edge
+DDOG,tech_saas,~40,~45000,upper edge
+ZS,tech_saas,~30,~30000,upper edge
+CRWD,tech_security,~80,~70000,large; flag for review
+S,tech_security,~10,~25000,
+PATH,tech_automation,~7,~40000,
+AI,tech_ai,~3,~75000,high gamma activity despite small cap
