@@ -1,0 +1,129 @@
+# UOA + Convexity Detector v5 — Track B Gamma Squeeze Precursor profile.
+#
+# Inherits from v5_default and overrides ONLY the leaves that differ for
+# Track B + Formülasyon A (multi-source fusion × Tier-2 universe edge).
+# Every non-overridden field is inherited unchanged via deep-merge semantics.
+#
+# This profile encodes a specific trading thesis:
+#
+#   "Dealer'lar net short gamma'da iken, küçük bir spot tetik reflexive
+#    hedge döngüsü başlatır. Bu döngü başlamadan ÖNCE options flow ve OI
+#    değişiklikleri positioning'i ele veriyor. Multi-source fusion
+#    (Polygon + UW + IBKR) Tier-2 evrende uygulandığında, hem gürültüyü
+#    eler hem de rekabet az olduğu için edge'in en yüksek olduğu yerde
+#    sinyal üretir."
+#
+# Configuration parameters (Phase 3 prep):
+#   Position size:    1% per trade
+#   Hard stop DD:     50%
+#   Soft alarm DD:    35%
+#   Sharpe pass:      > 1.5 (>2.5 bonus)
+#   E expectancy:     > 0.5R per trade
+#   Walk-forward:     3 of 4 quarters positive
+#   Max DD ceiling:   < 20% (backtest)
+#   Min trade freq:   30/year + 2-year backtest (60 total)
+#
+# DO NOT edit casually — fork this profile rather than tuning in place. The
+# combinatorial backtest (Tier-1+single, Tier-1+fusion, Tier-2+single,
+# Tier-2+fusion) compares this profile's output against the same code with
+# different runtime fusion selection; if you tune this profile mid-run you
+# break that comparison.
+
+profile_id: v5_gamma_squeeze
+description: "Track B (Gamma Squeeze Precursor) calibration. Tunes scoring toward dealer gamma + cluster + sweep, narrows DTE to 3-14, tightens label thresholds for 'az ama öz' filter."
+inherits_from: v5_default
+
+# --- Combined-score weights ---
+# Track B's core mechanic is dealer-gamma reflexivity, NOT catalyst proximity.
+# Reweight: gamma ↑↑ (squeeze engine), convexity ↑ (visible signature),
+# event ↓↓ (Track B catalyst-independent), uoa ↓ (still important but not
+# the heart of the signal). Sector confirmation stays low because squeezes
+# are typically ticker-specific, not sector-wide.
+scoring:
+  uoa: 0.20                  # was 0.30
+  convexity: 0.30            # was 0.25
+  event: 0.05                # was 0.15
+  gamma: 0.25                # was 0.10  (largest single shift)
+  price_confirmation: 0.10   # unchanged (spot trigger matters)
+  sector_confirmation: 0.05  # unchanged
+  time_of_day: 0.05          # unchanged
+  # Sum: 1.00
+
+# --- Early-convexity weights ---
+# Pre-UOA-confirmation scoring. Track B's edge often appears here BEFORE
+# UOA fully confirms — gamma + cluster are the leading indicators.
+early_scoring:
+  convexity: 0.35            # was 0.40
+  cluster_density: 0.25      # was 0.20
+  event: 0.05                # was 0.15
+  gamma: 0.30                # was 0.15  (Track B's lead indicator)
+  time_of_day: 0.05          # was 0.10
+  # Sum: 1.00
+
+# --- Module 38 temporal clustering ---
+# Track B signals are FAST. 60-min window + 90-min decay (default) is too
+# wide — squeezes either ignite within 30 minutes or never. Tighten window,
+# accelerate decay, demand more aggressive escalation, reduce the
+# nearby-strikes credit (squeezes concentrate on a single strike).
+cluster:
+  window_minutes: 30                   # was 60
+  decay_minutes: 45                    # was 90
+  escalation_ratio: 1.30               # was 1.20  (more aggressive demand)
+  density_three_escalating: 1.0        # unchanged (Track B's gold standard)
+  density_three_same: 0.7              # was 0.8 (escalation matters more)
+  density_two_same: 0.3                # was 0.4
+  density_isolated: 0.0                # unchanged
+  density_nearby_strikes: 0.5          # was 0.6 (squeezes concentrate)
+  nearby_strike_count: 1               # unchanged
+
+# --- Module 34 sweep / block ---
+# ISO + above-ask sweeps are Track B's earliest warning. Reward more.
+sweep:
+  iso_bonus: 0.20                      # was 0.15
+  cross_venue_bonus: 0.10              # unchanged
+  cross_venue_above_ask_bonus: 0.20    # was 0.15
+  cross_venue_window_ms: 50            # unchanged
+
+# --- Module 35 DTE multipliers ---
+# Track B trade horizon is 3-14 DTE OTM calls. Penalise mid/long DTE
+# aggressively — by 30+ DTE the squeeze window has closed and theta starts
+# eating capital. Lower leap_threshold from 90 to 60 because anything
+# 60+ DTE is already inappropriate for Track B.
+dte:
+  bucket_0_7: 1.30                     # was 1.20  (Track B's heart)
+  bucket_8_14: 1.20                    # was 1.10
+  bucket_15_30: 0.50                   # was 1.00  (steep penalty starts)
+  bucket_31_60: 0.30                   # was 0.85
+  bucket_60_plus: 0.10                 # was 0.70  (Track B no-go zone)
+  leap_threshold: 60                   # was 90
+
+# --- Labeler thresholds ---
+# "Az ama öz" filter applied here. Tighten every threshold so only genuine
+# Track B signals pass. Combined with the Tier-2 universe filter and
+# fusion=unanimous runtime selection, expected output is ~30 trades/year.
+label_thresholds:
+  penalized_below: 0.55                # was 0.30  (sharper rejection)
+  cluster_min: 0.7                     # was 0.4   (Track B demands density)
+  cluster_burst: 0.90                  # was 0.8   (BURST is the prize)
+  relative_premium_uoa: 0.7            # was 0.5
+  convexity_watch_floor: 0.55          # was 0.6   (slight loosening — let WATCH catch borderline early signals)
+  pre_catalyst_event_min: 0.6          # was 0.75  (less relevant; Track B is catalyst-independent)
+
+# --- Risk buckets (max-R per labeling bucket) ---
+# Bucket name convention is set by v5_default — overrides preserve the same
+# leaf names. Bucket-to-label mapping (defined in code): convexity_cluster
+# also covers CONVEXITY_BURST. Track B reweights: convexity_cluster ↑↑
+# (the prize signal), standard_uoa ↓ (UOA-only is weak in Track B context),
+# leap_positioning ↓ (Track B never holds LEAPs), pre_catalyst_flow ↓
+# (catalyst-independent thesis).
+risk_buckets:
+  convexity_watch: 0.25                # unchanged (watchlist)
+  convexity_cluster: 1.00              # was 0.50  (CLUSTER+BURST = full size)
+  standard_uoa: 0.25                   # was 0.75  (UOA-only is weak in Track B)
+  sweep_uoa: 0.50                      # was 0.85  (still solid but not full)
+  pre_catalyst_flow: 0.25              # was 0.85  (Track B catalyst-independent)
+  high_conviction_sequence: 1.00       # unchanged (top of stack)
+  high_conviction_initial: 0.50        # unchanged (scale-in still valid)
+  leap_positioning: 0.10               # was 0.25  (Track B doesn't trade LEAPs)
+  discard_or_log: 0.0                  # unchanged
+  rejected: 0.0                        # unchanged
