@@ -1,5 +1,18 @@
 """``ClusterDecayWatcher`` — sets ``cluster_decayed=True`` on stale cluster buffers.
 
+DEPRECATED in Phase 3.1.1 — replaced by ``ClusterDecayStage`` in
+``uoa_detector.pipeline.stages.cluster_decay_stage``. The new stage is
+event-time-driven (clock = incoming event's timestamp), so it works
+correctly in both live mode AND backtest replay. The watcher's asyncio
+loop was walltime-driven and broke in backtest replay.
+
+This file still exists in Phase 3.1.1 because the equivalence test in
+``tests/unit/test_cluster_decay.py`` compares the new stage's output
+against this legacy watcher to demonstrate same-input-same-output. The
+watcher is removed in Phase 3.1.2 (next commit) along with the
+orchestrator's ``decay_watcher_enabled`` and ``decay_check_interval_s``
+parameters.
+
 Phase 2 / Module 38 follow-up. The temporal-clustering stage builds up
 per-(ticker, strike, expiry, option_type) buffers as flow events arrive.
 A buffer that has not received a new qualifying print within
@@ -8,29 +21,8 @@ When that happens, the labeler downgrades a CONVEXITY_CLUSTER signal to
 CONVEXITY_WATCH on subsequent labeling passes for that key, because the
 event's ``cluster_decayed`` flag will be True.
 
-# TODO(phase-3): refactor to pull-based decay check using
-# event.print.timestamp as the clock; remove the asyncio task and the
-# walltime-driven check_interval_s loop entirely.
-#
-# Current design is walltime-driven: the asyncio task wakes every
-# check_interval_s walltime seconds and asks "is now - most_recent.event_time
-# >= decay_minutes?". This works in live mode (walltime ~ event-time) and
-# in unit tests (which inject ctx.clock to fake walltime). It breaks in
-# backtest replay where walltime collapses to seconds while event-time
-# spans months — the asyncio task either never fires or fires at the
-# wrong moments.
-#
-# Phase 3 should turn this into a stage that runs on every event and
-# checks decay using event.print.timestamp as the clock — no background
-# task, no walltime dependency, identical behaviour in live and replay.
-# The decay_once() method already does the right thing if called with
-# ctx.clock returning event-time; the asyncio loop is the part that
-# doesn't generalise. Keep the unit tests (they pin ctx.clock to a
-# specific datetime, so they'd survive the refactor) and rewrite the
-# orchestrator wiring to be a stage rather than a create_task.
-
-Design (Phase 2)
-----------------
+Design (Phase 2, retained for equivalence test only)
+----------------------------------------------------
 The watcher is a periodic asyncio task. Every ``check_interval_s`` walltime
 seconds it scans all open ``ctx.cluster_buffers`` and, for each buffer
 whose most-recent event's timestamp (event-time) is older than the
@@ -41,13 +33,6 @@ Only that single most-recent event gets the flag — the older events in
 the same buffer were already past the decay window when they were stored
 (if they weren't, they'd still be active). The flag on the most-recent
 event is what the labeler reads if the event is re-scored later.
-
-Walltime vs event-time. Stall detection here uses the active clock for
-the "is this stale now" question, but the timestamp comparison is against
-``event.print_.timestamp`` (event-time) because that's how M38's window
-logic works. In a backtest where the clock runs faster than walltime,
-inject ``ctx.clock`` to an event-time-driven function so decay timing
-matches what M38 actually observed.
 
 Tests / non-asyncio entry point. ``decay_once()`` performs one scan-and-
 flag pass synchronously (no asyncio sleep). Tests use this directly to

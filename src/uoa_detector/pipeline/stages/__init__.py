@@ -8,6 +8,7 @@ system depends on a correct time-of-day weight (see task spec).
 """
 
 from uoa_detector.pipeline.stage import EnrichmentStage
+from uoa_detector.pipeline.stages.cluster_decay_stage import ClusterDecayStage
 from uoa_detector.pipeline.stages.m21_dealer_gamma import DealerGammaStage
 from uoa_detector.pipeline.stages.m22_event_calendar import EventCalendarStage
 from uoa_detector.pipeline.stages.m23_price_confirmation import PriceConfirmationStage
@@ -22,6 +23,7 @@ from uoa_detector.pipeline.stages.m38_temporal_cluster import TemporalClusterSta
 from uoa_detector.pipeline.stages.m39_time_of_day import TimeOfDayStage
 
 __all__ = [
+    "ClusterDecayStage",
     "DTEDecayStage",
     "DarkPoolStage",
     "DealerGammaStage",
@@ -38,7 +40,7 @@ __all__ = [
 
 
 def default_stage_pipeline() -> list[EnrichmentStage]:
-    """Return all 12 stages in their canonical order.
+    """Return all stages in their canonical order.
 
     Order matters where stages depend on each other:
       - M37 (relative premium) feeds the UOA score that M21/M34 may further adjust.
@@ -46,6 +48,11 @@ def default_stage_pipeline() -> list[EnrichmentStage]:
       - M35 (DTE multiplier) is recorded here but actually applied inside the
         scoring engine (per spec — only to convexity/gamma).
       - M39 (time of day) must run before scoring.
+      - ``ClusterDecayStage`` runs AFTER M38 (TemporalClusterStage) because
+        M38 must have appended the incoming event to its cluster buffer first;
+        the decay stage then reads that and any older buffers to flip stale
+        ones. Phase 3.1.1: this stage replaces the walltime asyncio
+        ClusterDecayWatcher, fixing backtest-replay correctness.
     """
     return [
         TimeOfDayStage(),  # M39 — full impl
@@ -59,5 +66,6 @@ def default_stage_pipeline() -> list[EnrichmentStage]:
         SectorPeerStage(),  # M25
         DarkPoolStage(),  # M26
         OpeningClosingStage(),  # M27
-        TemporalClusterStage(),  # M38
+        TemporalClusterStage(),  # M38 — must precede ClusterDecayStage
+        ClusterDecayStage(),  # Phase 3.1.1 — event-time decay check
     ]
