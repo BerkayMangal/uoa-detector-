@@ -9,7 +9,6 @@ multi-source scenarios get watermark-driven fusion per ``profile.fusion``.
 
 from __future__ import annotations
 
-import asyncio
 import time
 from typing import TYPE_CHECKING
 
@@ -30,7 +29,6 @@ from uoa_detector.observability import (
     StageExecutionEntry,
     build_decision_record,
 )
-from uoa_detector.pipeline.cluster_decay import ClusterDecayWatcher
 from uoa_detector.pipeline.stage import EnrichmentStage, PipelineContext
 from uoa_detector.risk.sizer import RiskSizer
 from uoa_detector.scoring.combined import compute_combined_score
@@ -76,8 +74,6 @@ class Pipeline:
         store: BacktestStore | None = None,
         context: PipelineContext | None = None,
         force_multi_source: bool = False,
-        decay_watcher_enabled: bool = True,
-        decay_check_interval_s: float = 60.0,
         decision_record_writer: DecisionRecordWriter | None = None,
     ) -> None:
         # Profile resolution: if resolver is supplied, we snapshot
@@ -105,8 +101,6 @@ class Pipeline:
         self._penalty_engine = PenaltyEngine(self._profile)
         self._labeler = Labeler(self._profile)
         self._sizer = RiskSizer(self._profile)
-        self._decay_watcher_enabled = decay_watcher_enabled
-        self._decay_check_interval_s = decay_check_interval_s
         self._writer = decision_record_writer
 
     @property
@@ -122,31 +116,16 @@ class Pipeline:
     async def run(self) -> list[PipelineResult]:
         """Drain the fused source stream, process each event, return all results.
 
-        If ``decay_watcher_enabled`` (the default), a background
-        ``ClusterDecayWatcher`` task runs alongside event processing,
-        flipping ``cluster_decayed=True`` on stale cluster buffers every
-        ``decay_check_interval_s`` walltime. Cancelled cleanly on close.
+        Cluster decay runs as a pipeline stage (``ClusterDecayStage``, added
+        to the default pipeline in Phase 3.1.1) — no background task, no
+        walltime dependency. Each event triggers one decay-check pass using
+        its own timestamp as the clock. Backtest-replay correct.
         """
-        watcher_task: asyncio.Task[None] | None = None
-        watcher: ClusterDecayWatcher | None = None
-        if self._decay_watcher_enabled:
-            watcher = ClusterDecayWatcher(
-                self._ctx,
-                check_interval_s=self._decay_check_interval_s,
-            )
-            watcher_task = asyncio.create_task(watcher.run())
-
         results: list[PipelineResult] = []
         try:
             async for canonical in self._fusion.stream():
                 results.append(await self.process_one(canonical))
         finally:
-            if watcher is not None and watcher_task is not None:
-                watcher.stop()
-                try:
-                    await asyncio.wait_for(watcher_task, timeout=1.0)
-                except (TimeoutError, asyncio.CancelledError):
-                    watcher_task.cancel()
             await self._fusion.close()
             if self._writer is not None:
                 self._writer.close()

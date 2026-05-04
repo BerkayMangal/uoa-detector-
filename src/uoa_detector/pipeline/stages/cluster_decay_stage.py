@@ -32,15 +32,18 @@ Idempotency:
     bit acts as the latch). The stage can run repeatedly without
     double-counting.
 
-Equivalence with the prior ``ClusterDecayWatcher.decay_once()``:
-  - Same algorithm: for each non-empty buffer, take the most-recent
-    event, compute age = clock_now - most_recent.timestamp, if age >=
-    profile.cluster.decay_minutes and not already flagged then flip.
-  - Only difference: ``clock_now`` is now the INCOMING event's
-    timestamp, not ``ctx.now()``. In live mode they agree (within
-    100ms); in backtest they can differ by months. See the
-    Phase 3.1.1 equivalence test in ``tests/unit/test_cluster_decay.py``
-    that demonstrates same-input-same-output for the synthetic case.
+Phase 2 → Phase 3.1.x history:
+  The original Phase 2 implementation was a walltime asyncio task
+  (``ClusterDecayWatcher``, removed in Phase 3.1.2). Same algorithm,
+  same per-buffer decision logic — for each non-empty buffer, take the
+  most-recent event, compute age = clock_now - most_recent.timestamp,
+  if age >= profile.cluster.decay_minutes and not already flagged then
+  flip. The only real difference: ``clock_now`` is now the INCOMING
+  event's timestamp, not ``ctx.now()``. In live mode they agreed within
+  100ms; in backtest replay they diverged by months. The Phase 3.1.1
+  commit included a same-input-same-output equivalence test against
+  the old watcher; that test was removed in 3.1.2 along with the
+  watcher itself (nothing left to compare against).
 """
 
 from __future__ import annotations

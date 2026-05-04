@@ -38,12 +38,12 @@ stage skips the append (but still recomputes the density) if the
 event_id is already in the buffer. This makes the stage safe to re-run
 during pipeline replay or manual re-enrichment.
 
-ClusterDecayWatcher (NOT in this stage — separate background task):
-scans buffers periodically; when no new qualifying print has arrived
-within ``profile.cluster.decay_minutes``, sets ``cluster_decayed=True``
-on the most recent event from that buffer so the labeler downgrades
-``CONVEXITY_CLUSTER`` → ``CONVEXITY_WATCH``. Implemented in a follow-up
-commit alongside its orchestrator wire-up.
+ClusterDecayStage (NOT in this stage — separate stage that runs immediately
+after this one): when the incoming event's timestamp shows that a buffer's
+most-recent event is older than ``profile.cluster.decay_minutes``, the
+decay stage flips ``cluster_decayed=True`` so the labeler downgrades
+``CONVEXITY_CLUSTER`` → ``CONVEXITY_WATCH``. Phase 3.1.x event-time
+implementation; replaces the Phase 2 walltime asyncio task.
 """
 
 from __future__ import annotations

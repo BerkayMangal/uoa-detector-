@@ -112,7 +112,6 @@ async def test_pipeline_picks_up_profile_change_after_reload(
         [src_a],
         list(default_stage_pipeline()),
         resolver=resolver,
-        decay_watcher_enabled=False,  # deterministic; no walltime task
     )
     results_a = await pipeline_a.run()
     assert len(results_a) == 3
@@ -148,7 +147,6 @@ async def test_pipeline_picks_up_profile_change_after_reload(
         [src_b],
         list(default_stage_pipeline()),
         resolver=resolver,
-        decay_watcher_enabled=False,
     )
     results_b = await pipeline_b.run()
     assert len(results_b) == 3
@@ -224,7 +222,6 @@ async def test_in_flight_event_completes_on_old_profile(
         [src],
         stages,
         resolver=resolver,
-        decay_watcher_enabled=False,
     )
 
     results = await pipeline.run()
@@ -277,7 +274,6 @@ async def test_malformed_yaml_reload_retains_previous_state(
         [src],
         list(default_stage_pipeline()),
         resolver=resolver,
-        decay_watcher_enabled=False,
     )
     results = await pipeline.run()
     assert len(results) == 1

@@ -151,9 +151,10 @@ class EnrichedEvent(BaseModel):
     is_gamma_acceleration: bool = False  # Module 21 GAMMA_ACCELERATION_RISK flag
     escalating_cluster: bool = False  # Module 38 escalating-size flag (Phase 2 rename)
 
-    # Phase 2 cluster decay — set by ClusterDecayWatcher when it emits a
-    # synthetic decay event so the labeler can downgrade CONVEXITY_CLUSTER
-    # back to CONVEXITY_WATCH after the configured timeout.
+    # Cluster decay — set by ClusterDecayStage (Phase 3.1.x) when the buffer
+    # this event lives in has gone stale (no new qualifying print within
+    # profile.cluster.decay_minutes). The labeler then downgrades a
+    # CONVEXITY_CLUSTER signal back to CONVEXITY_WATCH on subsequent passes.
     cluster_decayed: bool = False
 
     # Phase 2.3.1: structured rejection marker. When set, the pipeline
