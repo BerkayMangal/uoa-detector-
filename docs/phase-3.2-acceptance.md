@@ -17,25 +17,45 @@ adapters) come after the edge has been validated or rejected.
 
 ## Approved decisions (review-cycle outcomes)
 
-The four key technical decisions in this document, captured here for
-quick reference. Each is detailed in the relevant sub-commit section.
+The key technical decisions in this document, captured here for quick
+reference. Each is detailed in the relevant sub-commit section.
 
   1. **3.2.1 — Schema migration via Alembic.** Handcoded
      schema_version checks rejected. Adds `alembic` as a runtime
-     dependency.
+     dependency. Schema is **four tables**: `backtest_run` (run_id,
+     started/finished_at, profile id+hash, universe_id,
+     source_config_hash, total_signals_processed, total_errors,
+     dataset_window_start/end, notes), `signal` (decision records
+     plus `pipeline_latency_ms` and `data_source_latency_ms`),
+     `backtest_run_error` (per-stage error log), and `schema_version`.
+     The latency columns + error table back the Phase 3.3.x cross-cell
+     comparison's "ran cleanly on the same window with the same
+     profile hash" precondition.
 
   2. **3.2.2 — Parquet compression: zstd level 3.** Sane default;
-     revisit only if 3.3.x runs hit disk pressure.
+     revisit only if 3.3.x runs hit disk pressure. Schema includes
+     `replay_ts` alongside the existing `timestamp` and `arrival_ts`,
+     so determinism diffs between runs can be debugged from the data
+     alone.
 
   3. **3.2.3 — Real PnL deferred to 3.4. SimplePnLProvider shipped now**
-     as the placeholder: entry = ask, exit = bid, slippage =
-     `profile.backtest.slippage_pct` (default 2%), no theta/IV decay.
+     as the placeholder. Defaults: entry = ask, exit = bid, slippage
+     = 2% (`profile.backtest.slippage_pct`), `holding_window_days = 5`
+     (revised down from 7 — Track B trade dynamics are 3-5 days),
+     `exit_on_dte_lte = 2` (forced exit before expiry-day chaos),
+     `holding_strategy = fixed_window` (default; `dte_based` also
+     implemented; `take_profit_or_stop` reserved in the enum but
+     raises `NotImplementedError` with a "Phase 3.4" message).
      Crude but consistent — if the edge is real, it shows up here.
 
   4. **3.2.4 — Tier-1 anchor universe: 20 tickers** (4 broad ETFs + 8
      mega-cap tech + 2 financials + 2 energy + 2 healthcare + 2 macro
      hedges). Approved list shipped in commit 3.2.0a alongside this
      acceptance doc, ready for use from 3.2.1 onward.
+     **Walk-forward windowing**: default N=8 (3-month slices over 2
+     years). **Pass threshold expressed as fraction**, not count:
+     `walk_forward_min_consistency_pct = 0.75` lives in the profile
+     and survives N changing without re-tuning.
 
 ---
 
@@ -47,29 +67,77 @@ across days of execution; in-memory-only is unviable. This commit adds a
 SQLite-backed store as a drop-in replacement, behind the same Protocol,
 so every existing test continues to pass with either backend selected.
 
-**Schema.** Three tables: `backtest_runs` (run_id PK, started_at,
-finished_at, profile_id, profile_content_hash, universe_filter,
-fusion_filter, source_set, notes); `decision_records` (run_id FK,
-event_id PK within run, ticker, ts, label, max_r, combined_score_pre,
-combined_score_post, profile_id, profile_content_hash, full_record_json
-TEXT); `schema_version` (single-row migration tracking, starts at 1).
-Indexes on `decision_records(run_id, ts)` and `(run_id, ticker)` for
-the metric calculator's expected access patterns. Migration uses
+**Schema.** Four tables.
+
+  * **`backtest_run`** — one row per backtest invocation. Columns:
+    `run_id` PK, `started_at`, `finished_at`, `profile_id`,
+    `profile_content_hash`, `universe_id` (e.g., `tier1_anchor` or
+    `tier2_starter`), `source_config_hash` (hash of which sources
+    were active and their config — Polygon/UW/IBKR enable flags,
+    fusion threshold, etc.), `total_signals_processed`,
+    `total_errors`, `dataset_window_start`, `dataset_window_end`,
+    `notes`. Phase 3.3.x cross-cell comparison ("cell 4 beat cell 1")
+    requires proving both cells ran on the same dataset window with
+    the same profile content_hash and zero errors — these columns
+    are the audit trail that backs that proof.
+
+  * **`signal`** — one row per processed event (renamed from earlier
+    draft's `decision_records` for brevity). Columns: `run_id` FK,
+    `event_id` PK within run, `ticker`, `ts`, `label`, `max_r`,
+    `combined_score_pre`, `combined_score_post`, `profile_id`,
+    `profile_content_hash`, `pipeline_latency_ms` (end-to-end stage
+    chain wall-clock), `data_source_latency_ms` (time from upstream
+    source emission to orchestrator entry — how stale was the data
+    when we acted on it), `full_record_json` TEXT. The two latency
+    columns matter for backtest realism: a pipeline that takes 800ms
+    end-to-end produces signals you'd never act on in live trading,
+    and the metric calculator should be able to flag that.
+
+  * **`backtest_run_error`** — one row per stage error encountered
+    during a run. Columns: `run_id` FK, `event_id` (nullable — some
+    errors happen before an event_id is assigned), `stage_name`,
+    `error_type`, `error_message`, `occurred_at`. Phase 1-2 errors
+    were logged but not persisted; backtests that ran "successfully
+    with 200 silently-skipped events" need to be visible. The metric
+    calculator reads `total_errors` from `backtest_run` for the
+    cross-cell comparison's "ran cleanly" precondition; the detail
+    rows in this table back that count.
+
+  * **`schema_version`** — single-row migration tracking, starts at
+    1. Alembic-managed.
+
+Indexes: `signal(run_id, ts)`, `signal(run_id, ticker)`,
+`backtest_run_error(run_id, occurred_at)`. Migration uses
 **Alembic** (approved decision; the alternative — handcoded
 schema_version checks — accumulates technical debt fast). Even at v1
 with no migrations to run, the framework is wired so v2/v3 migrations
 have a clear path. New runtime dependency: `alembic` (added to
 `pyproject.toml` in this commit).
 
-**Drop-in compatibility.** The store exposes `start_run(profile,
-universe_filter, fusion_filter, source_set, notes) -> run_id`,
-`add(event, decision, size)`, `finish_run()`, `get_run(run_id)`,
-`list_runs(...)`, and `iter_records(run_id, filters?)`. The orchestrator
-takes a `BacktestStore` Protocol; the SQLite implementation satisfies it.
-Every existing Phase 1-2 test that currently uses the in-memory store
-must pass when the test fixture is parameterised over both backends —
-this is the single most important acceptance check, written as a
-parametrised test sweep at the end of the commit.
+**Drop-in compatibility.** The store exposes:
+
+  * `start_run(profile, universe_id, source_config_hash,
+    dataset_window_start, dataset_window_end, notes) -> run_id`
+  * `add(event, decision, size, pipeline_latency_ms,
+    data_source_latency_ms)` — the two latency args default to None
+    so existing call sites that don't measure latency keep working
+  * `record_error(event_id, stage_name, error_type, error_message)`
+    — increments `backtest_run.total_errors` and inserts a row in
+    `backtest_run_error`
+  * `finish_run()` — sets `finished_at`, flushes batched writes
+  * `get_run(run_id) -> RunMetadata | None`
+  * `list_runs(...)` — filterable
+  * `iter_records(run_id, filters?)` — streaming
+  * `iter_errors(run_id) -> Iterator[ErrorRecord]`
+
+The orchestrator takes a `BacktestStore` Protocol; the SQLite
+implementation satisfies it. Every existing Phase 1-2 test that
+currently uses the in-memory store must pass when the test fixture
+is parameterised over both backends — this is the single most
+important acceptance check, written as a parametrised test sweep at
+the end of the commit. The in-memory store gets the new latency and
+error fields too (kept in lists alongside the existing decision list)
+so the Protocol stays unified.
 
 **Durability and concurrency.** `PRAGMA journal_mode=WAL` enabled at
 open; verified by a unit test that queries `PRAGMA journal_mode` after
@@ -80,13 +148,17 @@ once a record is written it is never updated or deleted by the store
 itself; tests verify this by attempting an `UPDATE` and expecting the
 test-only path to fail (production code path has no update method).
 
-**Done when:** all 12+ tests pass (including the parametrised
+**Done when:** all 16+ tests pass (including the parametrised
 in-memory-vs-SQLite equivalence sweep — every Phase 1-2 test that
 touches `BacktestStore` runs cleanly against both); WAL mode confirmed
 via PRAGMA query in a test; mid-write process kill test recovers
-cleanly on next open (WAL rollback works); CLI gains `--store
-sqlite:path/to/db` flag with default `:memory:`; one new doc file
-`docs/BACKTEST.md` introduces the storage layer.
+cleanly on next open (WAL rollback works); latency-column round-trip
+test (write known `pipeline_latency_ms` + `data_source_latency_ms`,
+read back, assert preserved); error-table round-trip test (record
+3 stage errors, `iter_errors` yields all 3, `total_errors=3` on the
+run row); CLI gains `--store sqlite:path/to/db` flag with default
+`:memory:`; one new doc file `docs/BACKTEST.md` introduces the
+storage layer.
 
 ---
 
@@ -103,12 +175,21 @@ synthetic data from historical replay apart at the boundary.
 Schema: every field of the canonical `RawPrint` Pydantic model
 (timestamp, ticker, option_type, strike, expiry, dte, spot_price,
 premium_paid, option_price, bid, ask, fill_side, exchange, is_iso,
-implied_volatility, open_interest) plus `source_id`, `source_event_id`,
-`arrival_ts` (the time the live system received the print, distinct
-from the print's exchange timestamp). Parquet compression: `zstd` level
-3 (approved default; revisitable in 3.3.x if disk pressure becomes a
-problem — `zstd 9` for smaller files, `snappy` for faster reads).
-Schema is pinned by a fixture file
+implied_volatility, open_interest) plus three time-tracking fields:
+`source_id`, `source_event_id`, `arrival_ts` (the time the live system
+received the print, distinct from the print's exchange `timestamp`),
+and `replay_ts` (the walltime the replay harness emitted this row in
+the current run). The triple `timestamp + arrival_ts + replay_ts` is
+the audit trail for replay determinism debugging: when two backtest
+runs over the same dataset window produce different signal counts, the
+diff between their `replay_ts` distributions points at where the
+non-determinism leaked in (file order, k-way merge, async scheduling).
+`replay_ts` is written by the harness at emission time, NOT by the
+upstream data source; the source files on disk leave this column NULL
+and the harness fills it during read. Parquet compression: `zstd`
+level 3 (approved default; revisitable in 3.3.x if disk pressure
+becomes a problem — `zstd 9` for smaller files, `snappy` for faster
+reads). Schema is pinned by a fixture file
 `tests/fixtures/historical/synthetic/AAPL/2025-06.parquet` containing
 10 hand-crafted records that the harness loads at test time; if anyone
 adds a new `RawPrint` field, that test fails until the fixture is
@@ -158,9 +239,14 @@ work" — the formulas are pinned by tests.
 divided by stdev, multiplied by √252. Returns `None` if total trades <
 30 (insufficient sample). *Expectancy E:* simple arithmetic mean of
 per-trade R. *Walk-forward consistency:* trades sorted by exit
-timestamp, partitioned into 4 equal-trade-count quarters (not
-equal-time, because Track B trade frequency varies); each quarter's E
-computed independently; consistency = count of quarters where E > 0.
+timestamp, partitioned into N equal-trade-count windows (N from
+`profile.backtest.walk_forward_windows`, default 8 — see 3.2.4); each
+window's E computed independently; consistency = **fraction of windows
+where E > 0** (a real number in [0, 1], not an integer count). The
+pass threshold is then expressed as a fraction
+(`walk_forward_min_consistency_pct`, default 0.75) so the same
+threshold survives if N is later changed to 4 or 16. With N=4, 0.75
+means 3-of-4; with N=8, it means 6-of-8 or better.
 *Max drawdown (%):* peak-to-trough on the cumulative-R curve, expressed
 as percentage of the running peak. *Total trades:* count of decision
 records whose label maps to a non-zero `max_r` bucket and whose realized
@@ -179,30 +265,60 @@ out of holding window"). Phase 3.2.3 ships THREE implementations:
   2. `NoOpPnLProvider` — returns None for every record, used by
      end-to-end tests that exercise the SQLite store + metric calculator
      wiring without taking a position on pricing.
-  3. `SimplePnLProvider` — the basic but consistent option-pricing
+  3. `SimplePnLProvider` — the basic-but-consistent option-pricing
      model approved for Phase 3.2.3:
        - Entry price: option `ask` at the decision's timestamp
        - Exit price: option `bid` at the holding-window close
        - Slippage: `profile.backtest.slippage_pct` of entry premium,
          applied as a haircut to realized P&L. Default 2%; lives in
          a new `BacktestConfig` profile section.
+       - Forced exit at expiry: `profile.backtest.exit_on_dte_lte`
+         (default 2) — when the option's DTE drops to this threshold
+         or below, position closes immediately at that day's bid
+         regardless of the holding strategy. This avoids modeling
+         expiry-day gamma chaos / pin risk / assignment scenarios
+         that the simple pricer cannot represent fairly.
        - No theta decay, no IV change, no underlying movement model —
          entry and exit prices are literal market quotes from the
          replay stream at those two timestamps.
-     This is intentionally crude. Real option pricing — Black-Scholes or
-     replay of full surface evolution — is Phase 3.4 territory. The
-     point of `SimplePnLProvider` is consistency: if the edge is real,
-     it shows up here; if it doesn't show up here, a more sophisticated
-     pricer is unlikely to rescue it. The first-real-backtest in Phase
-     3.3 uses `SimplePnLProvider`; downstream commits can swap in a
-     better one without touching the metric calculator.
+     This is intentionally crude. Real option pricing — Black-Scholes,
+     stop/take-profit logic, or replay of full surface evolution — is
+     Phase 3.4 territory. The point of `SimplePnLProvider` is
+     consistency: if the edge is real, it shows up here; if it doesn't
+     show up here, a more sophisticated pricer is unlikely to rescue
+     it. The first-real-backtest in Phase 3.3 uses `SimplePnLProvider`;
+     downstream commits can swap in a better one without touching the
+     metric calculator.
 
-  The `BacktestConfig` profile section added in this commit:
-  `slippage_pct: 0.02` (default), `holding_window_days: 7` (default —
-  Track B horizon midpoint), with both fields tunable per profile.
-  `v5_gamma_squeeze.yaml` is updated to inherit these defaults
-  unchanged in this commit; explicit Track B tuning of slippage can
-  happen in 3.3+ once we see real fills.
+  **Holding strategy enum.** The `BacktestConfig` profile section
+  introduces a `holding_strategy` field with three values:
+
+    * `fixed_window` (default) — close after `holding_window_days`
+      walltime, OR at `exit_on_dte_lte` boundary, whichever first.
+      Track B's 3-5 day "ignite or die" dynamic: 7 days of theta
+      bleed for a non-igniting position is unnecessary loss.
+    * `dte_based` — close as soon as DTE drops to a configured
+      threshold (separate from `exit_on_dte_lte`, which is a hard
+      safety floor). Useful for "ride the squeeze until a few days
+      to expiry, then bail" patterns. 3.2.3 implements this branch.
+    * `take_profit_or_stop` — implementer raises `NotImplementedError`
+      in 3.2.3. The enum value is reserved in the schema so
+      profiles can mention it ahead of Phase 3.4 arriving with the
+      real implementation. Tests verify the NotImplementedError
+      surfaces with a clear "Phase 3.4" message.
+
+  **`BacktestConfig` defaults pinned in this commit:**
+    - `slippage_pct: 0.02`
+    - `holding_strategy: fixed_window`
+    - `holding_window_days: 5`  (revised from earlier draft's 7;
+      Track B trade dynamics are 3-5 days "explode or die", and
+      7 days yields unnecessary theta to non-igniting positions)
+    - `exit_on_dte_lte: 2`
+    - `walk_forward_min_consistency_pct: 0.75`  (pinned here for
+      cross-reference; see 3.2.4 walk-forward section)
+
+  `v5_gamma_squeeze.yaml` inherits these defaults unchanged in 3.2.3;
+  explicit Track B tuning can happen in 3.3+ once we see real fills.
 
 The PnL boundary is documented explicitly in `docs/BACKTEST.md` so
 Phase 3.3's first backtest cannot silently use a misconfigured pricer.
@@ -210,11 +326,13 @@ Phase 3.3's first backtest cannot silently use a misconfigured pricer.
 **Pass/fail thresholds.** A `MetricThresholds` Pydantic model carries
 the five Track B + Formülasyon A numbers approved in Phase 3 prep step
 3: Sharpe pass `> 1.5` (`> 2.5` separate "bonus" flag), expectancy
-pass `> 0.5R`, walk-forward consistency pass `>= 3`, max DD ceiling
-`< 20%`, min trades `>= 60` over a 2-year backtest. These default
-values are pinned by a test (`test_track_b_thresholds_match_phase_3_prep`);
-override-via-constructor is supported but the defaults cannot drift
-without breaking the test.
+pass `> 0.5R`, walk-forward consistency pass `>= 0.75`
+(read from `profile.backtest.walk_forward_min_consistency_pct`,
+N-independent — survives windows-count changes between backtests),
+max DD ceiling `< 20%`, min trades `>= 60` over a 2-year backtest.
+These default values are pinned by a test
+(`test_track_b_thresholds_match_phase_3_prep`); override-via-constructor
+is supported but the defaults cannot drift without breaking the test.
 
 **Reproducibility.** Same input record stream → bit-identical metric
 output, modulo float precision (asserted to 1e-9 tolerance). Test
@@ -239,14 +357,20 @@ comparison report.
 
 **Walk-forward windowing.** The full backtest period is split into N
 equal-time slices (default N=8 over 2 years = 3-month slices, tunable
-via `--walk-forward-windows N`). Each slice has an in-sample boundary
-and an out-of-sample boundary; in Phase 3.2.4, in-sample is "data
-seen, profile NOT tuned" — the same frozen profile runs everywhere.
-(In-sample auto-tuning is Phase 3.4+; Phase 3.2.4's contribution is
-the windowing infrastructure itself, with a dummy "no tuning" pass
-function as the placeholder.) The walk-forward consistency metric in
-Phase 3.2.3 reads slice-level Es from the SQLite store and rolls them
-up.
+via `--walk-forward-windows N` and `profile.backtest.walk_forward_windows`).
+Each slice has an in-sample boundary and an out-of-sample boundary; in
+Phase 3.2.4, in-sample is "data seen, profile NOT tuned" — the same
+frozen profile runs everywhere. (In-sample auto-tuning is Phase 3.4+;
+Phase 3.2.4's contribution is the windowing infrastructure itself,
+with a dummy "no tuning" pass function as the placeholder.) The
+walk-forward consistency metric in Phase 3.2.3 reads slice-level Es
+from the SQLite store and rolls them up as a **fraction of windows
+positive** (not an integer count); the pass threshold is
+`profile.backtest.walk_forward_min_consistency_pct = 0.75`, which
+maps to "6 of 8" at the default N=8 and stays meaningful if a future
+backtest uses N=4 (3 of 4) or N=16 (12 of 16). The fraction-not-count
+representation is the explicit reason the threshold survives changes
+in window count without re-tuning.
 
 **4-cell matrix.** Four runs back to back: `(Tier-1, single)`,
 `(Tier-1, fusion=unanimous)`, `(Tier-2, single)`, `(Tier-2,
