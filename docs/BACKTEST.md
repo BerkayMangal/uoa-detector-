@@ -1,11 +1,14 @@
-# Backtest framework — storage, replay, and metrics
+# Backtest framework — storage, replay, metrics, and 4-cell runner
 
 This document is the operator's tour of the backtest framework. It
 covers persistence (Phase 3.2.1, in-memory + SQLite store), historical
-replay (Phase 3.2.2, parquet harness), and the metric calculator
+replay (Phase 3.2.2, parquet harness), the metric calculator
 (Phase 3.2.3, success criteria + pass/fail thresholds + `backtest
-report` CLI). The walk-forward + 4-cell runner (3.2.4) will extend
-this doc with its own section when it lands.
+report` CLI), and the walk-forward orchestrator + 4-cell
+combinatorial runner (Phase 3.2.4, `backtest run-4cell` CLI +
+markdown comparison report with the Formülasyon A falsification
+section). With Phase 3.2.4 complete, Phase 3.3's first real
+backtest can begin.
 
 ## What the store is for
 
@@ -345,145 +348,6 @@ schema module. Any new source layout that respects the directory
 convention and the schema pin will replay through the same harness
 without code changes.
 
-## Metric calculator — Track B + Formülasyon A success criteria
-
-Phase 3.2.3 added the metric calculator: a stateless function that
-turns a list of `RealizedTrade` into a `BacktestMetrics` containing
-the five Track B + Formülasyon A success metrics plus their
-pass/fail breakdown against pinned thresholds. The math is fixed
-here so subsequent commits and Phase 3.3's first real backtest
-cannot silently redefine "did the edge work".
-
-### Formulas
-
-| metric | formula | pass criterion (default) |
-|---|---|---|
-| **Sharpe (annualized)** | `mean(daily_R) / stdev(daily_R) × √252`; `None` if total trades < 30 or stdev = 0 | `> 1.5` (`> 2.5` flagged separately as "bonus") |
-| **Expectancy E** | arithmetic mean of per-trade R | `> 0.5R` |
-| **Walk-forward consistency** | trades sorted by exit_ts, partitioned into N equal-trade-count windows; consistency = fraction of windows where E > 0; `None` if fewer than N trades available | `≥ 0.75` (N-independent — survives changes to N) |
-| **Max drawdown** | peak-to-trough on cumulative-R curve, as fraction of `max(running_peak, 1)` | `< 0.20` (20%) |
-| **Total trades** | count of decisions with non-zero `max_r` AND non-`None` realized_r | `≥ 60` |
-
-Plus three diagnostics that don't gate pass/fail but appear in the
-report:
-
-  * **Hit rate** = fraction of total trades with `realized_r > 0`.
-    A break-even trade (R = 0) falls in the loser bucket, by
-    convention.
-  * **Avg winner R** = mean realized_r over winning trades only;
-    `None` if zero winners.
-  * **Avg loser R** = mean realized_r over non-winning trades; if
-    all trades were winners, falls back to mean of all trades so the
-    report has *something* to show.
-
-### Open trades — what they are and why they're excluded
-
-A trade is "open" when its `realized_r` is `None`. Three production
-reasons this happens:
-
-  1. The decision didn't take a position (`max_r == 0`).
-  2. The holding window hasn't closed by the end of the available
-     data (e.g. backtest cut off mid-trade).
-  3. The exit-quote source has no quote at the computed exit time.
-
-Open trades are counted under `BacktestMetrics.open_trades` and
-**excluded from every numerical metric** — Sharpe, expectancy,
-walk-forward consistency, max DD, hit rate, avg winner/loser. They
-don't push any metric in either direction. A backtest report with a
-high `open_trades / total_decisions` ratio is a warning that the
-holding window is too long for the dataset, or the exit-quote stream
-is missing data; the metrics shown are over the *closed* subset only.
-
-### PnL boundary — three providers
-
-The metric calculator does NOT compute realized R itself. It
-receives a list of `RealizedTrade` from a `PnLProvider`
-implementation. Phase 3.2.3 ships three:
-
-| provider | what it does | when to use |
-|---|---|---|
-| `NoOpPnLProvider` | returns `realized_r=None`, `exit_reason="holding_window_open"` for everything | end-to-end wiring tests; `backtest report` default |
-| `MockPnLProvider` | fixture-driven; returns whatever `RealizedTrade` was registered per `event_id` | unit tests of metric formulas with hand-built outcome streams |
-| `SimplePnLProvider` | entry=ask, exit=bid via `ExitQuoteProvider`, slippage haircut, holding-strategy dispatch | the realistic-but-crude pricing for first real backtests |
-
-`SimplePnLProvider`'s pricing model:
-
-  * **Entry**: option `ask` at the decision's timestamp.
-  * **Exit**: option `bid` at the holding-window close, looked up via
-    an `ExitQuoteProvider`.
-  * **Slippage**: `profile.backtest.slippage_pct` of entry premium,
-    applied as a haircut to realized PnL. Default 2%.
-  * **R units**: `1R ≡ entry premium`. Realized R = `(exit - entry -
-    slippage) / entry × max_r`. With `max_r=0.5` (a smaller-bucket
-    sized position) realized R is half magnitude.
-  * **Holding strategies**:
-      * `fixed_window` (default): close at `entry + holding_window_days`
-        OR at `expiry - exit_on_dte_lte`, whichever first.
-      * `dte_based`: close at `expiry - dte_based_close_threshold`,
-        capped by the DTE floor.
-      * `take_profit_or_stop`: raises `NotImplementedError` with a
-        clear "Phase 3.4" message.
-  * **No theta decay, no IV change, no underlying movement model.**
-    Entry and exit prices are literal market quotes from the replay
-    stream at those two timestamps.
-
-This is intentionally crude. Real option pricing — Black-Scholes,
-take-profit logic, volatility surface evolution — is Phase 3.4
-territory. The point of `SimplePnLProvider` is consistency: if the
-edge is real, it shows up here; if it doesn't show up here, a more
-sophisticated pricer is unlikely to rescue it.
-
-### MetricThresholds defaults — pinned
-
-The default `MetricThresholds` (at module
-`uoa_detector.backtest.metrics`) carries the Phase 3 prep step 3
-numbers. Override-via-constructor is supported but the defaults
-cannot drift without breaking
-`test_track_b_thresholds_match_phase_3_prep`:
-
-```
-sharpe_pass = 1.5          sharpe_bonus = 2.5
-expectancy_pass = 0.5      walk_forward_consistency_pass = 0.75
-max_drawdown_ceiling = 0.20    min_trades = 60
-```
-
-The walk-forward threshold is N-independent by design: the same
-0.75 means "6 of 8 at default N=8", "3 of 4 at N=4", "12 of 16 at
-N=16". Profiles can change `walk_forward_windows` between backtests
-without revising the threshold.
-
-### CLI: `backtest report`
-
-```sh
-# Render a pass/fail table for a finished run.
-python -m uoa_detector backtest report \
-    --run-id <run_id> \
-    --store sqlite:./run.db
-```
-
-The current default is `--pnl noop`: every trade reports as open,
-every numerical metric is "insufficient_sample", `total_trades`
-fails against `min_trades=60`. The point of running the report
-today is to confirm wiring — that the run made it to the store and
-the calculator + threshold + render path work end-to-end.
-
-`--pnl simple` is reserved but raises a "Phase 3.3" deferral
-message: it requires an exit-quote source wired from the replay
-stream, which is the first real backtest's job to design. Until
-then, real PnL math runs through the unit tests
-(`tests/unit/test_simple_pnl.py`), not the CLI.
-
-`--walk-forward-windows N` overrides the partition count for the
-report only (the default 8 reads from the profile).
-
-### Reproducibility
-
-`compute_metrics` is deterministic — same input list, same output
-`BacktestMetrics`, bit-identical. This is the precondition for
-Phase 3.2.4's 4-cell runner, which compares metrics across cells
-and would fail meaninglessly if the calculator drifted between
-calls.
-
 ## Metric calculator — pinning what "did the edge work" means
 
 Phase 3.2.3 added a metric calculator that converts a stream of
@@ -623,6 +487,178 @@ Max drawdown:       0.000
 OVERALL: FAIL
 ```
 
+## Walk-forward methodology + 4-cell combinatorial backtest
+
+Phase 3.2.4 adds the capstone of the 3.2.x backtest framework: a
+single CLI command that runs the **Formülasyon A 4-cell
+combinatorial backtest** end-to-end, with **walk-forward
+windowing** providing per-window expectancy values for the
+walk-forward consistency metric.
+
+### Walk-forward windowing (3.2.4.1)
+
+The full backtest period is split into `N` equal-time slices
+(default `N=8` over 2 years = 3-month slices, tunable via
+`--walk-forward-windows` and `profile.backtest.walk_forward_windows`).
+
+  - **Boundary convention**: `[start_i, start_{i+1})` half-open;
+    the very last window is closed-closed so the period's final
+    instant isn't lost. Pinned by
+    `test_window_boundaries_half_open_exhaustive`: sweep 100
+    timestamps and assert each lives in exactly one window.
+  - **Last window absorbs rounding remainder** so the union of
+    windows exactly covers `[period_start, period_end]`.
+  - **In-sample / out-of-sample split** is symbolic in 3.2.4 —
+    `in_sample_fraction=1.0` means "data seen, profile NOT tuned"
+    (the same frozen profile runs everywhere). The
+    `WalkForwardWindow.in_sample_end` property already computes
+    the boundary so Phase 3.4+ can drop in real auto-tuning
+    without changing the windowing API.
+  - **Tuner**: a `Callable[[CalibrationProfile, WalkForwardWindow],
+    CalibrationProfile]`. Phase 3.2.4 ships `no_op_tuner` (returns
+    input unchanged) as the only implementation.
+
+The walk-forward consistency metric (Phase 3.2.3) reads
+slice-level expectancies and rolls them up as a **fraction of
+windows positive** (not an integer count); the pass threshold is
+`profile.backtest.walk_forward_min_consistency_pct = 0.75`. This
+maps to "6 of 8" at default `N=8` and survives a future change to
+`N=4` (3 of 4) or `N=16` (12 of 16) without re-tuning. The
+fraction-not-count representation is the explicit reason the
+threshold doesn't drift across window-count changes.
+
+### The 4-cell matrix (3.2.4.2)
+
+The Formülasyon A hypothesis is **combinatorial**: a real edge
+requires both Tier-2 universe AND multi-source fusion. The 4-cell
+backtest is the experiment designed to falsify that hypothesis.
+
+|              | single source | unanimous fusion |
+|--------------|---------------|------------------|
+| **Tier-1**   | `tier1_single` (baseline) | `tier1_fusion`   |
+| **Tier-2**   | `tier2_single`            | `tier2_fusion` (the candidate winner) |
+
+Each cell becomes a separate `run_id` in the SQLite store, with
+`RunMetadata.universe_id` set to the cell name. The cell runner
+calls `start_run` explicitly per cell — 3.2.4 is the first
+explicit-`start_run` consumer in the codebase (Phase 1-2 + 3.2.1-3
+all used the implicit-default permissive path).
+
+  - **Tier-1 anchor universe** (`data/universes/tier1_anchor.csv`):
+    20 broadly-watched, deep-options-volume tickers across 8
+    sectors. Curated, no "flag for review" notes. The exact list
+    is approved Phase 3 prep:
+    SPY/QQQ/IWM/DIA broad ETFs;
+    NVDA/AMD/AAPL/MSFT/GOOGL/TSLA/META/AMZN mega-cap tech;
+    JPM/BAC financials; XOM/CVX energy;
+    JNJ/UNH healthcare; GLD/TLT macro hedges.
+  - **Tier-2 starter universe** (`data/universes/tier2_starter.csv`):
+    the broader edge-watch list shipped in Phase 3.2.0a.
+
+Both universes load through the same `load_universe_tickers()`
+code path, asserted by `test_both_universes_load_through_same_loader`.
+
+### Comparison report (3.2.4.3)
+
+The 4-cell run produces a markdown report (path passed via
+`--report-path`) with four sections:
+
+1. **4×6 main metrics table** — total trades, Sharpe (with bonus
+   star ⭐ if `> 2.5`), expectancy E, walk-forward, max DD,
+   overall PASS/FAIL. Each non-baseline cell has `(Δ X.XXX ↑/↓)`
+   raw deltas vs the `tier1_single` baseline. (Max DD uses
+   "lower is better" arrow semantics.)
+2. **Per-metric pass/fail breakdown** — 4 cells × 5 metrics with
+   ✅ PASS / ❌ FAIL / ⚠️ INSUFFICIENT.
+3. **Per-cell run metadata** — `run_id`, open trades, hit rate,
+   bonus Sharpe flag.
+4. **What would falsify Formülasyon A** — the heart of the
+   report (see next subsection).
+
+Deltas are **raw differences**. No statistical-significance test
+is applied at this stage — Phase 3.3 will pick the
+multiple-comparisons-correction approach (Bonferroni vs
+Benjamini-Hochberg vs nested cross-validation). Premature
+significance tests would lock us into the wrong correction.
+
+### What would make Phase 3 conclude the edge is real
+
+Formülasyon A is the combinatorial hypothesis: **a real edge
+requires `(Tier-2, fusion)` to materially beat the other three
+cells**. Each of the following partial outcomes **rejects** the
+combinatorial hypothesis even if individual signals look
+interesting:
+
+  - **Only `(Tier-2, single)` beats baseline.** The fusion layer
+    isn't pulling its weight; whatever Tier-2 signal exists works
+    at single-source. The "fusion is necessary" hypothesis fails.
+  - **Only `(Tier-1, fusion)` beats baseline.** The Tier-2
+    universe isn't where the edge lives; fusion alone on the
+    anchor universe is enough. The "Tier-2 is necessary"
+    hypothesis fails.
+  - **Both single-source cells beat both fusion cells.** Fusion
+    is a net negative — it's filtering out signal, not noise.
+    Combinatorial hypothesis is decisively rejected.
+  - **Tier-2 fusion does NOT materially beat Tier-1 fusion AND
+    Tier-2 single.** The combinatorial gain doesn't exist; the
+    edge can be explained by the marginal contribution of
+    fusion or universe alone, not their interaction.
+
+A strict "Tier-2 fusion materially beats every other cell"
+outcome with all five Track B thresholds passing on `tier2_fusion`
+is what would let us proceed to Phase 3.3's first real backtest
+with confidence in the Track B + Formülasyon A framing. **Anything
+weaker is a signal to revise the hypothesis before risking
+capital.**
+
+### Determinism
+
+The acceptance doc requires: "run the 4-cell suite twice with the
+same inputs, assert the SQLite content_hash of decision records
+is identical across runs." The implementation pin is stronger —
+the **markdown report itself** is byte-identical across runs,
+asserted by `test_run_4cell_is_deterministic_byte_identical_reports`
+in `tests/integration/test_cli_run_4cell.py`. If anything in the
+rendering or metric pipeline introduces non-determinism (timestamps,
+dict ordering, etc.), this test fails immediately.
+
+The `--seed` flag is wired through `run_4cell_backtest` for Phase
+3.4+ tuning (which will introduce randomness from grid jitter or
+Bayesian optimisation). 3.2.x is fully deterministic so the seed
+currently has no effect; the flag is a no-op placeholder.
+
+### CLI
+
+```sh
+# Full 4-cell backtest with markdown report writeout
+python -m uoa_detector backtest run-4cell \
+    --store sqlite:./4cell.db \
+    --report-path ./reports/exp1.md \
+    --from 2024-01-01 --to 2026-01-01
+
+# Custom walk-forward partition + custom profile
+python -m uoa_detector backtest run-4cell \
+    --store sqlite:./4cell.db \
+    --report-path ./reports/exp2.md \
+    --from 2024-01-01 --to 2026-01-01 \
+    --walk-forward-windows 16 \
+    --profile profiles/v5_gamma_squeeze.yaml \
+    --seed 42
+
+# Per-run summary report on a single cell of an existing 4-cell run
+python -m uoa_detector backtest report \
+    --run-id 4cell-tier2_fusion \
+    --store sqlite:./4cell.db
+```
+
+Phase 3.2.4 only ships `--trades noop` — every cell reports zero
+trades because real trade producers need an exit-quote source
+from the replay stream (Phase 3.3). The plumbing — `start_run`,
+`finish_run`, `RunMetadata`, comparison report rendering — is
+exercised end-to-end. When Phase 3.3 lands the first real trade
+producer, the same `run-4cell` CLI command will produce real
+metrics with no further CLI changes.
+
 ## Why WAL mode
 
 `PRAGMA journal_mode=WAL` is set on every connection (a SQLAlchemy
@@ -674,45 +710,61 @@ historical data after the fact is not a backtest.
 
 ## What these commits do NOT do
 
-The 3.2.x series is the backtest framework's plumbing. After 3.2.3
-the surface is: store + replay harness + PnL boundary + metric
-calculator + a CLI report. Currently missing — by design — are:
+After Phase 3.2.4 the backtest framework's surface is: store +
+replay harness + PnL boundary + metric calculator + 4-cell
+combinatorial runner + walk-forward windowing + CLI (`backtest
+run-4cell` + `backtest report`). Currently missing — by design — are:
 
+  - **No real trade producer.** The 4-cell runner in 3.2.4 takes a
+    `TradeProducer` callable; Phase 3.2.4 ships `noop_trade_producer`
+    (every cell reports 0 trades) and `fixture_trade_producer` (test
+    helper). A real producer that drives the full pipeline through
+    fusion + orchestrator and writes signals to the store is Phase
+    3.3 territory — that's the "first real backtest" milestone.
+  - **No exit-quote source from the replay stream.** Both
+    `SimplePnLProvider` and the eventual real trade producer need
+    `ExitQuoteProvider` instances backed by the parquet replay
+    data, not test-fixture dicts. Phase 3.3.
   - **No latency measurement in the orchestrator yet.** The columns
-    exist (`pipeline_latency_ms`, `data_source_latency_ms`), the
-    round-trip is tested, but `Pipeline.process_one` does not
-    currently populate them. Wiring lands in Phase 3.3 when the
-    first real backtest report needs the value.
-  - **No new orchestrator integration with `start_run`.** Phase 1-2
-    callers (including the CLI in both synthetic and historical
-    modes) hit the implicit-default run path. The 4-cell runner in
-    Phase 3.2.4 will be the first explicit `start_run` user.
-  - **`replay_ts` not threaded through to SQLite.** The parquet
-    schema reserves `replay_ts` as nullable harness-written; the
-    harness emits `RawPrint` (which has no `replay_ts` field), so
-    the SQLite signal row's `full_record_json` does not currently
-    carry `replay_ts`. Threading it through is a lazy enhancement
-    when cross-run determinism diffs become a real debugging need.
+    exist (`pipeline_latency_ms`, `data_source_latency_ms`); wiring
+    happens when the first real backtest report needs the value
+    (Phase 3.3).
+  - **`replay_ts` not threaded through to SQLite.** Reserved in the
+    parquet schema as nullable harness-written; the SQLite signal
+    row's `full_record_json` does not currently carry it. Lazy
+    enhancement for when cross-run determinism diffs become a real
+    debugging need.
   - **No multi-source replay via the CLI.** `--source historical`
-    drives one `ParquetReplaySource` against one `data_dir`. Phase
-    3.2.4's 4-cell runner will instantiate multiple harnesses
-    explicitly (one per cell × source combination) and own the
-    fusion wiring directly.
+    drives one `ParquetReplaySource` against one `data_dir`. The
+    4-cell runner could in principle instantiate multiple harnesses
+    explicitly per cell × source combination; today it doesn't —
+    Phase 3.3's real trade producer is the right place to wire that
+    because the producer owns the source-fusion topology decision.
   - **No snapshot exporter.** Historical parquet files have to be
     produced by hand or by a Phase 3.5+ exporter that taps a live
     source's incoming feed.
-  - **`backtest report` is wired with `NoOpPnLProvider` only.** Real
-    PnL math (`SimplePnLProvider`) needs an `ExitQuoteProvider`
-    sourced from the replay stream — that surface is Phase 3.3's
-    job. Today's report exercises the rendering + threshold compare
-    paths; it always reports every trade as open.
   - **`take_profit_or_stop` holding strategy raises NotImplementedError.**
-    The enum value is reserved in `BacktestConfig` so profiles can
-    mention it; the implementation is Phase 3.4.
-  - **No 4-cell combinatorial runner.** Phase 3.2.4 — single-source
-    vs. multi-source × Tier-1 anchor universe vs. Tier-2.
+    The enum value is reserved in `BacktestConfig`. Implementation
+    is Phase 3.4 (real intra-window stop/TP logic with Black-Scholes
+    or full surface evolution).
+  - **No statistical-significance test in the comparison report.**
+    Deltas are raw differences. Phase 3.3 will pick the
+    multiple-comparisons-correction approach (Bonferroni vs
+    Benjamini-Hochberg vs nested cross-validation); premature
+    significance tests would lock 3.2.4 into the wrong correction.
+  - **No real auto-tuner.** The walk-forward windowing exposes a
+    Tuner Callable; 3.2.4 ships `no_op_tuner` (returns input
+    profile unchanged). In-sample auto-tuning is Phase 3.4+
+    (grid search, Bayesian optimisation, etc.).
   - **No backup / archive utility.** SQLite files are just files;
     `cp` is the backup command for now.
+
+When Phase 3.3 lands the real trade producer, the existing CLI
+command `python -m uoa_detector backtest run-4cell ...` will
+produce real metrics with no flag changes — the `--trades` flag
+will gain `simple` (and eventually `real`) values, but the
+orchestration, windowing, comparison report, and falsification
+section all stay the same.
 
 ## Reading from the database
 
