@@ -1,10 +1,11 @@
-# Backtest framework — storage and replay
+# Backtest framework — storage, replay, and metrics
 
 This document is the operator's tour of the backtest framework. It
-covers persistence (Phase 3.2.1, in-memory + SQLite store) and
-historical replay (Phase 3.2.2, parquet harness). The metric
-calculator (3.2.3) and walk-forward + 4-cell runner (3.2.4) will
-extend this doc with their own sections when they land.
+covers persistence (Phase 3.2.1, in-memory + SQLite store), historical
+replay (Phase 3.2.2, parquet harness), and the metric calculator
+(Phase 3.2.3, success criteria + pass/fail thresholds + `backtest
+report` CLI). The walk-forward + 4-cell runner (3.2.4) will extend
+this doc with its own section when it lands.
 
 ## What the store is for
 
@@ -344,6 +345,284 @@ schema module. Any new source layout that respects the directory
 convention and the schema pin will replay through the same harness
 without code changes.
 
+## Metric calculator — Track B + Formülasyon A success criteria
+
+Phase 3.2.3 added the metric calculator: a stateless function that
+turns a list of `RealizedTrade` into a `BacktestMetrics` containing
+the five Track B + Formülasyon A success metrics plus their
+pass/fail breakdown against pinned thresholds. The math is fixed
+here so subsequent commits and Phase 3.3's first real backtest
+cannot silently redefine "did the edge work".
+
+### Formulas
+
+| metric | formula | pass criterion (default) |
+|---|---|---|
+| **Sharpe (annualized)** | `mean(daily_R) / stdev(daily_R) × √252`; `None` if total trades < 30 or stdev = 0 | `> 1.5` (`> 2.5` flagged separately as "bonus") |
+| **Expectancy E** | arithmetic mean of per-trade R | `> 0.5R` |
+| **Walk-forward consistency** | trades sorted by exit_ts, partitioned into N equal-trade-count windows; consistency = fraction of windows where E > 0; `None` if fewer than N trades available | `≥ 0.75` (N-independent — survives changes to N) |
+| **Max drawdown** | peak-to-trough on cumulative-R curve, as fraction of `max(running_peak, 1)` | `< 0.20` (20%) |
+| **Total trades** | count of decisions with non-zero `max_r` AND non-`None` realized_r | `≥ 60` |
+
+Plus three diagnostics that don't gate pass/fail but appear in the
+report:
+
+  * **Hit rate** = fraction of total trades with `realized_r > 0`.
+    A break-even trade (R = 0) falls in the loser bucket, by
+    convention.
+  * **Avg winner R** = mean realized_r over winning trades only;
+    `None` if zero winners.
+  * **Avg loser R** = mean realized_r over non-winning trades; if
+    all trades were winners, falls back to mean of all trades so the
+    report has *something* to show.
+
+### Open trades — what they are and why they're excluded
+
+A trade is "open" when its `realized_r` is `None`. Three production
+reasons this happens:
+
+  1. The decision didn't take a position (`max_r == 0`).
+  2. The holding window hasn't closed by the end of the available
+     data (e.g. backtest cut off mid-trade).
+  3. The exit-quote source has no quote at the computed exit time.
+
+Open trades are counted under `BacktestMetrics.open_trades` and
+**excluded from every numerical metric** — Sharpe, expectancy,
+walk-forward consistency, max DD, hit rate, avg winner/loser. They
+don't push any metric in either direction. A backtest report with a
+high `open_trades / total_decisions` ratio is a warning that the
+holding window is too long for the dataset, or the exit-quote stream
+is missing data; the metrics shown are over the *closed* subset only.
+
+### PnL boundary — three providers
+
+The metric calculator does NOT compute realized R itself. It
+receives a list of `RealizedTrade` from a `PnLProvider`
+implementation. Phase 3.2.3 ships three:
+
+| provider | what it does | when to use |
+|---|---|---|
+| `NoOpPnLProvider` | returns `realized_r=None`, `exit_reason="holding_window_open"` for everything | end-to-end wiring tests; `backtest report` default |
+| `MockPnLProvider` | fixture-driven; returns whatever `RealizedTrade` was registered per `event_id` | unit tests of metric formulas with hand-built outcome streams |
+| `SimplePnLProvider` | entry=ask, exit=bid via `ExitQuoteProvider`, slippage haircut, holding-strategy dispatch | the realistic-but-crude pricing for first real backtests |
+
+`SimplePnLProvider`'s pricing model:
+
+  * **Entry**: option `ask` at the decision's timestamp.
+  * **Exit**: option `bid` at the holding-window close, looked up via
+    an `ExitQuoteProvider`.
+  * **Slippage**: `profile.backtest.slippage_pct` of entry premium,
+    applied as a haircut to realized PnL. Default 2%.
+  * **R units**: `1R ≡ entry premium`. Realized R = `(exit - entry -
+    slippage) / entry × max_r`. With `max_r=0.5` (a smaller-bucket
+    sized position) realized R is half magnitude.
+  * **Holding strategies**:
+      * `fixed_window` (default): close at `entry + holding_window_days`
+        OR at `expiry - exit_on_dte_lte`, whichever first.
+      * `dte_based`: close at `expiry - dte_based_close_threshold`,
+        capped by the DTE floor.
+      * `take_profit_or_stop`: raises `NotImplementedError` with a
+        clear "Phase 3.4" message.
+  * **No theta decay, no IV change, no underlying movement model.**
+    Entry and exit prices are literal market quotes from the replay
+    stream at those two timestamps.
+
+This is intentionally crude. Real option pricing — Black-Scholes,
+take-profit logic, volatility surface evolution — is Phase 3.4
+territory. The point of `SimplePnLProvider` is consistency: if the
+edge is real, it shows up here; if it doesn't show up here, a more
+sophisticated pricer is unlikely to rescue it.
+
+### MetricThresholds defaults — pinned
+
+The default `MetricThresholds` (at module
+`uoa_detector.backtest.metrics`) carries the Phase 3 prep step 3
+numbers. Override-via-constructor is supported but the defaults
+cannot drift without breaking
+`test_track_b_thresholds_match_phase_3_prep`:
+
+```
+sharpe_pass = 1.5          sharpe_bonus = 2.5
+expectancy_pass = 0.5      walk_forward_consistency_pass = 0.75
+max_drawdown_ceiling = 0.20    min_trades = 60
+```
+
+The walk-forward threshold is N-independent by design: the same
+0.75 means "6 of 8 at default N=8", "3 of 4 at N=4", "12 of 16 at
+N=16". Profiles can change `walk_forward_windows` between backtests
+without revising the threshold.
+
+### CLI: `backtest report`
+
+```sh
+# Render a pass/fail table for a finished run.
+python -m uoa_detector backtest report \
+    --run-id <run_id> \
+    --store sqlite:./run.db
+```
+
+The current default is `--pnl noop`: every trade reports as open,
+every numerical metric is "insufficient_sample", `total_trades`
+fails against `min_trades=60`. The point of running the report
+today is to confirm wiring — that the run made it to the store and
+the calculator + threshold + render path work end-to-end.
+
+`--pnl simple` is reserved but raises a "Phase 3.3" deferral
+message: it requires an exit-quote source wired from the replay
+stream, which is the first real backtest's job to design. Until
+then, real PnL math runs through the unit tests
+(`tests/unit/test_simple_pnl.py`), not the CLI.
+
+`--walk-forward-windows N` overrides the partition count for the
+report only (the default 8 reads from the profile).
+
+### Reproducibility
+
+`compute_metrics` is deterministic — same input list, same output
+`BacktestMetrics`, bit-identical. This is the precondition for
+Phase 3.2.4's 4-cell runner, which compares metrics across cells
+and would fail meaninglessly if the calculator drifted between
+calls.
+
+## Metric calculator — pinning what "did the edge work" means
+
+Phase 3.2.3 added a metric calculator that converts a stream of
+trade outcomes into the five Track B + Formülasyon A success
+metrics approved in Phase 3 prep step 3. The math is fixed here —
+subsequent commits and Phase 3.3's first real backtest cannot
+quietly redefine the answer.
+
+### Formulas
+
+| metric | formula | None when |
+|---|---|---|
+| **Sharpe** (annualized) | `(mean / stdev_sample) * sqrt(252)` over daily realized-R series | `total_trades < 30` OR `stdev = 0` |
+| **Expectancy E** | arithmetic mean of `realized_r` over closed trades | always defined; 0 on empty |
+| **Walk-forward consistency** | trades sorted by `exit_ts`, split into N equal-trade-count chunks; consistency = `count(E_i > 0) / N` | `total_trades < N` |
+| **Max drawdown** | peak-to-trough on cumulative-R, denom = `max(running_peak, 1)` | always defined; 0 on empty |
+| **Total trades** | count of `realized_r is not None` | always defined |
+
+Plus three diagnostics: hit rate, avg winner R, avg loser R.
+
+The daily realized-R series is built by summing `realized_r` per UTC
+date of `exit_ts`. Two trades exiting on the same day collapse into
+a single daily return — without this, 60 same-day trades would
+inflate `len(daily)` and shift Sharpe by `sqrt(60)`.
+
+### Default thresholds (Track B + Formülasyon A)
+
+| threshold | default | meaning |
+|---|---|---|
+| `sharpe_pass` | 1.5 | Sharpe > this is a pass |
+| `sharpe_bonus` | 2.5 | Sharpe > this is a separately-flagged "bonus" |
+| `expectancy_pass` | 0.5 | E > this (R units) is a pass |
+| `walk_forward_consistency_pass` | 0.75 | fraction of windows with E > 0 |
+| `max_drawdown_ceiling` | 0.20 | max DD < 20% is a pass |
+| `min_trades` | 60 | total trades >= this for the run to be meaningful |
+
+These defaults are pinned by
+`test_track_b_thresholds_match_phase_3_prep`. Override via the
+`MetricThresholds` constructor is supported; the defaults cannot
+drift without breaking that test.
+
+### Pass/fail semantics
+
+Each metric returns one of `pass`, `fail`, `insufficient_sample`.
+The third state surfaces when the underlying value is `None` (e.g.
+Sharpe with < 30 trades, walk-forward with < N trades). A run with
+many `insufficient_sample` outcomes is a signal that the dataset is
+too small to evaluate the strategy, distinct from a strategy that
+trades enough but loses money. The 4-cell runner (Phase 3.2.4) uses
+this distinction when comparing cells.
+
+`overall_pass` is `True` only when every metric is `pass` — a single
+`fail` or `insufficient_sample` blocks the run from passing overall.
+
+### PnL boundary — three providers ship in 3.2.3
+
+The metric calculator does NOT compute realized R itself. It receives
+a `PnLProvider` Protocol implementation that maps decision records to
+`RealizedTrade`s. Phase 3.2.3 ships three:
+
+| provider | use case | exits |
+|---|---|---|
+| `NoOpPnLProvider` | wiring smoke; CLI report default | always open |
+| `MockPnLProvider` | unit tests with fixture R values per `event_id` | per fixture |
+| `SimplePnLProvider` | basic-but-consistent realistic pricing | entry=ask, exit=bid via ExitQuoteProvider, slippage haircut |
+
+`SimplePnLProvider` is the model approved for Phase 3.3's first real
+backtest. Pricing details:
+
+  - **Entry**: option ask at the decision's timestamp (the
+    `option_price` field on the StoredSignal).
+  - **Exit**: option bid at the holding-window close, looked up via
+    the injected `ExitQuoteProvider`.
+  - **Slippage**: `profile.backtest.slippage_pct` of entry premium,
+    haircut on per-contract PnL.
+  - **R-units**: 1R ≡ entry premium. With `max_r=0.5`, realized_r is
+    half magnitude.
+
+Holding strategy comes from `profile.backtest.holding_strategy`:
+
+  - `fixed_window`: close at `entry + holding_window_days`, capped
+    by the `exit_on_dte_lte` floor.
+  - `dte_based`: close at `expiry - dte_based_close_threshold`, also
+    capped by floor.
+  - `take_profit_or_stop`: reserved enum value; `SimplePnLProvider`
+    raises `NotImplementedError("... Phase 3.4 ...")`. Profiles that
+    select this strategy in 3.2.3 fail at first call rather than
+    silently degrade.
+
+Open trades (no quote available, max_r=0, degenerate entry price,
+or holding window not yet closed) round-trip as `realized_r=None`
+and are excluded from every numerical metric. They DO surface as
+`open_trades` in the metrics output so reports can flag runs where
+a large fraction of decisions never closed.
+
+### CLI: `backtest report --run-id <X>`
+
+```sh
+# Plumbing-only report — every signal counts as an open trade
+python -m uoa_detector backtest report \
+    --run-id implicit-default \
+    --store sqlite:./run.db
+
+# Custom walk-forward partition (default 8)
+python -m uoa_detector backtest report \
+    --run-id implicit-default \
+    --store sqlite:./run.db \
+    --walk-forward-windows 4
+```
+
+The default `--pnl noop` reports every signal as an open trade —
+useful for confirming wiring (did decisions reach the store?) and
+diagnosing replay determinism (is the run_id correct?). Real
+quote-driven reporting (`--pnl simple`) needs an exit-quote source
+wired from the replay stream; that lands in Phase 3.3, and 3.2.3
+returns a `--pnl simple` invocation with a clear deferral message.
+
+Sample output (NoOp on a 10-event historical replay):
+
+```
+=== Backtest report — run_id=implicit-default ===
+Total trades:       0
+Open trades:        10
+Hit rate:           0.000
+Expectancy E:       +0.0000 R
+Sharpe (annual):    n/a (insufficient sample)
+Walk-forward:       n/a (insufficient sample for window count)
+Max drawdown:       0.000
+
+--- Pass/fail vs thresholds ---
+  sharpe                       value=n/a        threshold=1.5000     INSUFFICIENT_SAMPLE
+  expectancy                   value=0.0000     threshold=0.5000     INSUFFICIENT_SAMPLE
+  walk_forward_consistency     value=n/a        threshold=0.7500     INSUFFICIENT_SAMPLE
+  max_drawdown                 value=0.0000     threshold=0.2000     PASS
+  total_trades                 value=0.0000     threshold=60.0000    FAIL
+
+OVERALL: FAIL
+```
+
 ## Why WAL mode
 
 `PRAGMA journal_mode=WAL` is set on every connection (a SQLAlchemy
@@ -395,14 +674,15 @@ historical data after the fact is not a backtest.
 
 ## What these commits do NOT do
 
-The 3.2.x series is the backtest framework's plumbing, not its
-analysis layer. Currently missing — by design — are:
+The 3.2.x series is the backtest framework's plumbing. After 3.2.3
+the surface is: store + replay harness + PnL boundary + metric
+calculator + a CLI report. Currently missing — by design — are:
 
   - **No latency measurement in the orchestrator yet.** The columns
     exist (`pipeline_latency_ms`, `data_source_latency_ms`), the
     round-trip is tested, but `Pipeline.process_one` does not
-    currently populate them. Wiring lands when the metric calculator
-    (Phase 3.2.3) needs the value.
+    currently populate them. Wiring lands in Phase 3.3 when the
+    first real backtest report needs the value.
   - **No new orchestrator integration with `start_run`.** Phase 1-2
     callers (including the CLI in both synthetic and historical
     modes) hit the implicit-default run path. The 4-cell runner in
@@ -420,10 +700,17 @@ analysis layer. Currently missing — by design — are:
     fusion wiring directly.
   - **No snapshot exporter.** Historical parquet files have to be
     produced by hand or by a Phase 3.5+ exporter that taps a live
-    source's incoming feed. For now, fixtures are generated via
-    `make_synthetic_aapl_2025_06_fixture()` and `write_parquet()`.
-  - **No metric calculation, no walk-forward, no cell comparison.**
-    Those are 3.2.3 + 3.2.4.
+    source's incoming feed.
+  - **`backtest report` is wired with `NoOpPnLProvider` only.** Real
+    PnL math (`SimplePnLProvider`) needs an `ExitQuoteProvider`
+    sourced from the replay stream — that surface is Phase 3.3's
+    job. Today's report exercises the rendering + threshold compare
+    paths; it always reports every trade as open.
+  - **`take_profit_or_stop` holding strategy raises NotImplementedError.**
+    The enum value is reserved in `BacktestConfig` so profiles can
+    mention it; the implementation is Phase 3.4.
+  - **No 4-cell combinatorial runner.** Phase 3.2.4 — single-source
+    vs. multi-source × Tier-1 anchor universe vs. Tier-2.
   - **No backup / archive utility.** SQLite files are just files;
     `cp` is the backup command for now.
 

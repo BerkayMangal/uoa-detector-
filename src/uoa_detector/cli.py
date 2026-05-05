@@ -38,7 +38,13 @@ from typing import TYPE_CHECKING
 import structlog
 import typer
 
-from uoa_detector.backtest import BacktestStore, SqliteBacktestStore
+from uoa_detector.backtest import (
+    BacktestMetrics,
+    BacktestStore,
+    NoOpPnLProvider,
+    SqliteBacktestStore,
+    compute_metrics,
+)
 from uoa_detector.calibration import load_default_profile
 from uoa_detector.calibration.loader import load_profile
 from uoa_detector.observability import (
@@ -72,11 +78,21 @@ class OutputFormat(StrEnum):
 
 
 app = typer.Typer(help="UOA + Convexity Detector v5 CLI", add_completion=False)
+backtest_app = typer.Typer(
+    help="Backtest reporting and tooling (Phase 3.2.3+).",
+    add_completion=False,
+)
+app.add_typer(backtest_app, name="backtest")
 
 
 @app.callback()
 def _root() -> None:
     """Force typer into multi-command mode so ``run`` is an explicit subcommand."""
+
+
+@backtest_app.callback()
+def _backtest_root() -> None:
+    """Force typer into multi-command mode for the backtest subcommands."""
 
 
 def _configure_logging(*, log_to_stderr: bool) -> None:
@@ -405,6 +421,131 @@ async def _run_historical(
         decision_record_writer=writer,
     )
     await pipeline.run()
+
+
+# ---------------------------------------------------------------------------
+# `backtest report` subcommand — Phase 3.2.3.5
+# ---------------------------------------------------------------------------
+
+
+@backtest_app.command("report")
+def backtest_report(
+    run_id: str = typer.Option(
+        ...,
+        "--run-id",
+        help="The run_id to report on. Use 'implicit-default' for runs "
+             "produced by the default CLI without explicit start_run.",
+    ),
+    store_url: str = typer.Option(
+        ...,
+        "--store",
+        help="Backtest store URL: 'sqlite:path/to/db' for the persistent "
+             "store, or ':memory:' (rare; the in-memory store empties at "
+             "process exit so this only works inside a single-process "
+             "test harness).",
+    ),
+    pnl: str = typer.Option(
+        "noop",
+        "--pnl",
+        help="PnL provider for the report. 'noop' (default) treats every "
+             "decision as an open trade — useful for confirming wiring and "
+             "diagnosing whether decisions reached the store at all. "
+             "'simple' (Phase 3.3+) needs an exit-quote source; not "
+             "available in 3.2.3.",
+    ),
+    walk_forward_windows: int = typer.Option(
+        8,
+        "--walk-forward-windows",
+        help="Number of equal-trade-count windows for walk-forward "
+             "consistency. Default 8.",
+    ),
+) -> None:
+    """Read signals for a run from the store, compute metrics, print
+    a pass/fail table to stdout.
+
+    Phase 3.2.3.5 scope: report rendering only. The default ``--pnl
+    noop`` reports every decision as open and is intended to confirm
+    that the run made it to the store. ``--pnl simple`` requires an
+    exit-quote source from the replay stream (Phase 3.3).
+    """
+    if pnl == "simple":
+        msg = (
+            "--pnl simple requires an exit-quote source wired from the "
+            "replay stream. Not available in Phase 3.2.3 — the first "
+            "real-quote-driven backtest report lands in Phase 3.3."
+        )
+        raise typer.BadParameter(msg, param_hint="--pnl")
+    if pnl != "noop":
+        msg = f"--pnl must be 'noop' (or 'simple', not yet wired); got {pnl!r}"
+        raise typer.BadParameter(msg, param_hint="--pnl")
+
+    store = _build_store(store_url)
+    try:
+        signals = list(store.iter_records(run_id))
+    finally:
+        store.close()
+
+    if not signals:
+        typer.echo(f"No signals found for run_id={run_id!r} in {store_url!r}.")
+        raise typer.Exit(code=1)
+
+    provider = NoOpPnLProvider()
+    trades = [provider.provide(s) for s in signals]
+    metrics = compute_metrics(
+        trades, walk_forward_windows=walk_forward_windows,
+    )
+
+    _render_metric_report(run_id=run_id, metrics=metrics)
+
+
+def _render_metric_report(*, run_id: str, metrics: BacktestMetrics) -> None:
+    """Print a text-table view of BacktestMetrics to stdout.
+
+    Format is plain text by design — the report is consumed by humans
+    reviewing a backtest at the terminal. JSON / structured output is
+    deferred until 3.2.4's 4-cell runner needs to diff metrics across
+    cells programmatically.
+    """
+    typer.echo(f"=== Backtest report — run_id={run_id} ===")
+    typer.echo(f"Total trades:       {metrics.total_trades}")
+    typer.echo(f"Open trades:        {metrics.open_trades}")
+    typer.echo(f"Hit rate:           {metrics.hit_rate:.3f}")
+    typer.echo(
+        f"Expectancy E:       {metrics.expectancy:+.4f} R",
+    )
+    if metrics.sharpe is not None:
+        bonus = "  [BONUS]" if metrics.sharpe_bonus_flag else ""
+        typer.echo(f"Sharpe (annual):    {metrics.sharpe:+.4f}{bonus}")
+    else:
+        typer.echo("Sharpe (annual):    n/a (insufficient sample)")
+    if metrics.walk_forward_consistency is not None:
+        typer.echo(
+            f"Walk-forward:       {metrics.walk_forward_consistency:.3f} "
+            "(fraction of windows with E > 0)",
+        )
+    else:
+        typer.echo(
+            "Walk-forward:       n/a (insufficient sample for window count)",
+        )
+    typer.echo(f"Max drawdown:       {metrics.max_drawdown:.3f}")
+    if metrics.avg_winner_r is not None:
+        typer.echo(f"Avg winner R:       {metrics.avg_winner_r:+.4f}")
+    if metrics.avg_loser_r is not None:
+        typer.echo(f"Avg loser R:        {metrics.avg_loser_r:+.4f}")
+    typer.echo("")
+    typer.echo("--- Pass/fail vs thresholds ---")
+    for r in metrics.results:
+        value_str = "n/a" if r.value is None else f"{r.value:.4f}"
+        threshold_str = (
+            "n/a" if r.threshold is None else f"{r.threshold:.4f}"
+        )
+        typer.echo(
+            f"  {r.name:<28} value={value_str:<10} "
+            f"threshold={threshold_str:<10} {r.pass_fail.upper()}",
+        )
+    typer.echo("")
+    label = "PASS" if metrics.overall_pass else "FAIL"
+    typer.echo(f"OVERALL: {label}")
 
 
 def main() -> None:
