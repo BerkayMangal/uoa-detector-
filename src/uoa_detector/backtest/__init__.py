@@ -15,6 +15,7 @@ implementations (``MockPnLProvider``, ``NoOpPnLProvider``).
 3.2.3.4.
 """
 
+from uoa_detector.backtest.cell_report import render_4cell_comparison_report
 from uoa_detector.backtest.cell_runner import (
     CANONICAL_CELLS,
     CELL_NAMES,
@@ -95,6 +96,7 @@ __all__ = [
     "load_universe_tickers",
     "no_op_tuner",
     "noop_trade_producer",
+    "render_4cell_comparison_report",
     "run_4cell_backtest",
     "universe_path",
 ]
