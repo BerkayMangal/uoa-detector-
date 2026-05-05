@@ -42,6 +42,12 @@ from uoa_detector.backtest.simple_pnl import (
 )
 from uoa_detector.backtest.sqlite_store import SqliteBacktestStore
 from uoa_detector.backtest.store import BacktestStore, StoredSignal
+from uoa_detector.backtest.walk_forward import (
+    WalkForwardWindow,
+    equal_time_slices,
+    equal_trade_count_slices,
+    no_op_tuner,
+)
 
 __all__ = [
     "RAWPRINT_PARQUET_SCHEMA",
@@ -64,5 +70,9 @@ __all__ = [
     "SimplePnLProvider",
     "SqliteBacktestStore",
     "StoredSignal",
+    "WalkForwardWindow",
     "compute_metrics",
+    "equal_time_slices",
+    "equal_trade_count_slices",
+    "no_op_tuner",
 ]
