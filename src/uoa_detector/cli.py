@@ -38,6 +38,7 @@ from typing import TYPE_CHECKING
 import structlog
 import typer
 
+from uoa_detector.backtest import BacktestStore, SqliteBacktestStore
 from uoa_detector.calibration import load_default_profile
 from uoa_detector.calibration.loader import load_profile
 from uoa_detector.observability import (
@@ -56,6 +57,7 @@ from uoa_detector.sources.scenarios import (
 from uoa_detector.sources.synthetic import SyntheticRawFlowSource, to_raw_print
 
 if TYPE_CHECKING:
+    from uoa_detector.backtest import BacktestStoreProtocol
     from uoa_detector.calibration import CalibrationProfile
     from uoa_detector.observability import DecisionRecordWriter
 
@@ -164,6 +166,15 @@ def run(
         "--profile",
         help="Path to a CalibrationProfile YAML; defaults to v5_default.",
     ),
+    store_url: str = typer.Option(
+        ":memory:",
+        "--store",
+        help=(
+            "Backtest store URL. ':memory:' (default) uses the in-memory "
+            "BacktestStore; 'sqlite:path/to/db' uses the persistent SQLite "
+            "store. Phase 3.2.1."
+        ),
+    ),
 ) -> None:
     """Run the pipeline against a flow source and emit labeled signal records."""
     if source != "synthetic":
@@ -176,16 +187,60 @@ def run(
     writer, log_to_stderr = _build_writer(output, output_file)
     _configure_logging(log_to_stderr=log_to_stderr)
     profile = _resolve_profile(profile_path)
+    store = _build_store(store_url)
 
-    if multi_source:
-        asyncio.run(_run_multi_source(profile, writer))
-    else:
-        asyncio.run(_run_default_synthetic(profile, writer))
+    # CLI owns the store's lifecycle. Pipeline.run() finalises the run
+    # it drove (calls finish_run()) but does NOT close the store —
+    # closing is the responsibility of whoever owns the store. Phase
+    # 3.2.4's 4-cell runner will own a store across four pipelines.
+    try:
+        if multi_source:
+            asyncio.run(_run_multi_source(profile, writer, store))
+        else:
+            asyncio.run(_run_default_synthetic(profile, writer, store))
+    finally:
+        store.close()
+
+
+def _build_store(store_url: str) -> BacktestStoreProtocol:
+    """Resolve ``--store`` flag to a BacktestStoreProtocol implementation.
+
+    Accepts:
+      - ``:memory:`` (default) → in-memory ``BacktestStore``
+      - ``sqlite:<path>`` → persistent ``SqliteBacktestStore``; the path
+        can be relative (``sqlite:backtest.db``) or absolute
+        (``sqlite:/abs/path.db``).
+
+    SQLAlchemy SQLite URL convention:
+      - ``sqlite:///relative/path.db``  (3 slashes, then relative path)
+      - ``sqlite:////absolute/path.db`` (4 slashes, then absolute path)
+    The CLI accepts the ergonomic shortcut ``sqlite:foo.db`` /
+    ``sqlite:/abs/foo.db`` and rewrites to the canonical form.
+    """
+    if store_url == ":memory:":
+        return BacktestStore()
+    if store_url.startswith("sqlite:"):
+        # Already-canonical forms pass through.
+        if store_url.startswith(("sqlite:///", "sqlite:////")):
+            return SqliteBacktestStore(store_url)
+        tail = store_url[len("sqlite:") :]
+        # SQLAlchemy expects ``sqlite:///<path>``: 3 slashes for the URL
+        # delimiter, then the path. If ``tail`` already starts with ``/``
+        # (absolute path), the result naturally has 4 slashes; if not
+        # (relative), 3. Same expression handles both cases.
+        url = f"sqlite:///{tail}"
+        return SqliteBacktestStore(url)
+    msg = (
+        f"Unrecognized --store value {store_url!r}. "
+        "Use ':memory:' or 'sqlite:path/to/db'."
+    )
+    raise typer.BadParameter(msg, param_hint="--store")
 
 
 async def _run_default_synthetic(
     profile: CalibrationProfile,
     writer: DecisionRecordWriter,
+    store: BacktestStoreProtocol,
 ) -> None:
     """Drive the default single-source scenario."""
     steps = default_scenario()
@@ -200,6 +255,7 @@ async def _run_default_synthetic(
         [src],
         stages,
         profile=profile,
+        store=store,
         decision_record_writer=writer,
     )
     await pipeline.run()
@@ -208,6 +264,7 @@ async def _run_default_synthetic(
 async def _run_multi_source(
     profile: CalibrationProfile,
     writer: DecisionRecordWriter,
+    store: BacktestStoreProtocol,
 ) -> None:
     """Drive the 3-source synthetic scenario through SourceFusion.
 
@@ -224,6 +281,7 @@ async def _run_multi_source(
         [a, b, c],
         list(default_stage_pipeline()),
         profile=profile,
+        store=store,
         decision_record_writer=writer,
     )
     await pipeline.run()

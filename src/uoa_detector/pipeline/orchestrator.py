@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING
 import structlog
 from pydantic import BaseModel, ConfigDict
 
+from uoa_detector.backtest.protocol import BacktestStoreProtocol
 from uoa_detector.backtest.store import BacktestStore
 from uoa_detector.calibration import CalibrationProfile, load_default_profile
 from uoa_detector.calibration.resolver import CalibrationResolver
@@ -71,7 +72,7 @@ class Pipeline:
         *,
         profile: CalibrationProfile | None = None,
         resolver: CalibrationResolver | None = None,
-        store: BacktestStore | None = None,
+        store: BacktestStoreProtocol | None = None,
         context: PipelineContext | None = None,
         force_multi_source: bool = False,
         decision_record_writer: DecisionRecordWriter | None = None,
@@ -104,7 +105,7 @@ class Pipeline:
         self._writer = decision_record_writer
 
     @property
-    def store(self) -> BacktestStore:
+    def store(self) -> BacktestStoreProtocol:
         """The backtest store this pipeline writes to."""
         return self._store
 
@@ -129,6 +130,15 @@ class Pipeline:
             await self._fusion.close()
             if self._writer is not None:
                 self._writer.close()
+            # Finalise the run that this pipeline drove (if any) — but
+            # do NOT close the store. Lifecycle is owned by the caller
+            # (CLI, 4-cell runner, test harness). Phase 3.2.4's 4-cell
+            # runner reuses one store across four pipeline.run() calls,
+            # one per cell; closing the store here would force that
+            # runner into "one SQLite file per cell", which the
+            # acceptance doc explicitly rejects.
+            if self._store.active_run_id is not None:
+                self._store.finish_run()
         return results
 
     async def process_one(self, raw: OptionsPrint) -> PipelineResult:

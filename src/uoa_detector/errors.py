@@ -38,3 +38,12 @@ class PipelineStageError(UOADetectorError):
 
 class LabelDecisionError(UOADetectorError):
     """Raised when the labeler cannot reach a coherent decision."""
+
+
+class RunLifecycleError(UOADetectorError):
+    """Raised when a backtest store's run lifecycle is violated.
+
+    Phase 3.2.1: when a store was opened with ``strict_run_lifecycle=True``
+    and an operation that requires an active run (``add``, ``record_error``)
+    is called without a preceding ``start_run()``.
+    """

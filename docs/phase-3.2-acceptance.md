@@ -31,6 +31,10 @@ reference. Each is detailed in the relevant sub-commit section.
      The latency columns + error table back the Phase 3.3.x cross-cell
      comparison's "ran cleanly on the same window with the same
      profile hash" precondition.
+     **Lifecycle:** `start_run` is permissive by default (implicit run
+     on first `add`), strict opt-in via
+     `BacktestStore(strict_run_lifecycle=True)` for 3.2.4's 4-cell
+     runner. `schema_version` is SQLite-only; in-memory returns `None`.
 
   2. **3.2.2 — Parquet compression: zstd level 3.** Sane default;
      revisit only if 3.3.x runs hit disk pressure. Schema includes
@@ -159,6 +163,53 @@ read back, assert preserved); error-table round-trip test (record
 run row); CLI gains `--store sqlite:path/to/db` flag with default
 `:memory:`; one new doc file `docs/BACKTEST.md` introduces the
 storage layer.
+
+**Post-implementation clarifications (added during 3.2.1 design,
+before code):**
+
+  * **`start_run` lifecycle defaults to implicit; strict mode is
+    opt-in.** Permissive default: the first `add()` call without a
+    prior `start_run()` auto-creates an "implicit" run and subsequent
+    `add()` calls write to it. Phase 1-2 tests keep working without
+    modification. Strict mode is enabled per-store via
+    `BacktestStore(strict_run_lifecycle=True)`; in strict mode an
+    `add()` without a preceding `start_run()` raises
+    `RunLifecycleError`. Phase 3.2.4's 4-cell runner uses strict
+    mode so each cell gets a separate `run_id` with no
+    cross-contamination from implicit-run leakage. The pattern
+    follows Phase 2's `sub_score_missing_behavior` precedent:
+    permissive default for the common case, strict opt-in for the
+    machinery that needs the guarantees. The parametrised test sweep
+    covers both modes: `test_implicit_run_default_behavior`,
+    `test_strict_lifecycle_raises_without_start_run`,
+    `test_strict_lifecycle_accepts_explicit_start_run`.
+
+  * **`schema_version` is SQLite-only; in-memory returns `None`.**
+    The Protocol exposes `schema_version: int | None`. The SQLite
+    implementation returns the current Alembic-tracked version
+    (starts at 1, climbs as migrations land). The in-memory
+    implementation returns `None` — there is no persistent state to
+    migrate, the value would be meaningless. Tests assert both
+    branches: `in_memory.schema_version is None` and
+    `sqlite.schema_version >= 1`.
+
+  * **`finish_run()` and `close()` are distinct lifecycle methods.**
+    `finish_run()` ends the active run (sets `finished_at`, flushes
+    batched buffers) but the store stays usable for the next
+    `start_run()`. `close()` flushes, finalises any active run, AND
+    disposes the engine; subsequent calls raise `RuntimeError`. The
+    separation exists so Phase 3.2.4's 4-cell runner can reuse one
+    store across four cells (one trailing `close()` after the loop)
+    without being forced into "one SQLite file per cell". The
+    orchestrator's `Pipeline.run()` calls `finish_run()` on its
+    `finally` block but never `close()` — the store's lifecycle
+    belongs to whoever constructed it (CLI, 4-cell runner, test
+    fixture), not the orchestrator. Tests pin this contract:
+    `test_finish_run_does_not_close_store`,
+    `test_pipeline_run_does_not_close_store`,
+    `test_close_makes_store_unusable`,
+    `test_close_is_idempotent`,
+    `test_pipeline_run_with_strict_store_explicit_start_run`.
 
 ---
 
