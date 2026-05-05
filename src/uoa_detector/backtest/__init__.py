@@ -29,6 +29,11 @@ from uoa_detector.backtest.pnl_provider import (
     RealizedTrade,
 )
 from uoa_detector.backtest.protocol import BacktestStoreProtocol
+from uoa_detector.backtest.simple_pnl import (
+    DictExitQuoteProvider,
+    ExitQuoteProvider,
+    SimplePnLProvider,
+)
 from uoa_detector.backtest.sqlite_store import SqliteBacktestStore
 from uoa_detector.backtest.store import BacktestStore, StoredSignal
 
@@ -37,7 +42,9 @@ __all__ = [
     "BacktestStore",
     "BacktestStoreProtocol",
     "DataIntegrityError",
+    "DictExitQuoteProvider",
     "ErrorRecord",
+    "ExitQuoteProvider",
     "ExitReason",
     "MockPnLProvider",
     "NoOpPnLProvider",
@@ -45,6 +52,7 @@ __all__ = [
     "PnLProvider",
     "RealizedTrade",
     "RunMetadata",
+    "SimplePnLProvider",
     "SqliteBacktestStore",
     "StoredSignal",
 ]
