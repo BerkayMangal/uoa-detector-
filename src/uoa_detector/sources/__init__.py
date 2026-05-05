@@ -25,6 +25,7 @@ from uoa_detector.sources.base import (
     RawFlowSource,
 )
 from uoa_detector.sources.ibkr_quotes import IBKRConfig, IBKRQuoteSource
+from uoa_detector.sources.parquet_replay import ParquetReplaySource
 from uoa_detector.sources.polygon import PolygonConfig, PolygonFlowSource
 from uoa_detector.sources.synthetic import (
     StallingRawFlowSource,
@@ -40,6 +41,7 @@ __all__ = [
     "FlowDataSource",
     "IBKRConfig",
     "IBKRQuoteSource",
+    "ParquetReplaySource",
     "PolygonConfig",
     "PolygonFlowSource",
     "QuoteSnapshot",
