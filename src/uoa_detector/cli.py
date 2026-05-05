@@ -55,6 +55,7 @@ from uoa_detector.observability import (
     NDJSONWriter,
     ParquetWriter,
     PrettyWriter,
+    redact_secrets,
 )
 from uoa_detector.pipeline.orchestrator import Pipeline
 from uoa_detector.pipeline.stages import default_stage_pipeline
@@ -100,7 +101,13 @@ def _backtest_root() -> None:
 
 
 def _configure_logging(*, log_to_stderr: bool) -> None:
-    """Wire up structlog. ``log_to_stderr=True`` keeps stdout clean for NDJSON."""
+    """Wire up structlog. ``log_to_stderr=True`` keeps stdout clean for NDJSON.
+
+    Phase 3.3.1.2: ``redact_secrets`` runs as the FIRST processor so
+    no downstream processor (timestamper, renderer, etc.) sees the
+    secret values. If a future processor decided to copy event_dict
+    to disk for debugging, that copy is already redacted.
+    """
     logging.basicConfig(
         format="%(message)s",
         stream=sys.stderr if log_to_stderr else sys.stdout,
@@ -109,6 +116,7 @@ def _configure_logging(*, log_to_stderr: bool) -> None:
     )
     structlog.configure(
         processors=[
+            redact_secrets,  # MUST be first — defense in depth
             structlog.processors.add_log_level,
             structlog.processors.TimeStamper(fmt="iso", utc=True),
             structlog.processors.KeyValueRenderer(
