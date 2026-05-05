@@ -1,9 +1,10 @@
-# Backtest framework — storage layer
+# Backtest framework — storage and replay
 
-This document is the operator's tour of the backtest store, introduced
-in Phase 3.2.1. As the framework grows (replay harness in 3.2.2, metric
-calculator in 3.2.3, walk-forward + 4-cell runner in 3.2.4) this doc
-will gain matching sections; right now it covers persistence only.
+This document is the operator's tour of the backtest framework. It
+covers persistence (Phase 3.2.1, in-memory + SQLite store) and
+historical replay (Phase 3.2.2, parquet harness). The metric
+calculator (3.2.3) and walk-forward + 4-cell runner (3.2.4) will
+extend this doc with their own sections when they land.
 
 ## What the store is for
 
@@ -177,6 +178,172 @@ The `:memory:` literal is the explicit form of the default. The
 `sqlite:` URL accepts both relative and absolute paths; SQLAlchemy
 canonicalises internally.
 
+## Replay harness — historical data into the same pipeline
+
+Phase 3.2.2 added `ParquetReplaySource`: a `RawFlowSource` Protocol
+implementation that reads historical parquet files and emits them
+through the same fusion + orchestrator path the live sources use.
+The orchestrator cannot tell synthetic from historical from live
+data at the boundary — it sees `RawPrint` events either way, and
+fusion does the source-arbitration math on event timestamps, not
+walltimes.
+
+### File format and directory convention
+
+```
+data/historical/{source}/{ticker}/{YYYY-MM}.parquet
+```
+
+One file per (source, ticker, calendar month). Months are inclusive,
+ascending; gaps are tolerated (warn-logged, not fatal). Within a
+file, rows must be event-time-monotonic by `timestamp` ascending —
+the reader validates this row-by-row using a streaming PyArrow
+`RecordBatch` reader (no whole-file load) and raises
+`DataIntegrityError` on the first out-of-order row.
+
+The parquet schema is exactly:
+
+| column | type | nullable | source |
+|---|---|---|---|
+| source_id | string | no | RawPrint |
+| source_event_id | string | no | RawPrint |
+| timestamp | timestamp[ns, UTC] | no | RawPrint |
+| ticker | string | no | RawPrint |
+| option_type | string | no | RawPrint |
+| strike | decimal128(20, 6) | no | RawPrint |
+| expiry | date32 | no | RawPrint |
+| dte | int32 | no | RawPrint |
+| spot_price | decimal128(20, 6) | no | RawPrint |
+| premium_paid | decimal128(20, 6) | no | RawPrint |
+| option_price | decimal128(20, 6) | no | RawPrint |
+| bid | decimal128(20, 6) | no | RawPrint |
+| ask | decimal128(20, 6) | no | RawPrint |
+| fill_side | string | no | RawPrint |
+| exchange | string | no | RawPrint |
+| implied_volatility | float64 | yes | RawPrint |
+| open_interest | int32 | yes | RawPrint |
+| is_iso | bool | no | RawPrint |
+| source_tags | list&lt;string&gt; | no | RawPrint |
+| arrival_ts | timestamp[ns, UTC] | yes | replay metadata |
+| replay_ts | timestamp[ns, UTC] | yes | replay metadata (always NULL on disk) |
+
+The schema is pinned by `RAWPRINT_PARQUET_SCHEMA` in
+`uoa_detector.backtest.parquet_schema`. Strict-match validation runs
+on every file open: if the on-disk schema gains, loses, or retypes
+any field, `ParquetSchemaMismatchError` raises with a "regenerate"
+hint pointing the operator at the snapshot exporter (Phase 3.5+) or
+the test fixture generator (now).
+
+### Time fields — three of them
+
+| field | meaning | populated by |
+|---|---|---|
+| `timestamp` | exchange print time (when the trade actually happened) | source feed |
+| `arrival_ts` | walltime the live system received this print | snapshot exporter (Phase 3.5+) — historical dumps may leave NULL |
+| `replay_ts` | walltime the replay harness emitted this row in the current run | always NULL on disk; harness fills at emission time |
+
+The triple is the audit trail for replay determinism debugging: if
+two backtest runs over the same dataset window produce different
+signal counts, diff their `replay_ts` distributions to localise the
+non-determinism (file order, k-way merge, async scheduling).
+
+### Reading: file discovery, k-way merge, ordering
+
+`ParquetReplaySource` is a single-source reader. Construction
+snapshots the file list at first read; files dropped into `data_dir`
+mid-replay are NOT picked up (determinism precondition). Within a
+single (source, ticker), all month files merge via `heapq.merge` on
+event timestamp into one ascending stream; only one row per file
+buffered in the heap at any time. Multi-source replay (Polygon + UW
++ IBKR all replaying at once) wires three `ParquetReplaySource`
+instances into the same `SourceFusion` — fusion does the per-source
+watermarking, no new fusion code.
+
+### Pacing and replay correctness
+
+`replay_speed=inf` (default) emits as fast as possible; positive
+finite values pace the emission. SourceFusion's watermark is
+**event-time** (Phase 2.3.3 invariant, originally pinned by
+`test_window_differentiation_dict_equality` in
+`tests/unit/test_source_fusion.py`), so correctness is independent
+of `replay_speed`. The pin for the harness layer is
+`test_replay_at_inf_preserves_fusion_correctness` in
+`tests/unit/test_replay_fusion.py` — it runs the same sequence at
+`replay_speed=inf` and `replay_speed=100` and asserts the fusion
+output is byte-identical on `(confidence_tier, sources_seen)`.
+
+### Edge cases
+
+| condition | behaviour |
+|---|---|
+| empty parquet (header only, 0 rows) | warn-log + skip; not fatal |
+| missing month in a contiguous range | warn-log gap + skip; not fatal |
+| corrupt parquet (un-openable) | re-raise as `DataIntegrityError` |
+| schema mismatch (missing/extra/retyped field) | `ParquetSchemaMismatchError` with regenerate hint |
+| out-of-order row mid-file | `DataIntegrityError` on the first violating row, no whole-file load |
+| file added after replay start | NOT picked up; snapshot is at first read |
+
+Each is pinned by an explicit named test under
+`tests/unit/test_parquet_replay.py`.
+
+### CLI
+
+```sh
+# Single-source historical replay → SQLite store
+python -m uoa_detector run \
+    --source historical \
+    --data-dir data/historical/synthetic \
+    --store sqlite:./run.db \
+    --output json
+
+# With universe + date filters
+python -m uoa_detector run \
+    --source historical \
+    --data-dir data/historical/polygon \
+    --tickers AAPL,MSFT,NVDA \
+    --from 2024-01 \
+    --to 2024-12 \
+    --store sqlite:./2024.db \
+    --output json
+
+# Real-time pacing (rare; for live-equivalent debugging)
+python -m uoa_detector run \
+    --source historical \
+    --data-dir data/historical/synthetic \
+    --replay-speed 1.0
+```
+
+Multi-source replay (three sources at once) is not exposed via the
+CLI in 3.2.2; the Phase 3.2.4 4-cell runner will be the first
+explicit consumer of multi-source replay.
+
+### How to provide your own historical data
+
+Two paths today:
+
+1. **From in-memory `RawPrint`s** — useful for tests, fixture
+   regeneration, or one-off conversions:
+
+   ```python
+   from pathlib import Path
+   from uoa_detector.backtest.parquet_schema import write_parquet
+
+   prints = [...]  # list[RawPrint], must be timestamp-monotonic
+   write_parquet(prints, Path("data/historical/mysource/AAPL/2025-06.parquet"))
+   ```
+
+2. **From a snapshot exporter** — Phase 3.5+, not landed yet. The
+   snapshot exporter will tap a live source's incoming feed and
+   write parquet on a rolling basis with `arrival_ts` populated.
+
+The synthetic fixture
+`tests/fixtures/historical/synthetic/AAPL/2025-06.parquet` is the
+worked example: 10 hand-crafted RawPrints across 5 trading days,
+generated by `make_synthetic_aapl_2025_06_fixture()` in the same
+schema module. Any new source layout that respects the directory
+convention and the schema pin will replay through the same harness
+without code changes.
+
 ## Why WAL mode
 
 `PRAGMA journal_mode=WAL` is set on every connection (a SQLAlchemy
@@ -226,19 +393,39 @@ that scans the public attributes and asserts none of those names
 exist. Phase 3.3.x audit needs this — a backtest that changed its
 historical data after the fact is not a backtest.
 
-## What this commit does NOT do
+## What these commits do NOT do
+
+The 3.2.x series is the backtest framework's plumbing, not its
+analysis layer. Currently missing — by design — are:
 
   - **No latency measurement in the orchestrator yet.** The columns
-    exist, the round-trip is tested, but `Pipeline.process_one` does
-    not currently populate `pipeline_latency_ms`. That wiring lands
-    when the metric calculator (Phase 3.2.3) needs the value.
+    exist (`pipeline_latency_ms`, `data_source_latency_ms`), the
+    round-trip is tested, but `Pipeline.process_one` does not
+    currently populate them. Wiring lands when the metric calculator
+    (Phase 3.2.3) needs the value.
   - **No new orchestrator integration with `start_run`.** Phase 1-2
-    callers (including the CLI) hit the implicit-default run path.
-    The 4-cell runner in Phase 3.2.4 will be the first explicit
-    `start_run` user.
+    callers (including the CLI in both synthetic and historical
+    modes) hit the implicit-default run path. The 4-cell runner in
+    Phase 3.2.4 will be the first explicit `start_run` user.
+  - **`replay_ts` not threaded through to SQLite.** The parquet
+    schema reserves `replay_ts` as nullable harness-written; the
+    harness emits `RawPrint` (which has no `replay_ts` field), so
+    the SQLite signal row's `full_record_json` does not currently
+    carry `replay_ts`. Threading it through is a lazy enhancement
+    when cross-run determinism diffs become a real debugging need.
+  - **No multi-source replay via the CLI.** `--source historical`
+    drives one `ParquetReplaySource` against one `data_dir`. Phase
+    3.2.4's 4-cell runner will instantiate multiple harnesses
+    explicitly (one per cell × source combination) and own the
+    fusion wiring directly.
+  - **No snapshot exporter.** Historical parquet files have to be
+    produced by hand or by a Phase 3.5+ exporter that taps a live
+    source's incoming feed. For now, fixtures are generated via
+    `make_synthetic_aapl_2025_06_fixture()` and `write_parquet()`.
+  - **No metric calculation, no walk-forward, no cell comparison.**
+    Those are 3.2.3 + 3.2.4.
   - **No backup / archive utility.** SQLite files are just files;
-    `cp` is the backup command for now. A Phase 3.5+ deployment
-    might add formal archiving.
+    `cp` is the backup command for now.
 
 ## Reading from the database
 
