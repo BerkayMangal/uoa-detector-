@@ -284,6 +284,15 @@ def test_invalid_weights_sum_rejected() -> None:
                 "cluster_density_score", "relative_premium_score",
             )
         } | {"time_of_day_weight": {"on_missing": "raise"}},
+        "backtest": {
+            "slippage_pct": 0.02,
+            "holding_strategy": "fixed_window",
+            "holding_window_days": 5,
+            "exit_on_dte_lte": 2,
+            "dte_based_close_threshold": 7,
+            "walk_forward_windows": 8,
+            "walk_forward_min_consistency_pct": 0.75,
+        },
     }
     with pytest.raises(Exception, match="scoring weights must sum"):
         CalibrationProfile.model_validate(bad)
@@ -308,3 +317,108 @@ def test_unknown_keys_rejected(v5: CalibrationProfile, tmp_path) -> None:
 
     with pytest.raises(ConfigurationError):
         load_profile(bad_yaml, profiles_dir=tmp_path)
+
+
+# ---------------------------------------------------------------------------
+# Phase 3.2.3 — BacktestConfig defaults pin
+# ---------------------------------------------------------------------------
+
+
+def test_backtest_config_defaults_match_phase_3_prep(v5: CalibrationProfile) -> None:
+    """The Track B + Formülasyon A backtest defaults are pinned in v5_default.
+
+    Any change to these defaults must be deliberate (re-approve via the
+    acceptance doc + bump this test). They drive every metric output
+    in 3.2.3 + every cell in 3.2.4's 4-cell runner.
+    """
+    bt = v5.backtest
+    assert bt.slippage_pct == 0.02
+    assert bt.holding_strategy == "fixed_window"
+    assert bt.holding_window_days == 5
+    assert bt.exit_on_dte_lte == 2
+    assert bt.dte_based_close_threshold == 7
+    assert bt.walk_forward_windows == 8
+    assert bt.walk_forward_min_consistency_pct == 0.75
+
+
+def test_backtest_config_holding_strategy_enum_values_pinned(
+    v5: CalibrationProfile,
+) -> None:
+    """The three holding-strategy enum values are part of the public schema.
+
+    'take_profit_or_stop' is reserved here; the SimplePnLProvider in
+    3.2.3 raises NotImplementedError for it. If a yaml mistypes the
+    strategy name, Pydantic catches it at load time.
+    """
+    # Tracker for the three valid values; if the enum is widened or
+    # renamed, this test fails and forces a deliberate update.
+    expected = {"fixed_window", "dte_based", "take_profit_or_stop"}
+    # Construct three minimal BacktestConfigs to confirm each value is
+    # accepted by Pydantic.
+    from uoa_detector.calibration.profile import BacktestConfig
+
+    base = v5.backtest.model_dump()
+    accepted: set[str] = set()
+    for strategy in expected:
+        cfg = BacktestConfig.model_validate({**base, "holding_strategy": strategy})
+        accepted.add(cfg.holding_strategy)
+    assert accepted == expected
+
+    # And an invalid value is rejected.
+    with pytest.raises(Exception, match="holding_strategy"):
+        BacktestConfig.model_validate({**base, "holding_strategy": "moonshot"})
+
+
+def test_backtest_config_slippage_bounds() -> None:
+    """slippage_pct is bounded in [0, 0.5] by Pydantic Field constraints.
+
+    A typo (e.g. 50 instead of 0.50) gets caught at load time rather
+    than silently halving every realized PnL.
+    """
+    from uoa_detector.calibration.profile import BacktestConfig
+
+    base = {
+        "slippage_pct": 0.02,
+        "holding_strategy": "fixed_window",
+        "holding_window_days": 5,
+        "exit_on_dte_lte": 2,
+        "dte_based_close_threshold": 7,
+        "walk_forward_windows": 8,
+        "walk_forward_min_consistency_pct": 0.75,
+    }
+    # Negative slippage rejected.
+    with pytest.raises(Exception, match="slippage_pct"):
+        BacktestConfig.model_validate({**base, "slippage_pct": -0.01})
+    # Above 50% rejected.
+    with pytest.raises(Exception, match="slippage_pct"):
+        BacktestConfig.model_validate({**base, "slippage_pct": 0.6})
+    # Within bounds accepted.
+    BacktestConfig.model_validate({**base, "slippage_pct": 0.0})
+    BacktestConfig.model_validate({**base, "slippage_pct": 0.5})
+
+
+def test_backtest_config_walk_forward_consistency_bounds() -> None:
+    """walk_forward_min_consistency_pct is bounded in [0, 1].
+
+    Anything outside is a profile-construction error; the metric
+    calculator should never see a non-fraction here.
+    """
+    from uoa_detector.calibration.profile import BacktestConfig
+
+    base = {
+        "slippage_pct": 0.02,
+        "holding_strategy": "fixed_window",
+        "holding_window_days": 5,
+        "exit_on_dte_lte": 2,
+        "dte_based_close_threshold": 7,
+        "walk_forward_windows": 8,
+        "walk_forward_min_consistency_pct": 0.75,
+    }
+    with pytest.raises(Exception, match="walk_forward_min_consistency_pct"):
+        BacktestConfig.model_validate(
+            {**base, "walk_forward_min_consistency_pct": 1.5},
+        )
+    with pytest.raises(Exception, match="walk_forward_min_consistency_pct"):
+        BacktestConfig.model_validate(
+            {**base, "walk_forward_min_consistency_pct": -0.1},
+        )

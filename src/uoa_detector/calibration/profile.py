@@ -448,6 +448,92 @@ class SubScoreMissingBehavior(_StrictModel):
 
 
 # ---------------------------------------------------------------------------
+# Backtest configuration — Phase 3.2.3
+# ---------------------------------------------------------------------------
+
+HoldingStrategy = Literal["fixed_window", "dte_based", "take_profit_or_stop"]
+
+
+class BacktestConfig(_StrictModel):
+    """Backtest-only knobs: PnL pricing, holding strategy, walk-forward.
+
+    Phase 3.2.3: introduces the section. SimplePnLProvider reads
+    ``slippage_pct``, ``holding_strategy``, ``holding_window_days``,
+    and ``exit_on_dte_lte``. The metric calculator reads
+    ``walk_forward_windows`` and ``walk_forward_min_consistency_pct``.
+
+    The defaults pinned here are the Track B + Formülasyon A values
+    approved in Phase 3 prep step 3 + acceptance-doc 3.2.0b/3.2.3
+    revisions. ``v5_default.yaml`` carries them; profiles that
+    inherit and don't override get them unchanged. A pin test in
+    ``tests/unit/test_calibration_profile.py`` (added in 3.2.3.1)
+    asserts the defaults; override-via-yaml is supported but the
+    defaults cannot drift without breaking the pin.
+    """
+
+    slippage_pct: float = Field(
+        ge=0.0, le=0.5,
+        description=(
+            "Fraction of entry premium taken as slippage haircut on "
+            "realized PnL. 0.02 = 2%."
+        ),
+    )
+    holding_strategy: HoldingStrategy = Field(
+        description=(
+            "When to close a position: 'fixed_window' (after "
+            "holding_window_days OR exit_on_dte_lte boundary), "
+            "'dte_based' (close at a configured DTE threshold), "
+            "'take_profit_or_stop' (Phase 3.4; raises NotImplementedError "
+            "in 3.2.3 SimplePnLProvider)."
+        ),
+    )
+    holding_window_days: int = Field(
+        ge=1, le=60,
+        description=(
+            "fixed_window strategy: walltime days from entry until forced "
+            "close. Track B's 3-5 day 'ignite or die' dynamic motivates "
+            "the 5-day default."
+        ),
+    )
+    exit_on_dte_lte: int = Field(
+        ge=0, le=14,
+        description=(
+            "Hard safety floor: close any open position when its DTE "
+            "drops to this threshold or below, regardless of strategy. "
+            "Avoids modelling expiry-day gamma chaos / pin risk that "
+            "the simple pricer cannot represent fairly."
+        ),
+    )
+    dte_based_close_threshold: int = Field(
+        ge=0, le=30,
+        description=(
+            "dte_based strategy only: close when DTE drops to this "
+            "value. Distinct from exit_on_dte_lte (the safety floor); "
+            "this is a tactical choice, not a hard floor. Ignored by "
+            "fixed_window."
+        ),
+    )
+    walk_forward_windows: int = Field(
+        ge=2, le=64,
+        description=(
+            "Number of equal-trade-count windows the walk-forward "
+            "consistency metric splits trades into. Default 8 over a "
+            "2-year backtest = 3-month slices; doubles to 16 for 4 "
+            "years, halves to 4 for 1 year."
+        ),
+    )
+    walk_forward_min_consistency_pct: float = Field(
+        ge=0.0, le=1.0,
+        description=(
+            "Pass threshold for walk-forward consistency: fraction of "
+            "windows whose expectancy E > 0. Default 0.75 means '6 of "
+            "8 at default N=8' / '3 of 4 at N=4' / '12 of 16 at N=16'. "
+            "N-independent by design."
+        ),
+    )
+
+
+# ---------------------------------------------------------------------------
 # CalibrationProfile — top-level
 # ---------------------------------------------------------------------------
 
@@ -472,6 +558,7 @@ class CalibrationProfile(_StrictModel):
     risk_buckets: RiskBuckets
     fusion: FusionParams
     sub_score_missing_behavior: SubScoreMissingBehavior
+    backtest: BacktestConfig
 
     @model_validator(mode="after")
     def _validate_invariants(self) -> CalibrationProfile:
