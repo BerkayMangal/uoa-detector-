@@ -15,6 +15,18 @@ implementations (``MockPnLProvider``, ``NoOpPnLProvider``).
 3.2.3.4.
 """
 
+from uoa_detector.backtest.cell_runner import (
+    CANONICAL_CELLS,
+    CELL_NAMES,
+    CellRunResult,
+    CellSpec,
+    cell_name,
+    fixture_trade_producer,
+    load_universe_tickers,
+    noop_trade_producer,
+    run_4cell_backtest,
+    universe_path,
+)
 from uoa_detector.backtest.metrics import (
     BacktestMetrics,
     MetricResult,
@@ -50,10 +62,14 @@ from uoa_detector.backtest.walk_forward import (
 )
 
 __all__ = [
+    "CANONICAL_CELLS",
+    "CELL_NAMES",
     "RAWPRINT_PARQUET_SCHEMA",
     "BacktestMetrics",
     "BacktestStore",
     "BacktestStoreProtocol",
+    "CellRunResult",
+    "CellSpec",
     "DataIntegrityError",
     "DictExitQuoteProvider",
     "ErrorRecord",
@@ -71,8 +87,14 @@ __all__ = [
     "SqliteBacktestStore",
     "StoredSignal",
     "WalkForwardWindow",
+    "cell_name",
     "compute_metrics",
     "equal_time_slices",
     "equal_trade_count_slices",
+    "fixture_trade_producer",
+    "load_universe_tickers",
     "no_op_tuner",
+    "noop_trade_producer",
+    "run_4cell_backtest",
+    "universe_path",
 ]
