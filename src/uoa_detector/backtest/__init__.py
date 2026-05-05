@@ -15,6 +15,12 @@ implementations (``MockPnLProvider``, ``NoOpPnLProvider``).
 3.2.3.4.
 """
 
+from uoa_detector.backtest.metrics import (
+    BacktestMetrics,
+    MetricResult,
+    MetricThresholds,
+    compute_metrics,
+)
 from uoa_detector.backtest.models import ErrorRecord, RunMetadata
 from uoa_detector.backtest.parquet_schema import (
     RAWPRINT_PARQUET_SCHEMA,
@@ -39,6 +45,7 @@ from uoa_detector.backtest.store import BacktestStore, StoredSignal
 
 __all__ = [
     "RAWPRINT_PARQUET_SCHEMA",
+    "BacktestMetrics",
     "BacktestStore",
     "BacktestStoreProtocol",
     "DataIntegrityError",
@@ -46,6 +53,8 @@ __all__ = [
     "ErrorRecord",
     "ExitQuoteProvider",
     "ExitReason",
+    "MetricResult",
+    "MetricThresholds",
     "MockPnLProvider",
     "NoOpPnLProvider",
     "ParquetSchemaMismatchError",
@@ -55,4 +64,5 @@ __all__ = [
     "SimplePnLProvider",
     "SqliteBacktestStore",
     "StoredSignal",
+    "compute_metrics",
 ]
