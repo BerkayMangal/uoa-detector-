@@ -31,6 +31,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import sys
+from datetime import UTC, datetime
 from enum import StrEnum
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -44,6 +45,9 @@ from uoa_detector.backtest import (
     NoOpPnLProvider,
     SqliteBacktestStore,
     compute_metrics,
+    noop_trade_producer,
+    render_4cell_comparison_report,
+    run_4cell_backtest,
 )
 from uoa_detector.calibration import load_default_profile
 from uoa_detector.calibration.loader import load_profile
@@ -546,6 +550,128 @@ def _render_metric_report(*, run_id: str, metrics: BacktestMetrics) -> None:
     typer.echo("")
     label = "PASS" if metrics.overall_pass else "FAIL"
     typer.echo(f"OVERALL: {label}")
+
+
+# ---------------------------------------------------------------------------
+# `backtest run-4cell` subcommand — Phase 3.2.4.4
+# ---------------------------------------------------------------------------
+
+
+@backtest_app.command("run-4cell")
+def backtest_run_4cell(
+    store_url: str = typer.Option(
+        ...,
+        "--store",
+        help="Backtest store URL: 'sqlite:path/to/db' for the persistent "
+             "store, or ':memory:' (rare; results lost at process exit "
+             "unless --report-path captures them).",
+    ),
+    report_path: Path = typer.Option(
+        ...,
+        "--report-path",
+        help="Path where the markdown comparison report is written.",
+    ),
+    period_start: str = typer.Option(
+        ...,
+        "--from",
+        help="Backtest period start, ISO date (e.g. 2024-01-01).",
+    ),
+    period_end: str = typer.Option(
+        ...,
+        "--to",
+        help="Backtest period end, ISO date (e.g. 2026-01-01).",
+    ),
+    walk_forward_windows: int = typer.Option(
+        8,
+        "--walk-forward-windows",
+        help="Number of equal-time walk-forward slices over the period. "
+             "Default 8 (3-month slices for a 2-year period).",
+    ),
+    profile_path: Path | None = typer.Option(
+        None,
+        "--profile",
+        help="Path to a CalibrationProfile YAML; defaults to v5_default.",
+    ),
+    seed: int = typer.Option(
+        0,
+        "--seed",
+        help="Determinism seed. Phase 3.2.x is fully deterministic so this "
+             "currently has no effect; wired for Phase 3.4+ tuning that "
+             "will introduce randomness (grid jitter, Bayesian opt, etc.).",
+    ),
+    trades: str = typer.Option(
+        "noop",
+        "--trades",
+        help="Trade producer. 'noop' (default) returns zero trades for "
+             "every cell — the 4-cell plumbing runs end-to-end (start_run, "
+             "finish_run, RunMetadata persisted, comparison report "
+             "rendered) but every cell reports 0 trades. Real trade "
+             "producers wired from the replay stream land in Phase 3.3.",
+    ),
+) -> None:
+    """Run the Formülasyon A 4-cell combinatorial backtest end-to-end.
+
+    Four runs back-to-back: (Tier-1, single), (Tier-1, fusion),
+    (Tier-2, single), (Tier-2, fusion). Each cell is a separate
+    run_id in the SQLite store with universe_id = cell name. The
+    comparison report is written to ``--report-path`` as markdown.
+
+    Phase 3.2.4 scope: orchestration + windowing + report rendering.
+    Real trade producers (driving the full pipeline through
+    fusion+orchestrator and writing signals to the store) land in
+    Phase 3.3 alongside the SimplePnL exit-quote source.
+    """
+    if trades != "noop":
+        msg = (
+            f"--trades must be 'noop' in Phase 3.2.4; got {trades!r}. "
+            "Real trade producers wired from the replay stream land in "
+            "Phase 3.3."
+        )
+        raise typer.BadParameter(msg, param_hint="--trades")
+
+    # Parse period dates as UTC midnight.
+    try:
+        start_dt = datetime.fromisoformat(period_start).replace(tzinfo=UTC)
+        end_dt = datetime.fromisoformat(period_end).replace(tzinfo=UTC)
+    except ValueError as exc:
+        msg = f"--from / --to must be ISO date (YYYY-MM-DD); got {exc}"
+        raise typer.BadParameter(msg, param_hint="--from") from exc
+
+    if end_dt <= start_dt:
+        msg = f"--to ({period_end}) must be after --from ({period_start})"
+        raise typer.BadParameter(msg, param_hint="--to")
+
+    profile = _resolve_profile(profile_path)
+    store = _build_store(store_url)
+
+    try:
+        results = run_4cell_backtest(
+            profile=profile,
+            store=store,
+            period_start=start_dt,
+            period_end=end_dt,
+            walk_forward_windows=walk_forward_windows,
+            trade_producer=noop_trade_producer,
+            seed=seed,
+        )
+    finally:
+        store.close()
+
+    report = render_4cell_comparison_report(results)
+    report_path.parent.mkdir(parents=True, exist_ok=True)
+    report_path.write_text(report, encoding="utf-8")
+
+    # Console summary so the operator sees the headline at the terminal.
+    typer.echo(f"=== 4-cell backtest complete — wrote {report_path} ===")
+    for r in results:
+        verdict = "PASS" if r.metrics.overall_pass else "FAIL"
+        typer.echo(
+            f"  {r.cell.name:<14} "
+            f"trades={r.metrics.total_trades:>4} "
+            f"open={r.metrics.open_trades:>4} "
+            f"E={r.metrics.expectancy:+.4f} "
+            f"{verdict}",
+        )
 
 
 def main() -> None:
