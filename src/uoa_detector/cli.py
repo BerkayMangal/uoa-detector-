@@ -49,6 +49,7 @@ from uoa_detector.observability import (
 from uoa_detector.pipeline.orchestrator import Pipeline
 from uoa_detector.pipeline.stages import default_stage_pipeline
 from uoa_detector.sources.multi_source_scenario import multi_source_scenario
+from uoa_detector.sources.parquet_replay import ParquetReplaySource
 from uoa_detector.sources.scenarios import (
     ScenarioOverrideStage,
     default_scenario,
@@ -143,7 +144,15 @@ def _resolve_profile(profile_path: Path | None) -> CalibrationProfile:
 
 @app.command()
 def run(
-    source: str = typer.Option("synthetic", help="Flow source name."),
+    source: str = typer.Option(
+        "synthetic",
+        "--source",
+        help=(
+            "Flow source. 'synthetic' (default) drives the in-memory scenario; "
+            "'historical' replays parquet files under --data-dir through the "
+            "RawFlowSource Protocol — Phase 3.2.2."
+        ),
+    ),
     scenario: str = typer.Option("default", help="Synthetic scenario name."),
     multi_source: bool = typer.Option(
         False,
@@ -175,14 +184,68 @@ def run(
             "store. Phase 3.2.1."
         ),
     ),
+    data_dir: Path | None = typer.Option(
+        None,
+        "--data-dir",
+        help=(
+            "Historical replay only: per-source parquet root, e.g., "
+            "data/historical/synthetic/. Required when --source=historical. "
+            "Phase 3.2.2."
+        ),
+    ),
+    tickers: str | None = typer.Option(
+        None,
+        "--tickers",
+        help=(
+            "Historical replay only: comma-separated ticker filter. Default: "
+            "all tickers found under --data-dir."
+        ),
+    ),
+    from_month: str | None = typer.Option(
+        None,
+        "--from",
+        help="Historical replay only: earliest month (YYYY-MM). Inclusive.",
+    ),
+    to_month: str | None = typer.Option(
+        None,
+        "--to",
+        help="Historical replay only: latest month (YYYY-MM). Inclusive.",
+    ),
+    replay_speed: float = typer.Option(
+        float("inf"),
+        "--replay-speed",
+        help=(
+            "Historical replay only: pacing multiplier. inf (default) = batch "
+            "as fast as possible; 1.0 = real-time; 10.0 = 10x real-time. "
+            "Replay correctness is independent of this — fusion uses event-"
+            "time watermarks (Phase 2.3.3)."
+        ),
+    ),
+    source_id: str = typer.Option(
+        "historical",
+        "--source-id",
+        help=(
+            "Historical replay only: source_id tag for the harness. Defaults "
+            "to 'historical'. Use this to label the source dimension in "
+            "SQLite signals and 4-cell runs."
+        ),
+    ),
 ) -> None:
     """Run the pipeline against a flow source and emit labeled signal records."""
-    if source != "synthetic":
-        msg = f"Only --source synthetic is supported in this build; got {source!r}"
+    if source not in ("synthetic", "historical"):
+        msg = (
+            f"--source must be 'synthetic' or 'historical'; got {source!r}"
+        )
         raise typer.BadParameter(msg, param_hint="--source")
-    if scenario != "default":
-        msg = f"Only the 'default' scenario name is supported in this build; got {scenario!r}"
+    if source == "synthetic" and scenario != "default":
+        msg = (
+            f"Only the 'default' scenario name is supported for synthetic; "
+            f"got {scenario!r}"
+        )
         raise typer.BadParameter(msg, param_hint="--scenario")
+    if source == "historical" and data_dir is None:
+        msg = "--data-dir is required when --source=historical"
+        raise typer.BadParameter(msg, param_hint="--data-dir")
 
     writer, log_to_stderr = _build_writer(output, output_file)
     _configure_logging(log_to_stderr=log_to_stderr)
@@ -194,7 +257,27 @@ def run(
     # closing is the responsibility of whoever owns the store. Phase
     # 3.2.4's 4-cell runner will own a store across four pipelines.
     try:
-        if multi_source:
+        if source == "historical":
+            assert data_dir is not None  # typer guarantees by check above
+            ticker_list = (
+                [t.strip().upper() for t in tickers.split(",") if t.strip()]
+                if tickers
+                else None
+            )
+            asyncio.run(
+                _run_historical(
+                    profile=profile,
+                    writer=writer,
+                    store=store,
+                    data_dir=data_dir,
+                    tickers=ticker_list,
+                    from_month=from_month,
+                    to_month=to_month,
+                    replay_speed=replay_speed,
+                    source_id=source_id,
+                ),
+            )
+        elif multi_source:
             asyncio.run(_run_multi_source(profile, writer, store))
         else:
             asyncio.run(_run_default_synthetic(profile, writer, store))
@@ -279,6 +362,43 @@ async def _run_multi_source(
     a, b, c = multi_source_scenario()
     pipeline = Pipeline(
         [a, b, c],
+        list(default_stage_pipeline()),
+        profile=profile,
+        store=store,
+        decision_record_writer=writer,
+    )
+    await pipeline.run()
+
+
+async def _run_historical(
+    *,
+    profile: CalibrationProfile,
+    writer: DecisionRecordWriter,
+    store: BacktestStoreProtocol,
+    data_dir: Path,
+    tickers: list[str] | None,
+    from_month: str | None,
+    to_month: str | None,
+    replay_speed: float,
+    source_id: str,
+) -> None:
+    """Drive the pipeline against a historical parquet replay source.
+
+    Single ``ParquetReplaySource`` against the supplied ``data_dir``.
+    Multi-source replay (Polygon + UW + IBKR) wires three harnesses
+    by hand at the call site or by a Phase 3.2.4 4-cell runner — the
+    CLI's role here is the single-source smoke path.
+    """
+    src = ParquetReplaySource(
+        source_id,
+        data_dir,
+        tickers=tickers,
+        from_month=from_month,
+        to_month=to_month,
+        replay_speed=replay_speed,
+    )
+    pipeline = Pipeline(
+        [src],
         list(default_stage_pipeline()),
         profile=profile,
         store=store,
