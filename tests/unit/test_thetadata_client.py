@@ -416,8 +416,13 @@ async def test_auth_error_message_does_not_include_secret() -> None:
 
 
 @pytest.mark.asyncio
-async def test_stream_ws_raises_not_implemented_in_phase_3_3_2_3() -> None:
-    """stream_ws is implemented in 3.3.2.5; here it raises clearly."""
+async def test_stream_ws_points_to_live_source_class() -> None:
+    """``ThetaDataClient.stream_ws`` is a placeholder that raises
+    pointing the caller to ``ThetaDataLiveSource`` (Phase 3.3.2.5).
+
+    The HTTP client and the WS live source are separate classes by
+    design — ``ThetaDataClient`` stays HTTP-only.
+    """
     client = ThetaDataClient(
         api_key=SecretStr("td_test"),
         settings=_settings(),
@@ -426,7 +431,7 @@ async def test_stream_ws_raises_not_implemented_in_phase_3_3_2_3() -> None:
         ),
     )
     try:
-        with pytest.raises(NotImplementedError, match=r"3\.3\.2\.5"):
+        with pytest.raises(NotImplementedError, match=r"ThetaDataLiveSource"):
             await client.stream_ws("/v2/ws", subscriptions=[])
     finally:
         await client.aclose()

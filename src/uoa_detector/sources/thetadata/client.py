@@ -384,14 +384,18 @@ class ThetaDataClient:
         *,
         subscriptions: Iterable[dict[str, Any]],
     ) -> Any:
-        """Open a WebSocket and yield decoded messages.
+        """Reserved — WebSocket streaming lives in ThetaDataLiveSource.
 
-        Phase 3.3.2.5 will fill in the framing and reconnect logic.
-        For 3.3.2.3 this method is a stub; it raises
-        NotImplementedError so accidental calls fail loudly.
+        Phase 3.3.2.5 introduced ``ThetaDataLiveSource`` as a separate
+        class (in ``thetadata.live``) rather than folding WS support
+        into the HTTP client. ``ThetaDataClient`` stays HTTP-only;
+        callers that want live streaming use ``ThetaDataLiveSource``
+        directly. This method is kept as a typed stub so the bisectable
+        history's earlier pin (3.3.2.3) still finds the symbol.
         """
         msg = (
-            "stream_ws is implemented in Phase 3.3.2.5 (live source). "
-            "For Phase 3.3.2.3 the client only exposes request_json."
+            "WebSocket streaming is implemented in ThetaDataLiveSource "
+            "(uoa_detector.sources.thetadata.live), introduced in "
+            "Phase 3.3.2.5. ThetaDataClient is HTTP-only by design."
         )
         raise NotImplementedError(msg)
