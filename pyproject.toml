@@ -84,3 +84,6 @@ ignore_missing_imports = true
 testpaths = ["tests"]
 asyncio_mode = "auto"
 addopts = "-ra"
+markers = [
+    "integration: tests that hit real external services (ThetaData, Unusual Whales). Skipped by default; require credentials in env to run.",
+]
