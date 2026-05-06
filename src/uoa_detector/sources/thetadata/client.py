@@ -1,0 +1,397 @@
+"""ThetaData HTTP / WebSocket client.
+
+Phase 3.3.2.3: the transport layer the historical downloader
+(3.3.2.4) and live source (3.3.2.5) build on. Implements:
+
+  - Authenticated HTTP via the local Theta Terminal proxy.
+    The Terminal listens on http://127.0.0.1:25510 by default
+    (per ThetaData docs); credentials are forwarded by the
+    Terminal, not sent over the public network. Our client still
+    accepts ``Credentials`` so different Terminal configs (a
+    cloud-hosted Terminal in the future, etc.) can be plumbed
+    without changing call sites.
+  - Token-bucket rate limiting (ThetaDataSettings.rate_limit_*)
+  - Retry with exponential backoff on transient failures
+  - Circuit breaker that trips after N consecutive failures
+  - WebSocket subscribe/iterate with the same auth + retry loop
+
+This module ships the **skeleton + transport contract**. The
+endpoint-specific helpers (trade fetch, quote fetch) are added in
+3.3.2.4. Live WebSocket framing is added in 3.3.2.5.
+
+Tests use a mocked transport (httpx.MockTransport / a fake WS
+server) so the entire surface is exercised without real network
+traffic. Smoke integration tests (3.3.2.6) hit the real Terminal
+and are skipped without ``THETADATA_API_KEY``.
+
+decision (transport contract via httpx.AsyncClient):
+  httpx already supports MockTransport for in-process testing,
+  has a clean async API, and is widely used. ThetaData publishes
+  a Python SDK but adopting it would couple us to their version
+  cadence; httpx + our own mapping layer keeps the dependency
+  surface minimal and testable.
+
+decision (lazy auth, never log secrets):
+  The client takes a ``SecretStr`` for the API key and calls
+  ``.get_secret_value()`` only when constructing the request
+  headers. structlog redact_secrets (Phase 3.3.1.2) catches any
+  accidental leak.
+
+decision (rate limit = token bucket, profile-tunable):
+  Acceptance doc names a token bucket. We implement it as a
+  monotonically-replenishing counter — simpler than a deque-based
+  sliding window, sufficient for the rps shape ThetaData
+  publishes. ``rate_limit_requests_per_second`` from
+  ThetaDataSettings drives the refill rate.
+
+decision (retry policy: exponential backoff, capped attempts):
+  Standard pattern: wait ``initial * 2^attempt`` seconds, capped
+  at ``max_backoff_s``. Three attempts (default) before raising.
+  Retryable errors: 5xx, network errors, timeouts. 4xx never
+  retries (auth, malformed request).
+
+decision (circuit breaker: trip after N consecutive failures):
+  After ``circuit_breaker_threshold`` consecutive failures
+  (default 5), the client refuses requests for
+  ``circuit_breaker_reset_s`` (default 30s) before allowing one
+  probe. This prevents thundering-herd retries when ThetaData is
+  hard-down.
+
+decision (no built-in connection pooling beyond httpx default):
+  httpx.AsyncClient pools connections by default. We don't expose
+  pool tunables in profile config — they're a deeper concern that
+  the operator can override by passing a constructed
+  AsyncClient if needed.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import time as time_module
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Any
+
+import httpx
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
+
+    from pydantic import SecretStr
+
+    from uoa_detector.calibration.profile import ThetaDataSettings
+
+
+# Default Theta Terminal location — operator can override via the
+# ``base_url`` constructor kwarg if running the Terminal on a
+# non-default port or a different host.
+DEFAULT_BASE_URL = "http://127.0.0.1:25510"
+
+
+class ThetaDataError(RuntimeError):
+    """Base exception for ThetaData client errors."""
+
+
+class ThetaDataAuthError(ThetaDataError):
+    """Authentication or authorisation failure (4xx)."""
+
+
+class ThetaDataRateLimitError(ThetaDataError):
+    """The configured token bucket would be exceeded.
+
+    Raised when a request is attempted while the bucket is empty
+    AND the client is configured to fail-fast on rate-limit
+    rather than wait. Default behaviour is to wait; this exception
+    exists for tests and for callers who want hard limits.
+    """
+
+
+class ThetaDataTransientError(ThetaDataError):
+    """Retryable failure: 5xx, network error, timeout."""
+
+
+class CircuitBreakerOpenError(ThetaDataError):
+    """The circuit breaker is open; refusing requests until reset."""
+
+
+# ---------------------------------------------------------------------------
+# Token bucket rate limiter
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class TokenBucket:
+    """Simple token-bucket rate limiter.
+
+    ``capacity`` tokens, refilled at ``refill_per_second`` tokens
+    per second. ``acquire()`` blocks (asyncio sleep) until a token
+    is available; ``try_acquire()`` returns immediately with a bool.
+
+    The bucket is monotonic-clock based; it survives wall-clock
+    jumps without spurious refills.
+    """
+
+    capacity: float
+    refill_per_second: float
+    _tokens: float = field(init=False)
+    _last_refill: float = field(init=False)
+
+    def __post_init__(self) -> None:
+        self._tokens = self.capacity
+        self._last_refill = time_module.monotonic()
+
+    def _refill(self) -> None:
+        now = time_module.monotonic()
+        elapsed = now - self._last_refill
+        if elapsed > 0:
+            self._tokens = min(
+                self.capacity,
+                self._tokens + elapsed * self.refill_per_second,
+            )
+            self._last_refill = now
+
+    def try_acquire(self, tokens: float = 1.0) -> bool:
+        """Non-blocking: take ``tokens`` if available, else False."""
+        self._refill()
+        if self._tokens >= tokens:
+            self._tokens -= tokens
+            return True
+        return False
+
+    async def acquire(self, tokens: float = 1.0) -> None:
+        """Async: block until ``tokens`` tokens are available."""
+        while not self.try_acquire(tokens):
+            self._refill()
+            shortfall = tokens - self._tokens
+            wait_s = shortfall / self.refill_per_second
+            await asyncio.sleep(max(wait_s, 0.001))
+
+
+# ---------------------------------------------------------------------------
+# Circuit breaker
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class CircuitBreaker:
+    """Trips after N consecutive failures; resets after a cooldown.
+
+    States:
+      CLOSED  — requests pass through; failures increment a counter
+      OPEN    — requests refused; cooldown timer running
+      HALF    — one probe allowed; success closes, failure re-opens
+
+    The probe-on-half-open is the standard pattern; we don't expose
+    it as a separate state externally.
+    """
+
+    threshold: int = 5
+    reset_seconds: float = 30.0
+    _failures: int = field(init=False, default=0)
+    _opened_at: float | None = field(init=False, default=None)
+
+    def is_open(self) -> bool:
+        if self._opened_at is None:
+            return False
+        # Open while cooldown not yet elapsed; otherwise allow probe.
+        return time_module.monotonic() - self._opened_at < self.reset_seconds
+
+    def record_success(self) -> None:
+        self._failures = 0
+        self._opened_at = None
+
+    def record_failure(self) -> None:
+        self._failures += 1
+        if self._failures >= self.threshold:
+            self._opened_at = time_module.monotonic()
+
+
+# ---------------------------------------------------------------------------
+# Client
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class RetryPolicy:
+    """Retry policy for transient errors.
+
+    ``max_attempts=3`` means up to 3 calls total (1 initial + 2
+    retries). ``initial_backoff_s`` doubles per retry up to
+    ``max_backoff_s``.
+    """
+
+    max_attempts: int = 3
+    initial_backoff_s: float = 0.5
+    max_backoff_s: float = 30.0
+
+
+class ThetaDataClient:
+    """HTTP / WebSocket client for the ThetaData Terminal.
+
+    Constructor injection of credentials + settings. The client is
+    stateful (token bucket, circuit breaker, http client) and
+    should be a singleton-per-process — one client serves the
+    historical downloader and the live source.
+
+    Lifecycle:
+      client = ThetaDataClient(creds, settings)
+      try:
+          response = await client.request_json("/v2/hist/option/trade", params={...})
+      finally:
+          await client.aclose()
+    """
+
+    def __init__(
+        self,
+        *,
+        api_key: SecretStr,
+        username: SecretStr | None = None,
+        settings: ThetaDataSettings,
+        base_url: str = DEFAULT_BASE_URL,
+        retry: RetryPolicy | None = None,
+        transport: httpx.AsyncBaseTransport | None = None,
+        circuit_breaker_threshold: int = 5,
+        circuit_breaker_reset_s: float = 30.0,
+    ) -> None:
+        self._api_key = api_key
+        self._username = username
+        self._settings = settings
+        self._base_url = base_url.rstrip("/")
+        self._retry = retry or RetryPolicy()
+        self._bucket = TokenBucket(
+            capacity=max(settings.rate_limit_requests_per_second, 1.0),
+            refill_per_second=settings.rate_limit_requests_per_second,
+        )
+        self._breaker = CircuitBreaker(
+            threshold=circuit_breaker_threshold,
+            reset_seconds=circuit_breaker_reset_s,
+        )
+        self._http = httpx.AsyncClient(
+            base_url=self._base_url,
+            transport=transport,
+            timeout=httpx.Timeout(connect=5.0, read=30.0, write=5.0, pool=5.0),
+        )
+
+    @property
+    def settings(self) -> ThetaDataSettings:
+        return self._settings
+
+    @property
+    def circuit_breaker(self) -> CircuitBreaker:
+        return self._breaker
+
+    async def aclose(self) -> None:
+        await self._http.aclose()
+
+    # -- request building ---------------------------------------------------
+
+    def _auth_headers(self) -> dict[str, str]:
+        """Build auth headers. Called only at the request site —
+        never logged, never returned."""
+        # ThetaData's local Terminal forwards credentials it was
+        # configured with; for direct upstream calls we'd send the
+        # API key. The header name is standard X-Api-Key style; if
+        # ThetaData docs specify a different name we update here
+        # without changing call sites.
+        headers = {"X-Api-Key": self._api_key.get_secret_value()}
+        if self._username is not None:
+            headers["X-Username"] = self._username.get_secret_value()
+        return headers
+
+    # -- core request loop --------------------------------------------------
+
+    async def request_json(
+        self,
+        path: str,
+        *,
+        params: dict[str, Any] | None = None,
+        method: str = "GET",
+    ) -> dict[str, Any]:
+        """Make an authenticated HTTP request and return parsed JSON.
+
+        Applies rate limit, retry policy, and circuit breaker. Raises
+        ``ThetaDataAuthError`` on 4xx, ``ThetaDataTransientError`` on
+        5xx after retries exhausted, ``CircuitBreakerOpenError`` if
+        the breaker is open.
+        """
+        if self._breaker.is_open():
+            msg = (
+                f"circuit breaker is open after {self._breaker.threshold}+ "
+                f"consecutive failures; cooldown {self._breaker.reset_seconds}s"
+            )
+            raise CircuitBreakerOpenError(msg)
+
+        last_error: Exception | None = None
+        for attempt in range(self._retry.max_attempts):
+            await self._bucket.acquire()
+            try:
+                response = await self._http.request(
+                    method, path,
+                    params=params,
+                    headers=self._auth_headers(),
+                )
+                if response.status_code >= 500:
+                    msg = (
+                        f"ThetaData {method} {path} returned "
+                        f"HTTP {response.status_code}"
+                    )
+                    raise ThetaDataTransientError(msg)
+                if response.status_code >= 400:
+                    msg = (
+                        f"ThetaData {method} {path} returned "
+                        f"HTTP {response.status_code}: {response.text[:200]}"
+                    )
+                    raise ThetaDataAuthError(msg)
+                self._breaker.record_success()
+                parsed: Any = response.json()
+                if not isinstance(parsed, dict):
+                    msg = (
+                        f"ThetaData {method} {path} returned non-object "
+                        f"JSON: {type(parsed).__name__}"
+                    )
+                    raise ThetaDataTransientError(msg)
+                return parsed
+            except (httpx.RequestError, ThetaDataTransientError) as exc:
+                last_error = exc
+                self._breaker.record_failure()
+                if attempt + 1 < self._retry.max_attempts:
+                    backoff = min(
+                        self._retry.initial_backoff_s * (2 ** attempt),
+                        self._retry.max_backoff_s,
+                    )
+                    await asyncio.sleep(backoff)
+                continue
+            except ThetaDataAuthError:
+                # 4xx — don't retry, but DO record as failure for the
+                # breaker (a flood of 4xx is still a sign something
+                # is wrong, e.g. rotated keys).
+                self._breaker.record_failure()
+                raise
+        # Retries exhausted.
+        if last_error is not None:
+            msg = (
+                f"ThetaData {method} {path} failed after "
+                f"{self._retry.max_attempts} attempts: {last_error}"
+            )
+            raise ThetaDataTransientError(msg) from last_error
+        msg = "unreachable: request loop exited without success or error"
+        raise ThetaDataTransientError(msg)
+
+    # -- WebSocket helpers --------------------------------------------------
+
+    async def stream_ws(
+        self,
+        ws_path: str,
+        *,
+        subscriptions: Iterable[dict[str, Any]],
+    ) -> Any:
+        """Open a WebSocket and yield decoded messages.
+
+        Phase 3.3.2.5 will fill in the framing and reconnect logic.
+        For 3.3.2.3 this method is a stub; it raises
+        NotImplementedError so accidental calls fail loudly.
+        """
+        msg = (
+            "stream_ws is implemented in Phase 3.3.2.5 (live source). "
+            "For Phase 3.3.2.3 the client only exposes request_json."
+        )
+        raise NotImplementedError(msg)
