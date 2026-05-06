@@ -177,3 +177,16 @@ backtest:
   dte_based_close_threshold: 7      # used only by holding_strategy=dte_based
   walk_forward_windows: 8           # 3-month slices over a 2-year backtest
   walk_forward_min_consistency_pct: 0.75  # 6-of-8 at default N; N-independent
+
+# --- Phase 3.3.2 data source adapter settings ---
+# Non-credential tunables only. Real API keys live in .env (see
+# .env.example for the variable names). Profiles that don't need
+# a particular source can omit the override and inherit defaults
+# from ThetaDataSettings.
+data_sources:
+  thetadata:
+    rate_limit_requests_per_second: 10.0   # Pro plan tier
+    historical_concurrency: 4              # Pro plan supports 4
+    live_reconnect_max_attempts: 5
+    live_reconnect_initial_backoff_s: 1.0
+    live_reconnect_max_backoff_s: 60.0

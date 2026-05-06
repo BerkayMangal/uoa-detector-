@@ -534,6 +534,73 @@ class BacktestConfig(_StrictModel):
 
 
 # ---------------------------------------------------------------------------
+# Data source settings — Phase 3.3.2 (ThetaData), 3.3.3 (Unusual Whales)
+# ---------------------------------------------------------------------------
+
+
+class ThetaDataSettings(_StrictModel):
+    """ThetaData adapter tunables.
+
+    Phase 3.3.2: introduces the section. Defaults track Phase 3 prep
+    + the ThetaData Pro plan limits documented at fetch time.
+
+    All fields are non-credential (rate limits, retry policy). Real
+    credentials live in env vars / .env, loaded by the ``Credentials``
+    model in ``uoa_detector.config.credentials``. Two distinct
+    surfaces, two distinct lifecycles.
+    """
+
+    rate_limit_requests_per_second: float = Field(
+        default=10.0, gt=0.0, le=1000.0,
+        description=(
+            "Token-bucket rate limit for outbound HTTP/WS requests. "
+            "10 req/s is conservative for the ThetaData Pro plan; "
+            "raise after observing the actual quota in production."
+        ),
+    )
+    historical_concurrency: int = Field(
+        default=4, ge=1, le=32,
+        description=(
+            "Max concurrent historical-download tasks. Pro plan "
+            "supports 4 in parallel; do not raise without re-reading "
+            "ThetaData's terms."
+        ),
+    )
+    live_reconnect_max_attempts: int = Field(
+        default=5, ge=0, le=100,
+        description=(
+            "Max reconnect attempts on WebSocket disconnect before "
+            "the live source raises and the operator must intervene. "
+            "0 disables reconnect entirely (rare; useful for tests "
+            "that want to assert a single failure)."
+        ),
+    )
+    live_reconnect_initial_backoff_s: float = Field(
+        default=1.0, gt=0.0, le=60.0,
+        description=(
+            "Initial backoff after first disconnect. Doubles on each "
+            "subsequent attempt up to live_reconnect_max_backoff_s."
+        ),
+    )
+    live_reconnect_max_backoff_s: float = Field(
+        default=60.0, gt=0.0, le=3600.0,
+        description="Ceiling for the exponential reconnect backoff.",
+    )
+
+
+class DataSourcesConfig(_StrictModel):
+    """Per-source adapter tunables.
+
+    Phase 3.3.2 ships ``thetadata``. Phase 3.3.3 will add
+    ``unusual_whales`` as a sibling field. Profiles that don't need
+    a particular source can omit the override and inherit the
+    defaults.
+    """
+
+    thetadata: ThetaDataSettings = Field(default_factory=ThetaDataSettings)
+
+
+# ---------------------------------------------------------------------------
 # CalibrationProfile — top-level
 # ---------------------------------------------------------------------------
 
@@ -559,6 +626,7 @@ class CalibrationProfile(_StrictModel):
     fusion: FusionParams
     sub_score_missing_behavior: SubScoreMissingBehavior
     backtest: BacktestConfig
+    data_sources: DataSourcesConfig = Field(default_factory=DataSourcesConfig)
 
     @model_validator(mode="after")
     def _validate_invariants(self) -> CalibrationProfile:
