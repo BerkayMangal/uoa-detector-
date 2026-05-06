@@ -588,16 +588,94 @@ class ThetaDataSettings(_StrictModel):
     )
 
 
+class UnusualWhalesProviderCacheTTL(_StrictModel):
+    """Per-provider-type cache TTL for the Unusual Whales adapter.
+
+    Phase 3.3.3: introduces this section. UW responses are cached
+    in-memory per provider instance keyed by request shape, with a
+    monotonic-clock TTL. Different data types have different staleness
+    tolerances:
+
+      - ``catalyst_calendar``: events change rarely intraday → 1h.
+      - ``dealer_gamma``: estimates updated through the day → 5min.
+      - ``iv_history``: snapshots are minute-level → 10min.
+      - ``sector_map``: ticker→sector is glacial → 24h.
+      - ``dark_pool``: prints stream constantly; tight window → 60s.
+      - ``open_interest``: end-of-day authoritative + intraday est → 10min.
+
+    All values are in seconds. Set to 0 to disable caching for that
+    provider (every request hits the API).
+    """
+
+    catalyst_calendar_seconds: int = Field(default=3600, ge=0, le=86_400)
+    dealer_gamma_seconds: int = Field(default=300, ge=0, le=86_400)
+    iv_history_seconds: int = Field(default=600, ge=0, le=86_400)
+    sector_map_seconds: int = Field(default=86_400, ge=0, le=604_800)
+    dark_pool_seconds: int = Field(default=60, ge=0, le=86_400)
+    open_interest_seconds: int = Field(default=600, ge=0, le=86_400)
+
+
+class UnusualWhalesSettings(_StrictModel):
+    """Unusual Whales adapter tunables.
+
+    Phase 3.3.3: introduces the section. Same shape as
+    ``ThetaDataSettings`` for the rate-limit / reconnect surface, plus
+    a nested ``cache_ttl`` block because UW exposes derived endpoints
+    (calendar, gamma, IV, sector, DP, OI) that benefit from per-type
+    caching.
+
+    Credentials live in env vars / .env, loaded by ``Credentials``.
+    """
+
+    rate_limit_requests_per_second: float = Field(
+        default=2.0, gt=0.0, le=1000.0,
+        description=(
+            "Token-bucket rate limit for outbound HTTP/WS requests. "
+            "2 req/s is conservative for UW's API-Plus tier (which "
+            "documents 120/min ≈ 2/s sustained); raise after observing "
+            "the actual quota in production."
+        ),
+    )
+    historical_concurrency: int = Field(
+        default=2, ge=1, le=32,
+        description=(
+            "Max concurrent historical-pull tasks (e.g. backfill "
+            "loops). Lower than ThetaData's 4 because UW endpoints "
+            "are aggregated/derived and respond more slowly."
+        ),
+    )
+    live_reconnect_max_attempts: int = Field(
+        default=5, ge=0, le=100,
+        description=(
+            "Max reconnect attempts on WebSocket disconnect. Same "
+            "semantics as ThetaData's field."
+        ),
+    )
+    live_reconnect_initial_backoff_s: float = Field(
+        default=1.0, gt=0.0, le=60.0,
+        description="Initial backoff after first disconnect.",
+    )
+    live_reconnect_max_backoff_s: float = Field(
+        default=60.0, gt=0.0, le=3600.0,
+        description="Ceiling for the exponential reconnect backoff.",
+    )
+    cache_ttl: UnusualWhalesProviderCacheTTL = Field(
+        default_factory=UnusualWhalesProviderCacheTTL,
+    )
+
+
 class DataSourcesConfig(_StrictModel):
     """Per-source adapter tunables.
 
-    Phase 3.3.2 ships ``thetadata``. Phase 3.3.3 will add
-    ``unusual_whales`` as a sibling field. Profiles that don't need
-    a particular source can omit the override and inherit the
-    defaults.
+    Phase 3.3.2 shipped ``thetadata``. Phase 3.3.3 adds
+    ``unusual_whales``. Profiles that don't need a particular
+    source can omit the override and inherit the defaults.
     """
 
     thetadata: ThetaDataSettings = Field(default_factory=ThetaDataSettings)
+    unusual_whales: UnusualWhalesSettings = Field(
+        default_factory=UnusualWhalesSettings,
+    )
 
 
 # ---------------------------------------------------------------------------

@@ -190,3 +190,16 @@ data_sources:
     live_reconnect_max_attempts: 5
     live_reconnect_initial_backoff_s: 1.0
     live_reconnect_max_backoff_s: 60.0
+  unusual_whales:
+    rate_limit_requests_per_second: 2.0    # ~120/min API-Plus tier
+    historical_concurrency: 2              # aggregated endpoints, slower
+    live_reconnect_max_attempts: 5
+    live_reconnect_initial_backoff_s: 1.0
+    live_reconnect_max_backoff_s: 60.0
+    cache_ttl:
+      catalyst_calendar_seconds: 3600      # events change rarely intraday
+      dealer_gamma_seconds: 300            # gamma updates through the day
+      iv_history_seconds: 600              # minute-level IV snapshots
+      sector_map_seconds: 86400            # ticker→sector glacial
+      dark_pool_seconds: 60                # DP prints stream constantly
+      open_interest_seconds: 600           # EOD authoritative + intraday est
