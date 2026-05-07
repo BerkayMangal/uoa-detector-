@@ -180,16 +180,23 @@ def collect_month_files(
 ) -> MonthValidation:
     """Find all parquet files for (ticker, year, month) under base_output_dir.
 
-    Looks under: ``{base}/{ticker}/{contract_subdir}/{YYYY-MM}.parquet``
+    Layout (per Phase 3.3.4.3 orchestrator):
+        {base}/{contract_subdir}/{ticker}/{YYYY-MM}.parquet
+
+    Walks every contract subdir at the top level, looks under
+    ``{contract_subdir}/{ticker}/`` for the year-month parquet.
     """
-    ticker_dir = base_output_dir / ticker.upper()
     month_label = f"{year:04d}-{month:02d}"
+    parquet_filename = f"{month_label}.parquet"
     files: list[FileValidation] = []
-    if ticker_dir.exists() and ticker_dir.is_dir():
-        for contract_dir in sorted(ticker_dir.iterdir()):
+    if base_output_dir.exists() and base_output_dir.is_dir():
+        for contract_dir in sorted(base_output_dir.iterdir()):
             if not contract_dir.is_dir():
                 continue
-            parquet_path = contract_dir / f"{month_label}.parquet"
+            ticker_dir = contract_dir / ticker.upper()
+            if not ticker_dir.exists():
+                continue
+            parquet_path = ticker_dir / parquet_filename
             if parquet_path.exists():
                 files.append(validate_parquet_file(parquet_path))
     return MonthValidation(

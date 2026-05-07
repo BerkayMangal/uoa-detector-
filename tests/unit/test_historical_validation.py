@@ -130,14 +130,14 @@ def test_collect_month_files_empty(tmp_path: Path) -> None:
 def test_collect_month_files_finds_per_contract_files(tmp_path: Path) -> None:
     """Multiple contract subdirs under one ticker × one month."""
     base = tmp_path
-    (base / "AAPL" / "EXP240216_C_00150000").mkdir(parents=True)
-    (base / "AAPL" / "EXP240216_C_00155000").mkdir(parents=True)
+    (base / "EXP240216_C_00150000" / "AAPL").mkdir(parents=True)
+    (base / "EXP240216_C_00155000" / "AAPL").mkdir(parents=True)
     _write_test_parquet(
-        base / "AAPL" / "EXP240216_C_00150000" / "2024-01.parquet",
+        base / "EXP240216_C_00150000" / "AAPL" / "2024-01.parquet",
         [_make_print(date(2024, 1, 15))],
     )
     _write_test_parquet(
-        base / "AAPL" / "EXP240216_C_00155000" / "2024-01.parquet",
+        base / "EXP240216_C_00155000" / "AAPL" / "2024-01.parquet",
         [_make_print(date(2024, 1, 16)), _make_print(date(2024, 1, 17))],
     )
     mv = collect_month_files(base, "AAPL", 2024, 1)
@@ -147,13 +147,13 @@ def test_collect_month_files_finds_per_contract_files(tmp_path: Path) -> None:
 
 def test_collect_month_files_other_months_excluded(tmp_path: Path) -> None:
     base = tmp_path
-    (base / "AAPL" / "EXP240216_C_00150000").mkdir(parents=True)
+    (base / "EXP240216_C_00150000" / "AAPL").mkdir(parents=True)
     _write_test_parquet(
-        base / "AAPL" / "EXP240216_C_00150000" / "2024-01.parquet",
+        base / "EXP240216_C_00150000" / "AAPL" / "2024-01.parquet",
         [_make_print(date(2024, 1, 15))],
     )
     _write_test_parquet(
-        base / "AAPL" / "EXP240216_C_00150000" / "2024-02.parquet",
+        base / "EXP240216_C_00150000" / "AAPL" / "2024-02.parquet",
         [_make_print(date(2024, 2, 15))],
     )
     mv = collect_month_files(base, "AAPL", 2024, 1)
@@ -191,7 +191,7 @@ def test_detect_calendar_gaps_empty_month(tmp_path: Path) -> None:
 
 def test_detect_calendar_gaps_with_present_dates(tmp_path: Path) -> None:
     base = tmp_path
-    (base / "AAPL" / "EXP240216_C_00150000").mkdir(parents=True)
+    (base / "EXP240216_C_00150000" / "AAPL").mkdir(parents=True)
     # Three trading days
     prints = [
         _make_print(date(2024, 1, 2)),
@@ -199,7 +199,7 @@ def test_detect_calendar_gaps_with_present_dates(tmp_path: Path) -> None:
         _make_print(date(2024, 1, 4)),
     ]
     _write_test_parquet(
-        base / "AAPL" / "EXP240216_C_00150000" / "2024-01.parquet",
+        base / "EXP240216_C_00150000" / "AAPL" / "2024-01.parquet",
         prints,
     )
     mv = collect_month_files(base, "AAPL", 2024, 1)
@@ -231,9 +231,9 @@ def test_build_manifest_empty_universe(tmp_path: Path) -> None:
 
 def test_build_manifest_with_one_complete_ticker(tmp_path: Path) -> None:
     base = tmp_path
-    (base / "AAPL" / "EXP240216_C_00150000").mkdir(parents=True)
+    (base / "EXP240216_C_00150000" / "AAPL").mkdir(parents=True)
     _write_test_parquet(
-        base / "AAPL" / "EXP240216_C_00150000" / "2024-01.parquet",
+        base / "EXP240216_C_00150000" / "AAPL" / "2024-01.parquet",
         [_make_print(date(2024, 1, 15))],
     )
     m = build_manifest(
@@ -273,9 +273,9 @@ def test_build_manifest_failed_keys_counted(tmp_path: Path) -> None:
 
 def test_build_manifest_includes_gaps(tmp_path: Path) -> None:
     base = tmp_path
-    (base / "AAPL" / "EXP240216_C_00150000").mkdir(parents=True)
+    (base / "EXP240216_C_00150000" / "AAPL").mkdir(parents=True)
     _write_test_parquet(
-        base / "AAPL" / "EXP240216_C_00150000" / "2024-01.parquet",
+        base / "EXP240216_C_00150000" / "AAPL" / "2024-01.parquet",
         [_make_print(date(2024, 1, 15))],
     )
     m = build_manifest(
@@ -296,9 +296,9 @@ def test_build_manifest_includes_gaps(tmp_path: Path) -> None:
 def test_build_manifest_skip_gaps_for_speed(tmp_path: Path) -> None:
     """detect_gaps=False produces a manifest without per-row scans."""
     base = tmp_path
-    (base / "AAPL" / "EXP240216_C_00150000").mkdir(parents=True)
+    (base / "EXP240216_C_00150000" / "AAPL").mkdir(parents=True)
     _write_test_parquet(
-        base / "AAPL" / "EXP240216_C_00150000" / "2024-01.parquet",
+        base / "EXP240216_C_00150000" / "AAPL" / "2024-01.parquet",
         [_make_print(date(2024, 1, 15))],
     )
     m = build_manifest(

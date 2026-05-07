@@ -177,12 +177,16 @@ def contract_subdir_name(contract: ContractSpec) -> str:
 def contract_output_dir(
     base_output_dir: Path, contract: ContractSpec,
 ) -> Path:
-    """``{base}/{ticker}/{contract_subdir}/`` — where the parquet lives."""
-    return (
-        base_output_dir
-        / contract.ticker.upper()
-        / contract_subdir_name(contract)
-    )
+    """Path the orchestrator passes as ``output_dir`` to the downloader.
+
+    The downloader's ``historical_file_path`` appends ``/{ticker}/
+    {YYYY-MM}.parquet`` to whatever ``output_dir`` we pass. To avoid
+    a double-ticker layer (``{base}/{ticker}/{subdir}/{ticker}/...``)
+    the orchestrator gives a ticker-less path: ``{base}/{subdir}``.
+    Final on-disk layout:
+        {base}/{contract_subdir}/{ticker}/{YYYY-MM}.parquet
+    """
+    return base_output_dir / contract_subdir_name(contract)
 
 
 # ---------------------------------------------------------------------------

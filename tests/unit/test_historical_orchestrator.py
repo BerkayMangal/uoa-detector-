@@ -70,7 +70,8 @@ def test_contract_output_dir_composes_correctly(tmp_path: Path) -> None:
         strike_dollars=Decimal("150.00"), right="C",
     )
     p = contract_output_dir(tmp_path, c)
-    assert p == tmp_path / "AAPL" / "EXP240216_C_00150000"
+    # Layout: base/{contract_subdir}; downloader adds /{ticker}/{ym}.parquet
+    assert p == tmp_path / "EXP240216_C_00150000"
 
 
 # ---------------------------------------------------------------------------
