@@ -95,6 +95,30 @@ class UnusualWhalesCatalystCalendarProvider:
         candidates.sort(key=lambda e: e.when)
         return candidates[0]
 
+    async def catalysts_in_window(
+        self,
+        ticker: str,
+        window_start: datetime,
+        window_end: datetime,
+    ) -> tuple[CatalystEvent, ...]:
+        """Return all catalysts for ``ticker`` with ``when`` in [start, end].
+
+        Phase 3.4.2: feeds M22. Sorted ascending by ``when``.
+        """
+        rows = await self._cache.get_or_fetch(
+            ticker.upper(),
+            loader=lambda: self._fetch(ticker),
+        )
+        out: list[CatalystEvent] = []
+        for row in rows:
+            ev = _row_to_catalyst_event(row, ticker=ticker)
+            if ev is None:
+                continue
+            if window_start <= ev.when <= window_end:
+                out.append(ev)
+        out.sort(key=lambda e: e.when)
+        return tuple(out)
+
     async def _fetch(self, ticker: str) -> list[dict[str, Any]]:
         path = f"/api/stock/{ticker.upper()}/upcoming-events"
         resp = await self._client.request_json(path)

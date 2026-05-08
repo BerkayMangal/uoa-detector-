@@ -57,9 +57,26 @@ class CatalystCalendarProvider(Protocol):
         """Return the next catalyst on or after ``after``; ``None`` if none."""
         ...
 
+    async def catalysts_in_window(
+        self,
+        ticker: str,
+        window_start: datetime,
+        window_end: datetime,
+    ) -> tuple[CatalystEvent, ...]:
+        """Return all catalysts for ``ticker`` with ``when`` in [start, end].
+
+        Phase 3.4.2: feeds M22 (Event calendar score). The window
+        spans both past and future relative to the event timestamp
+        (acceptance doc: ±30 days). Returns events sorted ascending
+        by ``when``. Empty tuple when the calendar has no events
+        in the window — Module 22 treats empty as 'neutral fallback'
+        (score = no_catalyst_neutral_score), NOT zero.
+        """
+        ...
+
 
 class NoOpCatalystCalendarProvider:
-    """Always returns ``None``. Module 22 falls back to ``event_score = 0.0``."""
+    """Always returns ``None`` / empty tuple. Module 22 falls back to neutral."""
 
     async def next_catalyst(
         self,
@@ -68,3 +85,12 @@ class NoOpCatalystCalendarProvider:
     ) -> CatalystEvent | None:
         del ticker, after
         return None
+
+    async def catalysts_in_window(
+        self,
+        ticker: str,
+        window_start: datetime,
+        window_end: datetime,
+    ) -> tuple[CatalystEvent, ...]:
+        del ticker, window_start, window_end
+        return ()
