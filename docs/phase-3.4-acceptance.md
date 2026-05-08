@@ -528,3 +528,219 @@ not after.
 This document is the contract for Phase 3.4. It will not be
 revised mid-implementation; if a decision needs revisiting, that
 discussion happens between sub-phases, not within them.
+
+---
+
+## Phase 3.4 closeout summary (added Phase 3.4.9.5)
+
+This section is appended after Phase 3.4 completes. Following the
+Phase 3.3.6 pattern, it captures the final state — sub-phase
+summary, totals, judgment-call themes, and lokal verification
+recipe — without revising the contract above.
+
+### Sub-phase summary
+
+| Sub-phase | HEAD | Tests | Sub-commits | Key delivery |
+|---|---|---|---|---|
+| 3.4.1 — M21 dealer gamma | `14829fe` | 1067 + 19 | 4 | `DealerGammaStage`; provider 3-field model; MAX-of-two-heuristics scoring; idempotency-on-preset pattern |
+| 3.4.2 — M22 event calendar | `fb66f93` | 1110 + 19 | 4 | `EventCalendarStage`; 3-source aggregation (earnings/FDA/FOMC); pre/post-event window; calendar-day approximation flagged |
+| 3.4.3 — M23 price confirmation | `3078521` | 1168 + 19 | 4 | `PriceConfirmationStage`; ThetaData OHLC integration (only ThetaData consumer in Phase 3.4); 3-state no-data semantics |
+| 3.4.4 — M24 IV exhaustion | `9178abe` | 1212 + 19 | 4 | `IVExhaustionStage`; first cross-module penalty via `ScoreAdjustment`; 80th-percentile threshold; binary penalty |
+| 3.4.5 — M25 sector peer | `2835f5c` | 1247 + 19 | 3 | `SectorPeerStage`; two-provider pattern (membership + flow); 5/3/1 peer-count tiers |
+| 3.4.6 — M26 dark pool | `030d634` | 1281 + 19 | 3 | `DarkPoolStage`; boolean flag (no score); symmetric ±30min window; 100K-share volume threshold |
+| 3.4.7 — M27 OI delta | `83c89d7` | 1318 + 19 | 3 | `OpeningClosingStage`; 3-state no-data semantics; prior_oi==0 divide-by-zero guard; new_strike branch distinct from no_data |
+| 3.4.8 — M28 next-day OI | `6f8b5a9` | 1390 + 20 | 4 | `M28Validator` (FIRST non-PipelineStage module); `BacktestStoreProtocol.update_signal_score` BREAKING; `scripts/run_m28_overnight.py` CLI; `opening_closing_score` field promoted |
+| 3.4.9 — Closeout | this | 1391 + 20 | 5 | Polygon/IBKR stub retirement; Track B M21+M27 overrides; end-to-end synthetic pipeline test; `docs/MODULES.md`; this closeout summary |
+
+### Phase 3.4 totals
+
+  - 9 sub-phases, 32 sub-commits (all bisectable; per-commit pytest
+    sweep confirmed at every closeout)
+  - 1391 tests green + 20 skipped (1 M21 + 1 M22 + 1 M23 + 1 M24
+    + 1 M25 + 1 M26 + 1 M27 + 1 M28 integration smokes gated on UW
+    key, 8 grouped UW smokes, 3 ThetaData smokes, 1 live_market;
+    all gated by API keys + market hours where applicable)
+  - 111 source files (was 113 before 3.4.9.1 stub deletion), mypy
+    --strict + ruff clean across the surface
+  - ~10000 LoC added across `src/`, `tests/`, `scripts/`, `docs/`
+  - ~150 documented judgment calls in commit messages (search
+    `decision (` in `git log` for the catalogue; consolidated by
+    module in `docs/MODULES.md`)
+  - **Architectural milestones**:
+    - First cross-module `ScoreAdjustment` rail (M24 in 3.4.4)
+    - First non-PipelineStage module (M28 in 3.4.8)
+    - First Protocol breaking change since Phase 3.3
+      (`BacktestStoreProtocol.update_signal_score` in 3.4.8.1)
+    - First field promotion from internal-telemetry to domain
+      (`opening_closing_score` from M27 in 3.4.7 → 3.4.8)
+    - First end-to-end synthetic pipeline test exercising every
+      Phase 3.4 stage (3.4.9.3)
+
+### Judgment-call themes (representative selection per sub-phase)
+
+3.4.1 — M21 dealer gamma
+  - Provider returns 3 fields not 1 — supports per-strike scoring
+  - MAX-of-two-heuristics scoring rather than weighted sum
+    (avoided double-counting at institutional threshold)
+  - Established the M21-M27 idempotency-on-preset pattern
+
+3.4.2 — M22 event calendar
+  - Calendar-day approximation flagged for Phase 3.5 trading-
+    calendar overlay
+  - `no_event_score = 0.5` not 0.0 (absence of catalyst is
+    neutral, not negative)
+  - Type-blind scoring (earnings/FDA/FOMC same weight); type-
+    weighting deferred until backtest data
+
+3.4.3 — M23 price confirmation
+  - Only ThetaData consumer in Phase 3.4 (rest go through UW)
+  - Half-day handling deferred to trading-calendar overlay
+  - 3-state no-data semantics (`legitimate score=0`,
+    `no provider data`, `timeout`) — backtest cost auditing
+    relies on these distinctions
+
+3.4.4 — M24 IV exhaustion
+  - First `ScoreAdjustment` cross-module rail (no sub-score field
+    on EnrichedEvent)
+  - Penalty applied to `combined_score_pre`, not `_post`
+    (pre-labeler placement matters)
+  - Binary penalty (no gradient) — defensible without backtest
+
+3.4.5 — M25 sector peer
+  - Two-provider pattern (membership lookup + flow data) —
+    pattern reused by M26
+  - `no_membership_score = 0.5` distinct from `no_peers_score = 0.0`
+  - Direction-blind peer counting (deferred until backtest shows
+    direction-matching helps)
+
+3.4.6 — M26 dark pool
+  - Boolean flag, not score (gradient over-engineers signal)
+  - Symmetric ±30min window (not asymmetric — institutional flow
+    can lead OR lag option flow)
+  - 100K-share volume floor pre-window-filter
+
+3.4.7 — M27 OI delta
+  - 3-state no-data distinction (new_strike / no_data / timeout) —
+    Phase 3.5 backtest cost auditing critical
+  - `prior_oi == 0` divide-by-zero guard with semantic distinction
+  - Score was internal-telemetry; promoted to domain field in
+    3.4.8.1 because M28 needed to filter signals
+
+3.4.8 — M28 next-day OI
+  - First non-PipelineStage module — `pipeline/validators/`
+    package, batch lifecycle
+  - `BacktestStoreProtocol.update_signal_score` BREAKING change
+    with whitelist (ClassVar frozenset) + bool return + ValueError
+    on unknown name
+  - Pending state distinct from error (T+1 not yet published →
+    retry next batch run, not failure)
+  - Validator never raises on individual signal failure (batch
+    resilience); failures counted in `ValidationStats.errors`
+  - Far-future expiry (2099) in smoke ensures deterministic
+    `pending` outcome — exercises wiring not branch coverage
+
+3.4.9 — Closeout
+  - `docs/MODULES.md` consolidates ~150 judgment calls per-module,
+    not chronologically (operators want all M21 decisions when
+    debugging M21)
+  - Track B (Phase 3.4.9.2) overrides only M21 + M27 (the
+    thesis-relevant modules); other modules inherited unchanged
+    pending Phase 3.5 backtest data
+  - End-to-end synthetic pipeline test (Phase 3.4.9.3) uses
+    NoOp providers — wiring contract, not scoring contract
+    (real-data wiring is per-module integration smokes)
+
+### What Phase 3.5 unblocks
+
+Phase 3.4 completes the module surface. Phase 3.5 runs the first
+real backtest:
+
+  - Tier-2 historical replay (51 tickers × 24 months) through the
+    full 13-stage pipeline + M28 batch validator
+  - 4-cell combinatorial comparison (Tier-1+single, Tier-1+fusion,
+    Tier-2+single, Tier-2+fusion)
+  - Profile threshold tuning based on backtest data (NOT before)
+  - Falsification scenarios from Phase 3.2.4 applied — 4 scenarios
+    REJECT Formülasyon A; we do not adjust them after seeing
+    results
+
+### Deferred to Phase 3.5+ (explicit)
+
+Items flagged during Phase 3.4 but NOT addressed in 3.4.9:
+
+  - **Trading-calendar overlay** — calendar-day vs trading-day
+    (M22), half-day handling (M23), prior-session-close holiday
+    handling (M27). Currently calendar-day approximations.
+  - **TTLCache instrumentation** — providers have caches but
+    don't expose hit/miss telemetry. Phase 3.5 metrics dashboard
+    will surface these.
+  - **`opening_closing_score` SQL column** — currently in JSON
+    blob only. Adding dedicated column speeds up M28 batch
+    filtering on large runs; Alembic migration cost deferred.
+  - **`next_day_oi_confirmed` boolean persistence** — M28 writes
+    `m28_confirmation_score` only; derived bool deferred until
+    a downstream consumer needs it.
+  - **M22 event-type weighting** — earnings/FDA/FOMC currently
+    type-blind; backtest may show type-specific edge.
+  - **M25 directional peer matching** — currently call/put-blind.
+  - **M26 score field** — currently boolean; gradient deferred.
+  - **M28 SQL filter via dedicated column** — see opening_closing.
+  - **Track B per-module retuning** — only M21 + M27 overridden in
+    3.4.9.2; M22-M26 + M28 inherited. Backtest may guide further
+    Track B tuning.
+
+### Lokal verification recipe
+
+After receiving the Phase 3.4.9 bundle:
+
+```bash
+git bundle list-heads uoa-detector-phase3.4.9.bundle
+# expected: <HEAD> refs/heads/phase-3
+
+git fetch uoa-detector-phase3.4.9.bundle phase-3:phase-3
+git checkout phase-3
+uv sync
+
+uv run pytest -q
+# expected: 1391 passed, 20 skipped
+uv run mypy --strict src/
+# expected: clean across 111 source files
+uv run ruff check .
+# expected: clean
+
+# Phase 3.4 specific:
+uv run pytest tests/unit/test_m2[1-8]_*.py tests/integration/test_phase_3_4_end_to_end.py -v
+# expected: ~380 unit tests covering M21-M28 + 3 end-to-end tests
+
+# Live integration smokes (need credentials):
+export THETADATA_API_KEY="..."
+export UNUSUAL_WHALES_API_KEY="..."
+java -jar ThetaTerminal.jar  # in another terminal, for M23 smoke
+uv run pytest -m integration -v
+# expected: 12 tests, no skips (8 UW + 3 ThetaData + 1 M28)
+
+# M28 batch CLI (dry-run, no credentials needed):
+uv run python scripts/run_m28_overnight.py \
+  --since-yesterday --in-memory --dry-run
+# expected: exit 3 (no runs in empty store) — confirms wiring
+```
+
+### Per-commit bisectability sweep
+
+The Phase 3.4 history is bisectable across all 32 sub-commits.
+Verifying:
+
+```bash
+for commit in $(git log --reverse --format=%H phase-2-complete..phase-3); do
+  git checkout -q "$commit"
+  uv sync -q
+  uv run pytest -q --no-header 2>&1 | tail -1
+done
+```
+
+Each commit prints "<N> passed, <M> skipped". The total grows
+monotonically except 3.4.9.1 (-10 from deleted `test_source_stubs.py`)
+and 3.4.8.4 (+1 to skipped count for new M28 smoke).
+
+This document is the closing contract for Phase 3.4. Phase 3.5
+will get its own working acceptance doc.
