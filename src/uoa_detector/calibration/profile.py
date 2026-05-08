@@ -8,6 +8,7 @@ parent at leaf level only). Loaded from YAML by the resolver/loader.
 from __future__ import annotations
 
 from datetime import time
+from decimal import Decimal
 from typing import Literal
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -18,6 +19,81 @@ class _StrictModel(BaseModel):
     """Base for every calibration sub-model. Strict (rejects unknown keys), frozen."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
+
+
+# ---------------------------------------------------------------------------
+# Per-module settings (Phase 3.4)
+# ---------------------------------------------------------------------------
+#
+# Each module M21..M28 has its own settings block under
+# ``scoring.modules.m{N}``. Sub-phases roll these in one at a time:
+#   3.4.1 → m21
+#   3.4.2 → m22
+#   3.4.3 → m23
+#   3.4.4 → m24
+#   3.4.5 → m25
+#   3.4.6 → m26
+#   3.4.7 → m27
+#   3.4.8 → m28
+
+
+class M21Settings(_StrictModel):
+    """Module 21 — Dealer gamma exposure score (Phase 3.4.1).
+
+    Fields source: Phase 3.4 acceptance doc §3.4.1 + edge-case
+    "distance_pct > 0.20 → score = 0.0" (cutoff also profiled per
+    the no-hardcoded-thresholds rule).
+    """
+
+    short_gamma_threshold: Decimal = Field(
+        default=Decimal("-50_000_000"),
+        description=(
+            "Dealer net gamma below this (more negative) ⇒ dealers "
+            "net short. Signed dollars per 1% spot move."
+        ),
+    )
+    flip_proximity_pct: float = Field(
+        default=0.03, gt=0.0, le=1.0,
+        description=(
+            "Spot-to-flip-strike fractional distance below which "
+            "score qualifies for the proximity bonus. Default 3%."
+        ),
+    )
+    extreme_distance_pct: float = Field(
+        default=0.20, gt=0.0, le=1.0,
+        description=(
+            "Spot-to-flip distance above which score collapses to "
+            "0.0 regardless of net-gamma sign — too far for "
+            "hedge-flow reflexivity to apply."
+        ),
+    )
+    provider_timeout_s: float = Field(
+        default=2.0, gt=0.0, le=60.0,
+        description=(
+            "asyncio.wait_for cap on the DealerPositioningProvider "
+            "call. Beyond this, score = 0.0 + warning logged."
+        ),
+    )
+    provider_cache_ttl_s: int = Field(
+        default=300, ge=0,
+        description=(
+            "Phase 4 reserve. Currently the provider owns its own "
+            "TTL cache; this knob is here so a future calibration "
+            "pass can raise/lower TTL without changing provider "
+            "code."
+        ),
+    )
+
+
+class ModulesSettings(_StrictModel):
+    """Per-module tunables. One field per M21..M28.
+
+    Phase 3.4 rolls these in one at a time. Each new module ships
+    with default_factory so older profile YAMLs (without the new
+    block) continue to load unchanged.
+    """
+
+    m21: M21Settings = Field(default_factory=M21Settings)
 
 
 # ---------------------------------------------------------------------------
@@ -34,6 +110,7 @@ class ScoringWeights(_StrictModel):
     price_confirmation: float
     sector_confirmation: float
     time_of_day: float
+    modules: ModulesSettings = Field(default_factory=lambda: ModulesSettings())
 
 
 class EarlyScoringWeights(_StrictModel):

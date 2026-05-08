@@ -16,6 +16,18 @@ scoring:
   price_confirmation: 0.10
   sector_confirmation: 0.05
   time_of_day: 0.05
+  # Phase 3.4 per-module tunables. Each block ships with default_factory
+  # in code, so a profile YAML omitting `modules:` still loads — the
+  # explicit blocks here pin the default values for grep-ability and
+  # operator inspection.
+  modules:
+    # M21 — Dealer gamma exposure score (Phase 3.4.1)
+    m21:
+      short_gamma_threshold: -50_000_000   # USD/1% spot move; below = dealers short
+      flip_proximity_pct: 0.03             # |spot-flip|/spot < 3% = ripe
+      extreme_distance_pct: 0.20           # > 20% from flip = collapse to 0
+      provider_timeout_s: 2.0
+      provider_cache_ttl_s: 300            # provider owns cache; this is reserve
 
 # --- Early-convexity score (Part 3) ---
 early_scoring:
