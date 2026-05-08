@@ -291,3 +291,149 @@ the ThetaData docs.
 This document is the contract for Phase 3.3. It will not be
 revised mid-implementation; if a decision needs revisiting, that
 discussion happens between sub-phases, not within them.
+
+---
+
+# Phase 3.3 — COMPLETE
+
+Phase 3.3 closed on `2269470` (Phase 3.3.5.4) plus the docs +
+cleanup work in `dc6ff38` / `4651b60` / this commit. All six
+sub-phases shipped in their original dependency order with no
+acceptance-doc revisions mid-implementation.
+
+## Sub-phase summary
+
+| Sub-phase | HEAD | Tests | Sub-commits | Key delivery |
+|---|---|---|---|---|
+| 3.3.1 — Credentials | `e92db7c` | 631 | 4 | `Credentials` Pydantic model, `redact_secrets`, `.env.example`, pre-commit hook |
+| 3.3.2 — ThetaData | `1e7c0b7` | 769 + 3 skip | 6 | HTTP client + retries + breaker; historical bulk downloader; live WS source; mapping utilities |
+| 3.3.3 — Unusual Whales | `a1e473c` | 885 + 11 skip | 6 | HTTP client; live WS source; six derived providers (gamma, calendar, IV history, sector, peer, dark-pool, OI); SourceFusion 'unanimous' tier pin |
+| 3.3.4 — Tier-N download | `233c8d6` | 977 + 11 skip | 5 | universe CSV reader; state machine (`.download_state.json`); orchestrator (concurrency + resume); validation + manifest; `scripts/download_tier2.py` CLI |
+| 3.3.5 — Live observer | `2269470` | 1019 + 12 skip | 4 | `LiveSettings` profile section; `LiveObserver` graceful shutdown; live source factory; CLI `--source live --feeds ...` + `live_market` smoke |
+| 3.3.6 — Closeout | this | 1014+ + 12 skip | 3 | `docs/DATA_INTEGRATION.md`; `legacy_stub.py` deletion; this acceptance summary |
+
+## Phase 3.3 totals
+
+  - 6 sub-phases, 28 sub-commits (all bisectable; per-commit pytest
+    sweep confirmed at every closeout)
+  - ~1014 tests green + 12 skipped (3 ThetaData smoke + 8 UW smoke
+    + 1 live_market smoke; all gated by API keys + market hours
+    where applicable)
+  - 109 source files, mypy --strict + ruff clean across the surface
+  - ~9000 LoC across `src/`, `tests/`, `scripts/`, `docs/`
+  - ~180 documented judgment calls in commit messages (search
+    `decision (` in `git log` for the catalogue)
+
+## Judgment-call themes (representative selection per sub-phase)
+
+3.3.1 — Credentials
+  - SecretStr everywhere; never plain str for secrets
+  - Pre-commit hook + CI gate so .env never enters git
+  - Redact-secrets log filter applied at the structlog handler
+
+3.3.2 — ThetaData
+  - HTTP layer: timeout / retry / circuit-breaker as composable
+    middleware in `_http_base.py` (DRY across both vendors)
+  - Historical: per-contract per-month parquet idempotency check
+    (file presence + row_count > 0)
+  - Live: reconnect with exponential backoff up to N attempts;
+    `ReconnectExhaustedError` surfaces only after backoff ceiling
+
+3.3.3 — Unusual Whales
+  - Six providers share a TTL cache (`_cache.py`) for DRY
+  - Providers are pure data-shipping (no semantic logic) — Phase
+    3.4 stages own the interpretation
+  - SourceFusion confidence_tier='unanimous' pin via
+    multi-source synthetic test (no real key needed)
+
+3.3.4 — Tier-N download
+  - State file uses Pydantic with extra=forbid + schema_version
+    raise on mismatch
+  - Per-task atomic checkpoint (one disk write per (ticker, month)
+    completion)
+  - LAYOUT FIX during 3.3.4.5: contract_output_dir drops ticker
+    layer to avoid double-ticker bug in path scheme
+
+3.3.5 — Live observer
+  - LiveObserver does NOT own pipeline construction (caller owns
+    Pipeline; observer only adds shutdown plumbing)
+  - --feeds thetadata gated until Phase 4 in CLI (factory surface
+    supports it; only CLI glue deferred)
+  - live_market marker registered separately from `integration`
+    because timing matters (skip outside market hours)
+
+3.3.6 — Closeout
+  - DATA_INTEGRATION.md is operator-facing (imperative voice);
+    phase-3.3-acceptance.md stays the design reference
+  - Polygon + IBKR stubs flagged for retirement but NOT deleted
+    in 3.3.6 (vendor-strategy decision deferred to Berkay
+    explicitly)
+
+## What Phase 3.4 unblocks
+
+Phase 3.3 was a prerequisite for the M21–M28 stage rewrites. Phase
+3.4 will:
+
+  - Wire each of the six UW providers to its corresponding stage
+    (gamma → M22, catalyst → M23, IV history → M24, sector → M25,
+    peer → M26, dark-pool → M27, OI → M28)
+  - Wire ThetaData live to the multi-feed CLI (per-contract
+    subscription enumeration via Phase 3.3.4.5's lister + snapshot
+    resolver)
+  - Add trading-calendar overlay so manifest gap-detection
+    auto-classifies weekends vs real gaps
+  - Phase 4 dashboard will start consuming
+    `live.dashboard_refresh_seconds`
+
+## Phase 3.4 prep checklist (Berkay)
+
+Before kicking off Phase 3.4, verify locally:
+
+  1. **Credentials in env**
+     - `THETADATA_API_KEY`, `THETADATA_USERNAME` set in `.env`
+     - `UNUSUAL_WHALES_API_KEY` set in `.env`
+     - `cp .env.example .env` then fill in (the .env is gitignored
+       and the pre-commit hook scans for accidental commits)
+
+  2. **Theta Terminal running locally**
+     - Download from ThetaData dashboard, run `java -jar
+       ThetaTerminal.jar`
+     - Verify: `curl http://127.0.0.1:25510/v2/list/exchanges`
+
+  3. **Smoke tests during market hours (Mon-Fri 09:30-16:00 ET)**
+     ```
+     uv run pytest -m integration -v
+     # Expects: 11 tests, no skips (3 ThetaData + 8 UW)
+     uv run pytest -m live_market -v
+     # Expects: 1 test, no skip (live observer)
+     ```
+
+  4. **Optional: small subset historical download**
+     ```
+     uv run python scripts/download_tier2.py \
+       --tier tier2_starter \
+       --start-date 2024-01-01 --end-date 2024-01-31 \
+       --max-tasks 5 --max-contracts 20
+     ```
+     Verify `.download_state.json` shows 5 done + `.manifest.json`
+     summary is reasonable. ~50 MB disk, ~5 minutes.
+
+  5. **Polygon / IBKR stub retirement decision**
+     - Read sources/__init__.py docstring (notes both as candidates)
+     - Decide: keep as-is, retire to a separate phase, or retire
+       in Phase 3.4 prep commit
+     - This is the only outstanding cleanup question from
+       Phase 3.3
+
+  6. **Phase 4 design alignment**
+     - Re-read `docs/UOA_Convexity_Detector_v5.docx` M21–M28
+       module specs
+     - Confirm the six UW provider data shapes match the stage
+       inputs M21–M28 expect (the providers ship raw fields; the
+       stages will compute M-specific metrics)
+
+When all six items are confirmed, Phase 3.4 can begin with
+confidence that the data layer is stable and validated.
+
+This document is the closing contract for Phase 3.3. Phase 3.4
+will get its own working acceptance doc.
