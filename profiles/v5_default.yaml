@@ -28,6 +28,16 @@ scoring:
       extreme_distance_pct: 0.20           # > 20% from flip = collapse to 0
       provider_timeout_s: 2.0
       provider_cache_ttl_s: 300            # provider owns cache; this is reserve
+    # M22 — Event calendar score (Phase 3.4.2)
+    m22:
+      post_event_blackout_days: 1          # 1 day after catalyst = blackout
+      pre_event_window_days: 14            # look-ahead horizon for upcoming
+      no_catalyst_neutral_score: 0.3       # absence ≠ zero edge
+      dte_survives_score: 1.0              # option lives past catalyst
+      dte_expires_before_score: 0.5        # option dies before catalyst
+      post_event_score: 0.0
+      provider_timeout_s: 2.0
+      provider_cache_ttl_s: 3600           # calendars change infrequently
 
 # --- Early-convexity score (Part 3) ---
 early_scoring:

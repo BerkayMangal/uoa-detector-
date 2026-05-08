@@ -85,6 +85,76 @@ class M21Settings(_StrictModel):
     )
 
 
+class M22Settings(_StrictModel):
+    """Module 22 — Event calendar score (Phase 3.4.2).
+
+    Fields source: Phase 3.4 acceptance doc §3.4.2. Score branches:
+      0.0 — catalyst within post_event_blackout_days (just happened)
+      1.0 — catalyst within pre_event_window_days AND
+            DTE > days_to_catalyst (option survives the event)
+      0.5 — catalyst in pre-event window but DTE < days_to_catalyst
+            (option expires before catalyst — speculative position)
+      0.3 — no catalyst in window (NEUTRAL fallback, NOT zero —
+            absence of data ≠ absence of edge)
+    """
+
+    post_event_blackout_days: int = Field(
+        default=1, ge=0, le=30,
+        description=(
+            "Catalysts within this many days BEFORE the event "
+            "trigger event_score=0.0 (post-event blackout). "
+            "Same-day catalyst counts as post-event."
+        ),
+    )
+    pre_event_window_days: int = Field(
+        default=14, ge=1, le=90,
+        description=(
+            "Catalysts within this many days AFTER the event are "
+            "considered. Beyond this horizon → no_catalyst fallback."
+        ),
+    )
+    no_catalyst_neutral_score: float = Field(
+        default=0.3, ge=0.0, le=1.0,
+        description=(
+            "Score when no catalyst falls inside the window. "
+            "Default 0.3 (neutral) — not zero. Acceptance doc: "
+            "'absence of data ≠ absence of edge'."
+        ),
+    )
+    dte_survives_score: float = Field(
+        default=1.0, ge=0.0, le=1.0,
+        description=(
+            "Score when a pre-event catalyst exists AND DTE > "
+            "days_to_catalyst (option survives the event)."
+        ),
+    )
+    dte_expires_before_score: float = Field(
+        default=0.5, ge=0.0, le=1.0,
+        description=(
+            "Score when a pre-event catalyst exists but DTE < "
+            "days_to_catalyst (option expires before catalyst — "
+            "speculative position)."
+        ),
+    )
+    post_event_score: float = Field(
+        default=0.0, ge=0.0, le=1.0,
+        description=(
+            "Score when a catalyst falls within the post-event "
+            "blackout window. Default 0.0."
+        ),
+    )
+    provider_timeout_s: float = Field(
+        default=2.0, gt=0.0, le=60.0,
+    )
+    provider_cache_ttl_s: int = Field(
+        default=3600, ge=0,
+        description=(
+            "Provider-owned cache TTL hint. Default 1 hour — calendars "
+            "change infrequently."
+        ),
+    )
+
+
 class ModulesSettings(_StrictModel):
     """Per-module tunables. One field per M21..M28.
 
@@ -94,6 +164,7 @@ class ModulesSettings(_StrictModel):
     """
 
     m21: M21Settings = Field(default_factory=M21Settings)
+    m22: M22Settings = Field(default_factory=M22Settings)
 
 
 # ---------------------------------------------------------------------------
