@@ -38,6 +38,17 @@ scoring:
       post_event_score: 0.0
       provider_timeout_s: 2.0
       provider_cache_ttl_s: 3600           # calendars change infrequently
+    # M23 — Price confirmation score (Phase 3.4.3)
+    m23:
+      lookback_minutes: 30                 # spot-move window
+      confirmation_pct: 0.005              # 0.5% spot move threshold
+      confirmed_score: 1.0
+      contrarian_score: 0.3                # opposite-direction move > threshold
+      neutral_score: 0.5                   # default when no signal either way
+      session_open_utc_hour: 14            # 09:30 ET during DST = 14:30 UTC
+      session_open_utc_minute: 30
+      provider_timeout_s: 2.0
+      provider_cache_ttl_s: 60             # intraday — changes by the second
 
 # --- Early-convexity score (Part 3) ---
 early_scoring:

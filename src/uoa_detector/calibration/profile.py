@@ -155,6 +155,81 @@ class M22Settings(_StrictModel):
     )
 
 
+class M23Settings(_StrictModel):
+    """Module 23 — Price confirmation score (Phase 3.4.3).
+
+    Hypothesis (acceptance doc): option flow without underlying
+    price confirmation is suspicious. Strong directional spot move
+    alongside option print = high conviction.
+
+    Score branches:
+      1.0 — call + spot up by confirmation_pct, OR
+            put + spot down by confirmation_pct (CONFIRMED)
+      0.3 — opposite direction, magnitude > confirmation_pct
+            (CONTRARIAN — could be hedge / dealer flow)
+      0.5 — no confirmation, no contradiction (NEUTRAL)
+      0.5 — spot data missing (NEUTRAL fallback per acceptance)
+    """
+
+    lookback_minutes: int = Field(
+        default=30, ge=1, le=240,
+        description=(
+            "Minutes to look back from event timestamp for spot "
+            "movement. Default 30. Capped at 4 hours so a single "
+            "M23 call can't span an entire trading session."
+        ),
+    )
+    confirmation_pct: float = Field(
+        default=0.005, gt=0.0, le=0.5,
+        description=(
+            "Spot move threshold (fractional). Default 0.5%. Move "
+            "above this in the option's direction = confirmed; "
+            "above in opposite direction = contrarian."
+        ),
+    )
+    confirmed_score: float = Field(
+        default=1.0, ge=0.0, le=1.0,
+    )
+    contrarian_score: float = Field(
+        default=0.3, ge=0.0, le=1.0,
+        description=(
+            "Score when spot moved against the option direction "
+            "by more than confirmation_pct. Could be hedge/dealer "
+            "flow — not zero, but penalised."
+        ),
+    )
+    neutral_score: float = Field(
+        default=0.5, ge=0.0, le=1.0,
+        description=(
+            "Default when no clear confirmation and no clear "
+            "contradiction. Also used when spot data is missing."
+        ),
+    )
+    session_open_utc_hour: int = Field(
+        default=14, ge=0, le=23,
+        description=(
+            "US equity RTH session open in UTC (24h). Default 14 "
+            "= 09:30 ET during DST (= 14:30 UTC). Operator "
+            "overrides for non-DST or non-US tickers. The 30-min "
+            "offset is added in compute helper."
+        ),
+    )
+    session_open_utc_minute: int = Field(
+        default=30, ge=0, le=59,
+        description="Minute component of session_open_utc_hour.",
+    )
+    provider_timeout_s: float = Field(
+        default=2.0, gt=0.0, le=60.0,
+    )
+    provider_cache_ttl_s: int = Field(
+        default=60, ge=0,
+        description=(
+            "Provider-owned cache TTL hint. Default 1 minute — "
+            "intraday data changes by the second."
+        ),
+    )
+
+
 class ModulesSettings(_StrictModel):
     """Per-module tunables. One field per M21..M28.
 
@@ -165,6 +240,7 @@ class ModulesSettings(_StrictModel):
 
     m21: M21Settings = Field(default_factory=M21Settings)
     m22: M22Settings = Field(default_factory=M22Settings)
+    m23: M23Settings = Field(default_factory=M23Settings)
 
 
 # ---------------------------------------------------------------------------
