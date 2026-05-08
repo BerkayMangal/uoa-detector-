@@ -49,6 +49,41 @@ scoring:
   time_of_day: 0.05          # unchanged
   # Sum: 1.00
 
+  # --- Phase 3.4 module tunables — Track B overrides (3.4.9.2) ---
+  # v5_default ships full m21..m28 blocks under scoring.modules.
+  # Track B inherits those defaults; the overrides below apply only
+  # where Track B's gamma-squeeze-precursor thesis demands different
+  # behaviour. Each override carries an explicit rationale in a
+  # comment above the value.
+  #
+  # Modules NOT overridden (m22-m26, m28): Track B's thesis doesn't
+  # alter their semantic interpretation. See per-module rationale
+  # in docs/MODULES.md and the closeout section of
+  # docs/phase-3.4-acceptance.md.
+  modules:
+    # M21 — Dealer gamma exposure score
+    # Track B's CORE mechanic is dealer-gamma reflexivity. Tighten
+    # flip_proximity to surface signals EARLIER (closer to flip =
+    # more squeeze runway remaining). The ABSOLUTE short-gamma
+    # threshold stays at the v5_default value because that's a
+    # market-mechanics number ($50M/1% spot is the institutional-
+    # significance line), not a Track B knob.
+    m21:
+      flip_proximity_pct: 0.025          # was 0.03 — earlier signal
+      extreme_distance_pct: 0.15         # was 0.20 — collapse sooner
+      # All other M21 fields inherited unchanged.
+
+    # M27 — Opening/closing OI delta
+    # Track B's edge surfaces in early positioning. Lower the
+    # threshold for "moderate opening" so smaller OI growth still
+    # scores 0.7+ — squeeze precursors are characterised by stealthy
+    # accumulation, not loud retail piling-on. The strong threshold
+    # stays at 0.5 (genuine squeeze positioning still requires clear
+    # OI growth).
+    m27:
+      moderate_opening_threshold: 0.05   # was 0.10 — catches stealth flow
+      # All other M27 fields inherited unchanged.
+
 # --- Early-convexity weights ---
 # Pre-UOA-confirmation scoring. Track B's edge often appears here BEFORE
 # UOA fully confirms — gamma + cluster are the leading indicators.
