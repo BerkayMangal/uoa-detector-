@@ -58,6 +58,7 @@ import logging
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
+from uoa_detector.sources.base import RawFlowSource
 from uoa_detector.sources.thetadata.live import (
     LiveSubscription as _ThetaDataSubscription,
 )
@@ -107,7 +108,7 @@ class LiveSourcesBundle:
     ``feeds_resolved`` is the canonical normalised set (for logging).
     """
 
-    sources: list[object] = field(default_factory=list)
+    sources: list[RawFlowSource] = field(default_factory=list)
     feeds_resolved: tuple[str, ...] = ()
 
 
@@ -166,7 +167,7 @@ def build_live_sources(
     Raises FeedConfigurationError if a feed's credential is missing
     or if a required subscription set is absent.
     """
-    sources: list[object] = []
+    sources: list[RawFlowSource] = []
     tickers_tuple = tuple(t.upper() for t in tickers)
     if not tickers_tuple:
         msg = "tickers list is empty; live observer needs at least one ticker"

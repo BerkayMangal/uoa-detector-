@@ -70,7 +70,13 @@ def test_historical_source_requires_data_dir() -> None:
 def test_unknown_source_rejected() -> None:
     result = runner.invoke(app, ["run", "--source", "polygon"])
     assert result.exit_code != 0
-    assert "must be 'synthetic' or 'historical'" in result.output
+    # Phase 3.3.5 added 'live' to the choice list. Typer wraps the
+    # error inside a box that line-breaks; check the substrings
+    # individually to be wrapping-tolerant.
+    assert "synthetic" in result.output
+    assert "historical" in result.output
+    assert "live" in result.output
+    assert "polygon" in result.output
 
 
 # ---------------------------------------------------------------------------

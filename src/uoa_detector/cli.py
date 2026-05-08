@@ -29,6 +29,7 @@ record stream goes to:
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 import sys
 from datetime import UTC, datetime
@@ -178,7 +179,9 @@ def run(
         help=(
             "Flow source. 'synthetic' (default) drives the in-memory scenario; "
             "'historical' replays parquet files under --data-dir through the "
-            "RawFlowSource Protocol — Phase 3.2.2."
+            "RawFlowSource Protocol — Phase 3.2.2; "
+            "'live' connects ThetaData and/or Unusual Whales WebSocket feeds "
+            "and runs the full pipeline against real market data — Phase 3.3.5."
         ),
     ),
     scenario: str = typer.Option("default", help="Synthetic scenario name."),
@@ -258,11 +261,30 @@ def run(
             "SQLite signals and 4-cell runs."
         ),
     ),
+    feeds: str = typer.Option(
+        "thetadata,unusual_whales",
+        "--feeds",
+        help=(
+            "Live mode only: comma-separated list of feeds to connect. "
+            "Supported: 'thetadata', 'unusual_whales'. Each requested feed "
+            "needs its credential set in env (THETADATA_API_KEY / "
+            "UNUSUAL_WHALES_API_KEY); fail-fast if missing."
+        ),
+    ),
+    live_tickers: str | None = typer.Option(
+        None,
+        "--live-tickers",
+        help=(
+            "Live mode only: comma-separated tickers to subscribe. "
+            "Required when --source=live. Example: 'AAPL,MSFT,SPY'."
+        ),
+    ),
 ) -> None:
     """Run the pipeline against a flow source and emit labeled signal records."""
-    if source not in ("synthetic", "historical"):
+    if source not in ("synthetic", "historical", "live"):
         msg = (
-            f"--source must be 'synthetic' or 'historical'; got {source!r}"
+            f"--source must be 'synthetic', 'historical', or 'live'; "
+            f"got {source!r}"
         )
         raise typer.BadParameter(msg, param_hint="--source")
     if source == "synthetic" and scenario != "default":
@@ -274,6 +296,9 @@ def run(
     if source == "historical" and data_dir is None:
         msg = "--data-dir is required when --source=historical"
         raise typer.BadParameter(msg, param_hint="--data-dir")
+    if source == "live" and not live_tickers:
+        msg = "--live-tickers is required when --source=live"
+        raise typer.BadParameter(msg, param_hint="--live-tickers")
 
     writer, log_to_stderr = _build_writer(output, output_file)
     _configure_logging(log_to_stderr=log_to_stderr)
@@ -305,6 +330,23 @@ def run(
                     source_id=source_id,
                 ),
             )
+        elif source == "live":
+            assert live_tickers is not None  # typer guarantees by check above
+            ticker_list = [
+                t.strip().upper()
+                for t in live_tickers.split(",") if t.strip()
+            ]
+            # Clean ctrl-C exit; LiveObserver already drained.
+            with contextlib.suppress(KeyboardInterrupt):
+                asyncio.run(
+                    _run_live(
+                        profile=profile,
+                        writer=writer,
+                        store=store,
+                        feeds_arg=feeds,
+                        tickers=ticker_list,
+                    ),
+                )
         elif multi_source:
             asyncio.run(_run_multi_source(profile, writer, store))
         else:
@@ -433,6 +475,83 @@ async def _run_historical(
         decision_record_writer=writer,
     )
     await pipeline.run()
+
+
+async def _run_live(
+    *,
+    profile: CalibrationProfile,
+    writer: DecisionRecordWriter,
+    store: BacktestStoreProtocol,
+    feeds_arg: str,
+    tickers: list[str],
+) -> None:
+    """Drive the live observer mode (Phase 3.3.5).
+
+    Wires:
+      - parse_feeds_arg(feeds_arg)         → tuple of feed names
+      - Credentials (env / .env)           → API keys for each feed
+      - build_live_sources(...)            → [RawFlowSource]
+      - Pipeline(sources, default_stages)  → fused decision records
+      - LiveObserver(pipeline, sources)    → SIGINT-graceful shutdown
+
+    For Phase 3.3.5 the 'thetadata' feed is gated: it requires
+    contract-level subscriptions + a snapshot resolver, neither of
+    which is wired in 3.3.5 (Phase 4 work). Operators specifying
+    --feeds containing 'thetadata' get a clear error directing
+    them to use --feeds unusual_whales for now. The factory
+    surface is in place; only the contract-enumeration glue is
+    deferred.
+    """
+    from uoa_detector.config.credentials import Credentials
+    from uoa_detector.live.factory import (
+        FeedConfigurationError,
+        build_live_sources,
+        parse_feeds_arg,
+    )
+    from uoa_detector.live.observer import LiveObserver
+
+    feeds = None
+    try:
+        feeds = parse_feeds_arg(feeds_arg)
+    except FeedConfigurationError as exc:
+        raise typer.BadParameter(str(exc), param_hint="--feeds") from exc
+    if "thetadata" in feeds:
+        msg = (
+            "Phase 3.3.5: --feeds thetadata is not yet wired through the "
+            "CLI (per-contract subscription enumeration + snapshot "
+            "resolver are Phase 4 work). Use --feeds unusual_whales "
+            "or run two separate processes if you need both feeds. "
+            "The factory surface (live/factory.py) supports both; "
+            "only the CLI glue is deferred."
+        )
+        raise typer.BadParameter(msg, param_hint="--feeds")
+
+    creds = Credentials()
+    try:
+        bundle = build_live_sources(
+            feeds=feeds,
+            credentials=creds,
+            thetadata_settings=profile.data_sources.thetadata,
+            unusual_whales_settings=profile.data_sources.unusual_whales,
+            tickers=tickers,
+        )
+    except FeedConfigurationError as exc:
+        raise typer.BadParameter(str(exc), param_hint="--feeds") from exc
+
+    pipeline = Pipeline(
+        bundle.sources,
+        list(default_stage_pipeline()),
+        profile=profile,
+        store=store,
+        decision_record_writer=writer,
+        force_multi_source=len(bundle.sources) > 1,
+    )
+    observer = LiveObserver(
+        pipeline=pipeline,
+        sources=bundle.sources,
+        install_signal_handlers=True,
+    )
+    await observer.run()
 
 
 # ---------------------------------------------------------------------------
