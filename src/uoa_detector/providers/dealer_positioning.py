@@ -41,6 +41,34 @@ class DealerPositioning(BaseModel):
     flow_direction: Literal["accumulating", "distributing", "neutral"]
 
 
+class DealerExposureAggregate(BaseModel):
+    """Ticker-aggregated dealer positioning at a point in time.
+
+    Phase 3.4.1: introduced for M21 (Dealer gamma exposure score)
+    which scores at the ticker level (net gamma + zero-gamma flip
+    strike), not the per-strike level that ``DealerPositioning``
+    represents.
+
+    ``net_gamma_dollars`` is the SUM across all listed strikes for
+    the ticker — a magnitude that reflects dealer-wide exposure.
+    Same sign convention as ``DealerPositioning``: negative ⇒
+    dealers net short, positive ⇒ dealers net long.
+
+    ``flip_strike`` is the strike at which the cumulative gamma
+    profile crosses zero (the 'zero-gamma' strike). May be None
+    if the curve is monotone (always net-long or always net-short
+    across all strikes published) — M21 treats None as no proximity
+    bonus.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    ticker: str
+    as_of: datetime
+    net_gamma_dollars: Decimal
+    flip_strike: Decimal | None
+
+
 @runtime_checkable
 class DealerPositioningProvider(Protocol):
     """Source of dealer-positioning estimates per (ticker, strike, time)."""
@@ -54,6 +82,22 @@ class DealerPositioningProvider(Protocol):
         """Return positioning at ``at`` (tz-aware UTC), or ``None`` if unknown."""
         ...
 
+    async def aggregate_for_ticker(
+        self,
+        ticker: str,
+        at: datetime,
+    ) -> DealerExposureAggregate | None:
+        """Return ticker-aggregate dealer exposure at ``at``, or None.
+
+        Phase 3.4.1: feeds M21 (Dealer gamma exposure score). Sums
+        net gamma across all strikes published for the ticker and
+        identifies the flip strike (where cumulative gamma crosses
+        zero). Returns None when no data is published for the
+        ticker (illiquid name, new listing, etc.); M21 treats None
+        as score = None and does not raise.
+        """
+        ...
+
 
 class NoOpDealerPositioningProvider:
     """Always returns ``None`` — Module 21 falls back to a neutral score."""
@@ -65,4 +109,12 @@ class NoOpDealerPositioningProvider:
         at: datetime,
     ) -> DealerPositioning | None:
         del ticker, strike, at
+        return None
+
+    async def aggregate_for_ticker(
+        self,
+        ticker: str,
+        at: datetime,
+    ) -> DealerExposureAggregate | None:
+        del ticker, at
         return None

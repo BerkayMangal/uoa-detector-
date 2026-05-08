@@ -46,7 +46,10 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any
 
-from uoa_detector.providers.dealer_positioning import DealerPositioning
+from uoa_detector.providers.dealer_positioning import (
+    DealerExposureAggregate,
+    DealerPositioning,
+)
 from uoa_detector.sources.unusual_whales.providers._cache import TTLCache
 
 if TYPE_CHECKING:
@@ -82,6 +85,62 @@ class UnusualWhalesDealerGammaProvider:
             loader=lambda: self._fetch(ticker),
         )
         return self._select_strike(rows, ticker=ticker, strike=strike)
+
+    async def aggregate_for_ticker(
+        self,
+        ticker: str,
+        at: datetime,
+    ) -> DealerExposureAggregate | None:
+        """Return the ticker-aggregate snapshot at ``at``, or None.
+
+        Phase 3.4.1: feeds M21 (Dealer gamma exposure score).
+
+        The UW per-strike feed is summed across all listed strikes
+        for ``net_gamma_dollars``. The flip strike is identified
+        as the strike at which cumulative gamma (sorted by strike
+        ascending) crosses zero. Returns None when no rows are
+        published for the ticker.
+        """
+        del at  # UW returns daily snapshots; date not part of cache key
+        key = ticker.upper()
+        rows = await self._cache.get_or_fetch(
+            key,
+            loader=lambda: self._fetch(ticker),
+        )
+        return self._aggregate(rows, ticker=ticker)
+
+    def _aggregate(
+        self,
+        rows: list[dict[str, Any]],
+        *,
+        ticker: str,
+    ) -> DealerExposureAggregate | None:
+        """Sum net gamma + identify flip strike from per-strike rows."""
+        if not rows:
+            return None
+        # Decode + sort by strike ascending
+        decoded: list[tuple[Decimal, Decimal, datetime]] = []
+        for row in rows:
+            try:
+                strike = Decimal(str(row["strike"]))
+                net = Decimal(str(row["net_gamma"]))
+                as_of = _parse_iso_utc(str(row["as_of"]))
+            except (KeyError, ValueError, ArithmeticError):
+                continue
+            decoded.append((strike, net, as_of))
+        if not decoded:
+            return None
+        decoded.sort(key=lambda x: x[0])
+        net_total = sum((d[1] for d in decoded), start=Decimal("0"))
+        # Use the latest as_of among rows for the aggregate timestamp
+        as_of_latest = max(d[2] for d in decoded)
+        flip_strike = _find_flip_strike(decoded)
+        return DealerExposureAggregate(
+            ticker=ticker.upper(),
+            as_of=as_of_latest,
+            net_gamma_dollars=net_total,
+            flip_strike=flip_strike,
+        )
 
     async def _fetch(self, ticker: str) -> list[dict[str, Any]]:
         path = f"/api/stock/{ticker.upper()}/greek-exposure-strike"
@@ -138,3 +197,36 @@ def _parse_iso_utc(raw: str) -> datetime:
     if parsed.tzinfo is None:
         parsed = parsed.replace(tzinfo=UTC)
     return parsed
+
+
+def _find_flip_strike(
+    decoded: list[tuple[Decimal, Decimal, datetime]],
+) -> Decimal | None:
+    """Identify the strike where cumulative gamma crosses zero.
+
+    Walks the sorted-by-strike rows, accumulating ``net_gamma``.
+    The first strike where the running cumulative changes sign
+    (vs the prior cumulative) is the flip. Returns None when the
+    cumulative never crosses zero (curve is monotonically positive
+    or monotonically negative across all listed strikes).
+
+    Phase 3.4.1: This matches the UW GEX semantic — the
+    'zero-gamma' strike identifies the dealer-positioning balance
+    point for M21's spot-to-flip distance computation.
+    """
+    if len(decoded) < 2:
+        return None
+    cumulative = Decimal("0")
+    prev_cumulative = Decimal("0")
+    for strike, net, _as_of in decoded:
+        prev_cumulative = cumulative
+        cumulative += net
+        # Sign change between prev and current (one positive, one
+        # negative or zero — treat zero-crossing strictly as a flip)
+        if (
+            (prev_cumulative > 0 and cumulative < 0)
+            or (prev_cumulative < 0 and cumulative > 0)
+            or (prev_cumulative != 0 and cumulative == 0)
+        ):
+            return strike
+    return None
