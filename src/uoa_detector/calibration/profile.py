@@ -558,6 +558,110 @@ class M26Settings(_StrictModel):
     )
 
 
+class M27Settings(_StrictModel):
+    """Module 27 — Opening/closing OI delta (Phase 3.4.7).
+
+    Hypothesis (acceptance doc): when current OI is significantly
+    higher than prior session's close, the option is being newly
+    OPENED (institutional positioning); when current is below
+    prior, it's being CLOSED (unwinding). Opening flow carries
+    fresh information; closing flow is pre-existing positioning
+    being released.
+
+    Score branches (opening_closing_score; internal/telemetry):
+      1.0 — oi_delta_pct > strong_opening_threshold (default 0.5)
+      0.7 — oi_delta_pct in (moderate, strong] (default 0.1-0.5)
+      0.5 — oi_delta_pct in [closing, moderate] (default -0.1..0.1)
+      0.0 — oi_delta_pct < closing_threshold (default <-0.1)
+      1.0 — new strike (no prior OI; OI change from zero is
+            opening by definition)
+      0.5 — provider timeout (neutral fallback)
+
+    Edge cases pinned in stage:
+      - Prior OI = 0 (new strike) → new_strike_score (1.0)
+      - Prior OI = current OI exactly → log stale warning, neutral
+        score (delta=0% naturally falls in neutral range)
+      - Provider timeout on either fetch → timeout_score
+    """
+
+    strong_opening_threshold: float = Field(
+        default=0.5, gt=0.0, le=10.0,
+        description=(
+            "Fractional OI increase above which signal is 'strong "
+            "opening'. Default 0.5 = 50% increase. Cap at 10.0 "
+            "(1000%) prevents typo configs."
+        ),
+    )
+    moderate_opening_threshold: float = Field(
+        default=0.1, gt=0.0, le=1.0,
+        description="0.1 = 10% increase. Below strong, above neutral.",
+    )
+    closing_threshold: float = Field(
+        default=-0.1, ge=-1.0, lt=0.0,
+        description=(
+            "Fractional OI decrease BELOW which signal is "
+            "'closing'. Default -0.1 = -10%. Bound -1.0 since "
+            "OI can't decrease by more than 100% (-100% = "
+            "everyone closed). Must be negative."
+        ),
+    )
+    strong_opening_score: float = Field(
+        default=1.0, ge=0.0, le=1.0,
+    )
+    moderate_opening_score: float = Field(
+        default=0.7, ge=0.0, le=1.0,
+    )
+    neutral_score: float = Field(
+        default=0.5, ge=0.0, le=1.0,
+        description="Score for OI delta in [closing, moderate] range.",
+    )
+    closing_score: float = Field(
+        default=0.0, ge=0.0, le=1.0,
+    )
+    new_strike_score: float = Field(
+        default=1.0, ge=0.0, le=1.0,
+        description=(
+            "Score when prior OI is zero (new strike/expiry). "
+            "Acceptance doc edge case: 'OI change from zero is "
+            "opening by definition'."
+        ),
+    )
+    timeout_score: float = Field(
+        default=0.5, ge=0.0, le=1.0,
+        description="Score on provider timeout. Neutral fallback.",
+    )
+    no_data_score: float = Field(
+        default=0.5, ge=0.0, le=1.0,
+        description=(
+            "Score when CURRENT OI is unavailable (provider "
+            "returned None). Distinct telemetry from timeout."
+        ),
+    )
+    session_close_utc_hour: int = Field(
+        default=21, ge=0, le=23,
+        description=(
+            "US equity RTH session close in UTC. Default 21 = "
+            "16:00 ET during DST (= 21:00 UTC). For Standard Time "
+            "operator overrides to 21 still; the offset is the "
+            "same difference. Used to compute prior session "
+            "close timestamp for OI lookup."
+        ),
+    )
+    session_close_utc_minute: int = Field(
+        default=0, ge=0, le=59,
+    )
+    provider_timeout_s: float = Field(
+        default=2.0, gt=0.0, le=60.0,
+    )
+    provider_cache_ttl_s: int = Field(
+        default=300, ge=0,
+        description=(
+            "OI changes slowly intraday (vs DP prints). Default "
+            "5 min cache."
+        ),
+    )
+
+
 class ModulesSettings(_StrictModel):
     """Per-module tunables. One field per M21..M28.
 
@@ -572,6 +676,7 @@ class ModulesSettings(_StrictModel):
     m24: M24Settings = Field(default_factory=M24Settings)
     m25: M25Settings = Field(default_factory=M25Settings)
     m26: M26Settings = Field(default_factory=M26Settings)
+    m27: M27Settings = Field(default_factory=M27Settings)
 
 
 # ---------------------------------------------------------------------------

@@ -91,6 +91,22 @@ scoring:
       delay_warning_minutes: 5             # log if latest print > 5m old
       provider_timeout_s: 2.0
       provider_cache_ttl_s: 30             # short TTL — DP intraday-fast
+    # M27 — Opening/closing OI delta (Phase 3.4.7)
+    m27:
+      strong_opening_threshold: 0.5        # >50% OI increase = strong
+      moderate_opening_threshold: 0.1      # 10-50% increase
+      closing_threshold: -0.1              # < -10% = closing
+      strong_opening_score: 1.0
+      moderate_opening_score: 0.7
+      neutral_score: 0.5
+      closing_score: 0.0
+      new_strike_score: 1.0                # prior OI = 0 → treat as opening
+      timeout_score: 0.5
+      no_data_score: 0.5                   # provider returned None
+      session_close_utc_hour: 21           # 16:00 ET DST = 21:00 UTC
+      session_close_utc_minute: 0
+      provider_timeout_s: 2.0
+      provider_cache_ttl_s: 300            # OI changes slowly (5 min)
 
 # --- Early-convexity score (Part 3) ---
 early_scoring:
