@@ -101,6 +101,15 @@ def compute_combined_score(
         + w.time_of_day * tod
     )
 
+    # Phase 3.4.4: Cross-module ScoreAdjustment targeting the combined
+    # pre-penalty score directly. Used by M24's post-earnings IV spike
+    # penalty (and any future cross-module penalty that operates on the
+    # combined score rather than a single sub-score). Targets:
+    #   - "combined_score_pre" (canonical name from acceptance doc)
+    #   - "combined_score_pre_penalty" (actual field name; alias)
+    pre += _adjustments_for(event, "combined_score_pre")
+    pre += _adjustments_for(event, "combined_score_pre_penalty")
+
     penalty_sum = sum(pen.value for pen in event.applied_penalties)
     post = pre + penalty_sum
 
