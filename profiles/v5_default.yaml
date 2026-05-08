@@ -64,6 +64,22 @@ scoring:
       post_earnings_session_days: 1        # "within 1 session"
       provider_timeout_s: 2.0
       provider_cache_ttl_s: 600            # IV rank changes slowly
+    # M25 — Sector peer score (Phase 3.4.5)
+    m25:
+      peer_window_minutes: 30              # lookback for peer flow events
+      peer_count: 5                        # top N peers to query
+      strong_alignment_threshold: 0.6      # >60% same-direction = full
+      moderate_alignment_threshold: 0.4    # 40-60%
+      weak_alignment_threshold: 0.2        # 20-40%; below = contrarian
+      strong_alignment_score: 1.0
+      moderate_alignment_score: 0.7
+      weak_alignment_score: 0.3
+      contrarian_score: 0.0
+      no_sector_score: 0.5                 # ETFs / illiquid / missing data
+      empty_peer_flow_score: 0.5           # small sector / quiet period
+      timeout_score: 0.5
+      provider_timeout_s: 3.0              # higher: multi-ticker fetch
+      provider_cache_ttl_s: 60
 
 # --- Early-convexity score (Part 3) ---
 early_scoring:

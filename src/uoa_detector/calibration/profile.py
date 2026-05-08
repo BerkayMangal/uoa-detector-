@@ -343,6 +343,116 @@ class M24Settings(_StrictModel):
     )
 
 
+class M25Settings(_StrictModel):
+    """Module 25 — Sector peer score (Phase 3.4.5).
+
+    Hypothesis (acceptance doc): when peer tickers in the same
+    sector show same-direction unusual flow within a short window,
+    the signal carries sector-wide information; conviction is
+    higher. Conversely, a signal alone in its sector (no peer
+    confirmation) is more likely idiosyncratic noise.
+
+    First M-module that uses TWO providers: SectorMapProvider
+    (ticker → peers) + PeerFlowProvider (recent flow on peers).
+
+    Score branches (sector_confirmation_score):
+      1.0 — alignment > strong (default 0.6)
+      0.7 — alignment in [moderate, strong) (default 0.4-0.6)
+      0.3 — alignment in [weak, moderate) (default 0.2-0.4)
+      0.0 — alignment < weak (default <0.2; sector contrarian)
+      0.5 — no sector mapping (fallback)
+      0.5 — empty peer flow (neutral)
+      0.5 — provider timeout (neutral, telemetry-flagged)
+    """
+
+    peer_window_minutes: int = Field(
+        default=30, ge=1, le=240,
+        description=(
+            "Lookback window for peer flow events. Default 30 "
+            "minutes (matches the M23 default — same intraday-"
+            "scale window). Capped at 4 hours."
+        ),
+    )
+    peer_count: int = Field(
+        default=5, ge=1, le=50,
+        description=(
+            "Top N peers to query. Default 5. SectorMapProvider "
+            "returns peers in implementation-defined order; M25 "
+            "takes the first N. Operator may widen for sector-wide "
+            "ETF analysis or narrow for single-pair confirmation."
+        ),
+    )
+    strong_alignment_threshold: float = Field(
+        default=0.6, gt=0.0, le=1.0,
+        description=(
+            "Alignment fraction above which sector_confirmation = "
+            "strong_alignment_score. Default 0.6 (60% of peers "
+            "moving the same way)."
+        ),
+    )
+    moderate_alignment_threshold: float = Field(
+        default=0.4, gt=0.0, le=1.0,
+        description="Threshold for moderate score branch.",
+    )
+    weak_alignment_threshold: float = Field(
+        default=0.2, ge=0.0, le=1.0,
+        description=(
+            "Threshold for weak/contrarian boundary. Below this, "
+            "sector is actively counter-signal (contrarian)."
+        ),
+    )
+    strong_alignment_score: float = Field(
+        default=1.0, ge=0.0, le=1.0,
+    )
+    moderate_alignment_score: float = Field(
+        default=0.7, ge=0.0, le=1.0,
+    )
+    weak_alignment_score: float = Field(
+        default=0.3, ge=0.0, le=1.0,
+    )
+    contrarian_score: float = Field(
+        default=0.0, ge=0.0, le=1.0,
+        description="Score when alignment < weak_alignment_threshold.",
+    )
+    no_sector_score: float = Field(
+        default=0.5, ge=0.0, le=1.0,
+        description=(
+            "Fallback when SectorMapProvider returns no sector "
+            "(missing reference data, ETF, illiquid name)."
+        ),
+    )
+    empty_peer_flow_score: float = Field(
+        default=0.5, ge=0.0, le=1.0,
+        description=(
+            "Score when sector exists but no peer flow events in "
+            "the window (small sector, quiet period). Neutral, "
+            "not zero."
+        ),
+    )
+    timeout_score: float = Field(
+        default=0.5, ge=0.0, le=1.0,
+        description=(
+            "Score when either provider times out. Neutral, with "
+            "branch label distinct from no_sector / empty_peer_flow."
+        ),
+    )
+    provider_timeout_s: float = Field(
+        default=3.0, gt=0.0, le=60.0,
+        description=(
+            "Higher than M21-M24's 2.0 because M25 fans out across "
+            "multiple peer tickers in one fetch. Acceptance doc "
+            "directive."
+        ),
+    )
+    provider_cache_ttl_s: int = Field(
+        default=60, ge=0,
+        description=(
+            "Provider cache TTL hint. Default 1 min — peer flow "
+            "is intraday-stale fast."
+        ),
+    )
+
+
 class ModulesSettings(_StrictModel):
     """Per-module tunables. One field per M21..M28.
 
@@ -355,6 +465,7 @@ class ModulesSettings(_StrictModel):
     m22: M22Settings = Field(default_factory=M22Settings)
     m23: M23Settings = Field(default_factory=M23Settings)
     m24: M24Settings = Field(default_factory=M24Settings)
+    m25: M25Settings = Field(default_factory=M25Settings)
 
 
 # ---------------------------------------------------------------------------
