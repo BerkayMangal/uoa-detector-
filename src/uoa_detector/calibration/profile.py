@@ -230,6 +230,119 @@ class M23Settings(_StrictModel):
     )
 
 
+class M24Settings(_StrictModel):
+    """Module 24 — IV exhaustion score (Phase 3.4.4).
+
+    Hypothesis (acceptance doc): when IV rank is already very
+    high, the option is expensive AND the move-priced-in is large.
+    Edge is greater when buying IV is low/moderate.
+
+    Score branches (iv_score):
+      1.0 — IV rank < low_iv_threshold (cheap)
+      0.7 — between low_iv and mid_iv
+      0.3 — between mid_iv and high_iv
+      0.0 — > high_iv_threshold (expensive)
+
+    Cross-module ScoreAdjustment (post-earnings IV spike penalty):
+      Trigger: iv_rank > post_earnings_iv_penalty_threshold
+               AND a catalyst was in the past
+               post_earnings_session_days
+      Target: combined_score_pre
+      Delta: post_earnings_iv_penalty (negative, default -0.4)
+
+    Edge cases (acceptance doc):
+      - New listing with no IV history → iv_score=0.5, no penalty
+      - Stale IV data (>1 day old) → log warning, use anyway
+      - Provider returns rank > 100 → clamp to 100
+    """
+
+    low_iv_threshold: float = Field(
+        default=30.0, ge=0.0, le=100.0,
+        description=(
+            "IV rank below this is cheap; full score. "
+            "Default 30 (= 30th percentile)."
+        ),
+    )
+    mid_iv_threshold: float = Field(
+        default=60.0, ge=0.0, le=100.0,
+        description=(
+            "IV rank between low_iv and mid_iv gets the moderate "
+            "score. Default 60."
+        ),
+    )
+    high_iv_threshold: float = Field(
+        default=80.0, ge=0.0, le=100.0,
+        description=(
+            "IV rank above this is expensive; zero score. "
+            "Also the trigger threshold for the post-earnings "
+            "penalty (separate field below to allow operator "
+            "override)."
+        ),
+    )
+    cheap_iv_score: float = Field(
+        default=1.0, ge=0.0, le=1.0,
+        description="iv_score for IV rank < low_iv_threshold.",
+    )
+    moderate_iv_score: float = Field(
+        default=0.7, ge=0.0, le=1.0,
+        description=(
+            "iv_score for IV rank in [low_iv, mid_iv) range."
+        ),
+    )
+    elevated_iv_score: float = Field(
+        default=0.3, ge=0.0, le=1.0,
+        description=(
+            "iv_score for IV rank in [mid_iv, high_iv) range."
+        ),
+    )
+    expensive_iv_score: float = Field(
+        default=0.0, ge=0.0, le=1.0,
+        description="iv_score for IV rank >= high_iv_threshold.",
+    )
+    no_iv_history_score: float = Field(
+        default=0.5, ge=0.0, le=1.0,
+        description=(
+            "Fallback score when provider returns None (new "
+            "listing, illiquid name). Acceptance doc edge case: "
+            "no penalty applied either way."
+        ),
+    )
+    post_earnings_iv_penalty: float = Field(
+        default=-0.4, le=0.0,
+        description=(
+            "ScoreAdjustment delta to combined_score_pre when "
+            "iv_rank > threshold AND catalyst within "
+            "post_earnings_session_days. Negative deduction."
+        ),
+    )
+    post_earnings_iv_penalty_threshold: float = Field(
+        default=80.0, ge=0.0, le=100.0,
+        description=(
+            "IV rank threshold above which the post-earnings "
+            "penalty fires (when also paired with a recent "
+            "catalyst). Default 80 (= high IV)."
+        ),
+    )
+    post_earnings_session_days: int = Field(
+        default=1, ge=0, le=10,
+        description=(
+            "Days back from the event to check for a catalyst. "
+            "Default 1 = 'within 1 session'. Bound 10 prevents "
+            "accidental month-long blackouts via typo."
+        ),
+    )
+    provider_timeout_s: float = Field(
+        default=2.0, gt=0.0, le=60.0,
+    )
+    provider_cache_ttl_s: int = Field(
+        default=600, ge=0,
+        description=(
+            "Provider cache TTL hint. Default 10 min — IV rank "
+            "changes slowly intraday."
+        ),
+    )
+
+
 class ModulesSettings(_StrictModel):
     """Per-module tunables. One field per M21..M28.
 
@@ -241,6 +354,7 @@ class ModulesSettings(_StrictModel):
     m21: M21Settings = Field(default_factory=M21Settings)
     m22: M22Settings = Field(default_factory=M22Settings)
     m23: M23Settings = Field(default_factory=M23Settings)
+    m24: M24Settings = Field(default_factory=M24Settings)
 
 
 # ---------------------------------------------------------------------------

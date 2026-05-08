@@ -49,6 +49,21 @@ scoring:
       session_open_utc_minute: 30
       provider_timeout_s: 2.0
       provider_cache_ttl_s: 60             # intraday — changes by the second
+    # M24 — IV exhaustion score (Phase 3.4.4)
+    m24:
+      low_iv_threshold: 30.0               # IV rank < 30 = cheap
+      mid_iv_threshold: 60.0               # 30-60 = moderate
+      high_iv_threshold: 80.0              # >= 80 = expensive (zero score)
+      cheap_iv_score: 1.0
+      moderate_iv_score: 0.7
+      elevated_iv_score: 0.3
+      expensive_iv_score: 0.0
+      no_iv_history_score: 0.5             # new listing fallback
+      post_earnings_iv_penalty: -0.4       # cross-module ScoreAdjustment
+      post_earnings_iv_penalty_threshold: 80.0
+      post_earnings_session_days: 1        # "within 1 session"
+      provider_timeout_s: 2.0
+      provider_cache_ttl_s: 600            # IV rank changes slowly
 
 # --- Early-convexity score (Part 3) ---
 early_scoring:
