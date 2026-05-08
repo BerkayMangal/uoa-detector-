@@ -203,3 +203,9 @@ data_sources:
       sector_map_seconds: 86400            # ticker→sector glacial
       dark_pool_seconds: 60                # DP prints stream constantly
       open_interest_seconds: 600           # EOD authoritative + intraday est
+
+live:
+  # Phase 4 reserve. Phase 3.3.5's live observer does NOT consume
+  # this value; the field exists so operator-curated YAML doesn't
+  # need to be re-edited when Phase 4 wires the dashboard.
+  dashboard_refresh_seconds: 2.0

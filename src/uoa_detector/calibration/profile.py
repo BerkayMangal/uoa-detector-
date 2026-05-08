@@ -679,6 +679,37 @@ class DataSourcesConfig(_StrictModel):
 
 
 # ---------------------------------------------------------------------------
+# Live mode tunables
+# ---------------------------------------------------------------------------
+
+
+class LiveSettings(_StrictModel):
+    """Live-observer mode tunables.
+
+    Phase 3.3.5: introduces the section. Currently holds one knob —
+    ``dashboard_refresh_seconds`` — reserved for the Phase 4
+    operator dashboard. Phase 3.3.5's live observer does NOT
+    consume this value; it ships only to make the future
+    integration backwards-compatible (operators tuning the YAML now
+    don't have to re-edit it later).
+
+    Other knobs likely to land here in Phase 4:
+      - watchlist_max_tickers: cap subscription set
+      - heartbeat_log_interval_seconds: periodic 'still alive' log
+      - reconnect_alert_threshold: warn after N reconnects/min
+    """
+
+    dashboard_refresh_seconds: float = Field(
+        default=2.0, gt=0.0, le=300.0,
+        description=(
+            "Phase 4 reserve: cadence at which the live operator "
+            "dashboard refreshes its state from the running observer. "
+            "Phase 3.3.5 does not consume this value."
+        ),
+    )
+
+
+# ---------------------------------------------------------------------------
 # CalibrationProfile — top-level
 # ---------------------------------------------------------------------------
 
@@ -705,6 +736,7 @@ class CalibrationProfile(_StrictModel):
     sub_score_missing_behavior: SubScoreMissingBehavior
     backtest: BacktestConfig
     data_sources: DataSourcesConfig = Field(default_factory=DataSourcesConfig)
+    live: LiveSettings = Field(default_factory=LiveSettings)
 
     @model_validator(mode="after")
     def _validate_invariants(self) -> CalibrationProfile:
