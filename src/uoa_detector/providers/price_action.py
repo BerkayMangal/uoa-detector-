@@ -12,6 +12,11 @@ state at a given timestamp:
 Phase 3 sources: Polygon aggregates (1-minute bars), IBKR historical
 bars, user's own intraday cache. The Protocol returns a typed snapshot;
 score derivation stays in the stage so the spec's bands are profile-tunable.
+
+Phase 3.4.3 extension: ``get_intraday_price_movement(ticker, at,
+lookback_minutes)`` returns a ``PriceMovement`` summary used by
+Module 23's score branches. Additive — existing ``snapshot_at``
+preserved for any callers (currently only NoOp).
 """
 
 from __future__ import annotations
@@ -39,6 +44,29 @@ class PriceActionSnapshot(BaseModel):
     volume_vs_trailing_avg: float = 1.0  # 1.0 = at average, 2.0 = double, etc.
 
 
+class PriceMovement(BaseModel):
+    """Spot price movement over a fixed lookback window.
+
+    Phase 3.4.3: feeds Module 23 (Price confirmation score). The
+    ``move_pct`` is signed: positive = spot rose over the lookback,
+    negative = spot fell.
+
+    ``lookback_minutes_actual`` may be less than the requested
+    lookback if the stage clamped the window to the session open.
+    Stage-side clamping (M23 owns the policy) — provider just
+    reports what it actually fetched.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    ticker: str
+    as_of: datetime
+    spot_at: Decimal
+    spot_lookback_ago: Decimal
+    move_pct: float
+    lookback_minutes_actual: int
+
+
 @runtime_checkable
 class PriceActionProvider(Protocol):
     """Source of intraday price-action state."""
@@ -55,6 +83,25 @@ class PriceActionProvider(Protocol):
         """
         ...
 
+    async def get_intraday_price_movement(
+        self,
+        ticker: str,
+        at: datetime,
+        lookback_minutes: int,
+    ) -> PriceMovement | None:
+        """Return spot movement over [at - lookback_minutes, at].
+
+        Phase 3.4.3: feeds M23. Returns ``None`` when spot data is
+        missing or the requested window is unavailable (illiquid
+        name, after-hours timestamp with no overnight carry, etc.);
+        M23 treats ``None`` as the neutral score branch.
+
+        The actual lookback used (``lookback_minutes_actual``) may
+        be smaller than requested if the caller clamped it to a
+        session boundary.
+        """
+        ...
+
 
 class NoOpPriceActionProvider:
     """Always returns ``None``. Module 23 falls back to neutral confirmation."""
@@ -65,4 +112,13 @@ class NoOpPriceActionProvider:
         at: datetime,
     ) -> PriceActionSnapshot | None:
         del ticker, at
+        return None
+
+    async def get_intraday_price_movement(
+        self,
+        ticker: str,
+        at: datetime,
+        lookback_minutes: int,
+    ) -> PriceMovement | None:
+        del ticker, at, lookback_minutes
         return None
