@@ -27,10 +27,14 @@ from uoa_detector.errors import DataSourceError
 from uoa_detector.sources.base import QuoteSnapshotSource, RawFlowSource
 from uoa_detector.sources.ibkr_quotes import IBKRConfig, IBKRQuoteSource
 from uoa_detector.sources.polygon import PolygonConfig, PolygonFlowSource
-from uoa_detector.sources.unusual_whales import (
-    UnusualWhalesConfig,
-    UnusualWhalesFlowSource,
-)
+
+# Phase 3.3.6.2: UnusualWhalesConfig / UnusualWhalesFlowSource were
+# Phase 2 stubs preserved through Phase 3.3.3-3.3.5 for back-compat;
+# they were removed when the real UnusualWhalesLiveSource (in
+# unusual_whales/live.py) shipped. The five UW stub tests that lived
+# in this file were removed alongside the legacy_stub.py module.
+# Polygon and IBKR stubs are still present pending an explicit
+# retire decision (see sources/__init__.py docstring).
 
 # ---------------------------------------------------------------------------
 # PolygonFlowSource
@@ -70,43 +74,6 @@ async def test_polygon_close_is_idempotent() -> None:
     src = PolygonFlowSource(PolygonConfig(api_key="dummy"))
     await src.close()
     await src.close()  # second call must not raise
-
-
-# ---------------------------------------------------------------------------
-# UnusualWhalesFlowSource
-# ---------------------------------------------------------------------------
-
-
-def test_unusual_whales_satisfies_raw_flow_source_protocol() -> None:
-    src = UnusualWhalesFlowSource(UnusualWhalesConfig(api_token="dummy"))
-    assert isinstance(src, RawFlowSource)
-    assert src.source_id == "unusual_whales"
-
-
-def test_unusual_whales_config_secret_is_not_in_repr() -> None:
-    cfg = UnusualWhalesConfig(api_token="leak-this-and-i-cry")
-    assert "leak-this-and-i-cry" not in repr(cfg)
-    assert cfg.api_token.get_secret_value() == "leak-this-and-i-cry"
-
-
-def test_unusual_whales_minimum_premium_must_be_non_negative() -> None:
-    with pytest.raises(ValidationError, match="greater than or equal to 0"):
-        UnusualWhalesConfig(api_token="k", minimum_premium_usd=-1)
-
-
-@pytest.mark.asyncio
-async def test_unusual_whales_stream_raises_phase_marker() -> None:
-    src = UnusualWhalesFlowSource(UnusualWhalesConfig(api_token="dummy"))
-    with pytest.raises(DataSourceError, match="Phase 2 stub"):
-        async for _ in src.stream():
-            pass  # pragma: no cover
-
-
-@pytest.mark.asyncio
-async def test_unusual_whales_close_is_idempotent() -> None:
-    src = UnusualWhalesFlowSource(UnusualWhalesConfig(api_token="dummy"))
-    await src.close()
-    await src.close()
 
 
 # ---------------------------------------------------------------------------
