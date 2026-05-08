@@ -80,6 +80,17 @@ scoring:
       timeout_score: 0.5
       provider_timeout_s: 3.0              # higher: multi-ticker fetch
       provider_cache_ttl_s: 60
+    # M26 — Dark pool corroboration (Phase 3.4.6)
+    m26:
+      dark_pool_lookback_minutes: 60       # look back 1 hour
+      min_print_size_usd: 5_000_000        # $5M institutional threshold
+      confirmed_match_score: 1.0           # DP direction matches option
+      direction_unclear_score: 0.5         # midpoint/unknown side
+      no_qualifying_prints_score: 0.2      # low fallback (NOT zero)
+      timeout_score: 0.5
+      delay_warning_minutes: 5             # log if latest print > 5m old
+      provider_timeout_s: 2.0
+      provider_cache_ttl_s: 30             # short TTL — DP intraday-fast
 
 # --- Early-convexity score (Part 3) ---
 early_scoring:

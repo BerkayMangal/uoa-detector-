@@ -453,6 +453,111 @@ class M25Settings(_StrictModel):
     )
 
 
+class M26Settings(_StrictModel):
+    """Module 26 — Dark pool corroboration (Phase 3.4.6).
+
+    Hypothesis (acceptance doc): large dark-pool equity prints
+    near the time of an option flow event indicate institutional
+    positioning. When DP direction matches option direction, the
+    options signal is corroborated; when it doesn't match, low
+    confidence; when no qualifying DP exists, mildly low (not
+    zero — DP data is sparse by nature).
+
+    Score branches (dark_pool_score; internal/telemetry):
+      1.0 — qualifying DP + direction matches event
+      0.5 — qualifying DP but direction unclear (midpoint/unknown)
+      0.2 — no qualifying prints (low, NOT zero — sparse-data
+            neutral fallback)
+      0.5 — provider timeout (telemetry-flagged)
+
+    Side effects:
+      - Sets event.has_dark_pool_confirmation = True iff
+        dark_pool_score == confirmed_match_score (default 1.0)
+
+    Direction classification:
+      - call (bullish event) confirmed by 'at_or_below_bid' DP
+        prints (someone absorbing sell pressure off-exchange)
+      - put (bearish event) confirmed by 'above_ask' DP prints
+        (someone unloading above the lit market)
+      - 'midpoint' and 'unknown' side_estimate = direction
+        unclear → 0.5 score regardless of option_type
+
+    Edge cases pinned in stage:
+      - Multiple prints with mixed directions → largest by
+        notional (price * size) wins
+      - DP data delayed > delay_warning_minutes vs event_ts →
+        log warning, use anyway
+      - has_dark_pool_confirmation already True → preset_skip
+    """
+
+    dark_pool_lookback_minutes: int = Field(
+        default=60, ge=1, le=480,
+        description=(
+            "Minutes to look back from event timestamp for DP "
+            "prints. Default 60. Capped at 8 hours to prevent "
+            "session-spanning configs."
+        ),
+    )
+    min_print_size_usd: int = Field(
+        default=5_000_000, ge=0,
+        description=(
+            "Notional threshold (price x shares) for a 'qualifying' "
+            "DP print. Default $5M — institutional-size filter. "
+            "Operator may lower for small-cap names where $5M is "
+            "rare."
+        ),
+    )
+    confirmed_match_score: float = Field(
+        default=1.0, ge=0.0, le=1.0,
+        description=(
+            "Score when a qualifying print exists AND its "
+            "direction matches the option_type. Also the threshold "
+            "for setting has_dark_pool_confirmation = True."
+        ),
+    )
+    direction_unclear_score: float = Field(
+        default=0.5, ge=0.0, le=1.0,
+        description=(
+            "Score when a qualifying print exists but its "
+            "side_estimate is 'midpoint' or 'unknown'. The print "
+            "happened but we can't classify direction — neutral, "
+            "not contrarian."
+        ),
+    )
+    no_qualifying_prints_score: float = Field(
+        default=0.2, ge=0.0, le=1.0,
+        description=(
+            "Score when zero qualifying prints in the window. "
+            "Default 0.2 — low-but-not-zero. Acceptance doc: 'DP "
+            "data is sparse; absence isn't strongly negative'."
+        ),
+    )
+    timeout_score: float = Field(
+        default=0.5, ge=0.0, le=1.0,
+        description="Score on provider timeout. Neutral fallback.",
+    )
+    delay_warning_minutes: int = Field(
+        default=5, ge=0, le=60,
+        description=(
+            "If the latest qualifying DP print is older than this "
+            "many minutes vs event_ts, log a warning (data may be "
+            "delayed). Score is computed regardless. Acceptance "
+            "doc edge case."
+        ),
+    )
+    provider_timeout_s: float = Field(
+        default=2.0, gt=0.0, le=60.0,
+    )
+    provider_cache_ttl_s: int = Field(
+        default=30, ge=0,
+        description=(
+            "DP data is intraday-stale fast. Default 30 sec. "
+            "Lower than M25's 60 sec because DP prints are less "
+            "frequent — fresh fetch matters more."
+        ),
+    )
+
+
 class ModulesSettings(_StrictModel):
     """Per-module tunables. One field per M21..M28.
 
@@ -466,6 +571,7 @@ class ModulesSettings(_StrictModel):
     m23: M23Settings = Field(default_factory=M23Settings)
     m24: M24Settings = Field(default_factory=M24Settings)
     m25: M25Settings = Field(default_factory=M25Settings)
+    m26: M26Settings = Field(default_factory=M26Settings)
 
 
 # ---------------------------------------------------------------------------
