@@ -189,10 +189,14 @@ class Pipeline:
             t0 = time.perf_counter()
             event = await stage.enrich(event, self._ctx)
             latency_ms = (time.perf_counter() - t0) * 1000.0
+            # Phase 3.4 telemetry: stages may expose
+            # ``last_execution_metadata`` for cost/perf audit.
+            stage_metadata = getattr(stage, "last_execution_metadata", None)
             stage_executions.append(
                 StageExecutionEntry(
                     stage_name=stage.name,
                     latency_ms=latency_ms,
+                    metadata=stage_metadata,
                 ),
             )
             if event.rejection is not None:

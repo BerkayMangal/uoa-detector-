@@ -52,6 +52,17 @@ class StageExecutionEntry(BaseModel):
     stage_name: str
     latency_ms: float = Field(ge=0.0)
     notes: str | None = None
+    metadata: dict[str, str] | None = Field(
+        default=None,
+        description=(
+            "Phase 3.4: per-stage telemetry — score branch taken, "
+            "provider outcome, cache hit/miss when available. "
+            "Stage-owned: stage exposes a 'last_execution_metadata' "
+            "attribute that the orchestrator copies here. None when "
+            "the stage doesn't expose telemetry (e.g., earlier-phase "
+            "stages)."
+        ),
+    )
 
 
 class SignalDecisionRecord(BaseModel):
