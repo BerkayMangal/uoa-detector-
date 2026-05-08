@@ -107,6 +107,17 @@ scoring:
       session_close_utc_minute: 0
       provider_timeout_s: 2.0
       provider_cache_ttl_s: 300            # OI changes slowly (5 min)
+    # M28 — Next-day OI confirmation (Phase 3.4.8). POST-EVENT VALIDATOR.
+    # Not a PipelineStage; runs as nightly batch via
+    # scripts/run_m28_overnight.py at batch_run_time_et next session.
+    m28:
+      min_m27_score_to_validate: 0.7       # only validate moderate+ signals
+      confirmed_score: 1.0                 # delta > 0: M27 was right
+      ambiguous_score: 0.5                 # delta == 0
+      closing_score: 0.0                   # delta < 0: M27 was wrong
+      provider_timeout_s: 5.0              # batch tolerates slower endpoints
+      batch_run_time_et: "09:31"           # 1 min after market open
+      provider_cache_ttl_s: 86400          # T+1 OI is stable, 24h cache
 
 # --- Early-convexity score (Part 3) ---
 early_scoring:

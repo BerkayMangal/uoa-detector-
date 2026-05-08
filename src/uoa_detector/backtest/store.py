@@ -90,6 +90,18 @@ class StoredSignal(BaseModel):
     final_label: SignalLabel | None = None
     next_day_oi_confirmed: bool | None = None
 
+    # Phase 3.4.8: Module 27 (Opening/closing OI delta) score —
+    # populated at signal creation by M27 stage. Phase 3.4.7
+    # treated this as internal/telemetry; 3.4.8 promotes to a
+    # persisted field because Module 28 needs to filter signals
+    # to validate.
+    opening_closing_score: float | None = None
+    # Phase 3.4.8: Module 28 (Next-day OI confirmation) score.
+    # POPULATED POST-EVENT — written by run_m28_overnight at T+1
+    # via store.update_signal_score(). None means "not yet
+    # validated"; non-None means M28 has run.
+    m28_confirmation_score: float | None = None
+
     # Phase 3.2.1: run association + latency tracking. Optional so
     # Phase 1-2 call sites that don't measure latency keep working.
     # ``run_id`` is populated by the store at insert time (auto-implicit
@@ -309,6 +321,8 @@ class BacktestStore:
             scale_in=size.scale_in,
             initial_r=size.initial_r,
             next_day_oi_confirmed=event.next_day_oi_confirmed,
+            opening_closing_score=event.opening_closing_score,
+            m28_confirmation_score=event.m28_confirmation_score,
             run_id=rid,
             event_id=pr.event_id,
             pipeline_latency_ms=pipeline_latency_ms,
@@ -401,6 +415,58 @@ class BacktestStore:
     def iter_errors(self, run_id: str) -> Iterator[ErrorRecord]:
         self._check_open()
         yield from self._run_errors.get(run_id, [])
+
+    # Allowed score_name values for update_signal_score (Phase 3.4.8).
+    # Restricted to float-typed sub-score fields. Adding a new sub-score
+    # field requires bumping this set.
+    _UPDATABLE_SCORE_FIELDS: ClassVar[frozenset[str]] = frozenset({
+        "uoa_score",
+        "convexity_score",
+        "event_score",
+        "gamma_score",
+        "price_confirmation_score",
+        "sector_confirmation_score",
+        "time_of_day_weight",
+        "cluster_density_score",
+        "relative_premium_score",
+        "dte_multiplier_applied",
+        "opening_closing_score",
+        "m28_confirmation_score",
+        "combined_score_pre_penalty",
+        "combined_score_post_penalty",
+    })
+
+    def update_signal_score(
+        self,
+        run_id: str,
+        event_id: str,
+        score_name: str,
+        value: float | None,
+    ) -> bool:
+        """Update one float sub-score on a stored signal.
+
+        Phase 3.4.8 BREAKING CHANGE — see protocol docstring.
+        """
+        self._check_open()
+        if score_name not in self._UPDATABLE_SCORE_FIELDS:
+            msg = (
+                f"update_signal_score: score_name '{score_name}' "
+                f"is not in the allowed set "
+                f"{sorted(self._UPDATABLE_SCORE_FIELDS)}"
+            )
+            raise ValueError(msg)
+        rows = self._run_signals.get(run_id, [])
+        for i, row in enumerate(rows):
+            if row.event_id == event_id:
+                updated = row.model_copy(update={score_name: value})
+                rows[i] = updated
+                # Mirror in self._rows
+                for j, r in enumerate(self._rows):
+                    if r.run_id == run_id and r.event_id == event_id:
+                        self._rows[j] = updated
+                        break
+                return True
+        return False
 
     def close(self) -> None:
         """Mark the store closed; finish any active run first.

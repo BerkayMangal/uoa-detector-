@@ -135,6 +135,36 @@ class BacktestStoreProtocol(Protocol):
     def iter_errors(self, run_id: str) -> Iterator[ErrorRecord]:
         """Stream the errors belonging to ``run_id``."""
 
+    def update_signal_score(
+        self,
+        run_id: str,
+        event_id: str,
+        score_name: str,
+        value: float | None,
+    ) -> bool:
+        """Update a single sub-score on a stored signal.
+
+        Phase 3.4.8 BREAKING CHANGE: required for post-event
+        validators (Module 28's next-day OI confirmation runs as
+        a nightly batch and writes back the validation score to
+        signals from prior session). Allowed score_name values
+        are the float-typed sub-score fields on StoredSignal:
+
+          - opening_closing_score (M27)
+          - m28_confirmation_score (M28)
+          - any future float sub-score field
+
+        Returns True if a row matched and was updated; False if
+        no signal with (run_id, event_id) was found.
+
+        Implementations should be idempotent: re-applying the
+        same (run_id, event_id, score_name, value) is a no-op
+        beyond a single UPDATE statement.
+
+        Setting ``value=None`` clears the score (useful for
+        invalidation/retry workflows).
+        """
+
     def close(self) -> None:
         """Flush any buffered writes and release resources.
 

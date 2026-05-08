@@ -108,6 +108,18 @@ class EnrichedEvent(BaseModel):
     time_of_day_weight: float | None = None
     cluster_density_score: float | None = None
     relative_premium_score: float | None = None
+    # Phase 3.4.8: Module 27 (Opening/closing OI delta) score —
+    # materialised so Module 28 can filter signals to validate.
+    # M27 writes this in its enrich() (Phase 3.4.7 made it
+    # internal/telemetry; 3.4.8 promotes it to a domain field
+    # because M28 is now a real consumer).
+    opening_closing_score: float | None = None
+    # Phase 3.4.8: Module 28 (Next-day OI confirmation) score.
+    # POPULATED POST-EVENT — written by run_m28_overnight at T+1
+    # via store.update_signal_score(); None means "not yet
+    # validated". Distinct from next_day_oi_confirmed (bool)
+    # which is the derived boolean signal.
+    m28_confirmation_score: float | None = None
 
     # Phase 2: additive adjustments produced by stages (e.g., Module 34 sweep bonus).
     # Applied inside the scoring engine; the original sub-score is preserved.

@@ -119,6 +119,12 @@ class OpeningClosingStage:
     async def enrich(
         self, event: EnrichedEvent, ctx: PipelineContext,
     ) -> EnrichedEvent:
+        # Idempotency-on-preset (Phase 3.4.8: opening_closing_score
+        # is now a domain field, so the standard preset check applies).
+        if event.opening_closing_score is not None:
+            self.last_execution_metadata = {"branch": "preset_skip"}
+            return event
+
         m27 = ctx.profile.scoring.modules.m27
         ticker = event.print_.ticker
         event_ts = event.print_.timestamp
@@ -156,19 +162,21 @@ class OpeningClosingStage:
                 "m27: provider timeout for %s; using neutral score",
                 ticker,
             )
+            event.opening_closing_score = m27.timeout_score
             self.last_execution_metadata = {
                 "branch": "timeout",
                 "provider_returned": "no",
             }
             return event
 
-        _score, branch, oi_delta_pct, prior_oi, current_oi = (
+        score, branch, oi_delta_pct, prior_oi, current_oi = (
             _score_from_oi_snapshots(
                 prior=prior_snapshot,
                 current=current_snapshot,
                 settings=m27,
             )
         )
+        event.opening_closing_score = score
 
         # Stale OI warning (telemetry-only)
         stale_warning = "no"

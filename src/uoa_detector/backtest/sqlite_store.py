@@ -347,6 +347,8 @@ class SqliteBacktestStore:
             scale_in=size.scale_in,
             initial_r=size.initial_r,
             next_day_oi_confirmed=event.next_day_oi_confirmed,
+            opening_closing_score=event.opening_closing_score,
+            m28_confirmation_score=event.m28_confirmation_score,
             run_id=rid,
             event_id=pr.event_id,
             pipeline_latency_ms=pipeline_latency_ms,
@@ -499,6 +501,76 @@ class SqliteBacktestStore:
                     error_message=row.error_message,
                     occurred_at=row.occurred_at,
                 )
+
+    # Allowed score_name values for update_signal_score (Phase 3.4.8).
+    # Must match the in-memory store's whitelist exactly.
+    _UPDATABLE_SCORE_FIELDS: ClassVar[frozenset[str]] = frozenset({
+        "uoa_score",
+        "convexity_score",
+        "event_score",
+        "gamma_score",
+        "price_confirmation_score",
+        "sector_confirmation_score",
+        "time_of_day_weight",
+        "cluster_density_score",
+        "relative_premium_score",
+        "dte_multiplier_applied",
+        "opening_closing_score",
+        "m28_confirmation_score",
+        "combined_score_pre_penalty",
+        "combined_score_post_penalty",
+    })
+
+    def update_signal_score(
+        self,
+        run_id: str,
+        event_id: str,
+        score_name: str,
+        value: float | None,
+    ) -> bool:
+        """Update one float sub-score on a stored signal.
+
+        Phase 3.4.8 BREAKING CHANGE — see protocol docstring.
+
+        Implementation note: signal data lives BOTH in dedicated SQL
+        columns (combined_score_pre, etc.) AND in full_record_json.
+        The JSON blob is the source of truth for re-deserialization
+        via iter_records, so we update both:
+          1. Deserialize full_record_json → StoredSignal
+          2. Replace the field via model_copy
+          3. Re-serialize and write back
+          4. Also UPDATE the SQL column if score_name has a
+             dedicated column (currently only combined_score_pre /
+             combined_score_post)
+        """
+        self._check_open()
+        if score_name not in self._UPDATABLE_SCORE_FIELDS:
+            msg = (
+                f"update_signal_score: score_name '{score_name}' "
+                f"is not in the allowed set "
+                f"{sorted(self._UPDATABLE_SCORE_FIELDS)}"
+            )
+            raise ValueError(msg)
+        # Flush buffered rows so the row is queryable
+        self._flush_buffers()
+        with self._session_factory() as session:
+            stmt = select(SignalRow).where(
+                SignalRow.run_id == run_id,
+                SignalRow.event_id == event_id,
+            )
+            row = session.execute(stmt).scalar_one_or_none()
+            if row is None:
+                return False
+            stored = StoredSignal.model_validate_json(row.full_record_json)
+            updated = stored.model_copy(update={score_name: value})
+            row.full_record_json = updated.model_dump_json()
+            # Sync dedicated SQL columns when the field has one
+            if score_name == "combined_score_pre_penalty":
+                row.combined_score_pre = value
+            elif score_name == "combined_score_post_penalty":
+                row.combined_score_post = value
+            session.commit()
+            return True
 
     # ---- Helpers -------------------------------------------------------
 

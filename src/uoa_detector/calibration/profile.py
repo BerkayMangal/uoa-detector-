@@ -662,6 +662,100 @@ class M27Settings(_StrictModel):
     )
 
 
+class M28Settings(_StrictModel):
+    """Module 28 — Next-day OI confirmation (Phase 3.4.8).
+
+    POST-EVENT VALIDATOR: Not a PipelineStage. Runs as a nightly
+    batch via ``scripts/run_m28_overnight.py`` at
+    ``batch_run_time_et`` next session day.
+
+    For each StoredSignal from prior session with
+    ``opening_closing_score >= min_m27_score_to_validate``:
+      - Fetch T+1 open OI for the contract via
+        ``OpenInterestProvider.next_day(...)``
+      - actual_oi_delta = next_day_open_oi - prior_session_close_oi
+      - delta > 0  → m28_confirmation_score = confirmed_score (1.0)
+                     next_day_oi_confirmed = True
+      - delta == 0 → m28_confirmation_score = ambiguous_score (0.5)
+                     next_day_oi_confirmed = False
+      - delta < 0  → m28_confirmation_score = closing_score (0.0)
+                     next_day_oi_confirmed = False
+    Write back via ``store.update_signal_score(run_id, event_id,
+    'm28_confirmation_score', value)``.
+
+    Edge cases pinned in M28Validator:
+      - T+1 OI provider returns None → mark m28_pending,
+        retry next batch run
+      - Signal contract expired before T+1 (DTE was 0) → skip,
+        cannot confirm
+      - Prior day was non-trading day → skip (handled by caller
+        via trading-calendar check)
+    """
+
+    min_m27_score_to_validate: float = Field(
+        default=0.7, ge=0.0, le=1.0,
+        description=(
+            "Only signals with opening_closing_score >= this "
+            "value are validated by M28. Default 0.7 (filters "
+            "the 'moderate opening' branch and above). Operator "
+            "may lower to validate weaker signals at higher API "
+            "cost."
+        ),
+    )
+    confirmed_score: float = Field(
+        default=1.0, ge=0.0, le=1.0,
+        description="Score when next-day OI delta > 0 (M27 was right).",
+    )
+    ambiguous_score: float = Field(
+        default=0.5, ge=0.0, le=1.0,
+        description=(
+            "Score when next-day OI delta == 0 exactly. "
+            "Ambiguous: contract was held overnight without "
+            "obvious add or remove."
+        ),
+    )
+    closing_score: float = Field(
+        default=0.0, ge=0.0, le=1.0,
+        description="Score when next-day OI delta < 0 (M27 was wrong).",
+    )
+    provider_timeout_s: float = Field(
+        default=5.0, gt=0.0, le=120.0,
+        description=(
+            "Higher than M21-M27's 2.0-3.0 because batch jobs are "
+            "not latency-critical and tolerate retries on slow "
+            "endpoints."
+        ),
+    )
+    batch_run_time_et: str = Field(
+        default="09:31",
+        description=(
+            "Local Eastern Time at which the overnight batch "
+            "runs. Default 09:31 ET — one minute after market "
+            "open ensures CBOE has published prior-night settle "
+            "OI. Used by scripts/run_m28_overnight.py for "
+            "scheduler integration."
+        ),
+    )
+    provider_cache_ttl_s: int = Field(
+        default=86400, ge=0,
+        description=(
+            "T+1 OI is stable once published. Default 24h cache."
+        ),
+    )
+
+    @field_validator("batch_run_time_et")
+    @classmethod
+    def _validate_time_format(cls, v: str) -> str:
+        """Pin HH:MM 24-hour format."""
+        import re
+        if not re.fullmatch(r"^([01]\d|2[0-3]):[0-5]\d$", v):
+            msg = (
+                f"batch_run_time_et must be HH:MM (24-hour); got '{v}'"
+            )
+            raise ValueError(msg)
+        return v
+
+
 class ModulesSettings(_StrictModel):
     """Per-module tunables. One field per M21..M28.
 
@@ -677,6 +771,7 @@ class ModulesSettings(_StrictModel):
     m25: M25Settings = Field(default_factory=M25Settings)
     m26: M26Settings = Field(default_factory=M26Settings)
     m27: M27Settings = Field(default_factory=M27Settings)
+    m28: M28Settings = Field(default_factory=M28Settings)
 
 
 # ---------------------------------------------------------------------------
