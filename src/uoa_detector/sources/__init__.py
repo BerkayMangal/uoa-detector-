@@ -9,12 +9,6 @@ Phase 2 split:
 Adapters:
   - ``SyntheticRawFlowSource`` (production-tested): in-memory scripted source.
   - ``StallingRawFlowSource`` (test-only): for the watermark-recovery test.
-  - ``PolygonFlowSource`` (Phase 2 STUB): OPRA tape direct, raw trades + NBBO.
-    Not selected for production; ThetaData (Phase 3.3.2) is the canonical
-    OPRA source. Polygon stub retained pending an explicit retire decision.
-  - ``IBKRQuoteSource`` (Phase 2 STUB): point-in-time IV/OI snapshots.
-    Not selected for production; UW (Phase 3.3.3) provides IV history.
-    IBKR stub retained pending an explicit retire decision.
 
 For real production sources see:
   - ``ThetaDataLiveSource`` and ``ThetaDataHistoricalDownloader`` in
@@ -22,13 +16,20 @@ For real production sources see:
   - ``UnusualWhalesLiveSource`` and the six providers in
     ``uoa_detector.sources.unusual_whales`` (Phase 3.3.3).
 
-Phase 3.3.6 retired the Phase 2 ``UnusualWhalesConfig`` /
-``UnusualWhalesFlowSource`` stubs; the live source is the source of
-truth for the UW feed now.
-
-Phase 1's ``SyntheticFlowSource`` (canonical-print emitter) was retired in
-Phase 2.3.4. New scenarios should construct ``RawPrint`` directly; legacy
-scenarios that author ``OptionsPrint`` can convert via ``to_raw_print``.
+Retirement history:
+  - Phase 2 ``UnusualWhalesConfig`` / ``UnusualWhalesFlowSource`` stubs
+    retired in Phase 3.3.6; live source is the source of truth.
+  - Phase 1 ``SyntheticFlowSource`` (canonical-print emitter) retired
+    in Phase 2.3.4. New scenarios construct ``RawPrint`` directly;
+    legacy scenarios that author ``OptionsPrint`` convert via
+    ``to_raw_print``.
+  - Phase 2 ``PolygonFlowSource`` + ``IBKRQuoteSource`` stubs retired
+    in Phase 3.4.9.1. ThetaData (Phase 3.3.2) is the canonical OPRA
+    source; UW (Phase 3.3.3) is the canonical derived-feed source.
+    Neither stub had a real consumer after Phase 3.3 wired the live
+    sources; keeping unimplemented adapters in the tree was
+    misleading. ``RawFlowSource`` Protocol preserved for future
+    adapters.
 """
 
 from uoa_detector.sources.base import (
@@ -37,9 +38,7 @@ from uoa_detector.sources.base import (
     QuoteSnapshotSource,
     RawFlowSource,
 )
-from uoa_detector.sources.ibkr_quotes import IBKRConfig, IBKRQuoteSource
 from uoa_detector.sources.parquet_replay import ParquetReplaySource
-from uoa_detector.sources.polygon import PolygonConfig, PolygonFlowSource
 from uoa_detector.sources.synthetic import (
     StallingRawFlowSource,
     SyntheticRawFlowSource,
@@ -48,11 +47,7 @@ from uoa_detector.sources.synthetic import (
 
 __all__ = [
     "FlowDataSource",
-    "IBKRConfig",
-    "IBKRQuoteSource",
     "ParquetReplaySource",
-    "PolygonConfig",
-    "PolygonFlowSource",
     "QuoteSnapshot",
     "QuoteSnapshotSource",
     "RawFlowSource",
