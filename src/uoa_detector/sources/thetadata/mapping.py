@@ -5,8 +5,22 @@ and the live source both feed rows through these helpers to
 canonicalise into the ``RawPrint`` schema the rest of the pipeline
 consumes.
 
-ThetaData trade endpoint format (per
-https://http-docs.thetadata.us/operations/get-hist-option-trade.html):
+Phase 3.3.7.2 (v2 → v3): ThetaData REST API moved from v2 to v3.
+The wire formats differ:
+  - v2 REST + v3 streaming WS:  positional JSON arrays, ms_of_day
+    + date_yyyymmdd integer pair, 1/10-cent integer strikes, 'C'/'P'
+    rights.
+  - v3 REST: array of named-dict objects, ISO timestamp strings,
+    dollar float strikes, 'call'/'put' rights.
+The streaming WS still uses the v2-style positional encoding per
+docs.thetadata.us/Streaming/Getting-Started.html. mapping.py
+exposes parsers + formatters for BOTH wire formats so historical
+(v3 REST) and live (v3 streaming WS) callers each have the right
+boundary.
+
+ThetaData v2 trade endpoint format (per
+https://http-docs.thetadata.us/operations/get-hist-option-trade.html);
+identical positional shape as v3 streaming WS messages:
 
   header.format: [ms_of_day, sequence, ext_condition1, ext_condition2,
                   ext_condition3, ext_condition4, condition, size,
@@ -16,7 +30,16 @@ https://http-docs.thetadata.us/operations/get-hist-option-trade.html):
   Example:       [43860664, 602567584, 255, 255, 255, 255, 125,
                   1, 43, 5.84, 0, 1, 0, 0, 20240116]
 
-Field semantics:
+ThetaData v3 trade endpoint shape (per
+https://docs.thetadata.us/operations/option_history_trade.html):
+
+  Array of objects, each:
+    {"symbol": "AAPL", "expiration": "2024-11-08", "strike": 220.00,
+     "right": "call", "timestamp": "2024-11-04T09:30:00.000",
+     "sequence": 12345, "ext_condition1": 0, ..., "condition": 0,
+     "size": 1, "exchange": 7, "price": 12.50}
+
+Field semantics (shared across v2/v3 representations):
   - ms_of_day:  milliseconds since midnight ET (NOT UTC)
   - condition:  OPRA condition code 0-255; 0 = regular sale,
                 certain values are cancels / out-of-sequence
@@ -25,6 +48,8 @@ Field semantics:
   - price:      decimal price in dollars
   - size:       contracts traded
   - date:       YYYYMMDD integer
+  - timestamp (v3 REST): "YYYY-MM-DDTHH:mm:ss.SSS" ET-naive ISO
+                string (parsed via ``iso_timestamp_to_utc_datetime``)
 
 Quote endpoint (separate call) provides bid/ask:
   [ms_of_day, bid_size, bid_exchange, bid, bid_condition,
@@ -89,6 +114,7 @@ from zoneinfo import ZoneInfo
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from uoa_detector.domain.events import OptionType
 from uoa_detector.domain.raw_print import RawPrint
 
 _ET = ZoneInfo("America/New_York")
@@ -172,6 +198,9 @@ def et_ms_to_utc_datetime(*, date_yyyymmdd: int, ms_of_day: int) -> datetime:
     ThetaData publishes timestamps in ET; the rest of the codebase
     works in UTC. Conversion happens exactly once, here at the
     boundary. ZoneInfo handles DST automatically.
+
+    Used for v2 REST + v3 streaming WS messages (both still use
+    the (date, ms_of_day) integer pair encoding).
     """
     yyyy = date_yyyymmdd // 10000
     mm = (date_yyyymmdd // 100) % 100
@@ -184,6 +213,87 @@ def et_ms_to_utc_datetime(*, date_yyyymmdd: int, ms_of_day: int) -> datetime:
         tzinfo=_ET,
     )
     return et_dt.astimezone(UTC)
+
+
+def iso_timestamp_to_utc_datetime(s: str) -> datetime:
+    """Convert v3 REST ISO timestamp string → tz-aware UTC datetime.
+
+    Phase 3.3.7.2 (J1 from migration spec): v3 REST responses
+    carry timestamps as ISO strings of the form
+    ``YYYY-MM-DDTHH:mm:ss.SSS`` (no timezone marker).
+
+    ThetaData reports ET; we attach ET as the implicit timezone
+    here at the boundary, then convert to UTC. If a future v3
+    response includes an explicit timezone (e.g., trailing 'Z' or
+    '+00:00'), we honour it directly without re-interpreting.
+    """
+    dt = datetime.fromisoformat(s)
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=_ET)
+    return dt.astimezone(UTC)
+
+
+def utc_datetime_to_et_date_ms(dt: datetime) -> tuple[int, int]:
+    """Convert a UTC datetime → (date_yyyymmdd, ms_of_day) ET pair.
+
+    Phase 3.3.7.2 helper: bridges ``iso_timestamp_to_utc_datetime``
+    output back to the (date, ms_of_day) representation that
+    ``TradeRow`` and ``QuoteRow`` model. Used by the v3 REST row
+    parsers so the downstream ``map_thetadata_*`` functions don't
+    need a separate code path for v3 vs v2 timestamps.
+    """
+    if dt.tzinfo is None:
+        msg = "utc_datetime_to_et_date_ms requires a tz-aware datetime"
+        raise ValueError(msg)
+    et_dt = dt.astimezone(_ET)
+    date_yyyymmdd = et_dt.year * 10000 + et_dt.month * 100 + et_dt.day
+    ms_of_day = (
+        et_dt.hour * 3_600_000
+        + et_dt.minute * 60_000
+        + et_dt.second * 1_000
+        + et_dt.microsecond // 1000
+    )
+    return date_yyyymmdd, ms_of_day
+
+
+def format_v3_strike_param(dollars: Decimal) -> str:
+    """Format a Decimal strike as the v3 REST URL ``strike`` query value.
+
+    Phase 3.3.7.2 (J4 from migration spec): v3 REST takes
+    ``strike`` as a string in dollars. The doc's canonical
+    example uses 2 decimals (``"100.00"``). v3 also accepts 3
+    decimals (``"220.000"``); we standardise on 2 to match the
+    documentation's canonical representation.
+
+    Asserts the strike fits 2-decimal precision exactly. v3 doesn't
+    document support for fractional pennies; rejecting them here
+    is consistent with v2's whole-1/10-cent invariant.
+    """
+    quantized = dollars.quantize(Decimal("0.01"))
+    if quantized != dollars:
+        msg = (
+            f"strike {dollars} cannot be represented in 2 decimals; "
+            f"v3 REST strike parameter requires whole-cent precision"
+        )
+        raise ValueError(msg)
+    return f"{quantized:.2f}"
+
+
+def format_v3_right(opt_type: OptionType) -> Literal["call", "put"]:
+    """Format domain ``OptionType`` as the v3 REST URL ``right`` value.
+
+    Phase 3.3.7.2: domain ``OptionType`` is already
+    ``Literal["call", "put"]`` (matches v3 wire). Function is
+    explicit identity to centralise wire-format conversions in
+    mapping.py — call sites in historical.py make the v3 contract
+    visible at the boundary.
+    """
+    if opt_type == "call":
+        return "call"
+    if opt_type == "put":
+        return "put"
+    msg = f"format_v3_right: unsupported option_type {opt_type!r}"
+    raise ValueError(msg)
 
 
 def et_ms_in_regular_hours(ms_of_day: int) -> bool:
@@ -235,7 +345,7 @@ class TradeRow(BaseModel):
     dict here so callers and tests can pass kwargs explicitly.
     """
 
-    model_config = ConfigDict(frozen=True, extra="forbid", populate_by_name=True)
+    model_config = ConfigDict(frozen=True, extra="ignore", populate_by_name=True)
 
     ms_of_day: int = Field(ge=0, le=24 * 60 * 60 * 1000)
     sequence: int = Field(ge=0)
@@ -254,7 +364,7 @@ class QuoteRow(BaseModel):
        ask_size, ask_exchange, ask, ask_condition, date]
     """
 
-    model_config = ConfigDict(frozen=True, extra="forbid")
+    model_config = ConfigDict(frozen=True, extra="ignore")
 
     ms_of_day: int = Field(ge=0, le=24 * 60 * 60 * 1000)
     bid: Decimal = Field(ge=Decimal(0))
@@ -339,6 +449,89 @@ def quote_row_from_array(
         k: v for k, v in raw.items() if k in _QUOTE_KEEP
     }
     return QuoteRow.model_validate(kept)
+
+
+# ---------------------------------------------------------------------------
+# v3 REST dict → row constructors (Phase 3.3.7.2)
+# ---------------------------------------------------------------------------
+#
+# v3 REST returns rows as named-dict objects (not positional arrays).
+# Timestamps are ISO strings in ET. We re-encode each row into the
+# same TradeRow / QuoteRow shape the streaming-WS path produces, so
+# downstream callers (``map_thetadata_*``) don't branch on wire
+# version.
+
+
+def trade_row_from_v3_dict(obj: dict[str, object]) -> TradeRow:
+    """Build a ``TradeRow`` from one v3 REST trade response object.
+
+    v3 trade response shape (per
+    docs.thetadata.us/operations/option_history_trade.html):
+
+        {"symbol": str, "expiration": str, "strike": float,
+         "right": "call"|"put", "timestamp": str (ISO),
+         "sequence": int, "ext_condition1..4": int, "condition": int,
+         "size": int, "exchange": int, "price": float}
+
+    Symbol / expiration / strike / right are redundant with the
+    request params (we know what we asked for) and are dropped via
+    extra="ignore". Timestamp ISO string → (date_yyyymmdd, ms_of_day)
+    for storage in TradeRow, matching the v2 streaming WS shape.
+    """
+    timestamp_raw = obj.get("timestamp")
+    if not isinstance(timestamp_raw, str):
+        msg = (
+            "trade_row_from_v3_dict: 'timestamp' missing or not a "
+            f"string (got {type(timestamp_raw).__name__})"
+        )
+        raise ValueError(msg)
+    utc_dt = iso_timestamp_to_utc_datetime(timestamp_raw)
+    date_yyyymmdd, ms_of_day = utc_datetime_to_et_date_ms(utc_dt)
+
+    # Build the kwargs that TradeRow expects.
+    fields = {
+        "ms_of_day": ms_of_day,
+        "date_yyyymmdd": date_yyyymmdd,
+        "sequence": obj.get("sequence"),
+        "condition": obj.get("condition"),
+        "size": obj.get("size"),
+        "exchange": obj.get("exchange"),
+        "price": obj.get("price"),
+    }
+    return TradeRow.model_validate(fields)
+
+
+def quote_row_from_v3_dict(obj: dict[str, object]) -> QuoteRow:
+    """Build a ``QuoteRow`` from one v3 REST quote response object.
+
+    Working assumption (J3 from migration spec; verified by
+    smoke test in 3.3.7.5): v3 quote response carries the same
+    fields as v2 (bid_size, bid_exchange, bid, bid_condition,
+    ask_size, ask_exchange, ask, ask_condition) plus a
+    timestamp ISO string. Strike / right / symbol / expiration
+    are redundant and dropped via extra="ignore" (J2).
+    """
+    fields: dict[str, object] = {}
+    for k in ("bid", "ask", "bid_size", "ask_size"):
+        if k in obj:
+            fields[k] = obj[k]
+    # ms_of_day required by QuoteRow validation; derive from
+    # timestamp if present (v3 REST), else trust caller-supplied
+    # value (rare back-compat path).
+    if "timestamp" in obj:
+        timestamp_raw = obj["timestamp"]
+        if not isinstance(timestamp_raw, str):
+            msg = (
+                "quote_row_from_v3_dict: 'timestamp' must be string "
+                f"(got {type(timestamp_raw).__name__})"
+            )
+            raise ValueError(msg)
+        utc_dt = iso_timestamp_to_utc_datetime(timestamp_raw)
+        _, ms_of_day = utc_datetime_to_et_date_ms(utc_dt)
+        fields["ms_of_day"] = ms_of_day
+    elif "ms_of_day" in obj:
+        fields["ms_of_day"] = obj["ms_of_day"]
+    return QuoteRow.model_validate(fields)
 
 
 # ---------------------------------------------------------------------------

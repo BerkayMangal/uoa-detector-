@@ -26,14 +26,20 @@ from uoa_detector.sources.thetadata.mapping import (
     TradeRow,
     et_ms_in_regular_hours,
     et_ms_to_utc_datetime,
+    format_v3_right,
+    format_v3_strike_param,
+    iso_timestamp_to_utc_datetime,
     map_thetadata_quote_to_bid_ask,
     map_thetadata_trade_to_rawprint,
     quote_row_from_array,
+    quote_row_from_v3_dict,
     should_drop_trade,
     thetadata_dollars_to_strike,
     thetadata_exchange_name,
     thetadata_strike_to_dollars,
     trade_row_from_array,
+    trade_row_from_v3_dict,
+    utc_datetime_to_et_date_ms,
 )
 
 # ---------------------------------------------------------------------------
@@ -253,14 +259,41 @@ def test_traderow_validates_ms_of_day_range() -> None:
         )
 
 
-def test_traderow_extra_fields_rejected() -> None:
-    """extra='forbid' catches typos / extra positional fields."""
-    with pytest.raises(Exception, match="rogue_field"):
-        TradeRow.model_validate({
-            "ms_of_day": 43860664, "sequence": 1, "condition": 0,
-            "size": 1, "exchange": 43, "price": Decimal("5.84"),
-            "date": 20240116, "rogue_field": "X",
-        })
+def test_traderow_extra_fields_ignored() -> None:
+    """Phase 3.3.7.2 (J2): extra='ignore' for v3 forward-compat.
+
+    v3 trade response may include fields TradeRow doesn't model
+    (symbol, expiration, strike, right, ext_condition1-4) — these
+    are dropped silently rather than raising. extra='forbid' was
+    the v2 invariant; it changed in 3.3.7.2 to support v3 wire.
+    """
+    row = TradeRow.model_validate({
+        "ms_of_day": 43860664, "sequence": 1, "condition": 0,
+        "size": 1, "exchange": 43, "price": Decimal("5.84"),
+        "date": 20240116,
+        "symbol": "AAPL",          # v3-only, ignored
+        "expiration": "2024-11-08",  # v3-only, ignored
+        "strike": 220.00,           # v3-only, ignored
+        "right": "call",            # v3-only, ignored
+        "rogue_field": "X",         # forward-compat
+    })
+    assert row.ms_of_day == 43860664
+    assert row.sequence == 1
+
+
+def test_quoterow_extra_fields_ignored() -> None:
+    """Phase 3.3.7.2 (J2): same forward-compat as TradeRow."""
+    row = QuoteRow.model_validate({
+        "ms_of_day": 43860664,
+        "bid": Decimal("1.40"), "ask": Decimal("1.55"),
+        "bid_size": 10, "ask_size": 12,
+        "bid_exchange": 7,           # v2 wire, dropped from QuoteRow
+        "ask_exchange": 7,           # same
+        "symbol": "AAPL",             # v3-only, ignored
+        "rogue_field": "X",           # forward-compat
+    })
+    assert row.bid == Decimal("1.40")
+    assert row.ask == Decimal("1.55")
 
 
 # ---------------------------------------------------------------------------
@@ -520,3 +553,207 @@ def test_one_second_after_close_drops() -> None:
         ask=Decimal("3.22"),
     )
     assert rp is None
+
+
+# ---------------------------------------------------------------------------
+# Phase 3.3.7.2 — v3 REST helpers
+# ---------------------------------------------------------------------------
+
+
+def test_iso_timestamp_to_utc_datetime_summer() -> None:
+    """ET ISO 09:30 in July → 13:30 UTC (DST)."""
+    dt = iso_timestamp_to_utc_datetime("2024-07-15T09:30:00.000")
+    assert dt.year == 2024
+    assert dt.month == 7
+    assert dt.day == 15
+    assert dt.hour == 13  # 09:30 ET DST = 13:30 UTC
+    assert dt.minute == 30
+    assert dt.tzinfo is UTC
+
+
+def test_iso_timestamp_to_utc_datetime_winter() -> None:
+    """ET ISO 09:30 in January → 14:30 UTC (EST)."""
+    dt = iso_timestamp_to_utc_datetime("2024-01-15T09:30:00.000")
+    assert dt.hour == 14  # 09:30 EST = 14:30 UTC
+    assert dt.minute == 30
+    assert dt.tzinfo is UTC
+
+
+def test_iso_timestamp_to_utc_datetime_with_milliseconds() -> None:
+    """Sub-second precision survives the conversion."""
+    dt = iso_timestamp_to_utc_datetime("2024-07-15T09:30:00.123")
+    assert dt.microsecond == 123_000
+
+
+def test_iso_timestamp_to_utc_datetime_with_tz_marker_honoured() -> None:
+    """If v3 ever includes 'Z' or '+00:00' suffix, honour it directly."""
+    dt = iso_timestamp_to_utc_datetime("2024-07-15T13:30:00+00:00")
+    assert dt.hour == 13  # already UTC, no ET re-interpretation
+    assert dt.tzinfo is UTC
+
+
+def test_utc_datetime_to_et_date_ms_round_trip() -> None:
+    """Full round-trip: ET ISO → UTC → (date, ms_of_day) → UTC again."""
+    iso = "2024-01-15T09:30:00.000"
+    utc1 = iso_timestamp_to_utc_datetime(iso)
+    date_yyyymmdd, ms_of_day = utc_datetime_to_et_date_ms(utc1)
+    utc2 = et_ms_to_utc_datetime(date_yyyymmdd=date_yyyymmdd, ms_of_day=ms_of_day)
+    assert utc1 == utc2
+    assert date_yyyymmdd == 20240115
+    assert ms_of_day == (9 * 3600 + 30 * 60) * 1000
+
+
+def test_utc_datetime_to_et_date_ms_rejects_naive_dt() -> None:
+    naive = datetime(2024, 1, 15, 14, 30)
+    with pytest.raises(ValueError, match="tz-aware"):
+        utc_datetime_to_et_date_ms(naive)
+
+
+def test_format_v3_strike_param_170_dollars() -> None:
+    """$170.00 → "170.00"."""
+    assert format_v3_strike_param(Decimal("170.00")) == "170.00"
+    assert format_v3_strike_param(Decimal("170")) == "170.00"
+
+
+def test_format_v3_strike_param_170_50() -> None:
+    """$170.50 → "170.50"."""
+    assert format_v3_strike_param(Decimal("170.50")) == "170.50"
+
+
+def test_format_v3_strike_param_rejects_fractional_cent() -> None:
+    """Half-pennies are not v3-supported; reject like v2 (J4)."""
+    with pytest.raises(ValueError, match="2 decimals"):
+        format_v3_strike_param(Decimal("170.005"))
+
+
+def test_format_v3_strike_param_zero() -> None:
+    """$0.00 strike formats correctly (degenerate but valid)."""
+    assert format_v3_strike_param(Decimal("0")) == "0.00"
+
+
+def test_format_v3_right_call() -> None:
+    assert format_v3_right("call") == "call"
+
+
+def test_format_v3_right_put() -> None:
+    assert format_v3_right("put") == "put"
+
+
+def test_format_v3_right_rejects_unknown() -> None:
+    with pytest.raises(ValueError, match="unsupported"):
+        format_v3_right("CALL")  # type: ignore[arg-type]
+
+
+def test_trade_row_from_v3_dict_happy_path() -> None:
+    """v3 trade response object → TradeRow with same shape as v2 path."""
+    obj = {
+        "symbol": "AAPL",
+        "expiration": "2024-11-08",
+        "strike": 220.00,
+        "right": "call",
+        "timestamp": "2024-11-04T09:30:00.000",
+        "sequence": 12345,
+        "ext_condition1": 0,
+        "ext_condition2": 0,
+        "ext_condition3": 0,
+        "ext_condition4": 0,
+        "condition": 0,
+        "size": 1,
+        "exchange": 7,
+        "price": 12.50,
+    }
+    row = trade_row_from_v3_dict(obj)
+    assert row.sequence == 12345
+    assert row.condition == 0
+    assert row.size == 1
+    assert row.exchange == 7
+    assert row.price == Decimal("12.5")
+    assert row.date_yyyymmdd == 20241104
+    # 09:30 ET DST = ms_of_day 09:30
+    assert row.ms_of_day == (9 * 3600 + 30 * 60) * 1000
+
+
+def test_trade_row_from_v3_dict_missing_timestamp_raises() -> None:
+    """timestamp is required; missing → ValueError."""
+    obj = {
+        "sequence": 12345, "condition": 0, "size": 1,
+        "exchange": 7, "price": 12.50,
+    }
+    with pytest.raises(ValueError, match="timestamp"):
+        trade_row_from_v3_dict(obj)
+
+
+def test_trade_row_from_v3_dict_drops_redundant_fields() -> None:
+    """symbol/expiration/strike/right are dropped silently (J2)."""
+    obj = {
+        "symbol": "AAPL", "expiration": "2024-11-08",
+        "strike": 220.00, "right": "call",
+        "timestamp": "2024-11-04T09:30:00.000",
+        "sequence": 1, "condition": 0, "size": 1,
+        "exchange": 7, "price": 1.0,
+    }
+    row = trade_row_from_v3_dict(obj)
+    assert "symbol" not in row.model_dump()
+    assert row.sequence == 1
+
+
+def test_quote_row_from_v3_dict_happy_path() -> None:
+    obj = {
+        "timestamp": "2024-11-04T09:30:00.000",
+        "bid": 1.40, "ask": 1.55,
+        "bid_size": 10, "ask_size": 12,
+        "bid_exchange": 7, "ask_exchange": 7,
+    }
+    row = quote_row_from_v3_dict(obj)
+    assert row.bid == Decimal("1.4")
+    assert row.ask == Decimal("1.55")
+    assert row.bid_size == 10
+    assert row.ask_size == 12
+    assert row.ms_of_day == (9 * 3600 + 30 * 60) * 1000
+
+
+def test_quote_row_from_v3_dict_drops_redundant_fields() -> None:
+    """v3 quote response may include symbol/expiration/strike/right/timestamp."""
+    obj = {
+        "symbol": "AAPL", "expiration": "2024-11-08",
+        "strike": 220.00, "right": "call",
+        "timestamp": "2024-11-04T09:30:00.000",
+        "bid": 1.40, "ask": 1.55,
+        "bid_exchange": 7, "ask_exchange": 7,
+    }
+    row = quote_row_from_v3_dict(obj)
+    assert row.bid == Decimal("1.4")
+
+
+def test_quote_row_from_v3_dict_invalid_timestamp_type() -> None:
+    obj = {"timestamp": 123, "bid": 1.0, "ask": 1.5}
+    with pytest.raises(ValueError, match="timestamp"):
+        quote_row_from_v3_dict(obj)
+
+
+def test_v3_trade_row_feeds_existing_map_function() -> None:
+    """End-to-end: v3 dict → TradeRow → RawPrint via the unchanged
+    ``map_thetadata_trade_to_rawprint``. Pinning that the v2/v3
+    boundary unification works.
+    """
+    obj = {
+        "symbol": "AAPL", "expiration": "2024-11-08",
+        "strike": 220.00, "right": "call",
+        "timestamp": "2024-01-16T13:30:00.000",  # 09:30 ET winter
+        "sequence": 1, "condition": 0, "size": 5,
+        "exchange": 43, "price": 1.85,
+    }
+    row = trade_row_from_v3_dict(obj)
+    rp = map_thetadata_trade_to_rawprint(
+        trade_row=row, ticker="AAPL", expiry=date(2024, 2, 16),
+        strike_dollars=Decimal("220.00"), right="C",
+        spot_price=Decimal("220.00"), bid=Decimal("1.80"),
+        ask=Decimal("1.90"),
+    )
+    assert rp is not None
+    assert rp.ticker == "AAPL"
+    assert rp.option_type == "call"
+    assert rp.strike == Decimal("220.00")
+    assert rp.option_price == Decimal("1.85")
+    assert rp.dte == 31  # Jan 16 → Feb 16
+
