@@ -91,7 +91,7 @@ if TYPE_CHECKING:
 # Default Theta Terminal location — operator can override via the
 # ``base_url`` constructor kwarg if running the Terminal on a
 # non-default port or a different host.
-DEFAULT_BASE_URL = "http://127.0.0.1:25510"
+DEFAULT_BASE_URL = "http://127.0.0.1:25503"  # Phase 3.3.7.3: v3 default
 
 
 class ThetaDataError(RuntimeError):
@@ -213,8 +213,19 @@ class ThetaDataClient:
         *,
         params: dict[str, Any] | None = None,
         method: str = "GET",
-    ) -> dict[str, Any]:
+    ) -> Any:
         """Make an authenticated HTTP request and return parsed JSON.
+
+        Phase 3.3.7.3: relaxed return type from ``dict`` to ``Any``.
+        v3 endpoints return JSON arrays-of-objects (trade, quote,
+        ohlc, list/symbols), not the v2 ``{header, response}``
+        dict shape. Caller checks response shape per-endpoint.
+
+        Phase 3.3.7.3: also auto-injects ``format=json`` into params
+        if absent. v3 default response format is CSV; without this
+        injection callers would receive un-parseable bytes. The
+        injection is silent and idempotent (caller-supplied
+        ``format`` value is preserved).
 
         Applies rate limit, retry policy, and circuit breaker. Raises
         ``ThetaDataAuthError`` on 4xx, ``ThetaDataTransientError`` on
@@ -228,13 +239,17 @@ class ThetaDataClient:
             )
             raise CircuitBreakerOpenError(msg)
 
+        # v3 always-on format=json (Phase 3.3.7.3 J5).
+        effective_params: dict[str, Any] = dict(params or {})
+        effective_params.setdefault("format", "json")
+
         last_error: Exception | None = None
         for attempt in range(self._retry.max_attempts):
             await self._bucket.acquire()
             try:
                 response = await self._http.request(
                     method, path,
-                    params=params,
+                    params=effective_params,
                     headers=self._auth_headers(),
                 )
                 if response.status_code >= 500:
@@ -251,12 +266,6 @@ class ThetaDataClient:
                     raise ThetaDataAuthError(msg)
                 self._breaker.record_success()
                 parsed: Any = response.json()
-                if not isinstance(parsed, dict):
-                    msg = (
-                        f"ThetaData {method} {path} returned non-object "
-                        f"JSON: {type(parsed).__name__}"
-                    )
-                    raise ThetaDataTransientError(msg)
                 return parsed
             except (httpx.RequestError, ThetaDataTransientError) as exc:
                 last_error = exc

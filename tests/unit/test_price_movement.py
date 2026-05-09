@@ -116,18 +116,38 @@ def test_noop_satisfies_protocol() -> None:
 
 def _bar(
     ms_of_day: int, open_px: float, close_px: float, date_int: int = 20240115,
-) -> list[Any]:
-    """Build a positional ThetaData OHLC bar tuple."""
-    return [
-        ms_of_day,
-        str(open_px),  # open
-        str(open_px),  # high (unused)
-        str(open_px),  # low (unused)
-        str(close_px),  # close
-        100,  # volume (unused)
-        10,   # count (unused)
-        date_int,
-    ]
+) -> dict[str, Any]:
+    """Build a v3-style ThetaData OHLC bar dict.
+
+    Phase 3.3.7.3: v3 returns named-dict bars with ISO timestamps,
+    not positional arrays with ms_of_day + date_yyyymmdd ints.
+
+    To keep test windows simple (UTC-only assertions), the ISO
+    timestamp is emitted with explicit '+00:00' marker so
+    ``iso_timestamp_to_utc_datetime`` honours it directly without
+    ET re-interpretation. Tests of the ET-naive path live separately
+    in ``test_thetadata_mapping.py``.
+    """
+    yyyy = date_int // 10000
+    mm = (date_int // 100) % 100
+    dd = date_int % 100
+    seconds, ms_remainder = divmod(ms_of_day, 1000)
+    h, rem = divmod(seconds, 3600)
+    m, s = divmod(rem, 60)
+    iso = (
+        f"{yyyy:04d}-{mm:02d}-{dd:02d}T{h:02d}:{m:02d}:{s:02d}"
+        f".{ms_remainder:03d}+00:00"
+    )
+    return {
+        "timestamp": iso,
+        "open": str(open_px),
+        "high": str(open_px),
+        "low": str(open_px),
+        "close": str(close_px),
+        "volume": 100,
+        "count": 10,
+        "vwap": str(open_px),
+    }
 
 
 def _at(hh: int, mm: int) -> datetime:
@@ -263,10 +283,12 @@ def test_build_movement_records_lookback_minutes_actual() -> None:
 
 def test_build_movement_skips_malformed_bars() -> None:
     """A bar that fails to parse is dropped; valid bars continue."""
-    bars: list[list[Any]] = [
-        ["not", "a", "bar"],  # too short
-        _bar(15 * 3_600_000, 100.0, 101.0),
-        [99 * 3_600_000, "garbage", "x", "y", "z", 1, 1, 20240115],
+    bars: list[dict[str, Any]] = [
+        {"not_a_real": "bar"},                                # missing all required keys
+        _bar(15 * 3_600_000, 100.0, 101.0),                   # valid
+        {"timestamp": "garbage", "open": "x", "close": "y"},  # bad timestamp
+        {"timestamp": "2024-01-15T15:00:00.000+00:00",
+         "open": "garbage", "close": "x"},                    # bad numeric
     ]
     out = _build_movement(
         bars=bars,
@@ -284,9 +306,18 @@ def test_build_movement_skips_malformed_bars() -> None:
 # ---------------------------------------------------------------------------
 
 
-def _provider_with_rows(rows: list[list[Any]]) -> ThetaDataPriceActionProvider:
+def _provider_with_rows(rows: list[dict[str, Any]]) -> ThetaDataPriceActionProvider:
+    """Build a ThetaDataPriceActionProvider with mocked v3 response.
+
+    Phase 3.3.7.3: v3 returns rows as a top-level JSON array, not
+    wrapped in a ``{"response": [...]}`` envelope. Tests pass the
+    bare list to exercise the v3 code path. The defensive v2-envelope
+    fallback in ``_fetch`` is exercised separately via the
+    ``test_thetadata_historical.py`` legacy compat fixture (the
+    same fallback lives in both _decode_*_response).
+    """
     fake = MagicMock()
-    fake.request_json = AsyncMock(return_value={"response": rows})
+    fake.request_json = AsyncMock(return_value=rows)
     settings = MagicMock(intraday_cache_ttl_seconds=60)
     return ThetaDataPriceActionProvider(client=fake, settings=settings)
 

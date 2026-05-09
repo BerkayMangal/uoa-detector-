@@ -78,10 +78,12 @@ from uoa_detector.backtest.parquet_schema import write_parquet
 from uoa_detector.sources.thetadata.mapping import (
     QuoteRow,
     TradeRow,
+    format_v3_strike_param,
     map_thetadata_trade_to_rawprint,
     quote_row_from_array,
-    thetadata_dollars_to_strike,
+    quote_row_from_v3_dict,
     trade_row_from_array,
+    trade_row_from_v3_dict,
 )
 
 if TYPE_CHECKING:
@@ -94,6 +96,23 @@ if TYPE_CHECKING:
 
 
 _logger = logging.getLogger(__name__)
+
+
+def _v2_right_to_v3(right: OptionRight) -> str:
+    """Convert v2 ContractSpec.right ('C'/'P') to v3 URL value ('call'/'put').
+
+    Phase 3.3.7.3: ContractSpec stays on the v2-internal 'C'/'P'
+    convention (used by both REST URL building and WS subscription
+    payloads). v3 REST URL needs 'call'/'put'. This is the boundary
+    converter — kept inline in historical.py because it's only one
+    use-site; promoting to mapping.py would invert the dependency.
+    """
+    if right == "C":
+        return "call"
+    if right == "P":
+        return "put"
+    msg = f"_v2_right_to_v3: unexpected right value {right!r} (expected 'C'/'P')"
+    raise ValueError(msg)
 
 
 # ---------------------------------------------------------------------------
@@ -277,40 +296,42 @@ class ThetaDataHistoricalDownloader:
     ) -> list[TradeRow]:
         """Default fetcher: real ThetaData call.
 
+        Phase 3.3.7.3: v3 endpoint + params.
+            Path: /v3/option/history/trade
+            Params: symbol, expiration, strike (dollars str),
+                    right ('call'/'put'), start_date/end_date (J7).
         Tests bypass this method by subclassing and overriding;
-        production uses it directly. The endpoint and the response
-        shape are pinned in the acceptance doc + ThetaData
-        documentation.
+        production uses it directly.
         """
         params = {
-            "root": contract.ticker.upper(),
-            "exp": _yyyymmdd(contract.expiry),
-            "strike": str(thetadata_dollars_to_strike(contract.strike_dollars)),
-            "right": contract.right,
+            "symbol": contract.ticker.upper(),
+            "expiration": _yyyymmdd(contract.expiry),
+            "strike": format_v3_strike_param(contract.strike_dollars),
+            "right": _v2_right_to_v3(contract.right),
             "start_date": _yyyymmdd(day),
             "end_date": _yyyymmdd(day),
         }
         async with self._sem:
             response = await self._client.request_json(
-                "/v2/hist/option/trade", params=params,
+                "/v3/option/history/trade", params=params,
             )
         return _decode_trade_response(response)
 
     async def _fetch_quotes_for_day(
         self, contract: ContractSpec, day: date,
     ) -> list[QuoteRow]:
-        """Default fetcher: real ThetaData quote call."""
+        """Default fetcher: real ThetaData quote call (v3)."""
         params = {
-            "root": contract.ticker.upper(),
-            "exp": _yyyymmdd(contract.expiry),
-            "strike": str(thetadata_dollars_to_strike(contract.strike_dollars)),
-            "right": contract.right,
+            "symbol": contract.ticker.upper(),
+            "expiration": _yyyymmdd(contract.expiry),
+            "strike": format_v3_strike_param(contract.strike_dollars),
+            "right": _v2_right_to_v3(contract.right),
             "start_date": _yyyymmdd(day),
             "end_date": _yyyymmdd(day),
         }
         async with self._sem:
             response = await self._client.request_json(
-                "/v2/hist/option/quote", params=params,
+                "/v3/option/history/quote", params=params,
             )
         return _decode_quote_response(response)
 
@@ -471,36 +492,57 @@ async def _resolve_snapshot(
     return result
 
 
-def _decode_trade_response(response: dict[str, object]) -> list[TradeRow]:
-    """Parse a ThetaData trade endpoint response into TradeRow list.
+def _decode_trade_response(response: object) -> list[TradeRow]:
+    """Parse a v3 trade endpoint response into a TradeRow list.
 
-    Response shape:
-      {
-        "header": {"format": ["ms_of_day", ..., "date"]},
-        "response": [[...], [...], ...]
-      }
+    Phase 3.3.7.3: v3 returns a JSON array of named-dict objects
+    (no ``{header, response}`` wrapper). Each object goes through
+    ``trade_row_from_v3_dict``.
+
+    Defensive: if the v3 endpoint returns nothing for the requested
+    contract/day (no trades), we accept ``[]``. If it returns the
+    legacy v2 shape ``{header, response: [...]}``, we still parse
+    via the v2 ``trade_row_from_array`` path — single-codebase
+    compat for adapters that haven't migrated yet.
     """
-    rows = response.get("response", [])
-    if not isinstance(rows, list):
-        msg = f"ThetaData trade response.response is not a list: {type(rows).__name__}"
-        raise TypeError(msg)
+    rows = _normalize_response_to_rows(response)
     out: list[TradeRow] = []
     for row in rows:
-        if not isinstance(row, list):
-            continue
-        out.append(trade_row_from_array(row))
+        if isinstance(row, dict):
+            out.append(trade_row_from_v3_dict(row))
+        elif isinstance(row, list):
+            # Legacy v2 positional shape — unlikely against v3
+            # Terminal but kept as a safety net.
+            out.append(trade_row_from_array(row))
+        # Anything else silently dropped (defensive forward-compat).
     return out
 
 
-def _decode_quote_response(response: dict[str, object]) -> list[QuoteRow]:
-    """Parse a ThetaData quote endpoint response into QuoteRow list."""
-    rows = response.get("response", [])
-    if not isinstance(rows, list):
-        msg = f"ThetaData quote response.response is not a list: {type(rows).__name__}"
-        raise TypeError(msg)
+def _decode_quote_response(response: object) -> list[QuoteRow]:
+    """Parse a v3 quote endpoint response into a QuoteRow list."""
+    rows = _normalize_response_to_rows(response)
     out: list[QuoteRow] = []
     for row in rows:
-        if not isinstance(row, list):
-            continue
-        out.append(quote_row_from_array(row))
+        if isinstance(row, dict):
+            out.append(quote_row_from_v3_dict(row))
+        elif isinstance(row, list):
+            out.append(quote_row_from_array(row))
     return out
+
+
+def _normalize_response_to_rows(response: object) -> list[object]:
+    """Pick the row-list out of a v3 array OR a legacy v2 envelope.
+
+    v3: response is itself a list (rows are dicts).
+    v2 (legacy fallback): response is a dict with ``response`` key
+        containing a list of positional arrays.
+    Anything else returns ``[]`` so downstream consumers see no rows
+    rather than crashing on shape mismatch.
+    """
+    if isinstance(response, list):
+        return response
+    if isinstance(response, dict):
+        rows = response.get("response", [])
+        if isinstance(rows, list):
+            return rows
+    return []
