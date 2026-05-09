@@ -249,7 +249,7 @@ def _make_source(
         settings=settings or _settings(),
         subscriptions=subs or _subscriptions(),
         get_context_for_contract=ctx,
-        ws_url="ws://test/v2/ws",
+        ws_url="ws://test/v1/events",
         connect_factory=factory,
     )
 
@@ -737,7 +737,7 @@ def test_source_id_can_be_customised() -> None:
         settings=_settings(),
         subscriptions=_subscriptions(),
         get_context_for_contract=_ctx,
-        ws_url="ws://test/v2/ws",
+        ws_url="ws://test/v1/events",
         connect_factory=factory,
         source_id="thetadata-prod",
     )

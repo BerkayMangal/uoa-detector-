@@ -432,7 +432,7 @@ async def test_stream_ws_points_to_live_source_class() -> None:
     )
     try:
         with pytest.raises(NotImplementedError, match=r"ThetaDataLiveSource"):
-            await client.stream_ws("/v2/ws", subscriptions=[])
+            await client.stream_ws("/v1/events", subscriptions=[])
     finally:
         await client.aclose()
 

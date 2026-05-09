@@ -7,6 +7,16 @@ frames, aligns each trade to the most recent bid/ask quote (held
 per-contract), maps to ``RawPrint``, and yields them through
 ``stream()``.
 
+Phase 3.3.7.4 (v2 → v3): WebSocket URL path changed from ``/v2/ws``
+to ``/v1/events`` per docs.thetadata.us/Streaming/Getting-Started.html.
+Port 25520 unchanged. Streaming has independent versioning (v1)
+from the REST API (which jumped v2 → v3); the message format
+itself is unchanged — contract objects still carry root + expiration
+(YYYYMMDD int) + strike (1/10 cent int) + right ('C'/'P'), and trade
+events still carry (date, ms_of_day) integer pair timestamps. Only
+the URL path constant is updated; subscription payload + frame
+parsing are byte-for-byte the same as Phase 3.3.2.5.
+
 Reconnect logic uses the ``live_reconnect_*`` profile fields
 (Phase 3.3.2.1):
   - max_attempts: cap before raising and surfacing to the operator
@@ -197,7 +207,7 @@ class ThetaDataLiveSource:
           settings=ThetaDataSettings(...),
           subscriptions=[...],
           get_context_for_contract=lambda c: ContextSnapshot(...),
-          ws_url="ws://127.0.0.1:25520/v2/ws",
+          ws_url="ws://127.0.0.1:25520/v1/events",
       )
       async for rp in live.stream():
           handle(rp)
@@ -213,7 +223,7 @@ class ThetaDataLiveSource:
         settings: ThetaDataSettings,
         subscriptions: Iterable[LiveSubscription],
         get_context_for_contract: Callable[[ContractSpec], ContextSnapshot],
-        ws_url: str = "ws://127.0.0.1:25520/v2/ws",
+        ws_url: str = "ws://127.0.0.1:25520/v1/events",
         connect_factory: ConnectFactory | None = None,
         source_id: str = "thetadata",
     ) -> None:
