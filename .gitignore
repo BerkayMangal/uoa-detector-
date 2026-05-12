@@ -9,3 +9,16 @@ __pycache__/
 *.egg-info/
 dist/
 build/
+
+# Phase 3.5.2+: downloaded historical data (parquet/csv) lives outside
+# the repo; only .manifest.json and .download_state.json (audit trail)
+# get committed.
+data/historical/**/*.parquet
+data/historical/**/*.csv
+data/historical/**/*.tmp
+
+# ThetaData Terminal jar + supporting artifacts (operator-local)
+*.jar
+config.toml
+creds.txt
+lib/

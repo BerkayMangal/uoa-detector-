@@ -1,0 +1,47 @@
+{
+  "date_range": {
+    "end": "2026-04-30",
+    "start": "2026-04-01"
+  },
+  "schema_version": 1,
+  "started_at": "2026-05-12T11:31:29.772621Z",
+  "tasks": {
+    "ABNB:2026-04": {
+      "completed_at": "2026-05-12T11:38:31.921838Z",
+      "error": null,
+      "file_path": "data/historical/dry-run/ABNB",
+      "row_count": 882,
+      "status": "done"
+    },
+    "AFRM:2026-04": {
+      "completed_at": "2026-05-12T11:38:38.434265Z",
+      "error": null,
+      "file_path": "data/historical/dry-run/AFRM",
+      "row_count": 2311,
+      "status": "done"
+    },
+    "AI:2026-04": {
+      "completed_at": "2026-05-12T11:45:16.845084Z",
+      "error": null,
+      "file_path": "data/historical/dry-run/AI",
+      "row_count": 5254,
+      "status": "done"
+    },
+    "APP:2026-04": {
+      "completed_at": "2026-05-12T11:46:24.649081Z",
+      "error": null,
+      "file_path": "data/historical/dry-run/APP",
+      "row_count": 1641,
+      "status": "done"
+    },
+    "CHGG:2026-04": {
+      "completed_at": "2026-05-12T11:50:39.334665Z",
+      "error": null,
+      "file_path": "data/historical/dry-run/CHGG",
+      "row_count": 2194,
+      "status": "done"
+    }
+  },
+  "tier": "tier2_starter",
+  "updated_at": "2026-05-12T11:50:39.334671Z"
+}

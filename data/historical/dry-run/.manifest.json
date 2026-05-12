@@ -1,0 +1,486 @@
+{
+  "date_range_end": "2026-04-30",
+  "date_range_start": "2026-04-01",
+  "generated_at": "2026-05-12T11:50:40.010066Z",
+  "per_ticker": {
+    "ABNB": {
+      "bytes_on_disk": 173122,
+      "files": 30,
+      "gaps_by_month": {
+        "2026-04": [
+          "2026-04-03",
+          "2026-04-04",
+          "2026-04-05",
+          "2026-04-11",
+          "2026-04-12",
+          "2026-04-18",
+          "2026-04-19",
+          "2026-04-25",
+          "2026-04-26"
+        ]
+      },
+      "months_done": 1,
+      "months_failed": 0,
+      "rows": 882
+    },
+    "AFRM": {
+      "bytes_on_disk": 219758,
+      "files": 30,
+      "gaps_by_month": {
+        "2026-04": [
+          "2026-04-03",
+          "2026-04-04",
+          "2026-04-05",
+          "2026-04-11",
+          "2026-04-12",
+          "2026-04-18",
+          "2026-04-19",
+          "2026-04-25",
+          "2026-04-26"
+        ]
+      },
+      "months_done": 1,
+      "months_failed": 0,
+      "rows": 2311
+    },
+    "AI": {
+      "bytes_on_disk": 265000,
+      "files": 30,
+      "gaps_by_month": {
+        "2026-04": [
+          "2026-04-03",
+          "2026-04-04",
+          "2026-04-05",
+          "2026-04-11",
+          "2026-04-12",
+          "2026-04-18",
+          "2026-04-19",
+          "2026-04-25",
+          "2026-04-26"
+        ]
+      },
+      "months_done": 1,
+      "months_failed": 0,
+      "rows": 5254
+    },
+    "APP": {
+      "bytes_on_disk": 214829,
+      "files": 30,
+      "gaps_by_month": {
+        "2026-04": [
+          "2026-04-03",
+          "2026-04-04",
+          "2026-04-05",
+          "2026-04-11",
+          "2026-04-12",
+          "2026-04-18",
+          "2026-04-19",
+          "2026-04-25",
+          "2026-04-26"
+        ]
+      },
+      "months_done": 1,
+      "months_failed": 0,
+      "rows": 1641
+    },
+    "CHGG": {
+      "bytes_on_disk": 202099,
+      "files": 30,
+      "gaps_by_month": {
+        "2026-04": [
+          "2026-04-03",
+          "2026-04-04",
+          "2026-04-05",
+          "2026-04-11",
+          "2026-04-12",
+          "2026-04-18",
+          "2026-04-19",
+          "2026-04-25",
+          "2026-04-26"
+        ]
+      },
+      "months_done": 1,
+      "months_failed": 0,
+      "rows": 2194
+    },
+    "CHWY": {
+      "bytes_on_disk": 0,
+      "files": 0,
+      "gaps_by_month": {},
+      "months_done": 0,
+      "months_failed": 0,
+      "rows": 0
+    },
+    "CIFR": {
+      "bytes_on_disk": 0,
+      "files": 0,
+      "gaps_by_month": {},
+      "months_done": 0,
+      "months_failed": 0,
+      "rows": 0
+    },
+    "CLSK": {
+      "bytes_on_disk": 0,
+      "files": 0,
+      "gaps_by_month": {},
+      "months_done": 0,
+      "months_failed": 0,
+      "rows": 0
+    },
+    "COIN": {
+      "bytes_on_disk": 0,
+      "files": 0,
+      "gaps_by_month": {},
+      "months_done": 0,
+      "months_failed": 0,
+      "rows": 0
+    },
+    "COUR": {
+      "bytes_on_disk": 0,
+      "files": 0,
+      "gaps_by_month": {},
+      "months_done": 0,
+      "months_failed": 0,
+      "rows": 0
+    },
+    "CRWD": {
+      "bytes_on_disk": 0,
+      "files": 0,
+      "gaps_by_month": {},
+      "months_done": 0,
+      "months_failed": 0,
+      "rows": 0
+    },
+    "DASH": {
+      "bytes_on_disk": 0,
+      "files": 0,
+      "gaps_by_month": {},
+      "months_done": 0,
+      "months_failed": 0,
+      "rows": 0
+    },
+    "DDOG": {
+      "bytes_on_disk": 0,
+      "files": 0,
+      "gaps_by_month": {},
+      "months_done": 0,
+      "months_failed": 0,
+      "rows": 0
+    },
+    "DKNG": {
+      "bytes_on_disk": 0,
+      "files": 0,
+      "gaps_by_month": {},
+      "months_done": 0,
+      "months_failed": 0,
+      "rows": 0
+    },
+    "DOCU": {
+      "bytes_on_disk": 0,
+      "files": 0,
+      "gaps_by_month": {},
+      "months_done": 0,
+      "months_failed": 0,
+      "rows": 0
+    },
+    "DUOL": {
+      "bytes_on_disk": 0,
+      "files": 0,
+      "gaps_by_month": {},
+      "months_done": 0,
+      "months_failed": 0,
+      "rows": 0
+    },
+    "ETSY": {
+      "bytes_on_disk": 0,
+      "files": 0,
+      "gaps_by_month": {},
+      "months_done": 0,
+      "months_failed": 0,
+      "rows": 0
+    },
+    "EXPE": {
+      "bytes_on_disk": 0,
+      "files": 0,
+      "gaps_by_month": {},
+      "months_done": 0,
+      "months_failed": 0,
+      "rows": 0
+    },
+    "FCEL": {
+      "bytes_on_disk": 0,
+      "files": 0,
+      "gaps_by_month": {},
+      "months_done": 0,
+      "months_failed": 0,
+      "rows": 0
+    },
+    "HOOD": {
+      "bytes_on_disk": 0,
+      "files": 0,
+      "gaps_by_month": {},
+      "months_done": 0,
+      "months_failed": 0,
+      "rows": 0
+    },
+    "HUBS": {
+      "bytes_on_disk": 0,
+      "files": 0,
+      "gaps_by_month": {},
+      "months_done": 0,
+      "months_failed": 0,
+      "rows": 0
+    },
+    "HUT": {
+      "bytes_on_disk": 0,
+      "files": 0,
+      "gaps_by_month": {},
+      "months_done": 0,
+      "months_failed": 0,
+      "rows": 0
+    },
+    "LCID": {
+      "bytes_on_disk": 0,
+      "files": 0,
+      "gaps_by_month": {},
+      "months_done": 0,
+      "months_failed": 0,
+      "rows": 0
+    },
+    "LMND": {
+      "bytes_on_disk": 0,
+      "files": 0,
+      "gaps_by_month": {},
+      "months_done": 0,
+      "months_failed": 0,
+      "rows": 0
+    },
+    "LYFT": {
+      "bytes_on_disk": 0,
+      "files": 0,
+      "gaps_by_month": {},
+      "months_done": 0,
+      "months_failed": 0,
+      "rows": 0
+    },
+    "MARA": {
+      "bytes_on_disk": 0,
+      "files": 0,
+      "gaps_by_month": {},
+      "months_done": 0,
+      "months_failed": 0,
+      "rows": 0
+    },
+    "NET": {
+      "bytes_on_disk": 0,
+      "files": 0,
+      "gaps_by_month": {},
+      "months_done": 0,
+      "months_failed": 0,
+      "rows": 0
+    },
+    "NIO": {
+      "bytes_on_disk": 0,
+      "files": 0,
+      "gaps_by_month": {},
+      "months_done": 0,
+      "months_failed": 0,
+      "rows": 0
+    },
+    "OPEN": {
+      "bytes_on_disk": 0,
+      "files": 0,
+      "gaps_by_month": {},
+      "months_done": 0,
+      "months_failed": 0,
+      "rows": 0
+    },
+    "PATH": {
+      "bytes_on_disk": 0,
+      "files": 0,
+      "gaps_by_month": {},
+      "months_done": 0,
+      "months_failed": 0,
+      "rows": 0
+    },
+    "PENN": {
+      "bytes_on_disk": 0,
+      "files": 0,
+      "gaps_by_month": {},
+      "months_done": 0,
+      "months_failed": 0,
+      "rows": 0
+    },
+    "PINS": {
+      "bytes_on_disk": 0,
+      "files": 0,
+      "gaps_by_month": {},
+      "months_done": 0,
+      "months_failed": 0,
+      "rows": 0
+    },
+    "PLTR": {
+      "bytes_on_disk": 0,
+      "files": 0,
+      "gaps_by_month": {},
+      "months_done": 0,
+      "months_failed": 0,
+      "rows": 0
+    },
+    "PLUG": {
+      "bytes_on_disk": 0,
+      "files": 0,
+      "gaps_by_month": {},
+      "months_done": 0,
+      "months_failed": 0,
+      "rows": 0
+    },
+    "RBLX": {
+      "bytes_on_disk": 0,
+      "files": 0,
+      "gaps_by_month": {},
+      "months_done": 0,
+      "months_failed": 0,
+      "rows": 0
+    },
+    "RDFN": {
+      "bytes_on_disk": 0,
+      "files": 0,
+      "gaps_by_month": {},
+      "months_done": 0,
+      "months_failed": 0,
+      "rows": 0
+    },
+    "RIOT": {
+      "bytes_on_disk": 0,
+      "files": 0,
+      "gaps_by_month": {},
+      "months_done": 0,
+      "months_failed": 0,
+      "rows": 0
+    },
+    "RIVN": {
+      "bytes_on_disk": 0,
+      "files": 0,
+      "gaps_by_month": {},
+      "months_done": 0,
+      "months_failed": 0,
+      "rows": 0
+    },
+    "ROKU": {
+      "bytes_on_disk": 0,
+      "files": 0,
+      "gaps_by_month": {},
+      "months_done": 0,
+      "months_failed": 0,
+      "rows": 0
+    },
+    "ROOT": {
+      "bytes_on_disk": 0,
+      "files": 0,
+      "gaps_by_month": {},
+      "months_done": 0,
+      "months_failed": 0,
+      "rows": 0
+    },
+    "S": {
+      "bytes_on_disk": 0,
+      "files": 0,
+      "gaps_by_month": {},
+      "months_done": 0,
+      "months_failed": 0,
+      "rows": 0
+    },
+    "SNAP": {
+      "bytes_on_disk": 0,
+      "files": 0,
+      "gaps_by_month": {},
+      "months_done": 0,
+      "months_failed": 0,
+      "rows": 0
+    },
+    "SOFI": {
+      "bytes_on_disk": 0,
+      "files": 0,
+      "gaps_by_month": {},
+      "months_done": 0,
+      "months_failed": 0,
+      "rows": 0
+    },
+    "TEAM": {
+      "bytes_on_disk": 0,
+      "files": 0,
+      "gaps_by_month": {},
+      "months_done": 0,
+      "months_failed": 0,
+      "rows": 0
+    },
+    "TWLO": {
+      "bytes_on_disk": 0,
+      "files": 0,
+      "gaps_by_month": {},
+      "months_done": 0,
+      "months_failed": 0,
+      "rows": 0
+    },
+    "UPST": {
+      "bytes_on_disk": 0,
+      "files": 0,
+      "gaps_by_month": {},
+      "months_done": 0,
+      "months_failed": 0,
+      "rows": 0
+    },
+    "W": {
+      "bytes_on_disk": 0,
+      "files": 0,
+      "gaps_by_month": {},
+      "months_done": 0,
+      "months_failed": 0,
+      "rows": 0
+    },
+    "WULF": {
+      "bytes_on_disk": 0,
+      "files": 0,
+      "gaps_by_month": {},
+      "months_done": 0,
+      "months_failed": 0,
+      "rows": 0
+    },
+    "XPEV": {
+      "bytes_on_disk": 0,
+      "files": 0,
+      "gaps_by_month": {},
+      "months_done": 0,
+      "months_failed": 0,
+      "rows": 0
+    },
+    "Z": {
+      "bytes_on_disk": 0,
+      "files": 0,
+      "gaps_by_month": {},
+      "months_done": 0,
+      "months_failed": 0,
+      "rows": 0
+    },
+    "ZS": {
+      "bytes_on_disk": 0,
+      "files": 0,
+      "gaps_by_month": {},
+      "months_done": 0,
+      "months_failed": 0,
+      "rows": 0
+    }
+  },
+  "schema_version": 1,
+  "summary": {
+    "total_bytes": 1074808,
+    "total_files": 150,
+    "total_months": 1,
+    "total_rows": 12282,
+    "total_tasks_done": 5,
+    "total_tasks_failed": 0,
+    "total_tickers": 51
+  },
+  "tier": "tier2_starter"
+}
