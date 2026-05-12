@@ -200,6 +200,16 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Cap contracts per ticker (sandbox sanity check).",
     )
     p.add_argument(
+        "--max-dte", type=int, default=None,
+        help=(
+            "Skip contracts whose expiry is further than MAX_DTE days "
+            "from the download date. Track B's strategy profile "
+            "penalises 60+ DTE to zero (v5_gamma_squeeze leap_threshold=60); "
+            "passing --max-dte 60 cuts the download universe in half "
+            "without losing any contract Track B would actually trade."
+        ),
+    )
+    p.add_argument(
         "--dry-run", action="store_true",
         help="List tasks; do not call any HTTP endpoints.",
     )
@@ -318,6 +328,7 @@ async def _run(args: argparse.Namespace) -> int:
     lister = ThetaDataContractLister(client=client)
     contract_filter = ContractListFilter(
         max_contracts=args.max_contracts,
+        max_dte=args.max_dte,
     )
 
     async def _contracts_for_ticker(ticker: str) -> list[ContractSpec]:
