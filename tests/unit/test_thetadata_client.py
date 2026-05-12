@@ -201,6 +201,31 @@ async def test_4xx_raises_auth_error_no_retry() -> None:
 
 
 @pytest.mark.asyncio
+async def test_472_no_data_returns_empty_response() -> None:
+    """Phase 3.3.12: ThetaData's custom HTTP 472 'no data found' is
+    a normal empty-response code, NOT auth or transient. The client
+    returns an empty response dict and records breaker success.
+    """
+    def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(472, text="No data found for your request")
+
+    client = ThetaDataClient(
+        api_key=SecretStr("good_key"),
+        settings=_settings(),
+        transport=httpx.MockTransport(handler),
+    )
+    try:
+        result = await client.request_json("/v3/option/history/trade")
+        assert result == {"response": []}
+        # 472 should NOT count as a circuit-breaker failure — the
+        # breaker is silently closed (otherwise repeated 472s on a
+        # large download would trip it).
+        assert client.circuit_breaker.is_open() is False
+    finally:
+        await client.aclose()
+
+
+@pytest.mark.asyncio
 async def test_5xx_retries_then_succeeds() -> None:
     """First 2 calls return 503, third succeeds."""
     calls = [0]

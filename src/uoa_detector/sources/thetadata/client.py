@@ -252,6 +252,15 @@ class ThetaDataClient:
                     params=effective_params,
                     headers=self._auth_headers(),
                 )
+                # Phase 3.3.12: ThetaData v3 uses HTTP 472 as a
+                # custom "no data found for this query" code. It is
+                # NOT an auth or transient error — many legitimate
+                # downloads hit this on contracts with no trading
+                # activity for the requested day. Treat as an empty
+                # success.
+                if response.status_code == 472:
+                    self._breaker.record_success()
+                    return {"response": []}
                 if response.status_code >= 500:
                     msg = (
                         f"ThetaData {method} {path} returned "
