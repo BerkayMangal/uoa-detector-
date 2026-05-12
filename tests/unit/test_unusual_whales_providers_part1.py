@@ -320,7 +320,7 @@ def test_iv_history_implements_protocol() -> None:
 @pytest.mark.asyncio
 async def test_iv_history_returns_nearest_snapshot() -> None:
     client = _FakeClient()
-    expected_path = "/api/option-contract/AAPL240216C00150000/iv-rank"
+    expected_path = "/api/stock/AAPL/iv-rank"
     client.stub(
         expected_path,
         {
@@ -374,7 +374,7 @@ async def test_iv_history_returns_none_on_empty() -> None:
 @pytest.mark.asyncio
 async def test_iv_history_caches_response() -> None:
     client = _FakeClient()
-    expected_path = "/api/option-contract/AAPL240216C00150000/iv-rank"
+    expected_path = "/api/stock/AAPL/iv-rank"
     client.stub(
         expected_path,
         {"data": [{"as_of": "2024-01-15T15:30:00Z",
@@ -396,8 +396,12 @@ async def test_iv_history_caches_response() -> None:
 
 
 @pytest.mark.asyncio
-async def test_iv_history_put_uses_p_in_occ_symbol() -> None:
-    """option_type='put' encodes as 'P' in the OCC symbol."""
+async def test_iv_history_uses_ticker_level_path_regardless_of_option_type() -> None:
+    """Phase 3.3.9.2: IV-rank is ticker-level, not per-contract.
+
+    Both call and put for the same ticker hit the same path; the
+    cache also collapses to one entry per ticker.
+    """
     client = _FakeClient()
     provider = UnusualWhalesIVHistoryProvider(
         client=client,  # type: ignore[arg-type]
@@ -409,8 +413,51 @@ async def test_iv_history_put_uses_p_in_occ_symbol() -> None:
         at=datetime(2024, 1, 15, 15, 30, tzinfo=UTC),
     )
     assert len(client.calls) == 1
-    path = client.calls[0][0]
-    assert "AAPL240216P00150000" in path
+    assert client.calls[0][0] == "/api/stock/AAPL/iv-rank"
+
+
+@pytest.mark.asyncio
+async def test_iv_history_parses_new_uw_schema() -> None:
+    """Phase 3.3.9.2: new UW response uses
+    date/updated_at/volatility/iv_rank_1y/close (string-valued).
+
+    Mapping:
+      - implied_volatility = volatility (string → float)
+      - iv_rank_252d = iv_rank_1y
+      - iv_percentile_252d = iv_rank_1y (fallback; no separate field)
+      - iv_change_intraday_pct = None (no longer published)
+      - as_of = updated_at (preferred) or date+21:00 UTC
+    """
+    client = _FakeClient()
+    client.stub(
+        "/api/stock/AAPL/iv-rank",
+        {
+            "data": [
+                {
+                    "date": "2026-05-11",
+                    "updated_at": "2026-05-11T22:35:03.362289Z",
+                    "volatility": "0.2263",
+                    "iv_rank_1y": "34.6915",
+                    "close": "293.32",
+                },
+            ],
+        },
+    )
+    provider = UnusualWhalesIVHistoryProvider(
+        client=client,  # type: ignore[arg-type]
+        settings=_settings(),
+    )
+    snap = await provider.iv_rank_at(
+        ticker="AAPL", strike=Decimal("150.00"),
+        expiry=date(2026, 5, 15), option_type="call",
+        at=datetime(2026, 5, 11, 22, 35, tzinfo=UTC),
+    )
+    assert snap is not None
+    assert snap.implied_volatility == pytest.approx(0.2263)
+    assert snap.iv_rank_252d == pytest.approx(34.6915)
+    assert snap.iv_percentile_252d == pytest.approx(34.6915)  # falls back to rank
+    assert snap.iv_change_intraday_pct is None
+    assert snap.as_of.year == 2026  # parsed from updated_at
 
 
 # ===========================================================================

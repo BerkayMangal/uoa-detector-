@@ -10,38 +10,56 @@ Filter) consumes the typed snapshot and applies penalty rules
 (e.g. 'IV expanded > 30% intraday → penalise late entry') with
 profile-tunable thresholds.
 
-UW endpoint shape (centralised here for schema-evolution fixes):
+UW endpoint shape (Phase 3.3.9.2 — migrated; the per-contract IV
+endpoint was retired and IV is now published at ticker granularity
+because UW's underlying source is the same series for every strike
+on a given expiry):
 
-  GET /api/option-contract/{symbol}/iv-rank
+  GET /api/stock/{ticker}/iv-rank
     → {
         "data": [
           {
-            "as_of": "2024-01-15T15:30:00Z",
-            "implied_volatility": 0.4231,
-            "iv_rank_252d": 67.5,
-            "iv_percentile_252d": 72.1,
-            "iv_change_intraday_pct": 12.3
+            "date": "2026-05-11",
+            "updated_at": "2026-05-11T22:35:03.362289Z",
+            "volatility": "0.2263",
+            "iv_rank_1y": "34.6915",
+            "close": "293.32"
           },
           ...
         ]
       }
 
-decision (per-contract OCC symbol as cache key):
-  UW's IV-rank endpoint is keyed by full OCC symbol
-  (ticker+expiry+right+strike). We build the symbol once per call
-  and use it as the cache key. Same call → same symbol → cache
-  hit during TTL window.
+decision (Phase 3.3.9.2 — IVRankSnapshot DTO unchanged):
+  Phase 3.4 stage code is frozen (M24 only consumes
+  ``implied_volatility`` and ``iv_rank_252d`` from the DTO). Map
+  the new UW schema:
+    - ``implied_volatility = volatility`` (string → float)
+    - ``iv_rank_252d = iv_rank_1y`` (semantic equivalent;
+      252 trading days ≈ 1 calendar year, same percentile basis)
+    - ``iv_percentile_252d`` → fall back to ``iv_rank_1y`` value
+      (UW no longer publishes a separate percentile; close enough
+      for the legacy field's "rank percentile" semantic)
+    - ``iv_change_intraday_pct`` → ``None`` (no longer published;
+      M24 doesn't consume this field)
+    - ``as_of`` → ``updated_at`` (preferred; intraday timestamp)
+      or fall back to ``date`` cast to 21:00 UTC (US session close)
+
+decision (cache key is now ticker, not OCC symbol):
+  Same IV-rank series applies to every contract on the same
+  underlying. Caching by OCC symbol would inflate the cache
+  (one entry per strike) for identical data; the new key is
+  ``ticker.upper()``. Legacy fixture compat is preserved via
+  ``_row_*`` helpers that accept either schema.
 
 decision (nearest-snapshot selection):
-  UW returns snapshots at minute granularity; we pick the one
-  closest in time to ``at``, choosing the most recent one if
-  ``at`` falls between two snapshots. None if the response is
-  empty.
+  Unchanged from Phase 3.3.3.
 """
 
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from datetime import date as _date
+from datetime import time as _time
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any, Literal
 
@@ -78,10 +96,10 @@ class UnusualWhalesIVHistoryProvider:
         at: datetime,
     ) -> IVRankSnapshot | None:
         """Return the IV-rank snapshot nearest to ``at``."""
-        symbol = _occ_symbol(ticker, expiry, option_type, strike)
+        key = ticker.upper()
         rows = await self._cache.get_or_fetch(
-            symbol,
-            loader=lambda: self._fetch(symbol),
+            key,
+            loader=lambda: self._fetch(ticker),
         )
         return self._select_nearest(
             rows,
@@ -92,8 +110,8 @@ class UnusualWhalesIVHistoryProvider:
             at=at,
         )
 
-    async def _fetch(self, symbol: str) -> list[dict[str, Any]]:
-        path = f"/api/option-contract/{symbol}/iv-rank"
+    async def _fetch(self, ticker: str) -> list[dict[str, Any]]:
+        path = f"/api/stock/{ticker.upper()}/iv-rank"
         resp = await self._client.request_json(path)
         data = resp.get("data", [])
         if not isinstance(data, list):
@@ -115,7 +133,7 @@ class UnusualWhalesIVHistoryProvider:
         best: tuple[float, dict[str, Any]] | None = None
         for row in rows:
             try:
-                row_at = _parse_iso_utc(str(row["as_of"]))
+                row_at = _row_as_of(row)
             except (KeyError, ValueError):
                 continue
             delta = abs((row_at - at).total_seconds())
@@ -140,13 +158,14 @@ def _row_to_iv_snapshot(
     expiry: date,
     option_type: Literal["call", "put"],
 ) -> IVRankSnapshot | None:
+    """Phase 3.3.9.2: maps both legacy and new UW row schemas."""
     try:
-        as_of = _parse_iso_utc(str(row["as_of"]))
-        iv = float(row["implied_volatility"])
+        as_of = _row_as_of(row)
+        iv = _row_iv(row)
     except (KeyError, ValueError, TypeError):
         return None
-    rank = _opt_float(row.get("iv_rank_252d"))
-    percentile = _opt_float(row.get("iv_percentile_252d"))
+    rank = _row_rank(row)
+    percentile = _row_percentile(row, rank)
     change_intraday = _opt_float(row.get("iv_change_intraday_pct"))
     return IVRankSnapshot(
         ticker=ticker.upper(),
@@ -159,6 +178,58 @@ def _row_to_iv_snapshot(
         iv_percentile_252d=percentile,
         iv_change_intraday_pct=change_intraday,
     )
+
+
+def _row_as_of(row: dict[str, Any]) -> datetime:
+    """Phase 3.3.9.2: prefer ``updated_at``, fall back to ``date`` at
+    21:00 UTC, legacy ``as_of`` ISO string also tolerated.
+    """
+    if "updated_at" in row:
+        return _parse_iso_utc(str(row["updated_at"]))
+    if "as_of" in row:
+        return _parse_iso_utc(str(row["as_of"]))
+    date_str = str(row["date"])
+    day = _date.fromisoformat(date_str)
+    return datetime.combine(day, _time(hour=21, minute=0, tzinfo=UTC))
+
+
+def _row_iv(row: dict[str, Any]) -> float:
+    """Phase 3.3.9.2: prefer ``volatility``, fall back to legacy
+    ``implied_volatility``. Both string-or-float tolerated.
+    """
+    raw = row["volatility"] if "volatility" in row else row["implied_volatility"]
+    return float(raw)
+
+
+def _row_rank(row: dict[str, Any]) -> float | None:
+    """Phase 3.3.9.2: prefer ``iv_rank_1y`` (new), fall back to
+    legacy ``iv_rank_252d``. Returns None if neither present.
+    """
+    if "iv_rank_1y" in row:
+        return _opt_float_or_str(row.get("iv_rank_1y"))
+    return _opt_float_or_str(row.get("iv_rank_252d"))
+
+
+def _row_percentile(row: dict[str, Any], rank: float | None) -> float | None:
+    """Phase 3.3.9.2: new endpoint doesn't publish percentile; fall
+    back to rank value (same percentile-of-distribution semantic).
+    """
+    if "iv_percentile_252d" in row:
+        return _opt_float_or_str(row.get("iv_percentile_252d"))
+    return rank
+
+
+def _opt_float_or_str(v: object) -> float | None:
+    if v is None:
+        return None
+    if isinstance(v, (int, float)):
+        return float(v)
+    if isinstance(v, str):
+        try:
+            return float(v)
+        except ValueError:
+            return None
+    return None
 
 
 def _occ_symbol(
