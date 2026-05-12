@@ -437,3 +437,154 @@ confidence that the data layer is stable and validated.
 
 This document is the closing contract for Phase 3.3. Phase 3.4
 will get its own working acceptance doc.
+
+---
+
+# Phase 3.3.7 addendum — ThetaData v2 → v3 migration
+
+Phase 3.3.7 is an UNPLANNED sub-phase inserted between Phase 3.5
+acceptance and Phase 3.5.1 (credential validation). ThetaData
+released API v3 in 2025; v2 endpoints now return ``410 GONE`` and
+the v2 binary that Phase 3.3.2 was built against is no longer
+publicly distributed. Phase 3.5.1 hit this on Berkay's first
+attempt to validate credentials; the only path forward was a
+narrow-scope v3 migration of the existing ThetaData adapter.
+
+The contract for the migration lives in
+``docs/phase-3.3.7-acceptance.md`` (frozen 2026-05 per the same
+discipline as Phase 3.3 / 3.4 / 3.5). It will not be revised; the
+addendum here records what shipped.
+
+## Sub-phase summary
+
+| Sub-phase | HEAD | Tests | Sub-commits | Key delivery |
+|---|---|---|---|---|
+| 3.3.7 — Acceptance | `b3b36f0` | 1391 + 20 | 1 | Frozen contract; 5 sub-phases; scope narrowed to `src/uoa_detector/sources/thetadata/` |
+| 3.3.7.1 — Investigation | `9229cbc` | 1391 + 20 | 1 | `docs/thetadata-v3-migration.md` (559 lines, 13 sections); v3 endpoint mappings + 7 judgment calls (J1-J7) |
+| 3.3.7.2 — mapping.py | `3467b1a` | 1412 + 20 | 1 | `iso_timestamp_to_utc_datetime`, `format_v3_strike_param`, `format_v3_right`, `trade_row_from_v3_dict`, `quote_row_from_v3_dict`, TradeRow/QuoteRow `extra="ignore"` |
+| 3.3.7.3 — REST surface | `d1fee15` | 1412 + 20 | 1 | client `DEFAULT_BASE_URL` 25510→25503, `request_json` returns `Any` + auto-injects `format=json`, historical v3 URLs + decoder, price_action.py full v3 rewrite |
+| 3.3.7.4 — live.py | `c650d41` | 1412 + 20 | 1 | WS URL `/v2/ws` → `/v1/events` (port 25520 unchanged); message format untouched |
+| 3.3.7.5 — Smoke + closeout | this | 1412 + 20 | 1 | smoke tests migrated to v3 paths + params; Berkay-filled validation template; this addendum |
+
+## Phase 3.3.7 totals
+
+  - 6 sub-phases, 6 sub-commits (all bisectable; per-commit pytest
+    sweep confirmed at each closeout)
+  - 1391 → 1412 tests passing (+21 net new for v3 mapping coverage)
+  - 4 source files modified in
+    `src/uoa_detector/sources/thetadata/`:
+    `mapping.py`, `client.py`, `historical.py`, `live.py`
+  - 1 source file rewritten:
+    `src/uoa_detector/sources/thetadata/providers/price_action.py`
+    (discovered to be a v2 caller during 3.3.7.3 implementation)
+  - Test files updated: `test_thetadata_mapping.py`,
+    `test_price_movement.py`, `test_thetadata_live.py`,
+    `test_thetadata_client.py`, `test_thetadata_smoke.py`,
+    `test_m23_smoke.py`
+  - 7 judgment calls (J1-J7) all resolved or scheduled in 3.3.7.1
+    spec; 8 additional sub-phase-specific judgment calls in commit
+    messages
+  - mypy --strict + ruff clean across 111 source files at every
+    sub-commit
+
+## What Phase 3.3.7 changed in the contract surface
+
+These items LOOK like behavior changes but are wire-format only;
+the canonical types (`OptionsContract`, `RawPrint`, `OptionType`,
+`OptionRight`) are unchanged.
+
+  - **Default REST port**: 25510 → 25503
+  - **Default WS port**: 25520 unchanged
+  - **REST URL paths**: `/v2/hist/option/{trade,quote}` →
+    `/v3/option/history/{trade,quote}`; `/v2/list/roots/option` →
+    `/v3/option/list/symbols`; `/v2/hist/stock/ohlc` →
+    `/v3/stock/history/ohlc`
+  - **WS URL path**: `/v2/ws` → `/v1/events`
+  - **REST query params**: `root` → `symbol`; `exp` → `expiration`;
+    `strike` 1/10-cent int → dollar string (`"170.00"`); `right`
+    `'C'`/`'P'` → `'call'`/`'put'`; `ivl` ms-int → `interval` str
+    (`"1m"`)
+  - **REST response shape**: `{header.format, response: [[...]]}`
+    positional → top-level array of named-dict objects with ISO
+    timestamps
+  - **WS message shape**: UNCHANGED (still positional integer
+    timestamps, 1/10-cent strikes, 'C'/'P' rights — Streaming API
+    has independent versioning)
+  - **`format=json`**: now auto-injected into every REST request
+    (v3 default response format is CSV)
+
+## Judgment-call themes
+
+  - **Dual-format mapping module** (J1-J4): REST uses dollar strings
+    + 'call'/'put' + ISO timestamps; WS still uses 1/10-cent
+    integers + 'C'/'P' + (date, ms_of_day) integer pairs. mapping.py
+    exports BOTH parser families so historical (REST) and live (WS)
+    callers each have the right boundary.
+  - **`extra="ignore"` on TradeRow/QuoteRow** (J2): v3 adds redundant
+    fields (symbol/expiration/strike/right per row). Silently
+    dropping them is safer than rejecting; forward-compat for future
+    v3 field additions.
+  - **`request_json` always-injects `format=json`** (J5): promoting
+    from per-call to global ensures callers can't accidentally omit.
+    Idempotent setdefault preserves caller-supplied value.
+  - **Defensive legacy v2-envelope fallback in v3 decoders**: all
+    three v3 decoders (trade, quote, OHLC) accept BOTH the v3 array
+    shape AND the legacy v2 envelope. Cost: a few isinstance checks.
+    Benefit: graceful degradation if Terminal version skew surfaces.
+  - **Streaming WS path is `/v1/events` not `/v3/events`**: v3
+    streaming endpoint does not exist; streaming API is on its own
+    version line (v1) independent from REST.
+  - **price_action.py in scope, not separate sub-phase**: Discovered
+    as v2 caller during 3.3.7.3 implementation. Acceptance contract
+    scope is "src/uoa_detector/sources/thetadata/" — the package,
+    not hand-listed files. Atomic v2 → v3 cutover preserved.
+
+## Backward-compat invariants confirmed
+
+  - **Parquet schema** (`parquet_schema.RAWPRINT_PARQUET_SCHEMA`)
+    unchanged. Phase 3.5.3 download produces identical files on
+    disk.
+  - **M23 provider injection seam** (`PriceActionProvider` Protocol +
+    `ThetaDataPriceActionProvider` implementor) holds across the v3
+    backend swap. Phase 3.4.3 stage code is unchanged.
+  - **Phase 3.3.4 download script** (`scripts/download_tier2.py`)
+    unchanged; the v3 migration is below the script's call surface.
+  - **Auth / rate-limit / retry / circuit-breaker** logic in
+    `_http_base.py` (Phase 3.3.2 middleware) unchanged; independent
+    of v2 vs v3 endpoint paths.
+  - **OPRA condition codes + exchange codes** (`OPRA_DROP_CONDITIONS`,
+    `_EXCHANGE_NAMES`) unchanged; these are OPRA Pillar standards,
+    not ThetaData-specific.
+
+## Validation status
+
+Phase 3.3.7.5's done-when criteria are recorded in
+``docs/phase-3.3.7-validation.md``. As of the Phase 3.3.7.5 commit:
+
+  - Unit-test layer: 1412 passing + 20 skipped, mypy strict + ruff
+    clean (no regressions from any sub-commit)
+  - Real-Terminal validation: PENDING — Berkay runs the 4-test
+    smoke (3 ThetaData + 1 M23) locally against Theta Terminal v3
+    + ``THETADATA_API_KEY``, then fills the Results section in
+    ``docs/phase-3.3.7-validation.md`` and commits.
+
+## Phase 3.5.1 resume notes
+
+After Phase 3.3.7 closes (Berkay-validated), Phase 3.5.1
+(credential validation — paused at Phase 3.3.7 insertion) resumes
+where it left off:
+
+  1. Theta Terminal v3 stays running (no re-setup).
+  2. ``.env`` already loaded.
+  3. ``docs/phase-3.5.1-validation.md`` template waits for the
+     remaining 16 integration smokes (8 UW + 8 M21-M28 + 1
+     live_market) since the 3 ThetaData + 1 M23 are already
+     validated by 3.3.7.5.
+
+Phase 3.5.1 is effectively the UW-side ledger after 3.3.7.5; the
+ThetaData side is covered by this addendum.
+
+This addendum closes Phase 3.3.7 from the perspective of code
+delivery. Berkay's validation commit (filling
+``docs/phase-3.3.7-validation.md``) is the final gate — only then
+does Phase 3.5.1 resume.

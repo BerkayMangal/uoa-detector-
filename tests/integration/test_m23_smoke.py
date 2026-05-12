@@ -10,8 +10,9 @@ GATED BY:
     (different from M21/M22 smokes — this is the first M-module
     that uses ThetaData rather than Unusual Whales)
   - ``@pytest.mark.integration`` marker
-  - Theta Terminal must be running locally at
-    http://127.0.0.1:25510 (per docs/DATA_INTEGRATION.md)
+  - Theta Terminal v3 must be running locally at
+    http://127.0.0.1:25503 (Phase 3.3.7 migrated from v2 port
+    25510 to v3 port 25503; see docs/DATA_INTEGRATION.md)
 
 Skipped without the key. CI never runs this; Berkay runs manually
 after loading credentials. The unit tests
