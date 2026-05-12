@@ -370,6 +370,67 @@ async def test_timeout_emits_neutral_score() -> None:
     assert stage.last_execution_metadata["provider_returned"] == "no"
 
 
+class _RaisingProvider:
+    """Provider that raises a configurable exception. Phase 3.3.8.1 fix."""
+
+    def __init__(self, *, exc: BaseException) -> None:
+        self._exc = exc
+        self.call_count = 0
+
+    async def snapshot_at(self, ticker, at):  # type: ignore[no-untyped-def]
+        return None
+
+    async def get_intraday_price_movement(
+        self,
+        ticker: str,
+        at: datetime,
+        lookback_minutes: int,
+    ) -> PriceMovement | None:
+        del ticker, at, lookback_minutes
+        self.call_count += 1
+        raise self._exc
+
+
+@pytest.mark.asyncio
+async def test_provider_exception_emits_neutral_score() -> None:
+    """Phase 3.3.8.1: provider exception → neutral score, branch=provider_error.
+
+    Before the fix, M23 only caught TimeoutError. A subscription / auth
+    failure (e.g. ThetaData STOCK.VALUE missing) raised an HTTP error
+    that crashed the pipeline. After the fix, generic Exception is
+    caught and mapped to the same neutral fallback as no-data, with a
+    distinct branch label and error_type telemetry.
+    """
+    provider = _RaisingProvider(
+        exc=RuntimeError("simulated HTTP 403 subscription required"),
+    )
+    stage = PriceConfirmationStage(provider=provider)
+    event = _make_event()
+    ctx = PipelineContext(profile=load_default_profile())
+    await stage.enrich(event, ctx)
+    assert event.price_confirmation_score == 0.5  # neutral_score
+    assert provider.call_count == 1
+    assert stage.last_execution_metadata is not None
+    assert stage.last_execution_metadata["branch"] == "provider_error"
+    assert stage.last_execution_metadata["provider_returned"] == "no"
+    assert stage.last_execution_metadata["error_type"] == "RuntimeError"
+
+
+@pytest.mark.asyncio
+async def test_provider_baseexception_propagates() -> None:
+    """KeyboardInterrupt / SystemExit / asyncio.CancelledError must propagate.
+
+    The 3.3.8.1 fix catches Exception (not BaseException). Verifies
+    that asyncio cancellation isn't accidentally swallowed.
+    """
+    provider = _RaisingProvider(exc=asyncio.CancelledError())
+    stage = PriceConfirmationStage(provider=provider)
+    event = _make_event()
+    ctx = PipelineContext(profile=load_default_profile())
+    with pytest.raises(asyncio.CancelledError):
+        await stage.enrich(event, ctx)
+
+
 @pytest.mark.asyncio
 async def test_no_spot_data_emits_neutral_score() -> None:
     """Provider returns None → neutral fallback per acceptance doc edge case."""

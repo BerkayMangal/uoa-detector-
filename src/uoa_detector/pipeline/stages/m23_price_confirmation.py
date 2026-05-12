@@ -22,12 +22,30 @@ Score branches (acceptance doc):
   - 0.5 — provider returned None (NEUTRAL fallback per
           acceptance doc edge case 'Spot data missing →
           price_confirmation_score = 0.5 (neutral)')
+  - 0.5 — provider raised an exception (NEUTRAL fallback,
+          Phase 3.3.8.1: subscription / auth / transient
+          HTTP errors must not abort the orchestrator).
 
 Cross-cutting acceptance pinned (same as M21 / M22):
   - Provider injection via constructor
   - Idempotency-on-preset
   - asyncio.wait_for on provider call
   - last_execution_metadata exposed for orchestrator telemetry
+
+decision (catch provider exceptions, not just TimeoutError —
+Phase 3.3.8.1 bug fix):
+  Before 3.3.8.1, M23 wrapped the provider call in asyncio.wait_for
+  but only caught TimeoutError. An HTTP 4xx / 5xx, auth failure
+  (e.g. ThetaData STOCK.VALUE subscription missing for the stock
+  OHLC endpoint), or transport error would propagate up and crash
+  the pipeline for that event. M21 / M22 had the same gap; M23 is
+  the one that surfaced it because its provider is the only one
+  consuming a subscription tier that operators may not have. Fix
+  pattern: same shape as timeout — neutral score, branch label
+  ``provider_error``, telemetry carries the exception class name
+  via ``error_type`` so a postmortem can grep for it.
+  ``BaseException`` (KeyboardInterrupt, SystemExit, asyncio.CancelledError)
+  is intentionally NOT caught — those must propagate.
 
 decision (session-boundary clamp via _compute_effective_lookback):
   Acceptance doc edge case: 'Lookback crosses session boundary →
@@ -137,6 +155,20 @@ class PriceConfirmationStage:
                 "branch": "timeout",
                 "provider_returned": "no",
                 "lookback_minutes_used": str(effective_lookback),
+            }
+            return event
+        except Exception as exc:
+            _logger.warning(
+                "m23: provider raised %s for %s; emitting neutral score",
+                type(exc).__name__,
+                ticker,
+            )
+            event.price_confirmation_score = m23.neutral_score
+            self.last_execution_metadata = {
+                "branch": "provider_error",
+                "provider_returned": "no",
+                "lookback_minutes_used": str(effective_lookback),
+                "error_type": type(exc).__name__,
             }
             return event
 
