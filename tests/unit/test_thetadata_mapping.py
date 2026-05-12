@@ -259,6 +259,20 @@ def test_traderow_validates_ms_of_day_range() -> None:
         )
 
 
+def test_traderow_accepts_negative_sequence() -> None:
+    """Phase 3.3.13: v3 Terminal emits 32-bit signed sequence values
+    (negatives observed in real downloads). TradeRow must accept
+    them; the field is an opaque tie-breaker, sign doesn't matter.
+    """
+    row = TradeRow(
+        ms_of_day=43860664,
+        sequence=-1630994273,  # negative — was rejected pre-3.3.13
+        condition=18, size=1, exchange=43,
+        price=Decimal("4.18"), date=20260508,
+    )
+    assert row.sequence == -1630994273
+
+
 def test_traderow_extra_fields_ignored() -> None:
     """Phase 3.3.7.2 (J2): extra='ignore' for v3 forward-compat.
 

@@ -348,7 +348,11 @@ class TradeRow(BaseModel):
     model_config = ConfigDict(frozen=True, extra="ignore", populate_by_name=True)
 
     ms_of_day: int = Field(ge=0, le=24 * 60 * 60 * 1000)
-    sequence: int = Field(ge=0)
+    # Phase 3.3.13: v3 Terminal emits 32-bit signed sequence values
+    # (negative IDs observed in production). The legacy ge=0
+    # constraint rejected valid rows. Sequence is an opaque
+    # tie-breaker; sign is irrelevant downstream.
+    sequence: int = Field()
     condition: int = Field(ge=0, le=255)
     size: int = Field(ge=0)
     exchange: int = Field(ge=0)
