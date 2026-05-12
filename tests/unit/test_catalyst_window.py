@@ -11,6 +11,12 @@ Pins:
   - UW handles empty rows
   - UW handles malformed rows (skipped)
   - UW shares cache with next_catalyst (single-fetch optimisation)
+
+Phase 3.3.9.4 update: stub fixtures use the new earnings-endpoint
+shape (report_date / report_time); the multi-source aggregation is
+exercised in test_unusual_whales_providers_part2.py. These tests
+focus on the windowing/filtering/sort semantics of
+``catalysts_in_window`` over a single source's output.
 """
 
 from __future__ import annotations
@@ -59,10 +65,26 @@ def test_noop_satisfies_protocol() -> None:
 # ---------------------------------------------------------------------------
 
 
-def _provider(rows: list[dict[str, Any]]) -> UnusualWhalesCatalystCalendarProvider:
-    """Build a UW provider with stubbed HTTP returning ``rows``."""
+def _provider(
+    earnings_rows: list[dict[str, Any]] | None = None,
+) -> UnusualWhalesCatalystCalendarProvider:
+    """Build a UW provider whose earnings endpoint returns ``earnings_rows``.
+
+    FDA and economic-calendar endpoints return empty by default; tests that
+    care about those sources should construct their own stubs (see
+    test_unusual_whales_providers_part2.py).
+    """
     fake_client = MagicMock()
-    fake_client.request_json = AsyncMock(return_value={"data": rows})
+
+    async def fake_request_json(
+        path: str, *, params: dict[str, Any] | None = None, method: str = "GET",
+    ) -> dict[str, Any]:
+        del params, method
+        if path.startswith("/api/earnings/"):
+            return {"data": earnings_rows or []}
+        return {"data": []}
+
+    fake_client.request_json = AsyncMock(side_effect=fake_request_json)
     settings = MagicMock(cache_ttl=MagicMock(catalyst_calendar_seconds=3600))
     return UnusualWhalesCatalystCalendarProvider(
         client=fake_client, settings=settings,
@@ -77,8 +99,8 @@ def _provider(rows: list[dict[str, Any]]) -> UnusualWhalesCatalystCalendarProvid
 @pytest.mark.asyncio
 async def test_window_returns_events_inside_range() -> None:
     p = _provider([
-        {"kind": "earnings", "when": "2024-01-25T21:00:00Z", "title": "Q1"},
-        {"kind": "fda", "when": "2024-02-15T15:00:00Z", "title": "FDA"},
+        {"report_date": "2024-01-25", "report_time": "after-hours"},
+        {"report_date": "2024-02-15", "report_time": "after-hours"},
     ])
     result = await p.catalysts_in_window(
         "AAPL",
@@ -91,8 +113,8 @@ async def test_window_returns_events_inside_range() -> None:
 @pytest.mark.asyncio
 async def test_window_filters_events_before_start() -> None:
     p = _provider([
-        {"kind": "earnings", "when": "2023-12-15T21:00:00Z", "title": "old"},
-        {"kind": "fda", "when": "2024-02-15T15:00:00Z", "title": "FDA"},
+        {"report_date": "2023-12-15", "report_time": "after-hours"},
+        {"report_date": "2024-02-15", "report_time": "after-hours"},
     ])
     result = await p.catalysts_in_window(
         "AAPL",
@@ -100,14 +122,14 @@ async def test_window_filters_events_before_start() -> None:
         datetime(2024, 2, 28, tzinfo=UTC),
     )
     assert len(result) == 1
-    assert result[0].title == "FDA"
+    assert result[0].when.date().isoformat() == "2024-02-15"
 
 
 @pytest.mark.asyncio
 async def test_window_filters_events_after_end() -> None:
     p = _provider([
-        {"kind": "earnings", "when": "2024-01-25T21:00:00Z", "title": "Q1"},
-        {"kind": "fda", "when": "2024-04-15T15:00:00Z", "title": "future"},
+        {"report_date": "2024-01-25", "report_time": "after-hours"},
+        {"report_date": "2024-04-15", "report_time": "after-hours"},
     ])
     result = await p.catalysts_in_window(
         "AAPL",
@@ -115,20 +137,24 @@ async def test_window_filters_events_after_end() -> None:
         datetime(2024, 2, 28, tzinfo=UTC),
     )
     assert len(result) == 1
-    assert result[0].title == "Q1"
+    assert result[0].when.date().isoformat() == "2024-01-25"
 
 
 @pytest.mark.asyncio
 async def test_window_includes_boundary_events() -> None:
-    """Events exactly at start or end are included (inclusive bounds)."""
+    """Events exactly at start or end are included (inclusive bounds).
+
+    Earnings report_time=after-hours maps to 21:00 UTC; window endpoints
+    at 22:00 UTC bracket the 21:00 events.
+    """
     p = _provider([
-        {"kind": "earnings", "when": "2024-01-15T00:00:00Z", "title": "start"},
-        {"kind": "fda", "when": "2024-02-28T00:00:00Z", "title": "end"},
+        {"report_date": "2024-01-15", "report_time": "after-hours"},
+        {"report_date": "2024-02-28", "report_time": "after-hours"},
     ])
     result = await p.catalysts_in_window(
         "AAPL",
-        datetime(2024, 1, 15, tzinfo=UTC),
-        datetime(2024, 2, 28, tzinfo=UTC),
+        datetime(2024, 1, 15, 21, 0, tzinfo=UTC),
+        datetime(2024, 2, 28, 21, 0, tzinfo=UTC),
     )
     assert len(result) == 2
 
@@ -137,17 +163,17 @@ async def test_window_includes_boundary_events() -> None:
 async def test_window_returns_ascending_sort() -> None:
     """Output is sorted ascending by when, regardless of input order."""
     p = _provider([
-        {"kind": "fda", "when": "2024-02-15T15:00:00Z", "title": "B"},
-        {"kind": "earnings", "when": "2024-01-25T21:00:00Z", "title": "A"},
-        {"kind": "fomc", "when": "2024-02-20T18:00:00Z", "title": "C"},
+        {"report_date": "2024-02-15", "report_time": "after-hours"},
+        {"report_date": "2024-01-25", "report_time": "after-hours"},
+        {"report_date": "2024-02-20", "report_time": "after-hours"},
     ])
     result = await p.catalysts_in_window(
         "AAPL",
         datetime(2024, 1, 1, tzinfo=UTC),
         datetime(2024, 3, 1, tzinfo=UTC),
     )
-    titles = [e.title for e in result]
-    assert titles == ["A", "B", "C"]
+    dates = [e.when.date().isoformat() for e in result]
+    assert dates == ["2024-01-25", "2024-02-15", "2024-02-20"]
 
 
 @pytest.mark.asyncio
@@ -163,11 +189,11 @@ async def test_window_empty_rows_returns_empty_tuple() -> None:
 
 @pytest.mark.asyncio
 async def test_window_skips_malformed_rows() -> None:
-    """A row missing 'when' is dropped; valid rows continue."""
+    """A row missing 'report_date' or with garbage date is dropped."""
     p = _provider([
-        {"kind": "earnings", "when": "2024-01-25T21:00:00Z", "title": "good"},
-        {"kind": "fda", "title": "no_when"},  # malformed
-        {"kind": "fomc", "when": "garbage", "title": "bad_when"},
+        {"report_date": "2024-01-25", "report_time": "after-hours"},
+        {"report_time": "after-hours"},                       # missing report_date
+        {"report_date": "garbage", "report_time": "unknown"}, # bad date
     ])
     result = await p.catalysts_in_window(
         "AAPL",
@@ -175,22 +201,7 @@ async def test_window_skips_malformed_rows() -> None:
         datetime(2024, 3, 1, tzinfo=UTC),
     )
     assert len(result) == 1
-    assert result[0].title == "good"
-
-
-@pytest.mark.asyncio
-async def test_window_unknown_kind_normalised_to_other() -> None:
-    """An unrecognised 'kind' is mapped to 'other' (not dropped)."""
-    p = _provider([
-        {"kind": "weird_unknown", "when": "2024-01-25T21:00:00Z", "title": "x"},
-    ])
-    result = await p.catalysts_in_window(
-        "AAPL",
-        datetime(2024, 1, 1, tzinfo=UTC),
-        datetime(2024, 3, 1, tzinfo=UTC),
-    )
-    assert len(result) == 1
-    assert result[0].kind == "other"
+    assert result[0].when.date().isoformat() == "2024-01-25"
 
 
 # ---------------------------------------------------------------------------
@@ -200,9 +211,9 @@ async def test_window_unknown_kind_normalised_to_other() -> None:
 
 @pytest.mark.asyncio
 async def test_window_and_next_share_cache() -> None:
-    """Calling both methods triggers the HTTP fetch only once."""
+    """Calling both methods triggers each endpoint's HTTP fetch only once."""
     p = _provider([
-        {"kind": "earnings", "when": "2024-01-25T21:00:00Z", "title": "Q1"},
+        {"report_date": "2024-01-25", "report_time": "after-hours"},
     ])
     await p.catalysts_in_window(
         "AAPL",
@@ -210,5 +221,6 @@ async def test_window_and_next_share_cache() -> None:
         datetime(2024, 2, 1, tzinfo=UTC),
     )
     await p.next_catalyst("AAPL", datetime(2024, 1, 1, tzinfo=UTC))
-    # Inspect the underlying mock; only one .request_json call expected
-    assert p._client.request_json.await_count == 1
+    # Three endpoints (earnings, fda, econ), each fetched once across the
+    # two calls; second invocation hits the per-endpoint TTL cache.
+    assert p._client.request_json.await_count == 3

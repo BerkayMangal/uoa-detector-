@@ -92,17 +92,14 @@ def test_catalyst_calendar_implements_protocol() -> None:
 
 @pytest.mark.asyncio
 async def test_catalyst_calendar_returns_next_event() -> None:
+    """Phase 3.3.9.4: earnings endpoint feeds the primary catalyst stream."""
     client = _FakeClient()
     client.stub(
-        "/api/stock/AAPL/upcoming-events",
+        "/api/earnings/AAPL",
         {
             "data": [
-                {"kind": "guidance", "when": "2024-01-20T12:00:00Z",
-                 "title": "AAPL guidance"},
-                {"kind": "earnings", "when": "2024-01-25T21:00:00Z",
-                 "title": "AAPL Q1 FY2024"},
-                {"kind": "investor_day", "when": "2024-03-15T13:00:00Z",
-                 "title": "AAPL Investor Day"},
+                {"report_date": "2024-01-20", "report_time": "after-hours"},
+                {"report_date": "2024-01-25", "report_time": "after-hours"},
             ],
         },
     )
@@ -112,19 +109,19 @@ async def test_catalyst_calendar_returns_next_event() -> None:
     )
     after = datetime(2024, 1, 22, 0, 0, tzinfo=UTC)
     event = await provider.next_catalyst("AAPL", after)
-    # Should pick earnings (next event >= after); guidance (Jan 20) is before.
+    # Picks Jan 25; Jan 20 is before ``after``.
     assert event is not None
     assert event.kind == "earnings"
-    assert event.title == "AAPL Q1 FY2024"
+    assert event.when.date().isoformat() == "2024-01-25"
 
 
 @pytest.mark.asyncio
 async def test_catalyst_calendar_returns_none_when_no_future_event() -> None:
+    """All three sources empty or past-only → next_catalyst returns None."""
     client = _FakeClient()
     client.stub(
-        "/api/stock/AAPL/upcoming-events",
-        {"data": [{"kind": "earnings", "when": "2023-12-01T12:00:00Z",
-                    "title": "old"}]},
+        "/api/earnings/AAPL",
+        {"data": [{"report_date": "2023-12-01", "report_time": "after-hours"}]},
     )
     provider = UnusualWhalesCatalystCalendarProvider(
         client=client,  # type: ignore[arg-type]
@@ -136,12 +133,17 @@ async def test_catalyst_calendar_returns_none_when_no_future_event() -> None:
 
 
 @pytest.mark.asyncio
-async def test_catalyst_calendar_unknown_kind_falls_back_to_other() -> None:
+async def test_catalyst_calendar_econ_event_falls_back_to_other() -> None:
+    """Phase 3.3.9.4: econ-calendar events with no 'fed' keyword → other."""
     client = _FakeClient()
     client.stub(
-        "/api/stock/AAPL/upcoming-events",
-        {"data": [{"kind": "weird", "when": "2024-02-01T00:00:00Z",
-                    "title": "x"}]},
+        "/api/market/economic-calendar",
+        {
+            "data": [
+                {"type": "report", "time": "2024-02-01T00:00:00Z",
+                 "event": "Empire State manufacturing survey"},
+            ],
+        },
     )
     provider = UnusualWhalesCatalystCalendarProvider(
         client=client,  # type: ignore[arg-type]
@@ -155,11 +157,11 @@ async def test_catalyst_calendar_unknown_kind_falls_back_to_other() -> None:
 
 @pytest.mark.asyncio
 async def test_catalyst_calendar_caches() -> None:
+    """Two next_catalyst calls → at most one fetch per endpoint."""
     client = _FakeClient()
     client.stub(
-        "/api/stock/AAPL/upcoming-events",
-        {"data": [{"kind": "earnings", "when": "2024-02-01T00:00:00Z",
-                    "title": "x"}]},
+        "/api/earnings/AAPL",
+        {"data": [{"report_date": "2024-02-01", "report_time": "after-hours"}]},
     )
     provider = UnusualWhalesCatalystCalendarProvider(
         client=client,  # type: ignore[arg-type]
@@ -168,7 +170,103 @@ async def test_catalyst_calendar_caches() -> None:
     after = datetime(2024, 1, 1, tzinfo=UTC)
     await provider.next_catalyst("AAPL", after)
     await provider.next_catalyst("AAPL", after)
-    assert len(client.calls) == 1
+    # 3 endpoints, each fetched once across the two next_catalyst calls.
+    paths = [call[0] for call in client.calls]
+    assert paths.count("/api/earnings/AAPL") == 1
+    assert paths.count("/api/market/fda-calendar") == 1
+    assert paths.count("/api/market/economic-calendar") == 1
+
+
+@pytest.mark.asyncio
+async def test_catalyst_calendar_fda_event_filtered_by_ticker() -> None:
+    """Phase 3.3.9.4: global FDA feed; provider filters by ticker."""
+    client = _FakeClient()
+    client.stub(
+        "/api/market/fda-calendar",
+        {
+            "data": [
+                {"ticker": "GERN", "event_type": "Top-line Data",
+                 "target_date": "2024-02-15"},
+                {"ticker": "AAPL", "event_type": "FDA approval",
+                 "target_date": "2024-02-20"},
+            ],
+        },
+    )
+    provider = UnusualWhalesCatalystCalendarProvider(
+        client=client,  # type: ignore[arg-type]
+        settings=_settings(),
+    )
+    after = datetime(2024, 1, 1, tzinfo=UTC)
+    event = await provider.next_catalyst("AAPL", after)
+    assert event is not None
+    assert event.kind == "fda"
+    assert event.when.date().isoformat() == "2024-02-20"
+
+
+@pytest.mark.asyncio
+async def test_catalyst_calendar_fda_unparseable_target_falls_back_to_start() -> None:
+    """Phase 3.3.9.4: text target_date ('2024-MID') → fall back to start_date."""
+    client = _FakeClient()
+    client.stub(
+        "/api/market/fda-calendar",
+        {
+            "data": [
+                {"ticker": "AAPL", "event_type": "FDA",
+                 "target_date": "2024-MID",
+                 "start_date": "2024-03-10"},
+            ],
+        },
+    )
+    provider = UnusualWhalesCatalystCalendarProvider(
+        client=client,  # type: ignore[arg-type]
+        settings=_settings(),
+    )
+    after = datetime(2024, 1, 1, tzinfo=UTC)
+    event = await provider.next_catalyst("AAPL", after)
+    assert event is not None
+    assert event.when.date().isoformat() == "2024-03-10"
+
+
+@pytest.mark.asyncio
+async def test_catalyst_calendar_econ_fed_event_kind_is_fomc() -> None:
+    """Phase 3.3.9.4: econ event mentioning 'Fed' → kind=fomc."""
+    client = _FakeClient()
+    client.stub(
+        "/api/market/economic-calendar",
+        {
+            "data": [
+                {"type": "fed-speech", "time": "2024-02-05T13:00:00Z",
+                 "event": "Federal Reserve Chair Powell speech"},
+            ],
+        },
+    )
+    provider = UnusualWhalesCatalystCalendarProvider(
+        client=client,  # type: ignore[arg-type]
+        settings=_settings(),
+    )
+    after = datetime(2024, 1, 1, tzinfo=UTC)
+    event = await provider.next_catalyst("AAPL", after)
+    assert event is not None
+    assert event.kind == "fomc"
+
+
+@pytest.mark.asyncio
+async def test_catalyst_calendar_earnings_premarket_time_maps_to_morning() -> None:
+    """Phase 3.3.9.4: report_time='pre-market' → 13:30 UTC (~08:30 ET DST)."""
+    client = _FakeClient()
+    client.stub(
+        "/api/earnings/AAPL",
+        {"data": [{"report_date": "2024-02-01", "report_time": "pre-market"}]},
+    )
+    provider = UnusualWhalesCatalystCalendarProvider(
+        client=client,  # type: ignore[arg-type]
+        settings=_settings(),
+    )
+    after = datetime(2024, 1, 1, tzinfo=UTC)
+    event = await provider.next_catalyst("AAPL", after)
+    assert event is not None
+    assert event.when.hour == 13
+    assert event.when.minute == 30
 
 
 # ===========================================================================
