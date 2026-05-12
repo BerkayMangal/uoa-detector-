@@ -10,39 +10,64 @@ The provider is pure data-shipping: no business logic. Module 21
 applies its own scoring (gamma_score, GAMMA_ACCELERATION_RISK
 flag) using profile-tunable thresholds.
 
-UW endpoint shape (documented at fetch time, kept centralised here
-for one-place schema-evolution fix):
+UW endpoint shape (Phase 3.3.9.1 — migrated from
+``/api/stock/{ticker}/greek-exposure-strike``, dash-separated, which
+UW deprecated; new path uses the slash-separated
+``greek-exposure/strike`` and a different row schema):
 
-  GET /api/stock/{ticker}/greek-exposure-strike
+  GET /api/stock/{ticker}/greek-exposure/strike
     → {
         "data": [
           {
-            "strike": "150.0",
-            "as_of": "2024-01-15T15:30:00Z",
-            "net_gamma": "-12345678.0",
-            "flow_direction": "accumulating"
+            "date": "2026-05-11",
+            "strike": "150",
+            "call_delta": "...", "put_delta": "...",
+            "call_charm": "...", "put_charm": "...",
+            "call_vanna": "...", "put_vanna": "...",
+            "call_gex": "0.0496", "put_gex": "-0.0080"
           },
           ...
         ]
       }
 
+decision (Phase 3.3.9.1 — DealerPositioning DTO unchanged):
+  Phase 3.4 stage code is frozen. To preserve the DTO surface,
+  the provider maps the new UW schema into the existing
+  ``DealerPositioning(strike, as_of, net_gamma_dollars,
+  flow_direction)`` shape:
+    - ``net_gamma_dollars = call_gex + put_gex`` per strike
+      (signed total dealer gamma for that strike).
+    - ``as_of`` derived from the row's ``date`` field, cast to
+      21:00 UTC (US session close on DST; non-DST off by 1h,
+      acceptable for daily-snapshot semantics — UW updates GEX
+      end-of-day).
+    - ``flow_direction = "neutral"`` (UW no longer publishes a
+      directional flow field on this endpoint; M21 stage doesn't
+      use the field for scoring, only for telemetry).
+  The unit of ``call_gex + put_gex`` in the new UW response is
+  expected to remain USD per 1% spot move (the established GEX
+  convention); if backtest reveals a scale mismatch with M21's
+  ``short_gamma_threshold = -$50M/1%``, that's a Phase 3.6
+  calibration question, not a Phase 3.3.9 path-migration concern.
+
 decision (UW gamma sign convention):
-  UW publishes ``net_gamma`` as signed dollars per 1% spot move
-  (negative = dealers short gamma). Same convention as
-  ``DealerPositioning.net_gamma_dollars``. No transformation
-  needed, only field rename.
+  UW's per-strike ``call_gex`` and ``put_gex`` are signed in the
+  same convention as the legacy ``net_gamma`` field. Negative sum
+  = dealers short gamma at that strike. No additional sign flip.
 
 decision (nearest-strike fallback):
-  UW returns gamma per discrete strike. If the requested strike
-  isn't on UW's list, we look for the nearest strike within
-  $0.01 (treating Decimal equality as a soft match). If nothing
-  matches, return None — Module 21 falls back to a neutral score
-  via NoOpDealerPositioningProvider semantics.
+  Unchanged from Phase 3.3.3. UW returns gamma per discrete
+  strike; if the requested strike isn't on UW's list, we look for
+  the nearest match within $0.01 (Decimal equality soft match).
+  Otherwise return None — Module 21 falls back to neutral via
+  NoOp semantics.
 """
 
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from datetime import date as _date
+from datetime import time as _time
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any
 
@@ -123,8 +148,8 @@ class UnusualWhalesDealerGammaProvider:
         for row in rows:
             try:
                 strike = Decimal(str(row["strike"]))
-                net = Decimal(str(row["net_gamma"]))
-                as_of = _parse_iso_utc(str(row["as_of"]))
+                net = _row_net_gamma(row)
+                as_of = _row_as_of(row)
             except (KeyError, ValueError, ArithmeticError):
                 continue
             decoded.append((strike, net, as_of))
@@ -143,7 +168,7 @@ class UnusualWhalesDealerGammaProvider:
         )
 
     async def _fetch(self, ticker: str) -> list[dict[str, Any]]:
-        path = f"/api/stock/{ticker.upper()}/greek-exposure-strike"
+        path = f"/api/stock/{ticker.upper()}/greek-exposure/strike"
         resp = await self._client.request_json(path)
         data = resp.get("data", [])
         if not isinstance(data, list):
@@ -170,15 +195,19 @@ class UnusualWhalesDealerGammaProvider:
 def _row_to_dealer_positioning(
     row: dict[str, Any], *, ticker: str,
 ) -> DealerPositioning | None:
-    """Map one UW gamma-strike row to a DealerPositioning DTO."""
+    """Map one UW gamma-strike row to a DealerPositioning DTO.
+
+    Phase 3.3.9.1: new UW schema (date/call_gex/put_gex/...);
+    legacy fields (as_of/net_gamma/flow_direction) no longer
+    present, derived per ``_row_*`` helpers below.
+    """
     try:
         strike = Decimal(str(row["strike"]))
-        as_of_raw = str(row["as_of"])
-        as_of = _parse_iso_utc(as_of_raw)
-        net_gamma = Decimal(str(row["net_gamma"]))
-        flow_direction_raw = str(row.get("flow_direction", "neutral")).lower()
+        as_of = _row_as_of(row)
+        net_gamma = _row_net_gamma(row)
     except (KeyError, ValueError, ArithmeticError):
         return None
+    flow_direction_raw = str(row.get("flow_direction", "neutral")).lower()
     if flow_direction_raw not in ("accumulating", "distributing", "neutral"):
         flow_direction_raw = "neutral"
     return DealerPositioning(
@@ -188,6 +217,31 @@ def _row_to_dealer_positioning(
         net_gamma_dollars=net_gamma,
         flow_direction=flow_direction_raw,
     )
+
+
+def _row_net_gamma(row: dict[str, Any]) -> Decimal:
+    """Phase 3.3.9.1: net_gamma = call_gex + put_gex per strike.
+
+    Legacy ``net_gamma`` field still tolerated (Phase 3.3.3 fixture
+    compat). Raises KeyError if neither shape present.
+    """
+    if "net_gamma" in row:
+        return Decimal(str(row["net_gamma"]))
+    call_gex = Decimal(str(row["call_gex"]))
+    put_gex = Decimal(str(row["put_gex"]))
+    return call_gex + put_gex
+
+
+def _row_as_of(row: dict[str, Any]) -> datetime:
+    """Phase 3.3.9.1: as_of derived from ``date`` (YYYY-MM-DD), cast to
+    21:00 UTC (US session close on DST). Legacy ``as_of`` ISO string
+    still tolerated (Phase 3.3.3 fixture compat).
+    """
+    if "as_of" in row:
+        return _parse_iso_utc(str(row["as_of"]))
+    date_str = str(row["date"])
+    day = _date.fromisoformat(date_str)
+    return datetime.combine(day, _time(hour=21, minute=0, tzinfo=UTC))
 
 
 def _parse_iso_utc(raw: str) -> datetime:

@@ -104,7 +104,7 @@ def test_dealer_gamma_implements_protocol() -> None:
 async def test_dealer_gamma_returns_positioning_for_known_strike() -> None:
     client = _FakeClient()
     client.stub(
-        "/api/stock/AAPL/greek-exposure-strike",
+        "/api/stock/AAPL/greek-exposure/strike",
         {
             "data": [
                 {
@@ -142,7 +142,7 @@ async def test_dealer_gamma_returns_positioning_for_known_strike() -> None:
 async def test_dealer_gamma_returns_none_for_unknown_strike() -> None:
     client = _FakeClient()
     client.stub(
-        "/api/stock/AAPL/greek-exposure-strike",
+        "/api/stock/AAPL/greek-exposure/strike",
         {"data": [{"strike": "150.00", "as_of": "2024-01-15T15:30:00Z",
                     "net_gamma": "1.0", "flow_direction": "neutral"}]},
     )
@@ -163,7 +163,7 @@ async def test_dealer_gamma_caches_response() -> None:
     """Two calls for same ticker → one HTTP request."""
     client = _FakeClient()
     client.stub(
-        "/api/stock/AAPL/greek-exposure-strike",
+        "/api/stock/AAPL/greek-exposure/strike",
         {"data": [{"strike": "150.00", "as_of": "2024-01-15T15:30:00Z",
                     "net_gamma": "1.0", "flow_direction": "neutral"}]},
     )
@@ -185,7 +185,7 @@ async def test_dealer_gamma_caches_response() -> None:
 async def test_dealer_gamma_cache_disabled_when_ttl_zero() -> None:
     client = _FakeClient()
     client.stub(
-        "/api/stock/AAPL/greek-exposure-strike",
+        "/api/stock/AAPL/greek-exposure/strike",
         {"data": [{"strike": "150.00", "as_of": "2024-01-15T15:30:00Z",
                     "net_gamma": "1.0", "flow_direction": "neutral"}]},
     )
@@ -202,10 +202,87 @@ async def test_dealer_gamma_cache_disabled_when_ttl_zero() -> None:
 
 
 @pytest.mark.asyncio
+async def test_dealer_gamma_parses_new_uw_schema_date_and_gex_pair() -> None:
+    """Phase 3.3.9.1: new UW response uses date/call_gex/put_gex per strike.
+
+    Mapping:
+      - net_gamma_dollars = call_gex + put_gex
+      - as_of = date cast to 21:00 UTC (US session close on DST)
+      - flow_direction defaults to "neutral" (field not published)
+    """
+    client = _FakeClient()
+    client.stub(
+        "/api/stock/AAPL/greek-exposure/strike",
+        {
+            "data": [
+                {
+                    "date": "2026-05-11",
+                    "strike": "150",
+                    "call_delta": "100.0",
+                    "put_delta": "-20.0",
+                    "call_charm": "1.0", "put_charm": "-0.5",
+                    "call_vanna": "2.0", "put_vanna": "-1.0",
+                    "call_gex": "0.0500",
+                    "put_gex": "-0.0200",
+                },
+            ],
+        },
+    )
+    provider = UnusualWhalesDealerGammaProvider(
+        client=client,  # type: ignore[arg-type]
+        settings=_settings(),
+    )
+    pos = await provider.net_gamma_at(
+        ticker="AAPL",
+        strike=Decimal("150"),
+        at=datetime(2026, 5, 11, 15, 30, tzinfo=UTC),
+    )
+    assert pos is not None
+    assert pos.ticker == "AAPL"
+    assert pos.strike == Decimal("150")
+    assert pos.net_gamma_dollars == Decimal("0.0300")  # 0.05 + (-0.02)
+    assert pos.flow_direction == "neutral"
+    assert pos.as_of == datetime(2026, 5, 11, 21, 0, tzinfo=UTC)
+
+
+@pytest.mark.asyncio
+async def test_dealer_gamma_aggregate_uses_new_schema() -> None:
+    """Phase 3.3.9.1: aggregate sums call_gex + put_gex across strikes."""
+    client = _FakeClient()
+    client.stub(
+        "/api/stock/AAPL/greek-exposure/strike",
+        {
+            "data": [
+                {
+                    "date": "2026-05-11", "strike": "140",
+                    "call_gex": "0.1000", "put_gex": "-0.0500",
+                },
+                {
+                    "date": "2026-05-11", "strike": "150",
+                    "call_gex": "0.0500", "put_gex": "0.0500",
+                },
+            ],
+        },
+    )
+    provider = UnusualWhalesDealerGammaProvider(
+        client=client,  # type: ignore[arg-type]
+        settings=_settings(),
+    )
+    agg = await provider.aggregate_for_ticker(
+        ticker="AAPL",
+        at=datetime(2026, 5, 11, 15, 30, tzinfo=UTC),
+    )
+    assert agg is not None
+    assert agg.ticker == "AAPL"
+    # Sum across both strikes: 0.10 + (-0.05) + 0.05 + 0.05 = 0.15
+    assert agg.net_gamma_dollars == Decimal("0.1500")
+
+
+@pytest.mark.asyncio
 async def test_dealer_gamma_unknown_flow_direction_falls_back_to_neutral() -> None:
     client = _FakeClient()
     client.stub(
-        "/api/stock/AAPL/greek-exposure-strike",
+        "/api/stock/AAPL/greek-exposure/strike",
         {"data": [{
             "strike": "150.00",
             "as_of": "2024-01-15T15:30:00Z",
