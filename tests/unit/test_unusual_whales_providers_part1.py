@@ -478,7 +478,7 @@ def test_dark_pool_implements_protocol() -> None:
 async def test_dark_pool_returns_prints_in_window() -> None:
     client = _FakeClient()
     client.stub(
-        "/api/darkpool/AAPL/prints",
+        "/api/darkpool/AAPL",
         {
             "data": [
                 {"executed_at": "2024-01-15T14:25:30Z",
@@ -512,7 +512,7 @@ async def test_dark_pool_returns_prints_in_window() -> None:
 async def test_dark_pool_unknown_side_falls_back() -> None:
     client = _FakeClient()
     client.stub(
-        "/api/darkpool/AAPL/prints",
+        "/api/darkpool/AAPL",
         {"data": [{"executed_at": "2024-01-15T14:30:00Z",
                     "price": "150.0", "size": 100,
                     "side_estimate": "weird_value"}]},
@@ -534,7 +534,7 @@ async def test_dark_pool_unknown_side_falls_back() -> None:
 async def test_dark_pool_caches_per_ticker() -> None:
     client = _FakeClient()
     client.stub(
-        "/api/darkpool/AAPL/prints",
+        "/api/darkpool/AAPL",
         {"data": []},
     )
     provider = UnusualWhalesDarkPoolProvider(
@@ -555,7 +555,7 @@ async def test_dark_pool_caches_per_ticker() -> None:
 @pytest.mark.asyncio
 async def test_dark_pool_handles_empty_response() -> None:
     client = _FakeClient()
-    client.stub("/api/darkpool/AAPL/prints", {"data": []})
+    client.stub("/api/darkpool/AAPL", {"data": []})
     provider = UnusualWhalesDarkPoolProvider(
         client=client,  # type: ignore[arg-type]
         settings=_settings(),
@@ -569,11 +569,124 @@ async def test_dark_pool_handles_empty_response() -> None:
 
 
 @pytest.mark.asyncio
+async def test_dark_pool_side_derived_from_nbbo_above_ask() -> None:
+    """Phase 3.3.9.3: price ≥ nbbo_ask → above_ask."""
+    client = _FakeClient()
+    client.stub(
+        "/api/darkpool/AAPL",
+        {
+            "data": [
+                {
+                    "executed_at": "2024-01-15T14:30:00Z",
+                    "price": "150.50", "size": 1000,
+                    "nbbo_bid": "150.30", "nbbo_ask": "150.45",
+                },
+            ],
+        },
+    )
+    provider = UnusualWhalesDarkPoolProvider(
+        client=client,  # type: ignore[arg-type]
+        settings=_settings(),
+    )
+    prints = await provider.recent_prints(
+        ticker="AAPL",
+        before=datetime(2024, 1, 15, 15, 0, tzinfo=UTC),
+        window=timedelta(minutes=60),
+    )
+    assert len(prints) == 1
+    assert prints[0].side_estimate == "above_ask"
+
+
+@pytest.mark.asyncio
+async def test_dark_pool_side_derived_from_nbbo_at_or_below_bid() -> None:
+    """Phase 3.3.9.3: price ≤ nbbo_bid → at_or_below_bid."""
+    client = _FakeClient()
+    client.stub(
+        "/api/darkpool/AAPL",
+        {
+            "data": [
+                {
+                    "executed_at": "2024-01-15T14:30:00Z",
+                    "price": "150.25", "size": 1000,
+                    "nbbo_bid": "150.30", "nbbo_ask": "150.45",
+                },
+            ],
+        },
+    )
+    provider = UnusualWhalesDarkPoolProvider(
+        client=client,  # type: ignore[arg-type]
+        settings=_settings(),
+    )
+    prints = await provider.recent_prints(
+        ticker="AAPL",
+        before=datetime(2024, 1, 15, 15, 0, tzinfo=UTC),
+        window=timedelta(minutes=60),
+    )
+    assert len(prints) == 1
+    assert prints[0].side_estimate == "at_or_below_bid"
+
+
+@pytest.mark.asyncio
+async def test_dark_pool_side_derived_from_nbbo_midpoint() -> None:
+    """Phase 3.3.9.3: nbbo_bid < price < nbbo_ask → midpoint."""
+    client = _FakeClient()
+    client.stub(
+        "/api/darkpool/AAPL",
+        {
+            "data": [
+                {
+                    "executed_at": "2024-01-15T14:30:00Z",
+                    "price": "150.37", "size": 1000,
+                    "nbbo_bid": "150.30", "nbbo_ask": "150.45",
+                },
+            ],
+        },
+    )
+    provider = UnusualWhalesDarkPoolProvider(
+        client=client,  # type: ignore[arg-type]
+        settings=_settings(),
+    )
+    prints = await provider.recent_prints(
+        ticker="AAPL",
+        before=datetime(2024, 1, 15, 15, 0, tzinfo=UTC),
+        window=timedelta(minutes=60),
+    )
+    assert len(prints) == 1
+    assert prints[0].side_estimate == "midpoint"
+
+
+@pytest.mark.asyncio
+async def test_dark_pool_side_unknown_when_nbbo_missing() -> None:
+    """Phase 3.3.9.3: no nbbo fields → unknown."""
+    client = _FakeClient()
+    client.stub(
+        "/api/darkpool/AAPL",
+        {
+            "data": [
+                {"executed_at": "2024-01-15T14:30:00Z",
+                 "price": "150.37", "size": 1000},
+            ],
+        },
+    )
+    provider = UnusualWhalesDarkPoolProvider(
+        client=client,  # type: ignore[arg-type]
+        settings=_settings(),
+    )
+    prints = await provider.recent_prints(
+        ticker="AAPL",
+        before=datetime(2024, 1, 15, 15, 0, tzinfo=UTC),
+        window=timedelta(minutes=60),
+    )
+    assert len(prints) == 1
+    assert prints[0].side_estimate == "unknown"
+
+
+@pytest.mark.asyncio
 async def test_dark_pool_malformed_row_skipped() -> None:
     """Bad row dropped, good row emitted."""
     client = _FakeClient()
     client.stub(
-        "/api/darkpool/AAPL/prints",
+        "/api/darkpool/AAPL",
         {
             "data": [
                 {"executed_at": "garbage_timestamp", "price": "1.0", "size": 1,

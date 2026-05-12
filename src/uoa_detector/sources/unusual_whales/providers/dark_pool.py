@@ -10,38 +10,50 @@ Confirmation) consumes the prints and applies its own logic
 (prints below bid → bullish absorption; above ask → bearish
 distribution; mid-price + drift → confirmation).
 
-UW endpoint shape:
+UW endpoint shape (Phase 3.3.9.3 — migrated from
+``/api/darkpool/{ticker}/prints``, which UW deprecated; current
+path drops the ``/prints`` suffix and ships an enriched row schema
+that no longer includes a precomputed ``side_estimate``):
 
-  GET /api/darkpool/{ticker}/prints?after={iso}
+  GET /api/darkpool/{ticker}
     → {
         "data": [
           {
-            "executed_at": "2024-01-15T14:25:30Z",
-            "price": "150.42",
-            "size": 50000,
-            "side_estimate": "midpoint"
+            "executed_at": "2026-05-11T23:43:15Z",
+            "price": "292.6001",
+            "size": 2000,
+            "premium": "585200.20",
+            "nbbo_bid": "292.6",
+            "nbbo_ask": "292.67",
+            "nbbo_bid_quantity": 116,
+            "nbbo_ask_quantity": 48,
+            "market_center": "L",
+            "trade_settlement": "regular",
+            "sale_cond_codes": null,
+            "ext_hour_sold_codes": "extended_hours_trade",
+            "tracking_id": 26946710210168
           },
           ...
         ]
       }
 
-decision (cache key includes ticker only, time-window filtering at consumer):
-  UW's endpoint returns recent prints (the ``after`` param bounds
-  the lookback). We cache the full response per ticker; the
-  consumer (``recent_prints``) filters to the requested window
-  in-memory. TTL=60s default keeps prints fresh enough that the
-  Module 26 stage sees near-real-time dark-pool flow.
+decision (Phase 3.3.9.3 — derive ``side_estimate`` locally):
+  UW dropped the precomputed ``side_estimate``. We derive it from
+  the print price against NBBO at execution time:
+    price ≥ nbbo_ask                → "above_ask"
+    price ≤ nbbo_bid                → "at_or_below_bid"
+    nbbo_bid < price < nbbo_ask     → "midpoint"
+    nbbo_bid / nbbo_ask missing or non-positive → "unknown"
+  This matches the Phase 3.4.6 M26 stage's expectation, which
+  reads the Literal field without further inference. The legacy
+  ``side_estimate`` field is still tolerated in fixtures for
+  Phase 3.3.3 unit-test back-compat.
 
-decision (UW side_estimate values pass through directly):
-  UW publishes 'above_ask' / 'at_or_below_bid' / 'midpoint' /
-  'unknown' which already match our DarkPoolPrint Literal. No
-  transformation needed beyond a defensive default.
+decision (cache key includes ticker only, time-window filtering at consumer):
+  Unchanged from Phase 3.3.3.
 
 decision (cap returned prints at 1000 per call):
-  UW may return very large windows; downstream code shouldn't
-  deal with arbitrary-size sequences. 1000 prints is well above
-  what Module 26 examines (typically last 30-60 minutes), with
-  margin for very heavy-volume tickers.
+  Unchanged from Phase 3.3.3.
 """
 
 from __future__ import annotations
@@ -105,7 +117,7 @@ class UnusualWhalesDarkPoolProvider:
         # Pull a generous lookback (60 min). The consumer filters down.
         after = (before - timedelta(minutes=60)).isoformat()
         params = {"after": after}
-        path = f"/api/darkpool/{ticker.upper()}/prints"
+        path = f"/api/darkpool/{ticker.upper()}"
         resp = await self._client.request_json(path, params=params)
         data = resp.get("data", [])
         if not isinstance(data, list):
@@ -123,9 +135,7 @@ def _row_to_dark_pool_print(
         size = int(row["size"])
     except (KeyError, ValueError, TypeError, ArithmeticError):
         return None
-    side_raw = str(row.get("side_estimate", "unknown")).lower()
-    if side_raw not in ("above_ask", "at_or_below_bid", "midpoint", "unknown"):
-        side_raw = "unknown"
+    side_raw = _row_side_estimate(row, price)
     return DarkPoolPrint(
         ticker=ticker.upper(),
         when=when,
@@ -133,6 +143,35 @@ def _row_to_dark_pool_print(
         size=size,
         side_estimate=side_raw,
     )
+
+
+def _row_side_estimate(row: dict[str, Any], price: Decimal) -> str:
+    """Phase 3.3.9.3: derive side_estimate from NBBO when absent.
+
+    Legacy ``side_estimate`` field (Phase 3.3.3 fixture compat) takes
+    precedence if present and valid.
+    """
+    legacy = row.get("side_estimate")
+    if isinstance(legacy, str):
+        v = legacy.lower()
+        if v in ("above_ask", "at_or_below_bid", "midpoint", "unknown"):
+            return v
+    bid_raw = row.get("nbbo_bid")
+    ask_raw = row.get("nbbo_ask")
+    if bid_raw is None or ask_raw is None:
+        return "unknown"
+    try:
+        bid = Decimal(str(bid_raw))
+        ask = Decimal(str(ask_raw))
+    except (ValueError, ArithmeticError):
+        return "unknown"
+    if bid <= Decimal("0") or ask <= Decimal("0") or ask < bid:
+        return "unknown"
+    if price >= ask:
+        return "above_ask"
+    if price <= bid:
+        return "at_or_below_bid"
+    return "midpoint"
 
 
 def _parse_iso_utc(raw: str) -> datetime:
