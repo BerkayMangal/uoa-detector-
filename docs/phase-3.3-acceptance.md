@@ -588,3 +588,28 @@ This addendum closes Phase 3.3.7 from the perspective of code
 delivery. Berkay's validation commit (filling
 ``docs/phase-3.3.7-validation.md``) is the final gate — only then
 does Phase 3.5.1 resume.
+
+---
+
+## Phase 3.3.8 follow-up — M23 ThetaData → UW (closed 2026-05-12)
+
+Phase 3.3.7.5 smoke validation surfaced that ThetaData's
+`/v3/stock/history/ohlc` endpoint requires the STOCK.VALUE
+subscription tier, which the operator does not hold. Phase 3.3.8
+shipped `UnusualWhalesPriceActionProvider` (against
+`/api/stock/{t}/ohlc/1m`) as M23's new default backend without
+touching M23 stage code or the `PriceActionProvider` Protocol.
+ThetaData provider retained for operators who do hold
+STOCK.VALUE. Full detail: `docs/phase-3.3.8-acceptance.md`.
+
+## Phase 3.3.9 follow-up — UW endpoint path migration (closed 2026-05-12)
+
+Phase 3.5.1 first smoke run reported 12/20 UW provider smokes
+HTTP 404 (UW had restructured six provider endpoints since Phase
+3.3.3). Phase 3.3.9 migrated dealer_gamma, iv_history, dark_pool,
+catalyst_calendar, open_interest, and sector_peer to the current
+UW REST surface in 7 sub-commits — all stage code and DTO
+surfaces unchanged. Full detail:
+`docs/phase-3.3.9-acceptance.md`. Phase 3.5.1 closed on
+2026-05-12 with 81 active integration smokes passing;
+`docs/phase-3.5.1-validation.md` records the run.

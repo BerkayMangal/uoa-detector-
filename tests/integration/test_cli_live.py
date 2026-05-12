@@ -46,9 +46,37 @@ def test_live_source_unknown_feed_rejected() -> None:
     assert "unknown feed" in result.output
 
 
-def test_live_source_missing_uw_key_rejected(monkeypatch) -> None:  # type: ignore[no-untyped-def]
-    """When --feeds unusual_whales is requested but no key, fail-fast."""
+def test_live_source_missing_uw_key_rejected(  # type: ignore[no-untyped-def]
+    monkeypatch,
+) -> None:
+    """When --feeds unusual_whales is requested but no key, fail-fast.
+
+    Phase 3.3.9.7 update: BaseSettings auto-loads ``.env`` from the
+    working directory, so on a developer machine with .env present
+    monkeypatch.delenv alone isn't enough. We patch the Credentials
+    ``_ENV_FILE`` module constant to a non-existent path so the
+    BaseSettings init reads only env vars (which we've also cleared).
+    """
+    from pathlib import Path
+
+    from uoa_detector.config import credentials as _creds_module
+
     monkeypatch.delenv("UNUSUAL_WHALES_API_KEY", raising=False)
+    monkeypatch.setattr(
+        _creds_module, "_ENV_FILE", Path("/nonexistent/.env"),
+    )
+    # Patch the model_config too so the already-bound env_file picks
+    # up the new path on next instantiation.
+    monkeypatch.setattr(
+        _creds_module.Credentials,
+        "model_config",
+        _creds_module.SettingsConfigDict(
+            env_file="/nonexistent/.env",
+            env_file_encoding="utf-8",
+            case_sensitive=False,
+            extra="ignore",
+        ),
+    )
     result = runner.invoke(app, [
         "run", "--source", "live",
         "--feeds", "unusual_whales",

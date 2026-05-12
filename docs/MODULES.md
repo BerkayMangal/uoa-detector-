@@ -38,6 +38,20 @@ all PipelineStages in retrospect.
 
 ---
 
+## Phase 3.3.9 — UW endpoint path migration (cross-cutting note)
+
+UW retired or restructured six provider endpoints between Phase
+3.3.3 (Q4 2024) and Phase 3.5.1 (May 2026). Phase 3.3.9 migrated
+M21 / M22 / M24 / M25 / M26 / M27 / M28 to the current UW REST
+surface **without touching any stage code, scoring weight, or
+DTO surface** — all schema changes are absorbed by the provider
+mapping layer. The current paths are summarised inline in each
+module's "Provider mapping" section below; full details, sub-
+commit hashes, and the migration table live in
+`docs/phase-3.3.9-acceptance.md`.
+
+---
+
 ## M21 — Dealer Gamma Exposure (Phase 3.4.1)
 
 ### What it computes
@@ -53,8 +67,11 @@ score via `ScoringWeights.gamma` (default 0.10, Track B 0.25).
 ### Provider mapping
 
 `UnusualWhalesDealerGammaProvider` → UW endpoint
-`/api/option/{ticker}/gex/strikes`. Returns total dealer gamma in
-USD-per-1%-spot-move and per-strike net gamma. The provider derives:
+`/api/stock/{ticker}/greek-exposure/strike` (Phase 3.3.9.1;
+migrated from `/api/option/{ticker}/gex/strikes` and the
+intermediate `/api/stock/{ticker}/greek-exposure-strike`).
+Returns per-strike `call_gex` and `put_gex`; provider sums them
+into the legacy `net_gamma_dollars` field. The provider derives:
 
   - `total_dealer_gamma`: scalar in USD/1%
   - `gamma_flip_strike`: spot price at which net dealer gamma flips
