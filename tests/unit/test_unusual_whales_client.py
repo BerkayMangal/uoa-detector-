@@ -161,10 +161,32 @@ async def test_request_json_returns_parsed_dict() -> None:
 
 
 @pytest.mark.asyncio
-async def test_non_dict_response_raises_transient() -> None:
-    """A bare-list response is treated as a serialisation bug."""
+async def test_top_level_array_response_auto_wrapped() -> None:
+    """Phase 3.3.9.6: UW endpoints like /flow-recent return a top-level
+    JSON array; client auto-wraps to ``{"data": [...]}`` so existing
+    ``resp.get("data", [])`` callers keep working.
+    """
     def handler(_r: httpx.Request) -> httpx.Response:
-        return httpx.Response(200, json=[1, 2, 3])
+        return httpx.Response(200, json=[{"a": 1}, {"a": 2}])
+
+    client = UnusualWhalesClient(
+        api_key=SecretStr("uw_test"),
+        settings=_settings(),
+        retry=RetryPolicy(max_attempts=1),
+        transport=httpx.MockTransport(handler),
+    )
+    try:
+        result = await client.request_json("/api/x")
+    finally:
+        await client.aclose()
+    assert result == {"data": [{"a": 1}, {"a": 2}]}
+
+
+@pytest.mark.asyncio
+async def test_non_dict_non_list_response_raises_transient() -> None:
+    """A scalar / string / number response is still a serialisation bug."""
+    def handler(_r: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json="garbage_string")
 
     client = UnusualWhalesClient(
         api_key=SecretStr("uw_test"),

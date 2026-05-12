@@ -227,6 +227,12 @@ class UnusualWhalesClient:
                     raise UnusualWhalesAuthError(msg)
                 self._breaker.record_success()
                 parsed: Any = response.json()
+                # Phase 3.3.9.6: a handful of UW endpoints (notably
+                # /api/stock/{t}/flow-recent) return a top-level JSON
+                # array rather than an object. Auto-wrap so existing
+                # ``resp.get("data", [])`` callers keep working.
+                if isinstance(parsed, list):
+                    return {"data": parsed}
                 if not isinstance(parsed, dict):
                     msg = (
                         f"UnusualWhales {method} {path} returned non-object "

@@ -534,22 +534,30 @@ def test_peer_flow_implements_protocol() -> None:
 
 @pytest.mark.asyncio
 async def test_peer_flow_returns_events_in_window() -> None:
+    """Phase 3.3.9.6: N parallel per-ticker fetches; window filter."""
     client = _FakeClient()
     client.stub(
-        "/api/option-flow/recent",
+        "/api/stock/MSFT/flow-recent",
         {
             "data": [
                 {"ticker": "MSFT",
                  "executed_at": "2024-01-15T14:30:00Z",
                  "side_classification": "bullish",
                  "label": "CONVEXITY_CLUSTER"},
-                {"ticker": "GOOGL",
-                 "executed_at": "2024-01-15T14:45:00Z",
-                 "side_classification": "bearish"},
                 # Outside window:
                 {"ticker": "MSFT",
                  "executed_at": "2024-01-15T13:00:00Z",
                  "side_classification": "bullish"},
+            ],
+        },
+    )
+    client.stub(
+        "/api/stock/GOOGL/flow-recent",
+        {
+            "data": [
+                {"ticker": "GOOGL",
+                 "executed_at": "2024-01-15T14:45:00Z",
+                 "side_classification": "bearish"},
             ],
         },
     )
@@ -568,12 +576,14 @@ async def test_peer_flow_returns_events_in_window() -> None:
 
 @pytest.mark.asyncio
 async def test_peer_flow_cache_key_caller_order_stable() -> None:
-    """Same ticker set in different order → same cache entry."""
+    """Phase 3.3.9.6: same ticker set in different order → same per-peer cache.
+
+    Two calls with different caller-side orderings → 2 total HTTP
+    fetches (one per peer), not 4. Second invocation hits cache.
+    """
     client = _FakeClient()
-    client.stub(
-        "/api/option-flow/recent",
-        {"data": []},
-    )
+    client.stub("/api/stock/MSFT/flow-recent", {"data": []})
+    client.stub("/api/stock/GOOGL/flow-recent", {"data": []})
     provider = UnusualWhalesPeerFlowProvider(
         client=client,  # type: ignore[arg-type]
         settings=_settings(),
@@ -587,8 +597,8 @@ async def test_peer_flow_cache_key_caller_order_stable() -> None:
         tickers=["GOOGL", "MSFT"],  # different order
         before=before, window=timedelta(minutes=30),
     )
-    # Single fetch — sorted-tuple key collides
-    assert len(client.calls) == 1
+    # Two fetches total (one per unique peer); second call hits cache
+    assert len(client.calls) == 2
 
 
 @pytest.mark.asyncio
@@ -610,9 +620,12 @@ async def test_peer_flow_empty_tickers_returns_empty() -> None:
 
 @pytest.mark.asyncio
 async def test_peer_flow_unknown_direction_falls_back_to_neutral() -> None:
+    """Phase 3.3.9.6: legacy side_classification still tolerated; bad
+    value falls back to neutral.
+    """
     client = _FakeClient()
     client.stub(
-        "/api/option-flow/recent",
+        "/api/stock/MSFT/flow-recent",
         {"data": [{"ticker": "MSFT",
                     "executed_at": "2024-01-15T14:30:00Z",
                     "side_classification": "wibble"}]},
@@ -628,3 +641,41 @@ async def test_peer_flow_unknown_direction_falls_back_to_neutral() -> None:
     )
     assert len(events) == 1
     assert events[0].direction == "neutral"
+
+
+@pytest.mark.asyncio
+async def test_peer_flow_direction_derived_from_ask_bid_volume() -> None:
+    """Phase 3.3.9.6: derive direction from ask_vol vs bid_vol."""
+    client = _FakeClient()
+    client.stub(
+        "/api/stock/MSFT/flow-recent",
+        {
+            "data": [
+                {"ticker": "MSFT",
+                 "executed_at": "2024-01-15T14:30:00Z",
+                 "ask_vol": 1000, "bid_vol": 100,
+                 "option_chain_id": "MSFT240216C00400000"},
+                {"ticker": "MSFT",
+                 "executed_at": "2024-01-15T14:35:00Z",
+                 "ask_vol": 50, "bid_vol": 800},
+                {"ticker": "MSFT",
+                 "executed_at": "2024-01-15T14:40:00Z",
+                 "ask_vol": 200, "bid_vol": 200},
+            ],
+        },
+    )
+    provider = UnusualWhalesPeerFlowProvider(
+        client=client,  # type: ignore[arg-type]
+        settings=_settings(),
+    )
+    events = await provider.recent_flow(
+        tickers=["MSFT"],
+        before=datetime(2024, 1, 15, 15, 0, tzinfo=UTC),
+        window=timedelta(minutes=60),
+    )
+    assert len(events) == 3
+    by_time = sorted(events, key=lambda e: e.when)
+    assert by_time[0].direction == "bullish"  # ask>bid
+    assert by_time[0].label == "MSFT240216C00400000"  # falls back to chain_id
+    assert by_time[1].direction == "bearish"  # ask<bid
+    assert by_time[2].direction == "neutral"  # ask==bid
