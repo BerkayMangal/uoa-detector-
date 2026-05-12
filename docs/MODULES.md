@@ -186,10 +186,18 @@ feeds the combined score via `ScoringWeights.price_confirmation`
 
 ### Provider mapping
 
-`ThetaDataPriceActionProvider` → ThetaData endpoint
-`/v2/hist/stock/ohlc?ivl=60000` (1-minute bars). Returns OHLC for
-the post-event window, from which the provider extracts the high
-(for call confirmation) or low (for put confirmation).
+**Phase 3.3.8.3 onwards:** `UnusualWhalesPriceActionProvider` → UW
+endpoint `/api/stock/{ticker}/ohlc/1m` (1-minute stock OHLC bars).
+Returns OHLC for the trading-date containing the event, from which
+the provider extracts the open of the earliest in-window bar and
+the close of the latest in-window bar.
+
+**Phase 3.4.3 – 3.3.8.2 (deprecated default, still wirable):**
+`ThetaDataPriceActionProvider` → ThetaData v3 endpoint
+`/v3/stock/history/ohlc?interval=1m`. Retained for operators with a
+ThetaData STOCK.VALUE subscription; rest of the system stays
+identical because both providers implement the same
+`PriceActionProvider` Protocol with the same `PriceMovement` DTO.
 
 ### Default thresholds + tuning rationale
 
@@ -215,11 +223,21 @@ followed by precisely this kind of move.
 move to the flow itself (not unrelated catalysts) but long enough
 for slow-quote fills to materialize.
 
-### Judgment-call ledger (Phase 3.4.3)
+### Judgment-call ledger (Phase 3.4.3, amended Phase 3.3.8)
 
-  - **ThetaData provider, not UW** — UW exposes flow not OHLC; spot
-    OHLC is ThetaData's domain. M23 is the only Phase 3.4 module
-    consuming ThetaData; the rest go through UW.
+  - **~~ThetaData provider, not UW~~ (superseded Phase 3.3.8.3)** —
+    Original 3.4.3 judgment placed spot OHLC under ThetaData's
+    domain because that was the natural shape of their endpoints.
+    Reality check during Phase 3.3.7 ThetaData v3 smoke validation:
+    the stock OHLC endpoint requires a separate STOCK.VALUE
+    subscription tier that operators on OPTION.STANDARD don't
+    have. Rather than block Phase 3.5.1 on a subscription
+    purchase, Phase 3.3.8.3 ships
+    `UnusualWhalesPriceActionProvider` against UW's documented
+    `/api/stock/{ticker}/ohlc/{candle_size}` endpoint. The
+    `PriceActionProvider` Protocol is unchanged; M23 stage code is
+    unchanged; only the wiring switches. See
+    `docs/phase-3.3.8-acceptance.md`.
   - **Half-day handling deferred to Phase 3.5+** — a 5-minute
     window crossing market close on a half-day (1pm ET) currently
     fetches partial data. The provider returns whatever it has;
@@ -233,6 +251,12 @@ for slow-quote fills to materialize.
     put → check low. The spec implies this but the implementation
     pins it explicitly. Spreads / multi-leg flows aren't covered;
     those are out of M23's scope.
+  - **Provider-exception branch (Phase 3.3.8.1)** — the stage
+    catches `Exception` from the provider (HTTP 4xx/5xx, auth,
+    transport) and maps to `branch=provider_error`, neutral score.
+    `BaseException` (CancelledError, KeyboardInterrupt) still
+    propagates. Required because subscription-tier mismatches
+    surface as HTTP errors, not None responses.
 
 ---
 
