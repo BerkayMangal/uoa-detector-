@@ -328,3 +328,66 @@ def noop_trade_producer(
 def noop_pnl_signal_to_trade(signal: StoredSignal) -> RealizedTrade:
     """Convert a StoredSignal to a NoOp open trade (helper for callers)."""
     return NoOpPnLProvider().provide(signal)
+
+
+# ---------------------------------------------------------------------------
+# Synthetic trade producer — Phase 3.5.4 4-cell pre-flight backtest
+# ---------------------------------------------------------------------------
+
+
+def synthetic_trade_producer(
+    cell: CellSpec,
+    windows: tuple[WalkForwardWindow, ...],
+    profile: CalibrationProfile,
+) -> list[RealizedTrade]:
+    """Drive the default synthetic scenario through the full Phase 3.4
+    pipeline, then convert every StoredSignal into a NoOp open trade.
+
+    Phase 3.5.4: this is a **wiring smoke** producer, not a real PnL
+    engine. The four cells (tier1_single, tier1_fusion, tier2_single,
+    tier2_fusion) share the same synthetic prints; the trade count
+    is identical across cells. The 4-cell runner exercises:
+
+      - SyntheticRawFlowSource → SourceFusion → all 13 stages
+      - StoredSignal write-through per event
+      - RealizedTrade construction via NoOpPnLProvider
+        (``realized_r=None``, ``exit_reason="holding_window_open"``)
+      - Walk-forward windowing + metric aggregation surface
+
+    Real PnL is Phase 3.5.5's job (the historical replay run that
+    consumes the Phase 3.5.3 download). For 3.5.4 the only
+    invariant we test is "≥ 1 trade reaches metrics per cell so the
+    pipeline → store → producer → metrics chain works end-to-end".
+    """
+    # Imports are scoped here so this module's import graph stays
+    # narrow (cli.py already pulls cell_runner at startup; we don't
+    # want the synthetic-source machinery loaded for every CLI run).
+    import asyncio
+
+    from uoa_detector.backtest.store import BacktestStore
+    from uoa_detector.pipeline.orchestrator import Pipeline
+    from uoa_detector.pipeline.stages import default_stage_pipeline
+    from uoa_detector.sources.scenarios import default_scenario_prints
+    from uoa_detector.sources.synthetic import (
+        SyntheticRawFlowSource,
+        to_raw_print,
+    )
+
+    del cell, windows  # producer is cell-agnostic in 3.5.4
+
+    raw_prints = [
+        to_raw_print(p, source_id="synthetic")
+        for p in default_scenario_prints()
+    ]
+    source = SyntheticRawFlowSource("synthetic", raw_prints)
+    store = BacktestStore()
+    pipeline = Pipeline(
+        sources=[source],
+        stages=default_stage_pipeline(),
+        profile=profile,
+        store=store,
+    )
+    asyncio.run(pipeline.run())
+
+    pnl = NoOpPnLProvider()
+    return [pnl.provide(sig) for sig in store.all()]

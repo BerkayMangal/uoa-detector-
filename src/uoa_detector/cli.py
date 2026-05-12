@@ -732,8 +732,11 @@ def backtest_run_4cell(
         help="Trade producer. 'noop' (default) returns zero trades for "
              "every cell — the 4-cell plumbing runs end-to-end (start_run, "
              "finish_run, RunMetadata persisted, comparison report "
-             "rendered) but every cell reports 0 trades. Real trade "
-             "producers wired from the replay stream land in Phase 3.3.",
+             "rendered) but every cell reports 0 trades. 'synthetic' "
+             "drives the default scripted scenario through the full "
+             "Phase 3.4 pipeline and emits one NoOp open trade per "
+             "stored signal — used by Phase 3.5.4 to validate the "
+             "wiring end-to-end before the real-data run in 3.5.5.",
     ),
 ) -> None:
     """Run the Formülasyon A 4-cell combinatorial backtest end-to-end.
@@ -748,11 +751,9 @@ def backtest_run_4cell(
     fusion+orchestrator and writing signals to the store) land in
     Phase 3.3 alongside the SimplePnL exit-quote source.
     """
-    if trades != "noop":
+    if trades not in ("noop", "synthetic"):
         msg = (
-            f"--trades must be 'noop' in Phase 3.2.4; got {trades!r}. "
-            "Real trade producers wired from the replay stream land in "
-            "Phase 3.3."
+            f"--trades must be 'noop' or 'synthetic'; got {trades!r}."
         )
         raise typer.BadParameter(msg, param_hint="--trades")
 
@@ -771,6 +772,12 @@ def backtest_run_4cell(
     profile = _resolve_profile(profile_path)
     store = _build_store(store_url)
 
+    if trades == "synthetic":
+        from uoa_detector.backtest.cell_runner import synthetic_trade_producer
+        producer = synthetic_trade_producer
+    else:
+        producer = noop_trade_producer
+
     try:
         results = run_4cell_backtest(
             profile=profile,
@@ -778,7 +785,7 @@ def backtest_run_4cell(
             period_start=start_dt,
             period_end=end_dt,
             walk_forward_windows=walk_forward_windows,
-            trade_producer=noop_trade_producer,
+            trade_producer=producer,
             seed=seed,
         )
     finally:

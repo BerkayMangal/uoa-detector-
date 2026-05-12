@@ -22,3 +22,4 @@ data/historical/**/*.tmp
 config.toml
 creds.txt
 lib/
+reports/

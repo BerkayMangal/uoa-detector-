@@ -306,6 +306,40 @@ def test_noop_trade_producer_always_empty() -> None:
         assert noop_trade_producer(cell, (), profile) == []
 
 
+def test_synthetic_trade_producer_emits_one_trade_per_signal() -> None:
+    """Phase 3.5.4: synthetic_trade_producer drives the default scenario
+    through the full Phase 3.4 pipeline and emits one NoOp open trade
+    per stored signal. The 4-cell smoke needs ≥ 1 trade per cell to
+    exercise the metrics surface.
+    """
+    from uoa_detector.backtest.cell_runner import synthetic_trade_producer
+    profile = load_default_profile()
+    trades = synthetic_trade_producer(CANONICAL_CELLS[0], (), profile)
+    assert len(trades) >= 1
+    # Every trade is an open NoOp position (Phase 3.5.4 is wiring-only;
+    # real PnL is Phase 3.5.5's job).
+    for t in trades:
+        assert t.realized_r is None
+        assert t.exit_reason == "holding_window_open"
+        assert t.event_id  # populated from StoredSignal.event_id
+
+
+def test_synthetic_trade_producer_is_cell_agnostic() -> None:
+    """Phase 3.5.4: every cell produces the same trade list — the 4-cell
+    matrix exercise is plumbing-only at this phase. (Real Phase 3.5.5
+    behaviour will diverge per cell based on universe filtering +
+    fusion mode.)
+    """
+    from uoa_detector.backtest.cell_runner import synthetic_trade_producer
+    profile = load_default_profile()
+    counts = {
+        c.name: len(synthetic_trade_producer(c, (), profile))
+        for c in CANONICAL_CELLS
+    }
+    assert len(set(counts.values())) == 1  # all four cells same count
+    assert next(iter(counts.values())) >= 1
+
+
 # ---------------------------------------------------------------------------
 # Validation
 # ---------------------------------------------------------------------------
