@@ -1357,6 +1357,8 @@ class UnusualWhalesProviderCacheTTL(_StrictModel):
       - ``sector_map``: ticker→sector is glacial → 24h.
       - ``dark_pool``: prints stream constantly; tight window → 60s.
       - ``open_interest``: end-of-day authoritative + intraday est → 10min.
+      - ``intraday_price``: 1-min stock OHLC for M23 (Phase 3.3.8.2);
+        matches the bar granularity → 60s.
 
     All values are in seconds. Set to 0 to disable caching for that
     provider (every request hits the API).
@@ -1368,6 +1370,7 @@ class UnusualWhalesProviderCacheTTL(_StrictModel):
     sector_map_seconds: int = Field(default=86_400, ge=0, le=604_800)
     dark_pool_seconds: int = Field(default=60, ge=0, le=86_400)
     open_interest_seconds: int = Field(default=600, ge=0, le=86_400)
+    intraday_price_seconds: int = Field(default=60, ge=0, le=86_400)
 
 
 class UnusualWhalesSettings(_StrictModel):
