@@ -1,10 +1,21 @@
 """ThetaData contract enumeration.
 
 Phase 3.3.4.5: production wiring for ``contracts_for_ticker``
-that the orchestrator (3.3.4.3) consumes. The list of (expiry,
-strike, right) tuples per ticker comes from ThetaData's
-``/v2/list/contracts/option/quote`` endpoint — one HTTP call per
-ticker returns every listed contract.
+that the orchestrator (3.3.4.3) consumes.
+
+Phase 3.3.10 (2026-05-12): migrated from the retired v2 endpoint
+``/v2/list/contracts/option/quote`` to v3
+``/v3/option/list/contracts/quote``. The v3 endpoint:
+
+  - Requires ``date=YYYYMMDD`` (single date, not a range) — we
+    use the filter's ``as_of_date`` (default: today UTC).
+  - Renames ``root`` → ``symbol``.
+  - Returns ``{"response": [...]}`` (dict wrapper). Each row is
+    ``{symbol, strike (float dollars), expiration (YYYY-MM-DD),
+     right (CALL|PUT)}``.
+  - Legacy v2 row shape (4-element array, 1/10-cent int strike,
+    YYYYMMDD int expiration, C|P right) is still accepted by the
+    row decoder for fixture back-compat.
 
 The class is constructed once per script run; ``list_contracts``
 is called per ticker. No caching beyond the request semaphore
@@ -47,6 +58,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
+from decimal import Decimal
 from typing import TYPE_CHECKING, Any
 
 from uoa_detector.sources.thetadata.historical import ContractSpec
@@ -82,7 +94,7 @@ class ThetaDataContractLister:
         self,
         *,
         client: ThetaDataClient,
-        endpoint: str = "/v2/list/contracts/option/quote",
+        endpoint: str = "/v3/option/list/contracts/quote",
     ) -> None:
         self._client = client
         self._endpoint = endpoint
@@ -99,7 +111,12 @@ class ThetaDataContractLister:
         failure; the orchestrator catches and records it as a
         task-level error.
         """
-        params = {"root": ticker.upper()}
+        f = filters or ContractListFilter()
+        as_of = f.as_of_date or datetime.now(UTC).date()
+        params = {
+            "symbol": ticker.upper(),
+            "date": as_of.strftime("%Y%m%d"),
+        }
         resp = await self._client.request_json(self._endpoint, params=params)
         rows = _decode_contract_rows(resp)
         contracts: list[ContractSpec] = []
@@ -108,20 +125,20 @@ class ThetaDataContractLister:
             if spec is None:
                 continue
             contracts.append(spec)
-        return _apply_filters(
-            contracts,
-            filters or ContractListFilter(),
-        )
+        return _apply_filters(contracts, f)
 
 
 def _decode_contract_rows(response: dict[str, Any]) -> list[dict[str, Any]]:
-    data = response.get("data", [])
-    if not isinstance(data, list):
+    """Phase 3.3.10: v3 returns ``{"response": [...]}``; legacy v2
+    fixtures use ``{"data": [...]}`` (list of dicts or 4-arrays).
+    """
+    raw = response.get("response")
+    if raw is None:
+        raw = response.get("data", [])
+    if not isinstance(raw, list):
         return []
     out: list[dict[str, Any]] = []
-    # ThetaData sometimes returns rows as dicts, sometimes as
-    # 4-element arrays [exp, strike, right, ...]. Tolerate both.
-    for row in data:
+    for row in raw:
         if isinstance(row, dict):
             out.append(row)
         elif isinstance(row, list) and len(row) >= 3:
@@ -136,18 +153,16 @@ def _decode_contract_rows(response: dict[str, Any]) -> list[dict[str, Any]]:
 def _row_to_contract_spec(
     row: dict[str, Any], *, ticker: str,
 ) -> ContractSpec | None:
+    """Phase 3.3.10: parse v3 schema (ISO date / float dollars /
+    CALL|PUT) with v2 fallback (YYYYMMDD int / 1/10-cent int / C|P).
+    """
     try:
-        # ThetaData expiration: int YYYYMMDD or string 'YYYYMMDD'
-        exp_raw = row["expiration"]
-        expiry = _parse_yyyymmdd(exp_raw)
-        # ThetaData strike: int in 1/10 cent (1500000 = $150.00)
-        strike_raw = row["strike"]
-        strike_int = int(strike_raw)
-        strike_dollars = thetadata_strike_to_dollars(strike_int)
-        right_raw = str(row["right"]).upper()
-        if right_raw not in ("C", "P"):
-            return None
+        expiry = _parse_expiration(row["expiration"])
+        strike_dollars = _parse_strike(row["strike"])
+        right_raw = _parse_right(row["right"])
     except (KeyError, ValueError, TypeError):
+        return None
+    if right_raw not in ("C", "P"):
         return None
     return ContractSpec(
         ticker=ticker.upper(),
@@ -155,6 +170,42 @@ def _row_to_contract_spec(
         strike_dollars=strike_dollars,
         right=right_raw,  # type: ignore[arg-type]
     )
+
+
+def _parse_expiration(raw: object) -> date:
+    """Phase 3.3.10: prefer v3 ISO ``YYYY-MM-DD``; fall back to
+    v2 ``YYYYMMDD`` (int or string).
+    """
+    if isinstance(raw, str) and "-" in raw:
+        return date.fromisoformat(raw)
+    return _parse_yyyymmdd(raw)
+
+
+def _parse_strike(raw: object) -> Decimal:
+    """Phase 3.3.10: prefer v3 float / string dollars; fall back to
+    v2 1/10-cent integer.
+    """
+    if isinstance(raw, float):
+        return Decimal(str(raw))
+    if isinstance(raw, str):
+        return Decimal(raw)
+    if isinstance(raw, int):
+        # v2 1/10 cent (1500000 = $150.00); v3 wouldn't ship this as int.
+        return thetadata_strike_to_dollars(raw)
+    msg = f"unparseable strike: {raw!r}"
+    raise TypeError(msg)
+
+
+def _parse_right(raw: object) -> str:
+    """Phase 3.3.10: accept v3 CALL/PUT and legacy v2 C/P; normalise
+    to internal canonical C/P.
+    """
+    s = str(raw).upper()
+    if s in ("CALL", "C"):
+        return "C"
+    if s in ("PUT", "P"):
+        return "P"
+    return s  # caller's downstream check rejects anything else
 
 
 def _parse_yyyymmdd(raw: object) -> date:
