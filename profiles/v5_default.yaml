@@ -305,6 +305,7 @@ data_sources:
       sector_map_seconds: 86400            # ticker→sector glacial
       dark_pool_seconds: 60                # DP prints stream constantly
       open_interest_seconds: 600           # EOD authoritative + intraday est
+      intraday_price_seconds: 60           # 1-min stock OHLC for M23 (Phase 3.3.8.2)
 
 live:
   # Phase 4 reserve. Phase 3.3.5's live observer does NOT consume
