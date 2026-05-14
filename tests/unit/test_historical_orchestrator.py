@@ -184,7 +184,7 @@ def _const_snapshot(_c: ContractSpec, _d: date) -> ContextSnapshot:
 async def test_run_one_task_happy_path_aggregates_rows(tmp_path: Path) -> None:
     contracts = [_make_contract("AAPL", "150.00"), _make_contract("AAPL", "155.00")]
 
-    async def _lookup(_t: str) -> Iterable[ContractSpec]:
+    async def _lookup(_t: str, _asof: date) -> Iterable[ContractSpec]:
         return contracts
 
     downloader = _RecordingDownloader(rows_per_call=500)
@@ -202,7 +202,7 @@ async def test_run_one_task_happy_path_aggregates_rows(tmp_path: Path) -> None:
 
 @pytest.mark.asyncio
 async def test_run_one_task_empty_contracts_no_error(tmp_path: Path) -> None:
-    async def _lookup(_t: str) -> Iterable[ContractSpec]:
+    async def _lookup(_t: str, _asof: date) -> Iterable[ContractSpec]:
         return []
 
     orch = HistoricalOrchestrator(
@@ -219,7 +219,7 @@ async def test_run_one_task_empty_contracts_no_error(tmp_path: Path) -> None:
 
 @pytest.mark.asyncio
 async def test_run_one_task_contracts_lookup_failure_recorded(tmp_path: Path) -> None:
-    async def _lookup(_t: str) -> Iterable[ContractSpec]:
+    async def _lookup(_t: str, _asof: date) -> Iterable[ContractSpec]:
         msg = "list endpoint down"
         raise RuntimeError(msg)
 
@@ -244,7 +244,7 @@ async def test_run_one_task_per_contract_failure_continues(tmp_path: Path) -> No
         _make_contract("AAPL", "160.00"),
     ]
 
-    async def _lookup(_t: str) -> Iterable[ContractSpec]:
+    async def _lookup(_t: str, _asof: date) -> Iterable[ContractSpec]:
         return contracts
 
     fail_subdir = "EXP240216_C_00155000"
@@ -285,7 +285,7 @@ async def test_run_iterates_pending_and_saves_state(tmp_path: Path) -> None:
     ])
     sp = state_path(tmp_path)
 
-    async def _lookup(_t: str) -> Iterable[ContractSpec]:
+    async def _lookup(_t: str, _asof: date) -> Iterable[ContractSpec]:
         return [_make_contract("AAPL", "150.00")]
 
     orch = HistoricalOrchestrator(
@@ -319,7 +319,7 @@ async def test_run_records_failure_in_state(tmp_path: Path) -> None:
     state.initialize_tasks([("AAPL", 2024, 1)])
     sp = state_path(tmp_path)
 
-    async def _lookup(_t: str) -> Iterable[ContractSpec]:
+    async def _lookup(_t: str, _asof: date) -> Iterable[ContractSpec]:
         msg = "boom"
         raise RuntimeError(msg)
 
@@ -360,7 +360,7 @@ async def test_run_skips_already_done_tasks(tmp_path: Path) -> None:
 
     contracts_lookup_calls = 0
 
-    async def _lookup(_t: str) -> Iterable[ContractSpec]:
+    async def _lookup(_t: str, _asof: date) -> Iterable[ContractSpec]:
         nonlocal contracts_lookup_calls
         contracts_lookup_calls += 1
         return [_make_contract("AAPL")]
@@ -421,7 +421,7 @@ async def test_run_concurrency_bound_respected(tmp_path: Path) -> None:
         ("AAPL", 2024, 3), ("AAPL", 2024, 4),
     ])
 
-    async def _lookup(_t: str) -> Iterable[ContractSpec]:
+    async def _lookup(_t: str, _asof: date) -> Iterable[ContractSpec]:
         return [_make_contract("AAPL")]
 
     orch = HistoricalOrchestrator(
@@ -446,7 +446,7 @@ async def test_run_skipped_contracts_counted(tmp_path: Path) -> None:
     """Idempotent re-run: skipped DownloadResult counted in skipped_contracts."""
     contracts = [_make_contract("AAPL", "150.00")]
 
-    async def _lookup(_t: str) -> Iterable[ContractSpec]:
+    async def _lookup(_t: str, _asof: date) -> Iterable[ContractSpec]:
         return contracts
 
     class _SkippingDownloader:

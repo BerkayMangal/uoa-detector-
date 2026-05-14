@@ -326,13 +326,30 @@ async def _run(args: argparse.Namespace) -> int:
         settings=profile.data_sources.thetadata,
     )
     lister = ThetaDataContractLister(client=client)
-    contract_filter = ContractListFilter(
-        max_contracts=args.max_contracts,
-        max_dte=args.max_dte,
-    )
+    # Phase 3.5.3.1: per-(ticker, month) contract resolution. Each
+    # ticker-month task gets a freshly-anchored ContractListFilter
+    # so the lister returns only contracts actually listed in that
+    # month. Combined with the downloader's per-(contract, day) DTE
+    # guard, this kills the 472 storm seen pre-3.5.3.1 (contracts
+    # listed at end_date but not yet listed during the 18-month
+    # backfill window).
+    _contracts_cache: dict[tuple[str, int, int], list[ContractSpec]] = {}
 
-    async def _contracts_for_ticker(ticker: str) -> list[ContractSpec]:
-        return await lister.list_contracts(ticker, filters=contract_filter)
+    async def _contracts_for_ticker(
+        ticker: str, asof: date,
+    ) -> list[ContractSpec]:
+        key = (ticker.upper(), asof.year, asof.month)
+        cached = _contracts_cache.get(key)
+        if cached is not None:
+            return cached
+        f = ContractListFilter(
+            max_contracts=args.max_contracts,
+            max_dte=args.max_dte,
+            as_of_date=asof,
+        )
+        contracts = await lister.list_contracts(ticker, filters=f)
+        _contracts_cache[key] = contracts
+        return contracts
 
     async def _snapshot_for(c: ContractSpec, d: date) -> ContextSnapshot:
         return await _default_snapshot_for(client, c, d)
@@ -340,6 +357,7 @@ async def _run(args: argparse.Namespace) -> int:
     downloader = ThetaDataHistoricalDownloader(
         client=client,
         concurrency=args.concurrency,
+        max_dte=args.max_dte,
     )
     orch = HistoricalOrchestrator(
         downloader=downloader,

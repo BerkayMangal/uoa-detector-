@@ -287,9 +287,20 @@ class ThetaDataHistoricalDownloader:
         *,
         client: ThetaDataClient,
         concurrency: int = 4,
+        max_dte: int | None = None,
     ) -> None:
         self._client = client
         self._sem = asyncio.Semaphore(max(1, concurrency))
+        # Phase 3.5.3 fix: per-(contract, trade_day) DTE guard.
+        # The contract-list filter (ContractListFilter.max_dte) only
+        # filters by DTE at the contract-listing as_of_date, which
+        # doesn't reject (contract, day) pairs where the day-relative
+        # DTE blows past the cap. Example: a May-2026 expiry contract
+        # passes today's DTE=14 filter but gets fetched for every
+        # trade-day back to 2024-11 where its DTE is 18+ months.
+        # Setting ``max_dte`` here skips those (contract, day) pairs
+        # at request time — no HTTP call, no 472 churn.
+        self._max_dte = max_dte
 
     async def _fetch_trades_for_day(
         self, contract: ContractSpec, day: date,
@@ -415,6 +426,14 @@ class ThetaDataHistoricalDownloader:
             )
             month_prints: list[RawPrint] = []
             for day in days_in_month:
+                # Phase 3.5.3 fix: skip (contract, day) pairs whose
+                # day-relative DTE blows past max_dte. Prevents the
+                # 472 storm where a 14-DTE-today contract gets
+                # fetched for trade-days 18 months in the past.
+                if self._max_dte is not None:
+                    dte = (request.contract.expiry - day).days
+                    if dte < 0 or dte > self._max_dte:
+                        continue
                 snapshot = await _resolve_snapshot(
                     request.snapshot_for_date, day,
                 )

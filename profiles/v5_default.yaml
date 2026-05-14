@@ -287,7 +287,7 @@ backtest:
 # from ThetaDataSettings.
 data_sources:
   thetadata:
-    rate_limit_requests_per_second: 10.0   # Pro plan tier
+    rate_limit_requests_per_second: 50.0   # OPTION.STANDARD: docs list 4 concurrent, no sustained-req-per-sec hard limit; raised 10→50 in Phase 3.5.3.2 after refactor still bottlenecked at conservative default. Step back to 25 if 429s appear.
     historical_concurrency: 4              # Pro plan supports 4
     live_reconnect_max_attempts: 5
     live_reconnect_initial_backoff_s: 1.0

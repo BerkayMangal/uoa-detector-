@@ -144,7 +144,16 @@ _logger = logging.getLogger(__name__)
 # A callable that returns the contracts to download for one ticker.
 # Production wires this to a ThetaData /v2/list endpoint; tests pass
 # a synchronous lambda.
-ContractsForTicker = Callable[[str], "Awaitable[Iterable[ContractSpec]]"]
+ContractsForTicker = Callable[
+    [str, date], "Awaitable[Iterable[ContractSpec]]",
+]
+# Phase 3.5.3.1: signature changed from ``[str]`` → ``[str, date]``.
+# The orchestrator now passes the (ticker, month-anchor date) so
+# the resolver can list contracts as_of that specific month, not a
+# single global snapshot at start_date / end_date / today. This
+# eliminates the 472-storm where contracts listed at end_date are
+# fetched for trade-days 18 months in the past (contract wasn't
+# listed then; every request returns 472 "no data").
 
 # A callable that returns the daily context snapshot for a (contract, date).
 # Production wires this to ThetaData stock-quote endpoint.
@@ -315,15 +324,19 @@ class HistoricalOrchestrator:
         summary. A complete fetch failure (e.g., contracts list
         endpoint down) returns an outcome with ``.error`` set.
         """
+        # Phase 3.5.3.1: anchor the contract resolution at mid-month
+        # of THIS task. Contract listing per-month + per-(contract,
+        # day) DTE guard together eliminate the 472 storm.
+        asof = date(year, month, 15)
         try:
             contracts = list(
-                await self._contracts_for_ticker(ticker),
+                await self._contracts_for_ticker(ticker, asof),
             )
         except Exception as exc:
             return TaskOutcome(
                 ticker=ticker, year=year, month=month,
                 row_count=0, contract_count=0, skipped_contracts=0,
-                error=f"contracts_for_ticker({ticker}) failed: {exc!r}",
+                error=f"contracts_for_ticker({ticker}, {asof}) failed: {exc!r}",
             )
 
         total_rows = 0

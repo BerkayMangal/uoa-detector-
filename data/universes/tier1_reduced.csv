@@ -1,0 +1,13 @@
+ticker,sector,market_cap_usd_b_approx,options_volume_30d_avg_approx,notes
+AMD,tech_semi,~250,~700000,
+GOOGL,tech_software,~2200,~500000,
+TSLA,auto_ev,~800,~2500000,
+META,tech_social,~1500,~600000,
+JPM,financials_bank,~700,~250000,
+BAC,financials_bank,~350,~300000,
+XOM,energy_oil,~500,~250000,
+CVX,energy_oil,~300,~150000,
+JNJ,healthcare_pharma,~400,~100000,
+UNH,healthcare_insurer,~500,~150000,
+GLD,commodities_gold,~75,~350000,
+TLT,fixed_income_long,~50,~600000,
