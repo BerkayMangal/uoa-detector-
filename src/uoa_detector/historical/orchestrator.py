@@ -126,6 +126,7 @@ from uoa_detector.sources.thetadata.historical import (
     ContextSnapshot,
     ContractSpec,
     DownloadRequest,
+    DownloadResult,
     ThetaDataHistoricalDownloader,
 )
 
@@ -339,27 +340,24 @@ class HistoricalOrchestrator:
                 error=f"contracts_for_ticker({ticker}, {asof}) failed: {exc!r}",
             )
 
-        total_rows = 0
-        skipped = 0
-        contract_errors = 0
-        first_contract_error: str | None = None
-        for contract in contracts:
+        from datetime import timedelta as _td
+
+        month_start = date(year, month, 1)
+        next_first = (
+            date(year + 1, 1, 1) if month == 12
+            else date(year, month + 1, 1)
+        )
+        month_end = next_first - _td(days=1)
+
+        async def _download_one(
+            contract: ContractSpec,
+        ) -> list[DownloadResult]:
             output_dir = contract_output_dir(
                 self._base_output_dir, contract,
             )
-            month_start = date(year, month, 1)
-            # Compute month_end inclusive: last day of month
-            next_first = (
-                date(year + 1, 1, 1) if month == 12
-                else date(year, month + 1, 1)
-            )
-            from datetime import timedelta as _td
-            month_end = next_first - _td(days=1)
-
-            captured_contract = contract
 
             def _snapshot_dispatcher(
-                d: date, _c: ContractSpec = captured_contract,
+                d: date, _c: ContractSpec = contract,
             ) -> Awaitable[ContextSnapshot] | ContextSnapshot:
                 return self._snapshot_for(_c, d)
 
@@ -370,24 +368,47 @@ class HistoricalOrchestrator:
                 output_dir=output_dir,
                 snapshot_for_date=_snapshot_dispatcher,
             )
-            try:
-                results = await self._downloader.download_request(req)
-            except Exception as exc:
-                contract_errors += 1
-                if first_contract_error is None:
-                    first_contract_error = (
-                        f"download {contract.ticker} "
-                        f"{contract_subdir_name(contract)} failed: {exc!r}"
+            return await self._downloader.download_request(req)
+
+        total_rows = 0
+        skipped = 0
+        contract_errors = 0
+        first_contract_error: str | None = None
+
+        # Phase 3.5.3.6: download a ticker-month's contracts in parallel
+        # batches. Pre-3.5.3.6 this was a sequential ``for`` loop — only
+        # ~6 requests in flight (one per concurrent ticker-month task),
+        # roughly a quarter of the 26 req/s token-bucket capacity, so
+        # tasks ran 4× slower than the rate limit allowed. The global
+        # rate-limiter still caps total throughput; batching at 16
+        # keeps in-flight requests under the httpx connection-pool
+        # ceiling while saturating the bucket.
+        batch_size = 16
+        for i in range(0, len(contracts), batch_size):
+            batch = contracts[i:i + batch_size]
+            gathered = await asyncio.gather(
+                *(_download_one(c) for c in batch),
+                return_exceptions=True,
+            )
+            for contract, res in zip(batch, gathered, strict=True):
+                if isinstance(res, BaseException):
+                    contract_errors += 1
+                    if first_contract_error is None:
+                        first_contract_error = (
+                            f"download {contract.ticker} "
+                            f"{contract_subdir_name(contract)} "
+                            f"failed: {res!r}"
+                        )
+                    _logger.warning(
+                        "contract %s %s download failed: %r",
+                        contract.ticker,
+                        contract_subdir_name(contract), res,
                     )
-                _logger.warning(
-                    "contract %s %s download failed: %r",
-                    contract.ticker, contract_subdir_name(contract), exc,
-                )
-                continue
-            for r in results:
-                total_rows += r.row_count
-                if r.skipped:
-                    skipped += 1
+                    continue
+                for r in res:
+                    total_rows += r.row_count
+                    if r.skipped:
+                        skipped += 1
 
         # Phase 3.5.3.5: a handful of transient contract failures must
         # NOT fail the whole ticker-month. Those contracts simply lack
