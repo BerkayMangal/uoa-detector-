@@ -176,7 +176,18 @@ class ThetaDataClient:
         self._http = httpx.AsyncClient(
             base_url=self._base_url,
             transport=transport,
-            timeout=httpx.Timeout(connect=5.0, read=30.0, write=5.0, pool=5.0),
+            # Phase 3.5.3.7: read 30→60s (large historical responses),
+            # pool 5→30s (avoid a PoolTimeout storm when the Phase
+            # 3.5.3.6 parallel batches put dozens of requests in
+            # flight at once). Connection limits raised so the pool
+            # doesn't become the bottleneck under parallel download.
+            timeout=httpx.Timeout(
+                connect=10.0, read=60.0, write=10.0, pool=30.0,
+            ),
+            limits=httpx.Limits(
+                max_connections=200,
+                max_keepalive_connections=50,
+            ),
         )
 
     @property

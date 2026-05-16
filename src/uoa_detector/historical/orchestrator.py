@@ -383,7 +383,7 @@ class HistoricalOrchestrator:
         # rate-limiter still caps total throughput; batching at 16
         # keeps in-flight requests under the httpx connection-pool
         # ceiling while saturating the bucket.
-        batch_size = 16
+        batch_size = 8
         for i in range(0, len(contracts), batch_size):
             batch = contracts[i:i + batch_size]
             gathered = await asyncio.gather(
