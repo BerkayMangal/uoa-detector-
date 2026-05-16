@@ -341,7 +341,8 @@ class HistoricalOrchestrator:
 
         total_rows = 0
         skipped = 0
-        first_error: str | None = None
+        contract_errors = 0
+        first_contract_error: str | None = None
         for contract in contracts:
             output_dir = contract_output_dir(
                 self._base_output_dir, contract,
@@ -372,8 +373,9 @@ class HistoricalOrchestrator:
             try:
                 results = await self._downloader.download_request(req)
             except Exception as exc:
-                if first_error is None:
-                    first_error = (
+                contract_errors += 1
+                if first_contract_error is None:
+                    first_contract_error = (
                         f"download {contract.ticker} "
                         f"{contract_subdir_name(contract)} failed: {exc!r}"
                     )
@@ -387,12 +389,28 @@ class HistoricalOrchestrator:
                 if r.skipped:
                     skipped += 1
 
+        # Phase 3.5.3.5: a handful of transient contract failures must
+        # NOT fail the whole ticker-month. Those contracts simply lack
+        # a parquet on disk; the next idempotent resume pass retries
+        # them. Only fail the task when a MAJORITY of contracts errored
+        # — that signals something genuinely broken (endpoint down,
+        # auth lost), not transient HTTP noise. Pre-3.5.3.5 the FIRST
+        # contract error stamped the whole task "failed", which put
+        # the run into an infinite retry-fail loop (every resume hit
+        # a different transient contract and re-failed the task).
+        task_error: str | None = None
+        if contracts and contract_errors > len(contracts) // 2:
+            task_error = (
+                f"{contract_errors}/{len(contracts)} contracts failed "
+                f"(majority) — first: {first_contract_error}"
+            )
+
         return TaskOutcome(
             ticker=ticker, year=year, month=month,
             row_count=total_rows,
             contract_count=len(contracts),
             skipped_contracts=skipped,
-            error=first_error,
+            error=task_error,
         )
 
 

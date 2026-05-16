@@ -236,8 +236,14 @@ async def test_run_one_task_contracts_lookup_failure_recorded(tmp_path: Path) ->
 
 
 @pytest.mark.asyncio
-async def test_run_one_task_per_contract_failure_continues(tmp_path: Path) -> None:
-    """One failing contract doesn't abort the others."""
+async def test_run_one_task_minority_contract_failure_does_not_fail_task(
+    tmp_path: Path,
+) -> None:
+    """Phase 3.5.3.5: a minority of failing contracts must NOT fail the
+    whole ticker-month — the other contracts download, the task is
+    'done', and the failed contracts get retried on the next
+    idempotent resume pass.
+    """
     contracts = [
         _make_contract("AAPL", "150.00"),
         _make_contract("AAPL", "155.00"),
@@ -247,7 +253,7 @@ async def test_run_one_task_per_contract_failure_continues(tmp_path: Path) -> No
     async def _lookup(_t: str, _asof: date) -> Iterable[ContractSpec]:
         return contracts
 
-    fail_subdir = "EXP240216_C_00155000"
+    fail_subdir = "EXP240216_C_00155000"  # 1 of 3 → minority
     downloader = _RecordingDownloader(
         raise_on={fail_subdir}, rows_per_call=300,
     )
@@ -258,11 +264,44 @@ async def test_run_one_task_per_contract_failure_continues(tmp_path: Path) -> No
         snapshot_for=_const_snapshot,
     )
     outcome = await orch.run_one_task("AAPL", 2024, 1)
-    # First error captured but other two contracts succeed
-    assert outcome.error is not None
-    assert "EXP240216_C_00155000" in outcome.error
+    # 1/3 failed = minority → task is NOT failed
+    assert outcome.error is None
     assert outcome.contract_count == 3
     assert outcome.row_count == 600  # 300 × 2 successful contracts
+
+
+@pytest.mark.asyncio
+async def test_run_one_task_majority_contract_failure_fails_task(
+    tmp_path: Path,
+) -> None:
+    """Phase 3.5.3.5: when a MAJORITY of contracts error, the task IS
+    failed — that signals something genuinely broken, not noise.
+    """
+    contracts = [
+        _make_contract("AAPL", "150.00"),
+        _make_contract("AAPL", "155.00"),
+        _make_contract("AAPL", "160.00"),
+    ]
+
+    async def _lookup(_t: str, _asof: date) -> Iterable[ContractSpec]:
+        return contracts
+
+    # 2 of 3 fail → majority
+    downloader = _RecordingDownloader(
+        raise_on={"EXP240216_C_00150000", "EXP240216_C_00155000"},
+        rows_per_call=300,
+    )
+    orch = HistoricalOrchestrator(
+        downloader=downloader,  # type: ignore[arg-type]
+        base_output_dir=tmp_path,
+        contracts_for_ticker=_lookup,
+        snapshot_for=_const_snapshot,
+    )
+    outcome = await orch.run_one_task("AAPL", 2024, 1)
+    assert outcome.error is not None
+    assert "2/3 contracts failed" in outcome.error
+    assert outcome.contract_count == 3
+    assert outcome.row_count == 300  # only 1 contract succeeded
 
 
 # ---------------------------------------------------------------------------

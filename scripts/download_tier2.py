@@ -68,6 +68,7 @@ from uoa_detector.historical.validation import (
     manifest_path,
     save_manifest,
 )
+from uoa_detector.sources._http_base import RetryPolicy
 from uoa_detector.sources.thetadata.client import ThetaDataClient
 from uoa_detector.sources.thetadata.historical import (
     ContextSnapshot,
@@ -324,6 +325,20 @@ async def _run(args: argparse.Namespace) -> int:
     client = ThetaDataClient(
         api_key=api_key,
         settings=profile.data_sources.thetadata,
+        # Phase 3.5.3.4: the circuit breaker is a live-trading safety
+        # device (Phase 3.3.2) — wrong tool for a multi-day batch
+        # download. A handful of transient HTTP 500s (Terminal
+        # hiccups under concurrency) would trip the breaker and
+        # cascade-fail every remaining ticker-month with
+        # CircuitBreakerOpenError. Transient errors are already
+        # handled per-request by RetryPolicy. Set the breaker
+        # threshold effectively infinite for the download path so
+        # one bad contract never kills the whole run.
+        circuit_breaker_threshold=10**9,
+        # Phase 3.5.3.5: 5 attempts (was default 3) — transient
+        # ThetaData HTTP 5xx under sustained concurrency clears on
+        # retry the overwhelming majority of the time.
+        retry=RetryPolicy(max_attempts=5),
     )
     lister = ThetaDataContractLister(client=client)
     # Phase 3.5.3.1: per-(ticker, month) contract resolution. Each
