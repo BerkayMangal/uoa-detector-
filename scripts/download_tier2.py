@@ -44,7 +44,7 @@ import argparse
 import asyncio
 import logging
 import sys
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 
 from uoa_detector.calibration import load_default_profile
@@ -357,12 +357,23 @@ async def _run(args: argparse.Namespace) -> int:
         cached = _contracts_cache.get(key)
         if cached is not None:
             return cached
-        f = ContractListFilter(
-            max_contracts=args.max_contracts,
-            max_dte=args.max_dte,
-            as_of_date=asof,
-        )
-        contracts = await lister.list_contracts(ticker, filters=f)
+        # Phase 3.5.3.8: ThetaData's contract-list endpoint returns
+        # "no data" on non-trading days (weekends, market holidays).
+        # The orchestrator anchors at the 15th of the month, which is
+        # a weekend ~2/7 of the time — that yielded 0 contracts and
+        # stamped the whole ticker-month "done" with zero rows. Walk
+        # nearby days until one lands on a trading day with listings.
+        contracts: list[ContractSpec] = []
+        for delta in (0, 1, 2, 3, -1, -2, -3, 4, 5):
+            cand = asof + timedelta(days=delta)
+            f = ContractListFilter(
+                max_contracts=args.max_contracts,
+                max_dte=args.max_dte,
+                as_of_date=cand,
+            )
+            contracts = await lister.list_contracts(ticker, filters=f)
+            if contracts:
+                break
         _contracts_cache[key] = contracts
         return contracts
 
