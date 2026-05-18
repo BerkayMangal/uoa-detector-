@@ -95,9 +95,16 @@ class UnusualWhalesDarkPoolProvider:
         before: datetime,
         window: timedelta,
     ) -> Sequence[DarkPoolPrint]:
-        """Return DP prints on ``ticker`` within ``window`` before ``before``."""
+        """Return DP prints on ``ticker`` within ``window`` before ``before``.
+
+        Phase 3.5.5 B2: the cache key includes ``before``'s date and the
+        fetch pulls that whole day, so a backtest replaying many events
+        for one ticker on different days each sees its own day's prints
+        rather than whichever window the first event happened to fetch.
+        The ``when > before`` guard already excludes future prints.
+        """
         rows = await self._cache.get_or_fetch(
-            ticker.upper(),
+            f"{ticker.upper()}:{before:%Y-%m-%d}",
             loader=lambda: self._fetch(ticker, before),
         )
         cutoff = before - window
@@ -114,8 +121,11 @@ class UnusualWhalesDarkPoolProvider:
     async def _fetch(
         self, ticker: str, before: datetime,
     ) -> list[dict[str, Any]]:
-        # Pull a generous lookback (60 min). The consumer filters down.
-        after = (before - timedelta(minutes=60)).isoformat()
+        # Pull the whole day of ``before`` so every event on that day
+        # shares one fetch; the consumer filters down to its window.
+        after = before.replace(
+            hour=0, minute=0, second=0, microsecond=0,
+        ).isoformat()
         params = {"after": after}
         path = f"/api/darkpool/{ticker.upper()}"
         resp = await self._client.request_json(path, params=params)
