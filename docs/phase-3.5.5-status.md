@@ -74,16 +74,23 @@ context. That is a real engineering phase, not a command.
 Answers "is there edge in raw unusual flow + convexity" — the
 product's namesake. Achievable with data in hand + one $80 add-on.
 
-| Step | Work | Est. |
+| Step | Work | State |
 |---|---|---|
-| A1 | Derive `fill_side` from price vs bid/ask in the mapping | ~0.5 day |
-| A2 | Decode `is_iso` from ThetaData trade condition codes | ~1 day |
+| A1 | Derive `fill_side` from price vs bid/ask in the mapping | **DONE** — commit 3.5.5.5 |
+| A2 | Decode `is_iso` from ThetaData trade condition codes (95/126/128) | **DONE** — commit 3.5.5.6 |
 | A3 | Bucket cross-exchange near-simultaneous prints so M34 sees multi-venue sweeps | ~2–3 days |
 | A4 | Spot price: subscribe ThetaData STOCK add-on ($80/mo), download stock history, join → unblocks convexity | ~1–2 days |
 | A5 | Candidate pre-filter + streaming store for the 245M-row scale | ~2–3 days |
 | A6 | Run single-cell 4-cell, Phase 3.5.6 falsification | ~1 day |
 
-**Track A total: ~1.5–2 weeks → a real verdict on UOA + convexity edge.**
+**Track A remaining: ~1–1.5 weeks → a real verdict on UOA + convexity edge.**
+
+**Re-download note:** A1 and A2 are mapping-layer fixes — they take
+effect only when the bulk data is re-downloaded (the parquet stores
+`fill_side`/`is_iso` but not the raw condition code). A4 also adds a
+mapping change (spot from a stock-history join). To avoid spending
+ThetaData bandwidth twice, the re-download is **batched once after A4**,
+capturing A1 + A2 + A4 together. A3 and A5 need no re-download.
 
 ### Track B — full fusion (8-axis confluence) verdict
 Needs historical point-in-time UW data.
