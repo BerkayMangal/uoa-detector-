@@ -47,13 +47,19 @@ class OptionsPrint(BaseModel):
     spot_price: Decimal
     premium_paid: Decimal = Field(description="Notional dollar size of the print.")
     option_price: Decimal
-    implied_volatility: float = Field(ge=0.0)
+    # ``implied_volatility`` / ``open_interest`` are None when no source
+    # supplies them. ThetaData v3 has no historical print-level IV
+    # endpoint and its trade_quote feed carries no OI, so a pure
+    # ThetaData replay (Phase 3.5.5) produces IV-less / OI-less prints.
+    # Print-level IV has no downstream scoring consumer; the thin-OI
+    # penalty and M28's at-event OI baseline degrade gracefully on None.
+    implied_volatility: float | None = Field(default=None, ge=0.0)
     bid: Decimal
     ask: Decimal
     fill_side: FillSide = "unknown"
     exchange: str
     is_iso: bool = False
-    open_interest: int = Field(ge=0)
+    open_interest: int | None = Field(default=None, ge=0)
 
     # Phase 2: required first-class metadata
     source_agreement: SourceAgreement
