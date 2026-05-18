@@ -95,21 +95,42 @@ capturing A1 + A2 + A4 together. A3 and A5 need no re-download.
 ### Track B — full fusion (8-axis confluence) verdict
 Needs historical point-in-time UW data.
 
+**B1 RESOLVED (probed live 2026-05-18).** The UW API *does* expose
+historical endpoints with a `date` param — but the current
+subscription only returns the **last 7 trading days**:
+
+> `historic_data_access_missing` — "The earliest date currently
+> available to you is 2026-05-07 (7 trading days) ... If you wish to
+> access full historic data please email dev@unusualwhales.com."
+
+The backtest window is 2025-05 → 2026-04 (12 months). **UW historical
+enrichment data for that window is not accessible under the current
+plan.** This is the single hard gate on a real Phase 3.5 verdict.
+
 | Step | Work | Est. |
 |---|---|---|
-| B1 | Determine if the UW API exposes historical point-in-time endpoints | ~0.5 day |
-| B2a | If yes: rebuild the 6 UW providers in "as-of" mode | ~1 week |
-| B2b | If no: build a UW historical enrichment snapshot download | ~2–3 weeks |
+| B0 | **Obtain UW full historical data access** — email dev@unusualwhales.com, likely a paid tier / data-shop purchase | external, Berkay |
+| B2 | Rebuild the 6 UW providers in "as-of" mode (they fetch dated series already — just need to *select* by `at` instead of `del at`) | ~3–5 days |
 | B3 | Wire enrichment into fusion cells, run full 4-cell | ~2–3 days |
 
-**Track B total: ~4–6 weeks, gated on the UW historical-data question.**
+**Track B total once B0 is granted: ~1.5–2 weeks.**
 
-## Decisions needed (money / strategy)
+## The bottom line
 
-1. **ThetaData STOCK add-on, $80/mo** — required for spot price →
-   convexity. Without it, Track A cannot test convexity.
-2. **UW historical data** — investigate B1 before committing to Track B.
-3. **Scope**: accept Track A (single-cell UOA + convexity) as the
-   Phase 3.5 verdict for now, and make Track B a separate Phase 3.6?
-   Recommended — it gives a real, honest answer to the core question
-   in ~2 weeks instead of waiting 4–6.
+There is **no single-cell shortcut.** `v5_gamma_squeeze` is a
+confluence strategy by construction: the 0.55 threshold is set so
+that no single axis and no core-only subset clears it — that *is*
+the Track B hypothesis ("edge requires confluence"). Measured:
+core-only `combined_score` tops out ~0.17 even with A1–A3 done.
+So the single cells are the null baseline; a real verdict requires
+the **fusion cells**, which require **historical UW data**.
+
+## Decisions / actions needed
+
+1. **UW full historical data access** — email dev@unusualwhales.com.
+   This is THE gate. Nothing downstream produces a verdict without it.
+2. **ThetaData STOCK add-on, $80/mo** — required for spot → convexity
+   (Berkay is purchasing).
+3. Track A1–A3 are done and are real input-signal fixes the fusion
+   backtest will use; A4 (spot) waits on the add-on; A5 (scale) can
+   proceed any time. But none of A4–A6 yields a verdict without B0.
