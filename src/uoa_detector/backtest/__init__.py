@@ -35,6 +35,7 @@ from uoa_detector.backtest.metrics import (
     compute_metrics,
 )
 from uoa_detector.backtest.models import ErrorRecord, RunMetadata
+from uoa_detector.backtest.parquet_exit_quote import ParquetExitQuoteProvider
 from uoa_detector.backtest.parquet_schema import (
     RAWPRINT_PARQUET_SCHEMA,
     DataIntegrityError,
@@ -80,6 +81,7 @@ __all__ = [
     "MetricThresholds",
     "MockPnLProvider",
     "NoOpPnLProvider",
+    "ParquetExitQuoteProvider",
     "ParquetSchemaMismatchError",
     "PnLProvider",
     "RealizedTrade",
