@@ -520,6 +520,14 @@ def replay_trade_producer(
             profile=profile,
             store=store,
             context=context,
+            # Phase 3.5.5 A3: route the single ThetaData source through
+            # windowed fusion. Fusion buckets by contract key, so the
+            # several exchange-legs of one sweep land in one bucket —
+            # giving the canonical print exchanges_seen >= 2, which is
+            # what M34 needs to classify a multi-venue sweep. The
+            # single-source fast path emits one event per print
+            # (exchanges_seen == 1) and can never see a sweep.
+            force_multi_source=True,
         )
         asyncio.run(pipeline.run())
 
