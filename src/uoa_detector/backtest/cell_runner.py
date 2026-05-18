@@ -445,6 +445,7 @@ def replay_trade_producer(
     *,
     tier1_tickers: tuple[str, ...],
     tier2_tickers: tuple[str, ...],
+    medians_csv: Path | None = None,
     source_id: str = "thetadata",
 ) -> Callable[
     [CellSpec, tuple[WalkForwardWindow, ...], CalibrationProfile],
@@ -464,6 +465,12 @@ def replay_trade_producer(
     are the downloaded universes (the reduced 9 / 15-name lists, NOT
     the cell runner's default tier1_anchor / tier2_starter — those are
     not what was downloaded).
+
+    ``medians_csv`` feeds M37 (relative premium): without a per-ticker
+    median trade premium every print scores as non-unusual and the core
+    flow score collapses. When None, M37 falls back to its NoOp provider
+    (``relative_premium_score=None``). Generate the CSV with
+    ``scripts/compute_medians.py``.
     """
 
     def _producer(
@@ -479,6 +486,10 @@ def replay_trade_producer(
         from uoa_detector.backtest.simple_pnl import SimplePnLProvider
         from uoa_detector.backtest.store import BacktestStore
         from uoa_detector.pipeline.orchestrator import Pipeline
+        from uoa_detector.pipeline.stage import PipelineContext
+        from uoa_detector.providers.median_trade_size import (
+            CSVMedianTradeSizeProvider,
+        )
         from uoa_detector.sources.parquet_replay import ParquetReplaySource
 
         tickers = (
@@ -494,12 +505,21 @@ def replay_trade_producer(
             from_month=f"{period_start:%Y-%m}",
             to_month=f"{period_end:%Y-%m}",
         )
+        context = PipelineContext(profile=profile)
+        if medians_csv is not None:
+            context = PipelineContext(
+                profile=profile,
+                median_trade_size_provider=CSVMedianTradeSizeProvider(
+                    medians_csv,
+                ),
+            )
         store = BacktestStore()
         pipeline = Pipeline(
             sources=[source],
             stages=_replay_stages(cell.fusion),
             profile=profile,
             store=store,
+            context=context,
         )
         asyncio.run(pipeline.run())
 

@@ -816,10 +816,15 @@ def backtest_run_4cell(
                 msg = f"universe CSV not found: {csv_path}"
                 raise typer.BadParameter(msg, param_hint="--trades")
         assert replay_data is not None  # guarded above
+        # M37 relative-premium baseline. Optional: absent → M37 NoOp.
+        medians_csv: Path | None = Path("data/medians_bulk.csv")
+        if medians_csv is not None and not medians_csv.exists():
+            medians_csv = None
         producer = replay_trade_producer(
             replay_data,
             tier1_tickers=tickers_only(read_universe(tier1_csv)),
             tier2_tickers=tickers_only(read_universe(tier2_csv)),
+            medians_csv=medians_csv,
         )
     else:
         producer = noop_trade_producer
