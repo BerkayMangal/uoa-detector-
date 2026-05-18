@@ -107,13 +107,29 @@ The backtest window is 2025-05 → 2026-04 (12 months). **UW historical
 enrichment data for that window is not accessible under the current
 plan.** This is the single hard gate on a real Phase 3.5 verdict.
 
-| Step | Work | Est. |
+| Step | Work | State |
 |---|---|---|
 | B0 | **Obtain UW full historical data access** — email dev@unusualwhales.com, likely a paid tier / data-shop purchase | external, Berkay |
-| B2 | Rebuild the 6 UW providers in "as-of" mode (they fetch dated series already — just need to *select* by `at` instead of `del at`) | ~3–5 days |
+| B2 | UW providers in "as-of" mode (select by event time, no lookahead) | **mostly DONE** — see below |
 | B3 | Wire enrichment into fusion cells, run full 4-cell | ~2–3 days |
 
-**Track B total once B0 is granted: ~1.5–2 weeks.**
+**B2 progress (commits 3.5.5.8–10):**
+- `dealer_gamma` — DONE: `_rows_as_of` selects the snapshot date ≤ `at`.
+- `iv_history` — DONE: most-recent snapshot ≤ `at`, no future rows.
+- `dark_pool` — DONE: per-day cache key; `when > before` guard already present.
+- `open_interest` — already as-of correct (fetches `?date=` per `when`).
+- `catalyst_calendar` — no code change: `next_catalyst`/`catalysts_in_window`
+  already filter by event time. Residual is data coverage (the earnings/FDA
+  calendar must include the backtest period) — gated on B0.
+- `sector_peer` PeerFlow — `recent_flow` already has the `when > before`
+  guard, but `/api/stock/{t}/flow-recent` has no date param, so historical
+  peer flow is gated on B0 (a historical flow endpoint / access).
+
+So B2 is complete for every provider where code can fix it. The
+remaining two are data-coverage-gated on B0, not code.
+
+**Track B total once B0 is granted: ~1 week** (B3 + the catalyst/sector
+data wiring once the historical endpoints are reachable).
 
 ## The bottom line
 
