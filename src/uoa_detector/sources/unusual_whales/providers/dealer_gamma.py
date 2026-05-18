@@ -102,14 +102,21 @@ class UnusualWhalesDealerGammaProvider:
         strike: Decimal,
         at: datetime,
     ) -> DealerPositioning | None:
-        """Return the dealer-positioning snapshot at ``at``, or None."""
-        del at  # UW returns daily snapshots; date is not part of the key
+        """Return the dealer-positioning snapshot as of ``at``, or None.
+
+        Phase 3.5.5 B2: ``at`` selects the UW snapshot as it stood on
+        the most recent published date on or before ``at`` — point-in-
+        time correct for backtest replay. Live callers pass ``now()``
+        and get the latest, exactly as before.
+        """
         key = ticker.upper()
         rows = await self._cache.get_or_fetch(
             key,
             loader=lambda: self._fetch(ticker),
         )
-        return self._select_strike(rows, ticker=ticker, strike=strike)
+        return self._select_strike(
+            _rows_as_of(rows, at), ticker=ticker, strike=strike,
+        )
 
     async def aggregate_for_ticker(
         self,
@@ -125,14 +132,16 @@ class UnusualWhalesDealerGammaProvider:
         as the strike at which cumulative gamma (sorted by strike
         ascending) crosses zero. Returns None when no rows are
         published for the ticker.
+
+        Phase 3.5.5 B2: ``at`` selects the snapshot as of the most
+        recent published date on or before ``at``.
         """
-        del at  # UW returns daily snapshots; date not part of cache key
         key = ticker.upper()
         rows = await self._cache.get_or_fetch(
             key,
             loader=lambda: self._fetch(ticker),
         )
-        return self._aggregate(rows, ticker=ticker)
+        return self._aggregate(_rows_as_of(rows, at), ticker=ticker)
 
     def _aggregate(
         self,
@@ -230,6 +239,33 @@ def _row_net_gamma(row: dict[str, Any]) -> Decimal:
     call_gex = Decimal(str(row["call_gex"]))
     put_gex = Decimal(str(row["put_gex"]))
     return call_gex + put_gex
+
+
+def _rows_as_of(
+    rows: list[dict[str, Any]], at: datetime,
+) -> list[dict[str, Any]]:
+    """Filter to the single most-recent UW snapshot date on or before ``at``.
+
+    Phase 3.5.5 B2: the UW greek-exposure feed returns one (date,
+    strike) row per strike per published date. A backtest enriching
+    an event at ``at`` must see the snapshot as it stood then. Returns
+    the rows of the newest date that is on or before ``at`` — empty if
+    no snapshot pre-dates ``at`` (the event is then left un-enriched,
+    a neutral M21 score, rather than peeking at future data).
+    """
+    at_date = at.date()
+    dated: list[tuple[_date, dict[str, Any]]] = []
+    for row in rows:
+        try:
+            row_date = _row_as_of(row).date()
+        except (KeyError, ValueError, ArithmeticError):
+            continue
+        if row_date <= at_date:
+            dated.append((row_date, row))
+    if not dated:
+        return []
+    latest = max(d for d, _ in dated)
+    return [row for d, row in dated if d == latest]
 
 
 def _row_as_of(row: dict[str, Any]) -> datetime:
