@@ -79,10 +79,12 @@ decision (drop conditions, not annotate):
   need to know about cancel-codes; filtering once is cleaner
   and matches the 'canonical print stream' contract.
 
-decision (no fill_side inference here):
-  The acceptance doc's M34 sweep classifier is the system of
-  record for fill_side. The mapping passes fill_side='unknown'
-  and lets downstream classify.
+decision (fill_side inferred from the NBBO — Phase 3.5.5 A1):
+  Originally the mapping passed fill_side='unknown' on the
+  assumption M34 would classify it. M34 only *reads* fill_side,
+  never derives it, so historical replays had no aggression
+  signal at all. The mapping now classifies fill_side from the
+  trade price against bid/ask (``classify_fill_side``).
 
 decision (Pydantic input models, not dict[str, object]):
   Trade and quote rows arrive from the ThetaData JSON response
@@ -114,7 +116,7 @@ from zoneinfo import ZoneInfo
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from uoa_detector.domain.events import OptionType
+from uoa_detector.domain.events import FillSide, OptionType
 from uoa_detector.domain.raw_print import RawPrint
 
 _ET = ZoneInfo("America/New_York")
@@ -575,6 +577,31 @@ def thetadata_dollars_to_strike(dollars: Decimal) -> int:
 # ---------------------------------------------------------------------------
 
 
+def classify_fill_side(price: Decimal, bid: Decimal, ask: Decimal) -> FillSide:
+    """Classify a trade's aggression from its price against the NBBO.
+
+    Phase 3.5.5 (Track A1): a trade executed at-or-above the ask is an
+    aggressive buy; at-or-below the bid an aggressive sell; the gradations
+    in between place it on the bid- or ask-half of the spread. This is the
+    primary "unusual aggression" signal feeding the UOA score.
+
+    Returns ``"unknown"`` when the quote is missing or crossed (bid > ask)
+    or non-positive — the side genuinely cannot be inferred.
+    """
+    if bid <= 0 or ask <= 0 or bid > ask:
+        return "unknown"
+    if price >= ask:
+        return "above_ask"
+    if price <= bid:
+        return "below_bid"
+    midpoint = (bid + ask) / 2
+    if price > midpoint:
+        return "at_ask"
+    if price < midpoint:
+        return "at_bid"
+    return "midpoint"
+
+
 def map_thetadata_trade_to_rawprint(
     *,
     trade_row: TradeRow,
@@ -636,7 +663,7 @@ def map_thetadata_trade_to_rawprint(
         option_price=trade_row.price,
         bid=bid,
         ask=ask,
-        fill_side="unknown",  # M34 classifies; mapping doesn't infer
+        fill_side=classify_fill_side(trade_row.price, bid, ask),
         exchange=thetadata_exchange_name(trade_row.exchange),
         implied_volatility=implied_volatility,
         open_interest=open_interest,

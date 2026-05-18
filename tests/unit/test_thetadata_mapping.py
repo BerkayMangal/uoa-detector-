@@ -24,6 +24,7 @@ from uoa_detector.sources.thetadata.mapping import (
     OPRA_DROP_CONDITIONS,
     QuoteRow,
     TradeRow,
+    classify_fill_side,
     et_ms_in_regular_hours,
     et_ms_to_utc_datetime,
     format_v3_right,
@@ -420,7 +421,9 @@ def test_happy_path_call_trade() -> None:
     assert rp.option_price == Decimal("3.20")
     assert rp.bid == Decimal("3.18")
     assert rp.ask == Decimal("3.22")
-    assert rp.fill_side == "unknown"
+    # Phase 3.5.5 A1: fill_side is now inferred from the NBBO. Price
+    # 3.20 sits exactly at the 3.18/3.22 midpoint → "midpoint".
+    assert rp.fill_side == "midpoint"
     assert rp.exchange == "NYSE"
     assert rp.implied_volatility == 0.28
     assert rp.open_interest == 12000
@@ -771,3 +774,32 @@ def test_v3_trade_row_feeds_existing_map_function() -> None:
     assert rp.option_price == Decimal("1.85")
     assert rp.dte == 31  # Jan 16 → Feb 16
 
+
+
+# ---------------------------------------------------------------------------
+# Phase 3.5.5 A1 — fill_side classification from the NBBO
+# ---------------------------------------------------------------------------
+
+
+def test_classify_fill_side_at_or_above_ask() -> None:
+    assert classify_fill_side(Decimal("3.25"), Decimal("3.18"), Decimal("3.22")) == "above_ask"
+    assert classify_fill_side(Decimal("3.22"), Decimal("3.18"), Decimal("3.22")) == "above_ask"
+
+
+def test_classify_fill_side_at_or_below_bid() -> None:
+    assert classify_fill_side(Decimal("3.10"), Decimal("3.18"), Decimal("3.22")) == "below_bid"
+    assert classify_fill_side(Decimal("3.18"), Decimal("3.18"), Decimal("3.22")) == "below_bid"
+
+
+def test_classify_fill_side_within_spread() -> None:
+    # bid 3.18 / ask 3.22 → midpoint 3.20
+    assert classify_fill_side(Decimal("3.21"), Decimal("3.18"), Decimal("3.22")) == "at_ask"
+    assert classify_fill_side(Decimal("3.19"), Decimal("3.18"), Decimal("3.22")) == "at_bid"
+    assert classify_fill_side(Decimal("3.20"), Decimal("3.18"), Decimal("3.22")) == "midpoint"
+
+
+def test_classify_fill_side_unknown_on_bad_quote() -> None:
+    # Missing / non-positive / crossed quotes cannot be classified.
+    assert classify_fill_side(Decimal("3.20"), Decimal("0"), Decimal("3.22")) == "unknown"
+    assert classify_fill_side(Decimal("3.20"), Decimal("3.18"), Decimal("0")) == "unknown"
+    assert classify_fill_side(Decimal("3.20"), Decimal("3.30"), Decimal("3.22")) == "unknown"
