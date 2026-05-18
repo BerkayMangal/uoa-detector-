@@ -230,6 +230,12 @@ async def _download_ticker_month(
             ),
         )
 
+    # ParquetReplaySource enforces event-time-monotonic rows WITHIN a
+    # file (it raises DataIntegrityError on the first row that goes
+    # back in time). The bulk response groups rows per-contract, so
+    # they arrive interleaved by time — sort the whole month ascending
+    # before writing.
+    month_prints.sort(key=lambda p: p.timestamp)
     fp.parent.mkdir(parents=True, exist_ok=True)
     write_parquet(month_prints, fp)
     return "done", len(month_prints)
