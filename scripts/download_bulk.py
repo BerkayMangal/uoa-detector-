@@ -211,34 +211,65 @@ async def _download_ticker_month(
     output_dir: Path,
     max_dte: int | None,
 ) -> tuple[str, int]:
-    """Download one ticker-month via bulk calls. Returns (status, rows)."""
+    """Download one ticker-month via bulk calls. Returns (status, rows).
+
+    Streams day-by-day: each day's prints are converted to a parquet
+    row group and written immediately via ``ParquetWriter``, then
+    dropped. The whole month is NEVER materialised in memory — a
+    high-volume ticker (TSLA) is tens of millions of rows per month,
+    which OOM-kills the process if accumulated as RawPrint objects.
+
+    Within-file event-time monotonicity (required by
+    ``ParquetReplaySource``) holds because each day's prints are
+    sorted before its row group is written and day N's prints all
+    precede day N+1's.
+    """
+    import pyarrow.parquet as pq
+
+    from uoa_detector.backtest.parquet_schema import (
+        RAWPRINT_PARQUET_SCHEMA,
+        raw_prints_to_table,
+    )
+
     fp = historical_file_path(output_dir, ticker, year, month)
     if _month_complete(fp):
         return "skip", 0
 
     days = _days_in_month(year, month, start, end)
-    month_prints: list[RawPrint] = []
-    for d in days:
-        try:
-            wrappers = await _fetch_day(client, ticker, d)
-        except Exception as exc:  # one bad day must not abort the month
-            _logger.warning("%s %s: day fetch failed: %r", ticker, d, exc)
-            continue
-        month_prints.extend(
-            _day_to_prints(
-                wrappers, ticker=ticker, day=d, max_dte=max_dte,
-            ),
-        )
-
-    # ParquetReplaySource enforces event-time-monotonic rows WITHIN a
-    # file (it raises DataIntegrityError on the first row that goes
-    # back in time). The bulk response groups rows per-contract, so
-    # they arrive interleaved by time — sort the whole month ascending
-    # before writing.
-    month_prints.sort(key=lambda p: p.timestamp)
     fp.parent.mkdir(parents=True, exist_ok=True)
-    write_parquet(month_prints, fp)
-    return "done", len(month_prints)
+    writer: pq.ParquetWriter | None = None
+    total = 0
+    try:
+        for d in days:
+            try:
+                wrappers = await _fetch_day(client, ticker, d)
+            except Exception as exc:  # one bad day must not abort the month
+                _logger.warning("%s %s: day fetch failed: %r", ticker, d, exc)
+                continue
+            day_prints = _day_to_prints(
+                wrappers, ticker=ticker, day=d, max_dte=max_dte,
+            )
+            if not day_prints:
+                continue
+            day_prints.sort(key=lambda p: p.timestamp)
+            table = raw_prints_to_table(day_prints)
+            if writer is None:
+                writer = pq.ParquetWriter(  # type: ignore[no-untyped-call]
+                    fp, RAWPRINT_PARQUET_SCHEMA,
+                    compression="zstd", compression_level=3,
+                )
+            writer.write_table(table)
+            total += len(day_prints)
+    finally:
+        if writer is not None:
+            writer.close()
+
+    # A month with no rows at all (every day failed or empty): write an
+    # empty file so the layout stays consistent. _month_complete treats
+    # 0 rows as incomplete, so a re-run retries it.
+    if writer is None:
+        write_parquet([], fp)
+    return "done", total
 
 
 async def _run(args: argparse.Namespace) -> int:
