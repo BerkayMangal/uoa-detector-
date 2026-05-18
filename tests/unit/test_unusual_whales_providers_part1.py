@@ -447,10 +447,14 @@ async def test_iv_history_parses_new_uw_schema() -> None:
         client=client,  # type: ignore[arg-type]
         settings=_settings(),
     )
+    # Phase 3.5.5 B2: iv_rank_at is now as-of (no lookahead). The query
+    # time must be at or after the row's updated_at (22:35:03) for the
+    # snapshot to be available — this test pins schema parsing, so the
+    # query time is set just after the row.
     snap = await provider.iv_rank_at(
         ticker="AAPL", strike=Decimal("150.00"),
         expiry=date(2026, 5, 15), option_type="call",
-        at=datetime(2026, 5, 11, 22, 35, tzinfo=UTC),
+        at=datetime(2026, 5, 11, 22, 36, tzinfo=UTC),
     )
     assert snap is not None
     assert snap.implied_volatility == pytest.approx(0.2263)
@@ -458,6 +462,43 @@ async def test_iv_history_parses_new_uw_schema() -> None:
     assert snap.iv_percentile_252d == pytest.approx(34.6915)  # falls back to rank
     assert snap.iv_change_intraday_pct is None
     assert snap.as_of.year == 2026  # parsed from updated_at
+
+
+@pytest.mark.asyncio
+async def test_iv_history_as_of_no_lookahead() -> None:
+    """Phase 3.5.5 B2: iv_rank_at returns the most recent snapshot on
+    or before ``at`` and never a future one."""
+    client = _FakeClient()
+    client.stub(
+        "/api/stock/AAPL/iv-rank",
+        {
+            "data": [
+                {"date": "2025-07-10", "updated_at": "2025-07-10T22:00:00Z",
+                 "volatility": "0.20", "iv_rank_1y": "30.0", "close": "200"},
+                {"date": "2025-07-14", "updated_at": "2025-07-14T22:00:00Z",
+                 "volatility": "0.25", "iv_rank_1y": "55.0", "close": "205"},
+                {"date": "2025-07-20", "updated_at": "2025-07-20T22:00:00Z",
+                 "volatility": "0.40", "iv_rank_1y": "90.0", "close": "210"},
+            ],
+        },
+    )
+    provider = UnusualWhalesIVHistoryProvider(
+        client=client,  # type: ignore[arg-type]
+        settings=_settings(),
+    )
+    # Query mid-July: must see the 07-14 snapshot, not the future 07-20.
+    snap = await provider.iv_rank_at(
+        ticker="AAPL", strike=Decimal("150"), expiry=date(2025, 8, 15),
+        option_type="call", at=datetime(2025, 7, 15, 14, tzinfo=UTC),
+    )
+    assert snap is not None
+    assert snap.iv_rank_252d == pytest.approx(55.0)
+    # Query before any snapshot → None (no peeking forward).
+    early = await provider.iv_rank_at(
+        ticker="AAPL", strike=Decimal("150"), expiry=date(2025, 8, 15),
+        option_type="call", at=datetime(2025, 7, 1, tzinfo=UTC),
+    )
+    assert early is None
 
 
 # ===========================================================================

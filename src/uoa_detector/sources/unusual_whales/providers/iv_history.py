@@ -95,7 +95,13 @@ class UnusualWhalesIVHistoryProvider:
         option_type: Literal["call", "put"],
         at: datetime,
     ) -> IVRankSnapshot | None:
-        """Return the IV-rank snapshot nearest to ``at``."""
+        """Return the IV-rank snapshot as of ``at``.
+
+        Phase 3.5.5 B2: the most recent snapshot on or before ``at`` —
+        never a future row. The previous "nearest by absolute time
+        delta" could select a row *after* ``at``, lookahead bias in a
+        backtest.
+        """
         key = ticker.upper()
         rows = await self._cache.get_or_fetch(
             key,
@@ -130,15 +136,17 @@ class UnusualWhalesIVHistoryProvider:
     ) -> IVRankSnapshot | None:
         if not rows:
             return None
-        best: tuple[float, dict[str, Any]] | None = None
+        # As-of selection: the most recent snapshot on or before ``at``.
+        best: tuple[datetime, dict[str, Any]] | None = None
         for row in rows:
             try:
                 row_at = _row_as_of(row)
             except (KeyError, ValueError):
                 continue
-            delta = abs((row_at - at).total_seconds())
-            if best is None or delta < best[0]:
-                best = (delta, row)
+            if row_at > at:
+                continue  # no lookahead — skip future snapshots
+            if best is None or row_at > best[0]:
+                best = (row_at, row)
         if best is None:
             return None
         return _row_to_iv_snapshot(
