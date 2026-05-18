@@ -803,3 +803,51 @@ def test_classify_fill_side_unknown_on_bad_quote() -> None:
     assert classify_fill_side(Decimal("3.20"), Decimal("0"), Decimal("3.22")) == "unknown"
     assert classify_fill_side(Decimal("3.20"), Decimal("3.18"), Decimal("0")) == "unknown"
     assert classify_fill_side(Decimal("3.20"), Decimal("3.30"), Decimal("3.22")) == "unknown"
+
+
+# ---------------------------------------------------------------------------
+# Phase 3.5.5 A2 — is_iso decoded from the trade condition code
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("iso_condition", [95, 126, 128])
+def test_map_trade_is_iso_true_for_iso_conditions(iso_condition: int) -> None:
+    """Condition codes 95 / 126 / 128 mark an Intermarket Sweep Order."""
+    row = TradeRow(
+        date_yyyymmdd=20240115,
+        ms_of_day=(14 * 3600) * 1000,
+        sequence=1,
+        condition=iso_condition,
+        size=3,
+        exchange=43,
+        price=Decimal("2.00"),
+    )
+    rp = map_thetadata_trade_to_rawprint(
+        trade_row=row, ticker="AAPL", expiry=date(2024, 2, 16),
+        strike_dollars=Decimal("170.00"), right="C",
+        spot_price=Decimal("180.00"),
+        bid=Decimal("1.95"), ask=Decimal("2.05"),
+    )
+    assert rp is not None
+    assert rp.is_iso is True
+
+
+@pytest.mark.parametrize("plain_condition", [0, 1, 18, 125])
+def test_map_trade_is_iso_false_for_non_iso_conditions(plain_condition: int) -> None:
+    row = TradeRow(
+        date_yyyymmdd=20240115,
+        ms_of_day=(14 * 3600) * 1000,
+        sequence=1,
+        condition=plain_condition,
+        size=3,
+        exchange=43,
+        price=Decimal("2.00"),
+    )
+    rp = map_thetadata_trade_to_rawprint(
+        trade_row=row, ticker="AAPL", expiry=date(2024, 2, 16),
+        strike_dollars=Decimal("170.00"), right="C",
+        spot_price=Decimal("180.00"),
+        bid=Decimal("1.95"), ask=Decimal("2.05"),
+    )
+    assert rp is not None
+    assert rp.is_iso is False

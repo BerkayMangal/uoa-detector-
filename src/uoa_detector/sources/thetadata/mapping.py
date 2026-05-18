@@ -149,6 +149,19 @@ OPRA_DROP_CONDITIONS: Final[frozenset[int]] = frozenset(
 )
 
 
+# Trade condition codes that mark an Intermarket Sweep Order execution
+# (ThetaData "Trade Conditions" table). An ISO is by definition an
+# aggressive multi-venue order — M34 treats ``is_iso`` as the top
+# urgency tier. Phase 3.5.5 A2.
+ISO_TRADE_CONDITIONS: Final[frozenset[int]] = frozenset(
+    {
+        95,   # INTERMARKET_SWEEP
+        126,  # SINGLE_LEG_AUCTION_ISO
+        128,  # SINGLE_LEG_CROSS_ISO
+    },
+)
+
+
 # Regular US options market hours (ET).
 _REGULAR_OPEN_ET: Final[time] = time(9, 30)
 _REGULAR_CLOSE_ET: Final[time] = time(16, 0)
@@ -667,7 +680,7 @@ def map_thetadata_trade_to_rawprint(
         exchange=thetadata_exchange_name(trade_row.exchange),
         implied_volatility=implied_volatility,
         open_interest=open_interest,
-        is_iso=False,
+        is_iso=trade_row.condition in ISO_TRADE_CONDITIONS,
         source_tags=(),
     )
 
