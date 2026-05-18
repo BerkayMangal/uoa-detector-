@@ -25,6 +25,7 @@ from uoa_detector.backtest.cell_runner import (
     fixture_trade_producer,
     load_universe_tickers,
     noop_trade_producer,
+    replay_trade_producer,
     run_4cell_backtest,
     universe_path,
 )
@@ -99,6 +100,7 @@ __all__ = [
     "no_op_tuner",
     "noop_trade_producer",
     "render_4cell_comparison_report",
+    "replay_trade_producer",
     "run_4cell_backtest",
     "universe_path",
 ]

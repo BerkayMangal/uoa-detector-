@@ -71,6 +71,7 @@ if TYPE_CHECKING:
     from uoa_detector.backtest.protocol import BacktestStoreProtocol
     from uoa_detector.backtest.store import StoredSignal
     from uoa_detector.calibration.profile import CalibrationProfile
+    from uoa_detector.pipeline.stage import EnrichmentStage
 
 
 _logger = logging.getLogger(__name__)
@@ -391,3 +392,126 @@ def synthetic_trade_producer(
 
     pnl = NoOpPnLProvider()
     return [pnl.provide(sig) for sig in store.all()]
+
+
+# ---------------------------------------------------------------------------
+# Replay trade producer — Phase 3.5.5 real-data 4-cell backtest
+# ---------------------------------------------------------------------------
+
+
+def _replay_stages(fusion: CellFusion) -> list[EnrichmentStage]:
+    """Return the stage list for a cell's fusion coordinate.
+
+    ``single`` runs only the core-flow stages — the ones that score
+    the raw UOA print without external-source corroboration
+    (time-of-day, DTE decay, sweep/block, relative premium, temporal
+    clustering + decay). ``fusion`` runs the full Phase 3.4 pipeline,
+    adding the M21-M27 enrichment confluence on top.
+
+    NOTE (Phase 3.5.5.2): the M21-M27 enrichment stages in the fusion
+    set are constructed with their default NoOp providers — no real
+    Unusual Whales provider is wired into the enrichment stages
+    anywhere in the codebase yet. So a fusion run today exercises the
+    enrichment *plumbing* but the enrichment *scores* are neutral.
+    Wiring real UW providers into M21-M27 is a follow-up sub-phase;
+    Phase 3.5.6's falsification verdict must not be read off a
+    NoOp-enrichment run.
+    """
+    from uoa_detector.pipeline.stages import (
+        ClusterDecayStage,
+        DTEDecayStage,
+        RelativePremiumStage,
+        SweepBlockStage,
+        TemporalClusterStage,
+        TimeOfDayStage,
+        default_stage_pipeline,
+    )
+
+    if fusion == "fusion":
+        return list(default_stage_pipeline())
+    # Core-flow subset, in the same relative order as the full pipeline.
+    return [
+        TimeOfDayStage(),
+        DTEDecayStage(),
+        SweepBlockStage(),
+        RelativePremiumStage(),
+        TemporalClusterStage(),
+        ClusterDecayStage(),
+    ]
+
+
+def replay_trade_producer(
+    data_dir: Path,
+    *,
+    tier1_tickers: tuple[str, ...],
+    tier2_tickers: tuple[str, ...],
+    source_id: str = "thetadata",
+) -> Callable[
+    [CellSpec, tuple[WalkForwardWindow, ...], CalibrationProfile],
+    list[RealizedTrade],
+]:
+    """Build a TradeProducer that replays historical parquet data.
+
+    Phase 3.5.5: the real-data counterpart of ``synthetic_trade_producer``.
+    For each cell it streams the cell's universe through a
+    ``ParquetReplaySource``, drives the Phase 3.4 pipeline (stage set
+    chosen by ``cell.fusion`` — see ``_replay_stages``), then realizes
+    every stored signal into a ``RealizedTrade`` via ``SimplePnLProvider``
+    with exit bids from ``ParquetExitQuoteProvider``.
+
+    ``data_dir`` is the per-source replay root
+    (``data/historical/bulk``); ``tier1_tickers`` / ``tier2_tickers``
+    are the downloaded universes (the reduced 9 / 15-name lists, NOT
+    the cell runner's default tier1_anchor / tier2_starter — those are
+    not what was downloaded).
+    """
+
+    def _producer(
+        cell: CellSpec,
+        windows: tuple[WalkForwardWindow, ...],
+        profile: CalibrationProfile,
+    ) -> list[RealizedTrade]:
+        import asyncio
+
+        from uoa_detector.backtest.parquet_exit_quote import (
+            ParquetExitQuoteProvider,
+        )
+        from uoa_detector.backtest.simple_pnl import SimplePnLProvider
+        from uoa_detector.backtest.store import BacktestStore
+        from uoa_detector.pipeline.orchestrator import Pipeline
+        from uoa_detector.sources.parquet_replay import ParquetReplaySource
+
+        tickers = (
+            tier1_tickers if cell.universe == "tier1" else tier2_tickers
+        )
+        period_start = windows[0].start
+        period_end = windows[-1].end
+
+        source = ParquetReplaySource(
+            source_id,
+            data_dir,
+            tickers=list(tickers),
+            from_month=f"{period_start:%Y-%m}",
+            to_month=f"{period_end:%Y-%m}",
+        )
+        store = BacktestStore()
+        pipeline = Pipeline(
+            sources=[source],
+            stages=_replay_stages(cell.fusion),
+            profile=profile,
+            store=store,
+        )
+        asyncio.run(pipeline.run())
+
+        pnl = SimplePnLProvider(
+            profile.backtest,
+            ParquetExitQuoteProvider(data_dir),
+        )
+        trades = [pnl.provide(sig) for sig in store.all()]
+        _logger.info(
+            "replay producer: cell=%s tickers=%d signals=%d",
+            cell.name, len(tickers), len(trades),
+        )
+        return trades
+
+    return _producer

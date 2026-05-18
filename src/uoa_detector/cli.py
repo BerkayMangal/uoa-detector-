@@ -70,9 +70,19 @@ from uoa_detector.sources.scenarios import (
 from uoa_detector.sources.synthetic import SyntheticRawFlowSource, to_raw_print
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from uoa_detector.backtest import BacktestStoreProtocol
+    from uoa_detector.backtest.cell_runner import CellSpec
+    from uoa_detector.backtest.pnl_provider import RealizedTrade
+    from uoa_detector.backtest.walk_forward import WalkForwardWindow
     from uoa_detector.calibration import CalibrationProfile
     from uoa_detector.observability import DecisionRecordWriter
+
+    _TradeProducer = Callable[
+        [CellSpec, tuple[WalkForwardWindow, ...], CalibrationProfile],
+        list[RealizedTrade],
+    ]
 
 
 class OutputFormat(StrEnum):
@@ -736,7 +746,17 @@ def backtest_run_4cell(
              "drives the default scripted scenario through the full "
              "Phase 3.4 pipeline and emits one NoOp open trade per "
              "stored signal — used by Phase 3.5.4 to validate the "
-             "wiring end-to-end before the real-data run in 3.5.5.",
+             "wiring end-to-end before the real-data run in 3.5.5. "
+             "'replay' streams the downloaded historical parquet data "
+             "(--replay-data) through the pipeline and realizes trades "
+             "via SimplePnLProvider — the Phase 3.5.5 real-data run.",
+    ),
+    replay_data: Path | None = typer.Option(
+        None,
+        "--replay-data",
+        help="Replay parquet root (e.g. data/historical/bulk) — the "
+             "per-source dir holding {TICKER}/{YYYY-MM}.parquet. "
+             "Required when --trades replay.",
     ),
 ) -> None:
     """Run the Formülasyon A 4-cell combinatorial backtest end-to-end.
@@ -751,11 +771,15 @@ def backtest_run_4cell(
     fusion+orchestrator and writing signals to the store) land in
     Phase 3.3 alongside the SimplePnL exit-quote source.
     """
-    if trades not in ("noop", "synthetic"):
+    if trades not in ("noop", "synthetic", "replay"):
         msg = (
-            f"--trades must be 'noop' or 'synthetic'; got {trades!r}."
+            f"--trades must be 'noop', 'synthetic', or 'replay'; "
+            f"got {trades!r}."
         )
         raise typer.BadParameter(msg, param_hint="--trades")
+    if trades == "replay" and replay_data is None:
+        msg = "--trades replay requires --replay-data PATH."
+        raise typer.BadParameter(msg, param_hint="--replay-data")
 
     # Parse period dates as UTC midnight.
     try:
@@ -772,9 +796,31 @@ def backtest_run_4cell(
     profile = _resolve_profile(profile_path)
     store = _build_store(store_url)
 
+    producer: _TradeProducer
     if trades == "synthetic":
         from uoa_detector.backtest.cell_runner import synthetic_trade_producer
         producer = synthetic_trade_producer
+    elif trades == "replay":
+        from uoa_detector.backtest.cell_runner import replay_trade_producer
+        from uoa_detector.historical.universe import (
+            read_universe,
+            tickers_only,
+        )
+
+        # The downloaded universes — the reduced 9 / 15-name lists,
+        # not the cell runner's default tier1_anchor / tier2_starter.
+        tier1_csv = Path("data/universes/tier1_reduced.csv")
+        tier2_csv = Path("data/universes/tier2_top15.csv")
+        for csv_path in (tier1_csv, tier2_csv):
+            if not csv_path.exists():
+                msg = f"universe CSV not found: {csv_path}"
+                raise typer.BadParameter(msg, param_hint="--trades")
+        assert replay_data is not None  # guarded above
+        producer = replay_trade_producer(
+            replay_data,
+            tier1_tickers=tickers_only(read_universe(tier1_csv)),
+            tier2_tickers=tickers_only(read_universe(tier2_csv)),
+        )
     else:
         producer = noop_trade_producer
 
