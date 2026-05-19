@@ -78,12 +78,14 @@ product's namesake. Achievable with data in hand + one $80 add-on.
 |---|---|---|
 | A1 | Derive `fill_side` from price vs bid/ask in the mapping | **DONE** — commit 3.5.5.5 |
 | A2 | Decode `is_iso` from ThetaData trade condition codes (95/126/128) | **DONE** — commit 3.5.5.6 |
-| A3 | Bucket cross-exchange near-simultaneous prints so M34 sees multi-venue sweeps | ~2–3 days |
-| A4 | Spot price: subscribe ThetaData STOCK add-on ($80/mo), download stock history, join → unblocks convexity | ~1–2 days |
-| A5 | Candidate pre-filter + streaming store for the 245M-row scale | ~2–3 days |
-| A6 | Run single-cell 4-cell, Phase 3.5.6 falsification | ~1 day |
+| A3 | Bucket cross-exchange near-simultaneous prints so M34 sees multi-venue sweeps | **DONE** — commit 3.5.5.7 |
+| A4 | Spot price: subscribe ThetaData STOCK add-on ($80/mo), download stock history, join → unblocks convexity | gated on the add-on (stock endpoints 403 until subscribed) |
+| A5 | Candidate pre-filter for the 245M-row scale (`--min-premium`) | **DONE** — commit 3.5.5.12. Streaming store deferred — only needed if the filter is left loose. |
+| A6 | Run single-cell 4-cell, Phase 3.5.6 falsification | gated on A4 + B0 |
 
-**Track A remaining: ~1–1.5 weeks → a real verdict on UOA + convexity edge.**
+**Track A status: all code done except A4, which is gated on the
+ThetaData STOCK add-on. Once the add-on is active, A4 (spot download +
+join) is ~1–2 days; then the run.**
 
 **Re-download note:** A1 and A2 are mapping-layer fixes — they take
 effect only when the bulk data is re-downloaded (the parquet stores
