@@ -33,6 +33,7 @@ import contextlib
 import logging
 import sys
 from datetime import UTC, datetime
+from decimal import Decimal
 from enum import StrEnum
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -767,6 +768,15 @@ def backtest_run_4cell(
              "historical data access is granted; before that the "
              "providers return only the last few days.",
     ),
+    min_premium: float | None = typer.Option(
+        None,
+        "--min-premium",
+        help="Candidate pre-filter (Phase 3.5.5 A5): skip replayed "
+             "prints whose premium (USD) is below this, so a full run "
+             "processes unusual-size trades rather than all ~245M "
+             "prints. Default: no filter. The value is a modelling "
+             "choice — it interacts with M38 cluster counts.",
+    ),
 ) -> None:
     """Run the Formülasyon A 4-cell combinatorial backtest end-to-end.
 
@@ -835,6 +845,9 @@ def backtest_run_4cell(
             tier2_tickers=tickers_only(read_universe(tier2_csv)),
             medians_csv=medians_csv,
             use_uw_enrichment=uw_enrichment,
+            min_premium_usd=(
+                Decimal(str(min_premium)) if min_premium is not None else None
+            ),
         )
     else:
         producer = noop_trade_producer

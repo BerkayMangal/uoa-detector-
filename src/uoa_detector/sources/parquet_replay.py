@@ -61,6 +61,7 @@ import logging
 import math
 import re
 from datetime import UTC, datetime
+from decimal import Decimal
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -100,6 +101,7 @@ class ParquetReplaySource:
         from_month: str | None = None,
         to_month: str | None = None,
         replay_speed: float = math.inf,
+        min_premium_usd: Decimal | None = None,
     ) -> None:
         """Initialise but do not yet read.
 
@@ -112,9 +114,20 @@ class ParquetReplaySource:
 
         ``replay_speed`` ≤ 0 raises ``ValueError`` — we accept ``inf``
         (default) and any positive finite float.
+
+        ``min_premium_usd`` (Phase 3.5.5 A5): when set, prints whose
+        ``premium_paid`` is below it are skipped — a candidate
+        pre-filter so a full-universe replay processes the unusual-size
+        trades rather than all ~245M retail prints. Default None = no
+        filter (every print is emitted, exactly as before). Rows are
+        still validated for timestamp monotonicity before being
+        skipped, so the data-integrity contract is unaffected.
         """
         if replay_speed <= 0:
             msg = f"replay_speed must be > 0; got {replay_speed!r}"
+            raise ValueError(msg)
+        if min_premium_usd is not None and min_premium_usd < 0:
+            msg = f"min_premium_usd must be >= 0; got {min_premium_usd!r}"
             raise ValueError(msg)
         self.source_id = source_id
         self._data_dir = data_dir
@@ -124,6 +137,7 @@ class ParquetReplaySource:
         self._from_month = from_month
         self._to_month = to_month
         self._replay_speed = replay_speed
+        self._min_premium_usd = min_premium_usd
         self._closed = False
         # Snapshot the file list at the FIRST stream() call rather than
         # at __init__ — tests construct the source and expect it not to
@@ -260,6 +274,16 @@ class ParquetReplaySource:
                     )
                     raise DataIntegrityError(msg)
                 last_seen_ts = ts
+                # A5 candidate pre-filter: skip below-threshold prints
+                # AFTER the monotonicity check (the integrity contract
+                # covers every row on disk, filtered or not).
+                if self._min_premium_usd is not None:
+                    premium_raw = row.get("premium_paid")
+                    if (
+                        premium_raw is not None
+                        and Decimal(str(premium_raw)) < self._min_premium_usd
+                    ):
+                        continue
                 # Pydantic validation may raise; wrap as DataIntegrityError.
                 try:
                     yield row_to_raw_print(row)

@@ -49,6 +49,7 @@ def _build_print(
     ticker: str = "AAPL",
     source_event_id: str = "e0",
     source_id: str = "synthetic_replay",
+    premium: Decimal = Decimal("1000"),
 ) -> RawPrint:
     return RawPrint(
         source_id=source_id,
@@ -60,7 +61,7 @@ def _build_print(
         expiry=date(2025, 7, 18),
         dte=39,
         spot_price=Decimal("198.50"),
-        premium_paid=Decimal("1000"),
+        premium_paid=premium,
         option_price=Decimal("1.50"),
         bid=Decimal("1.45"),
         ask=Decimal("1.55"),
@@ -477,3 +478,60 @@ def _drain_inmemory(src: object) -> list[RawPrint]:
         return rows
 
     return asyncio.run(go())
+
+
+# ---------------------------------------------------------------------------
+# Phase 3.5.5 A5 — min_premium_usd candidate pre-filter
+# ---------------------------------------------------------------------------
+
+
+def test_min_premium_filter_skips_below_threshold(tmp_path: Path) -> None:
+    """min_premium_usd skips prints whose premium is below it; the rest
+    stream through unchanged."""
+    aapl = tmp_path / "AAPL"
+    aapl.mkdir(parents=True)
+    base = datetime(2025, 6, 9, 14, 0, tzinfo=UTC)
+    prints = [
+        _build_print(base, source_event_id="small", premium=Decimal("500")),
+        _build_print(
+            base.replace(minute=1), source_event_id="big",
+            premium=Decimal("50000"),
+        ),
+        _build_print(
+            base.replace(minute=2), source_event_id="mid",
+            premium=Decimal("2500"),
+        ),
+    ]
+    write_parquet(prints, aapl / "2025-06.parquet")
+
+    src = ParquetReplaySource(
+        "synthetic_replay", tmp_path, min_premium_usd=Decimal("2500"),
+    )
+    out = _drain(src)
+    ids = {p.source_event_id for p in out}
+    # 'small' (500) dropped; 'mid' (2500, at threshold) and 'big' kept.
+    assert ids == {"big", "mid"}
+
+
+def test_min_premium_none_emits_everything(tmp_path: Path) -> None:
+    """Default (no filter) emits every print, exactly as before."""
+    aapl = tmp_path / "AAPL"
+    aapl.mkdir(parents=True)
+    base = datetime(2025, 6, 9, 14, 0, tzinfo=UTC)
+    prints = [
+        _build_print(base, source_event_id="a", premium=Decimal("10")),
+        _build_print(
+            base.replace(minute=1), source_event_id="b",
+            premium=Decimal("99999"),
+        ),
+    ]
+    write_parquet(prints, aapl / "2025-06.parquet")
+    src = ParquetReplaySource("synthetic_replay", tmp_path)
+    assert len(_drain(src)) == 2
+
+
+def test_min_premium_negative_rejected(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="min_premium_usd"):
+        ParquetReplaySource(
+            "synthetic_replay", tmp_path, min_premium_usd=Decimal("-1"),
+        )

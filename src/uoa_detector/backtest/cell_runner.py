@@ -49,6 +49,7 @@ import csv
 import logging
 from dataclasses import dataclass
 from datetime import datetime
+from decimal import Decimal
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal
 
@@ -537,6 +538,7 @@ def replay_trade_producer(
     medians_csv: Path | None = None,
     source_id: str = "thetadata",
     use_uw_enrichment: bool = False,
+    min_premium_usd: Decimal | None = None,
 ) -> Callable[
     [CellSpec, tuple[WalkForwardWindow, ...], CalibrationProfile],
     list[RealizedTrade],
@@ -569,6 +571,13 @@ def replay_trade_producer(
     before that the providers return only the last few days and a
     fusion run would be both API-heavy and un-enriched for the
     backtest period.
+
+    ``min_premium_usd`` (Phase 3.5.5 A5): candidate pre-filter — prints
+    with ``premium_paid`` below it are skipped during replay so a
+    full-universe run processes the unusual-size trades, not all ~245M
+    retail prints. Default None = no filter. The threshold value is a
+    modelling choice (it interacts with M38 cluster counts); pick it
+    deliberately, do not leave it to chance.
     """
 
     def _producer(
@@ -602,6 +611,7 @@ def replay_trade_producer(
             tickers=list(tickers),
             from_month=f"{period_start:%Y-%m}",
             to_month=f"{period_end:%Y-%m}",
+            min_premium_usd=min_premium_usd,
         )
         context = PipelineContext(profile=profile)
         if medians_csv is not None:
