@@ -110,8 +110,9 @@ plan.** This is the single hard gate on a real Phase 3.5 verdict.
 | Step | Work | State |
 |---|---|---|
 | B0 | **Obtain UW full historical data access** — email dev@unusualwhales.com, likely a paid tier / data-shop purchase | external, Berkay |
-| B2 | UW providers in "as-of" mode (select by event time, no lookahead) | **mostly DONE** — see below |
-| B3 | Wire enrichment into fusion cells, run full 4-cell | ~2–3 days |
+| B2 | UW providers in "as-of" mode (select by event time, no lookahead) | **DONE** — see below |
+| B3 | Wire enrichment into fusion cells | **DONE** — commit 3.5.5.11 |
+| B4 | Run full 4-cell with `--uw-enrichment` once B0 granted | ~1–2 days |
 
 **B2 progress (commits 3.5.5.8–10):**
 - `dealer_gamma` — DONE: `_rows_as_of` selects the snapshot date ≤ `at`.
@@ -128,8 +129,15 @@ plan.** This is the single hard gate on a real Phase 3.5 verdict.
 So B2 is complete for every provider where code can fix it. The
 remaining two are data-coverage-gated on B0, not code.
 
-**Track B total once B0 is granted: ~1 week** (B3 + the catalyst/sector
-data wiring once the historical endpoints are reachable).
+**B3 done (commit 3.5.5.11):** `fusion_stages_with_uw` builds the full
+13-stage pipeline with M21-M27 on the real (as-of) UW providers;
+`replay_trade_producer(use_uw_enrichment=True)` / `run-4cell
+--uw-enrichment` activates it for the fusion cells. Default off until
+B0 — before historical access the providers only return a few days.
+
+**Track B once B0 is granted: ~1–2 days** — just run
+`run-4cell --trades replay --replay-data ... --uw-enrichment` and apply
+Phase 3.5.6 falsification. Everything upstream of B0 is built.
 
 ## The bottom line
 
