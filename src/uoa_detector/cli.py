@@ -758,6 +758,15 @@ def backtest_run_4cell(
              "per-source dir holding {TICKER}/{YYYY-MM}.parquet. "
              "Required when --trades replay.",
     ),
+    uw_enrichment: bool = typer.Option(
+        False,
+        "--uw-enrichment",
+        help="Wire real Unusual Whales providers into the fusion cells' "
+             "M21-M27 enrichment (Phase 3.5.5 B3). Default off — fusion "
+             "runs on NoOp enrichment (wiring smoke). Enable only once UW "
+             "historical data access is granted; before that the "
+             "providers return only the last few days.",
+    ),
 ) -> None:
     """Run the Formülasyon A 4-cell combinatorial backtest end-to-end.
 
@@ -825,6 +834,7 @@ def backtest_run_4cell(
             tier1_tickers=tickers_only(read_universe(tier1_csv)),
             tier2_tickers=tickers_only(read_universe(tier2_csv)),
             medians_csv=medians_csv,
+            use_uw_enrichment=uw_enrichment,
         )
     else:
         producer = noop_trade_producer

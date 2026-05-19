@@ -16,11 +16,16 @@ from decimal import Decimal
 from pathlib import Path
 
 from uoa_detector.backtest import replay_trade_producer
-from uoa_detector.backtest.cell_runner import CellSpec, _replay_stages
+from uoa_detector.backtest.cell_runner import (
+    CellSpec,
+    _replay_stages,
+    fusion_stages_with_uw,
+)
 from uoa_detector.backtest.parquet_schema import write_parquet
 from uoa_detector.backtest.pnl_provider import RealizedTrade
 from uoa_detector.backtest.walk_forward import equal_time_slices
 from uoa_detector.calibration import load_default_profile
+from uoa_detector.calibration.profile import UnusualWhalesSettings
 from uoa_detector.domain.raw_print import RawPrint
 
 
@@ -80,6 +85,37 @@ def test_replay_stages_single_is_core_subset() -> None:
     single_names = {type(s).__name__ for s in single}
     assert "DealerGammaStage" not in single_names
     assert "DealerGammaStage" in {type(s).__name__ for s in fusion}
+
+
+def test_fusion_stages_with_uw_builds_full_enrichment() -> None:
+    """Phase 3.5.5 B3: fusion_stages_with_uw wires real UW providers
+    into the M21-M27 enrichment stages."""
+
+    class _StubClient:
+        """Stand-in — UW providers don't call the client at construction."""
+
+    stages = fusion_stages_with_uw(_StubClient(), UnusualWhalesSettings())
+    names = [type(s).__name__ for s in stages]
+    assert len(stages) == 13
+    for enrichment in (
+        "DealerGammaStage", "EventCalendarStage", "PriceConfirmationStage",
+        "IVExhaustionStage", "SectorPeerStage", "DarkPoolStage",
+        "OpeningClosingStage",
+    ):
+        assert enrichment in names
+
+
+def test_replay_stages_fusion_with_client_uses_uw() -> None:
+    """With a client + settings, the fusion set is the full 13-stage
+    UW-wired pipeline; without, it falls back to the NoOp default."""
+
+    class _StubClient:
+        pass
+
+    wired = _replay_stages("fusion", _StubClient(), UnusualWhalesSettings())
+    noop = _replay_stages("fusion", None, None)
+    assert len(wired) == 13
+    assert len(noop) == 13  # same stages, NoOp providers
 
 
 def test_producer_returns_realized_trades(tmp_path: Path) -> None:

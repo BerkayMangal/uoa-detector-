@@ -399,23 +399,110 @@ def synthetic_trade_producer(
 # ---------------------------------------------------------------------------
 
 
-def _replay_stages(fusion: CellFusion) -> list[EnrichmentStage]:
+def fusion_stages_with_uw(
+    uw_client: object,
+    uw_settings: object,
+) -> list[EnrichmentStage]:
+    """Build the full 13-stage pipeline with M21-M27 wired to real UW.
+
+    Phase 3.5.5 B3: the enrichment stages are normally constructed with
+    NoOp providers (``default_stage_pipeline``). This builds them with
+    live Unusual Whales providers — the (B2) as-of providers — so the
+    fusion cells actually exercise the 8-axis confluence.
+
+    ``uw_client`` is a ``UnusualWhalesClient``; ``uw_settings`` an
+    ``UnusualWhalesSettings``. Typed as ``object`` here only to keep
+    this module's import graph narrow — the providers validate.
+    """
+    from uoa_detector.pipeline.stages import (
+        ClusterDecayStage,
+        DarkPoolStage,
+        DealerGammaStage,
+        DTEDecayStage,
+        EventCalendarStage,
+        IVExhaustionStage,
+        OpeningClosingStage,
+        PriceConfirmationStage,
+        RelativePremiumStage,
+        SectorPeerStage,
+        SweepBlockStage,
+        TemporalClusterStage,
+        TimeOfDayStage,
+    )
+    from uoa_detector.sources.unusual_whales.providers.catalyst_calendar import (
+        UnusualWhalesCatalystCalendarProvider,
+    )
+    from uoa_detector.sources.unusual_whales.providers.dark_pool import (
+        UnusualWhalesDarkPoolProvider,
+    )
+    from uoa_detector.sources.unusual_whales.providers.dealer_gamma import (
+        UnusualWhalesDealerGammaProvider,
+    )
+    from uoa_detector.sources.unusual_whales.providers.iv_history import (
+        UnusualWhalesIVHistoryProvider,
+    )
+    from uoa_detector.sources.unusual_whales.providers.open_interest import (
+        UnusualWhalesOpenInterestProvider,
+    )
+    from uoa_detector.sources.unusual_whales.providers.price_action import (
+        UnusualWhalesPriceActionProvider,
+    )
+    from uoa_detector.sources.unusual_whales.providers.sector_peer import (
+        UnusualWhalesPeerFlowProvider,
+        UnusualWhalesSectorMapProvider,
+    )
+
+    c = uw_client
+    s = uw_settings
+    catalyst = UnusualWhalesCatalystCalendarProvider(client=c, settings=s)  # type: ignore[arg-type]
+    return [
+        TimeOfDayStage(),
+        DTEDecayStage(),
+        SweepBlockStage(),
+        RelativePremiumStage(),
+        DealerGammaStage(
+            UnusualWhalesDealerGammaProvider(client=c, settings=s),  # type: ignore[arg-type]
+        ),
+        EventCalendarStage(catalyst),
+        PriceConfirmationStage(
+            UnusualWhalesPriceActionProvider(client=c, settings=s),  # type: ignore[arg-type]
+        ),
+        IVExhaustionStage(
+            UnusualWhalesIVHistoryProvider(client=c, settings=s),  # type: ignore[arg-type]
+            catalyst,
+        ),
+        SectorPeerStage(
+            UnusualWhalesSectorMapProvider(client=c, settings=s),  # type: ignore[arg-type]
+            UnusualWhalesPeerFlowProvider(client=c, settings=s),  # type: ignore[arg-type]
+        ),
+        DarkPoolStage(
+            UnusualWhalesDarkPoolProvider(client=c, settings=s),  # type: ignore[arg-type]
+        ),
+        OpeningClosingStage(
+            UnusualWhalesOpenInterestProvider(client=c, settings=s),  # type: ignore[arg-type]
+        ),
+        TemporalClusterStage(),
+        ClusterDecayStage(),
+    ]
+
+
+def _replay_stages(
+    fusion: CellFusion,
+    uw_client: object | None = None,
+    uw_settings: object | None = None,
+) -> list[EnrichmentStage]:
     """Return the stage list for a cell's fusion coordinate.
 
     ``single`` runs only the core-flow stages — the ones that score
     the raw UOA print without external-source corroboration
     (time-of-day, DTE decay, sweep/block, relative premium, temporal
-    clustering + decay). ``fusion`` runs the full Phase 3.4 pipeline,
-    adding the M21-M27 enrichment confluence on top.
+    clustering + decay).
 
-    NOTE (Phase 3.5.5.2): the M21-M27 enrichment stages in the fusion
-    set are constructed with their default NoOp providers — no real
-    Unusual Whales provider is wired into the enrichment stages
-    anywhere in the codebase yet. So a fusion run today exercises the
-    enrichment *plumbing* but the enrichment *scores* are neutral.
-    Wiring real UW providers into M21-M27 is a follow-up sub-phase;
-    Phase 3.5.6's falsification verdict must not be read off a
-    NoOp-enrichment run.
+    ``fusion`` runs the full Phase 3.4 pipeline. When ``uw_client`` is
+    supplied (Phase 3.5.5 B3) the M21-M27 enrichment stages use real
+    Unusual Whales providers; without it they fall back to the NoOp
+    providers in ``default_stage_pipeline`` (enrichment plumbing runs
+    but scores are neutral — a wiring smoke, not a verdict).
     """
     from uoa_detector.pipeline.stages import (
         ClusterDecayStage,
@@ -428,6 +515,8 @@ def _replay_stages(fusion: CellFusion) -> list[EnrichmentStage]:
     )
 
     if fusion == "fusion":
+        if uw_client is not None and uw_settings is not None:
+            return fusion_stages_with_uw(uw_client, uw_settings)
         return list(default_stage_pipeline())
     # Core-flow subset, in the same relative order as the full pipeline.
     return [
@@ -447,6 +536,7 @@ def replay_trade_producer(
     tier2_tickers: tuple[str, ...],
     medians_csv: Path | None = None,
     source_id: str = "thetadata",
+    use_uw_enrichment: bool = False,
 ) -> Callable[
     [CellSpec, tuple[WalkForwardWindow, ...], CalibrationProfile],
     list[RealizedTrade],
@@ -471,6 +561,14 @@ def replay_trade_producer(
     flow score collapses. When None, M37 falls back to its NoOp provider
     (``relative_premium_score=None``). Generate the CSV with
     ``scripts/compute_medians.py``.
+
+    ``use_uw_enrichment`` (Phase 3.5.5 B3): when True, the fusion cells'
+    M21-M27 stages use real Unusual Whales providers — the (B2) as-of
+    providers. Default False keeps fusion on NoOp enrichment (a wiring
+    smoke). Set True only once UW historical data access is granted;
+    before that the providers return only the last few days and a
+    fusion run would be both API-heavy and un-enriched for the
+    backtest period.
     """
 
     def _producer(
@@ -513,10 +611,29 @@ def replay_trade_producer(
                     medians_csv,
                 ),
             )
+
+        # B3: build a UW client for the fusion cells when enrichment is
+        # enabled. None for single cells / when disabled.
+        uw_client = None
+        if use_uw_enrichment and cell.fusion == "fusion":
+            from uoa_detector.config.credentials import Credentials
+            from uoa_detector.sources.unusual_whales.client import (
+                UnusualWhalesClient,
+            )
+
+            uw_client = UnusualWhalesClient(
+                api_key=Credentials().require_unusual_whales_api_key(),
+                settings=profile.data_sources.unusual_whales,
+            )
+
         store = BacktestStore()
         pipeline = Pipeline(
             sources=[source],
-            stages=_replay_stages(cell.fusion),
+            stages=_replay_stages(
+                cell.fusion,
+                uw_client,
+                profile.data_sources.unusual_whales,
+            ),
             profile=profile,
             store=store,
             context=context,
@@ -529,7 +646,15 @@ def replay_trade_producer(
             # (exchanges_seen == 1) and can never see a sweep.
             force_multi_source=True,
         )
-        asyncio.run(pipeline.run())
+
+        async def _run_and_close() -> None:
+            try:
+                await pipeline.run()
+            finally:
+                if uw_client is not None:
+                    await uw_client.aclose()
+
+        asyncio.run(_run_and_close())
 
         pnl = SimplePnLProvider(
             profile.backtest,
