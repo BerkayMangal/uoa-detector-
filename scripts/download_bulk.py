@@ -44,9 +44,13 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import bisect
 import logging
+import math
+import statistics
 import sys
-from datetime import date, timedelta
+from collections import defaultdict
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
 from typing import Any
@@ -67,6 +71,15 @@ from uoa_detector.sources.thetadata.mapping import (
 _logger = logging.getLogger("download_bulk")
 
 _ZERO = Decimal("0")
+
+# Phase 3.5.5.13 (Track A4 via parity): static annualized risk-free
+# rate for put-call parity spot derivation. Recent SOFR has hovered
+# 4-5%; 5% gives a ~0.5% bias on K·exp(-rt) at DTE=60, well within
+# the moneyness bands the convexity scoring cares about. Dividends
+# are ignored — for div-payers this introduces a small additive bias
+# (~$0.5-1 on a $150 stock) that is consistent across strikes and
+# does not break parity's internal consistency.
+_PARITY_RATE = 0.05
 
 
 def _months_in_range(start: date, end: date) -> list[tuple[int, int]]:
@@ -126,6 +139,120 @@ async def _fetch_day(
     return _wrappers(resp)
 
 
+def _parse_trade_ts(s: str) -> datetime | None:
+    """ThetaData v3 trade_timestamp ISO string → tz-aware UTC datetime.
+
+    The string is ET-naive in the v3 feed; we parse and force UTC since
+    that is what the rest of the pipeline expects. We do NOT convert ET
+    → UTC here because the bulk-download mapping treats these as UTC
+    consistently; what matters for parity is internal time-ordering,
+    which is unchanged whichever fixed offset we apply.
+    """
+    try:
+        dt = datetime.fromisoformat(s)
+    except (TypeError, ValueError):
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=UTC)
+    return dt
+
+
+def _compute_parity_spot_curve(
+    wrappers: list[dict[str, Any]],
+    day: date,
+) -> list[tuple[datetime, float]]:
+    """Per-minute spot estimate curve from put-call parity pairs.
+
+    Phase 3.5.5.13 (Track A4 via parity): for each (expiry, strike,
+    minute) where BOTH a call and a put traded, compute a spot
+    estimate via ``S = K·exp(-r·DTE/365) + C − P``. Within a minute,
+    multiple (expiry, strike) pairs may give estimates; the per-minute
+    spot is the median across pairs (robust to outliers / volatility
+    skew). The result is sorted ascending by minute and is consumed by
+    ``_spot_at`` (forward-fill lookup) for the trade-emission pass.
+
+    Built from ALL wrappers irrespective of the day's max_dte filter —
+    longer-dated options also reveal spot via parity and the curve
+    benefits from the extra coverage.
+    """
+    # bucket[(expiry, strike, minute)][right] = [prices]
+    bucket: dict[
+        tuple[date, Decimal, datetime], dict[str, list[float]],
+    ] = defaultdict(lambda: {"C": [], "P": []})
+    for tw in wrappers:
+        contract = tw.get("contract")
+        if not isinstance(contract, dict):
+            continue
+        rows = tw.get("data")
+        if not isinstance(rows, list):
+            continue
+        try:
+            expiry = date.fromisoformat(str(contract["expiration"]))
+            strike = Decimal(str(contract["strike"]))
+            right_raw = str(contract["right"]).upper()
+        except (KeyError, ValueError, TypeError):
+            continue
+        if right_raw not in ("CALL", "C", "PUT", "P"):
+            continue
+        right = "C" if right_raw in ("CALL", "C") else "P"
+        for r in rows:
+            if not isinstance(r, dict):
+                continue
+            ts_raw = r.get("trade_timestamp") or r.get("quote_timestamp")
+            price_raw = r.get("price")
+            if ts_raw is None or price_raw is None:
+                continue
+            ts = _parse_trade_ts(str(ts_raw))
+            if ts is None:
+                continue
+            try:
+                price = float(price_raw)
+            except (TypeError, ValueError):
+                continue
+            minute = ts.replace(second=0, microsecond=0)
+            bucket[(expiry, strike, minute)][right].append(price)
+
+    # Parity spot per (expiry, strike, minute) pair.
+    minute_spots: dict[datetime, list[float]] = defaultdict(list)
+    for (expiry, strike, minute), cp in bucket.items():
+        if not cp["C"] or not cp["P"]:
+            continue
+        dte = (expiry - day).days
+        if dte < 0:
+            continue
+        c = statistics.median(cp["C"])
+        p = statistics.median(cp["P"])
+        discount = math.exp(-_PARITY_RATE * dte / 365.0)
+        spot = float(strike) * discount + c - p
+        if spot > 0:  # sanity — negative spot is degenerate noise
+            minute_spots[minute].append(spot)
+
+    curve: list[tuple[datetime, float]] = []
+    for minute, spots in minute_spots.items():
+        curve.append((minute, statistics.median(spots)))
+    curve.sort(key=lambda x: x[0])
+    return curve
+
+
+def _spot_at(
+    curve: list[tuple[datetime, float]], t: datetime,
+) -> Decimal | None:
+    """Forward-fill spot lookup: the most recent estimate at or before ``t``.
+
+    Returns None when ``t`` precedes the first available estimate of
+    the day — the caller then falls back to ``Decimal('0')``, leaving
+    ``spot_price=0`` on the print (convexity stays None for that print,
+    which is graceful given the IV/OI nullable change).
+    """
+    if not curve:
+        return None
+    idx = bisect.bisect_right(curve, (t, math.inf))
+    if idx == 0:
+        return None
+    _, spot = curve[idx - 1]
+    return Decimal(f"{spot:.6f}")
+
+
 def _day_to_prints(
     wrappers: list[dict[str, Any]],
     *,
@@ -135,9 +262,14 @@ def _day_to_prints(
 ) -> list[RawPrint]:
     """Map a day's bulk trade_quote wrappers into RawPrints.
 
-    Each row already pairs a trade with its at-trade quote, so no
-    align step is needed — bid/ask are read straight off the row.
+    Each row already pairs a trade with its at-trade quote (no align
+    step needed — bid/ask are read straight off the row). Phase 3.5.5.13:
+    spot_price is filled per-trade from a put-call parity curve built
+    from the whole day's wrappers; trades before the first parity
+    estimate of the day get spot_price=0 (graceful — convexity_score
+    stays None for those).
     """
+    curve = _compute_parity_spot_curve(wrappers, day)
     prints: list[RawPrint] = []
     for tw in wrappers:
         contract = tw.get("contract")
@@ -174,13 +306,17 @@ def _day_to_prints(
                 ask = Decimal(str(r["ask"]))
             except (ValueError, KeyError, TypeError, ArithmeticError):
                 continue
+            trade_ts = _parse_trade_ts(str(r.get("trade_timestamp", "")))
+            spot = (
+                _spot_at(curve, trade_ts) if trade_ts is not None else None
+            ) or _ZERO
             rp = map_thetadata_trade_to_rawprint(
                 trade_row=trade,
                 ticker=ticker,
                 expiry=expiry,
                 strike_dollars=strike,
                 right=right,  # type: ignore[arg-type]
-                spot_price=_ZERO,
+                spot_price=spot,
                 bid=bid,
                 ask=ask,
             )
