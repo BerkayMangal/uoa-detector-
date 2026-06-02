@@ -777,6 +777,15 @@ def backtest_run_4cell(
              "prints. Default: no filter. The value is a modelling "
              "choice — it interacts with M38 cluster counts.",
     ),
+    verdict_path: Path | None = typer.Option(
+        None,
+        "--verdict-path",
+        help="If set, apply the Phase 3.5.6 falsification framework to "
+             "the four cells and write the mechanical verdict (edge "
+             "proven / rejected / insufficient) here as markdown — by "
+             "convention docs/phase-3.5-results.md. Default: skip the "
+             "verdict step (the comparison report is still written).",
+    ),
 ) -> None:
     """Run the Formülasyon A 4-cell combinatorial backtest end-to-end.
 
@@ -868,6 +877,28 @@ def backtest_run_4cell(
     report = render_4cell_comparison_report(results)
     report_path.parent.mkdir(parents=True, exist_ok=True)
     report_path.write_text(report, encoding="utf-8")
+
+    # Phase 3.5.6 — mechanical falsification verdict, written only when
+    # the operator asks for it (--verdict-path). The four pinned reject
+    # scenarios + the sample-size gate; no judgment-call wiggle room.
+    if verdict_path is not None:
+        from uoa_detector.backtest.falsification import (
+            apply_falsification,
+            write_verdict_report,
+        )
+        falsification_verdict = apply_falsification(results)
+        write_verdict_report(
+            falsification_verdict,
+            results,
+            verdict_path,
+            period_label=f"{period_start} → {period_end}",
+        )
+        typer.echo(
+            f"=== Phase 3.5.6 verdict: "
+            f"{falsification_verdict.verdict.upper()} "
+            f"— wrote {verdict_path} ===",
+        )
+        typer.echo(f"  {falsification_verdict.rationale}")
 
     # Console summary so the operator sees the headline at the terminal.
     typer.echo(f"=== 4-cell backtest complete — wrote {report_path} ===")

@@ -177,7 +177,9 @@ def test_build_both_feeds() -> None:
 
 
 def test_missing_uw_key_fails_fast() -> None:
-    creds = Credentials()  # no UW key
+    # _env_file=None isolates from the developer's .env (which carries a
+    # real key locally); the docstring's documented clean-slate pattern.
+    creds = Credentials(_env_file=None)  # no UW key
     with pytest.raises(
         FeedConfigurationError,
         match="UNUSUAL_WHALES_API_KEY is not set",
@@ -192,7 +194,8 @@ def test_missing_uw_key_fails_fast() -> None:
 
 
 def test_missing_thetadata_key_fails_fast() -> None:
-    creds = Credentials()  # no TD key
+    # _env_file=None isolates from the developer's .env (see above).
+    creds = Credentials(_env_file=None)  # no TD key
     with pytest.raises(
         FeedConfigurationError,
         match="THETADATA_API_KEY is not set",
