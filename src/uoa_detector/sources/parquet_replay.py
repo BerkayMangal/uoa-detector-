@@ -60,14 +60,17 @@ import heapq
 import logging
 import math
 import re
-from datetime import UTC, datetime
+from datetime import datetime
 from decimal import Decimal
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, NoReturn
 
+import pyarrow as pa
+import pyarrow.compute as pc
 import pyarrow.parquet as pq
 
 from uoa_detector.backtest.parquet_schema import (
+    RAWPRINT_PARQUET_SCHEMA,
     DataIntegrityError,
     row_to_raw_print,
     validate_schema_or_raise,
@@ -83,6 +86,13 @@ _logger = logging.getLogger(__name__)
 
 
 _FILENAME_RE = re.compile(r"^(\d{4})-(\d{2})\.parquet$")
+
+# Vectorised replay (Phase 3.5.5.14): read in large batches and push the
+# monotonicity check + min_premium filter onto Arrow columns, so only the
+# rows that survive the candidate filter are materialised to Python. A
+# big batch amortises the per-batch overhead; the filter does the rest.
+_REPLAY_BATCH_SIZE = 65_536
+_PREMIUM_ARROW_TYPE = RAWPRINT_PARQUET_SCHEMA.field("premium_paid").type
 
 
 class ParquetReplaySource:
@@ -222,13 +232,17 @@ class ParquetReplaySource:
     def _iter_file(self, file_path: Path) -> Iterable[RawPrint]:
         """Stream rows from one parquet file, validating ordering inline.
 
-        Opens with ``ParquetFile.iter_batches``; for each batch, emits
-        rows in order; per-file ``last_seen_timestamp`` rejects any row
-        that goes back in time. Empty files (header only, 0 rows) are
-        skipped with a log message.
+        Opens with ``ParquetFile.iter_batches``; each batch is validated
+        and filtered **vectorised** on Arrow columns before any row is
+        materialised to Python. Monotonicity is checked on every row on
+        disk (filtered or not); the ``min_premium_usd`` candidate filter
+        then drops below-threshold prints, so only survivors pay the
+        per-row ``RawPrint`` construction cost — the per-row Python scan
+        that dominated the pre-3.5.5.14 path is gone.
 
-        Schema is validated on first open. Read errors are wrapped as
-        ``DataIntegrityError``.
+        Empty files (header only, 0 rows) are skipped with a log message.
+        Schema is validated on first open. Read/validation errors are
+        wrapped as ``DataIntegrityError``.
         """
         try:
             pf = pq.ParquetFile(file_path)  # type: ignore[no-untyped-call]
@@ -245,45 +259,57 @@ class ParquetReplaySource:
             )
             return
 
-        last_seen_ts: datetime | None = None
         try:
             batches = pf.iter_batches(  # type: ignore[no-untyped-call]
-                batch_size=1024,
+                batch_size=_REPLAY_BATCH_SIZE,
             )
         except Exception as exc:
             msg = f"Failed to iterate batches in {file_path}: {exc}"
             raise DataIntegrityError(msg) from exc
 
+        threshold = (
+            pa.scalar(self._min_premium_usd, type=_PREMIUM_ARROW_TYPE)
+            if self._min_premium_usd is not None else None
+        )
+
+        last_seen_ts: datetime | None = None
         for batch in batches:
-            for row in batch.to_pylist():
-                ts = row["timestamp"]
-                if not isinstance(ts, datetime):
-                    msg = (
-                        f"{file_path}: row timestamp is not a datetime: {ts!r}"
+            n = batch.num_rows
+            if n == 0:
+                continue
+            ts_col = batch.column("timestamp")
+
+            # Monotonicity — vectorised, over every row on disk (filtered
+            # or not). Within-batch: any strictly-backward step. Then the
+            # batch's first row against the previous batch's last.
+            if n > 1:
+                backward = pc.less(  # type: ignore[attr-defined]
+                    ts_col.slice(1), ts_col.slice(0, n - 1),
+                )
+                offending = pc.indices_nonzero(backward)  # type: ignore[attr-defined]
+                if len(offending) > 0:
+                    i = offending[0].as_py()
+                    self._raise_non_monotonic(
+                        file_path,
+                        ts_col[i + 1].as_py(),
+                        ts_col[i].as_py(),
                     )
-                    raise DataIntegrityError(msg)
-                if ts.tzinfo is None:
-                    ts = ts.replace(tzinfo=UTC)
-                if last_seen_ts is not None and ts < last_seen_ts:
-                    msg = (
-                        f"{file_path}: timestamps are not monotonic — row "
-                        f"with timestamp {ts.isoformat()} follows "
-                        f"{last_seen_ts.isoformat()}. Streaming "
-                        "validation rejects this immediately. Regenerate "
-                        "or pre-sort the source data."
-                    )
-                    raise DataIntegrityError(msg)
-                last_seen_ts = ts
-                # A5 candidate pre-filter: skip below-threshold prints
-                # AFTER the monotonicity check (the integrity contract
-                # covers every row on disk, filtered or not).
-                if self._min_premium_usd is not None:
-                    premium_raw = row.get("premium_paid")
-                    if (
-                        premium_raw is not None
-                        and Decimal(str(premium_raw)) < self._min_premium_usd
-                    ):
-                        continue
+            first_ts = ts_col[0].as_py()
+            if last_seen_ts is not None and first_ts < last_seen_ts:
+                self._raise_non_monotonic(file_path, first_ts, last_seen_ts)
+            last_seen_ts = ts_col[n - 1].as_py()
+
+            # A5 candidate pre-filter — vectorised decimal comparison, so
+            # below-threshold prints never reach ``to_pylist``.
+            emit = batch
+            if threshold is not None:
+                emit = batch.filter(
+                    pc.greater_equal(  # type: ignore[attr-defined]
+                        batch.column("premium_paid"), threshold,
+                    ),
+                )
+
+            for row in emit.to_pylist():
                 # Pydantic validation may raise; wrap as DataIntegrityError.
                 try:
                     yield row_to_raw_print(row)
@@ -292,6 +318,19 @@ class ParquetReplaySource:
                         f"{file_path}: row failed RawPrint validation: {exc}"
                     )
                     raise DataIntegrityError(msg) from exc
+
+    @staticmethod
+    def _raise_non_monotonic(
+        file_path: Path, ts: datetime, prev_ts: datetime,
+    ) -> NoReturn:
+        """Raise the canonical non-monotonic ``DataIntegrityError``."""
+        msg = (
+            f"{file_path}: timestamps are not monotonic — row with "
+            f"timestamp {ts.isoformat()} follows {prev_ts.isoformat()}. "
+            "Streaming validation rejects this immediately. Regenerate "
+            "or pre-sort the source data."
+        )
+        raise DataIntegrityError(msg)
 
     # ---- K-way merge across files for a single source ----------------
 
