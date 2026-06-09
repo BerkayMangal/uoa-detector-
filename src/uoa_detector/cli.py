@@ -115,15 +115,27 @@ def _backtest_root() -> None:
 def _configure_logging(*, log_to_stderr: bool) -> None:
     """Wire up structlog. ``log_to_stderr=True`` keeps stdout clean for NDJSON.
 
+    The level comes from ``AppSettings.log_level`` (env ``UOA_LOG_LEVEL``,
+    default ``INFO``). ``make_filtering_bound_logger`` drops below-level
+    events *before* the processor chain runs, so a quiet level
+    (``UOA_LOG_LEVEL=WARNING``) makes a large backtest fast — the
+    per-signal INFO logs are never rendered. Pre-3.5 this level was
+    hardcoded to INFO and ``log_level`` was dead config.
+
     Phase 3.3.1.2: ``redact_secrets`` runs as the FIRST processor so
     no downstream processor (timestamper, renderer, etc.) sees the
     secret values. If a future processor decided to copy event_dict
     to disk for debugging, that copy is already redacted.
     """
+    from uoa_detector.config import default_settings
+
+    level = logging.getLevelName(default_settings().log_level.upper())
+    if not isinstance(level, int):
+        level = logging.INFO
     logging.basicConfig(
         format="%(message)s",
         stream=sys.stderr if log_to_stderr else sys.stdout,
-        level=logging.INFO,
+        level=level,
         force=True,  # override any prior basicConfig in tests
     )
     structlog.configure(
@@ -136,6 +148,7 @@ def _configure_logging(*, log_to_stderr: bool) -> None:
                 drop_missing=True,
             ),
         ],
+        wrapper_class=structlog.make_filtering_bound_logger(level),
         logger_factory=structlog.stdlib.LoggerFactory(),
     )
 
@@ -799,6 +812,11 @@ def backtest_run_4cell(
     fusion+orchestrator and writing signals to the store) land in
     Phase 3.3 alongside the SimplePnL exit-quote source.
     """
+    # Configure logging up front (to stderr — stdout carries the console
+    # summary). Level honours UOA_LOG_LEVEL; a full-universe replay should
+    # run with UOA_LOG_LEVEL=WARNING or the per-signal INFO logs dominate.
+    _configure_logging(log_to_stderr=True)
+
     if trades not in ("noop", "synthetic", "replay"):
         msg = (
             f"--trades must be 'noop', 'synthetic', or 'replay'; "
