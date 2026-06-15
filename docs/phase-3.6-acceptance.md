@@ -105,15 +105,26 @@ proximity bonus).
   by provider unit tests (a contract whose only snapshot is after `at`
   must be excluded).
 
-## OI coverage approximation (documented limitation)
+## Data source (revised after a discovery, 2026-06-15)
 
-Full-chain OI for strikes that did not trade in the window is absent (we
-only persist OI on prints). GEX is therefore computed over the **traded
-contracts'** OI. Near-the-money strikes — which dominate gamma — trade
-actively, so the approximation is acceptable for the proximity signal. If
-the MVP verdict is promising, the precision upgrade is a one-time ThetaData
-full-chain daily-OI download (we have access); that is a 3.6.x follow-up,
-not part of the MVP.
+The bulk `trade_quote` download carries **no** OI or IV — both columns are
+100% null (the trade/quote endpoints don't ship them). GEX needs both, so
+3.6.2 **downloads** them from ThetaData v3 (we have access; verified live):
+
+- **OI** — `/v3/option/history/open_interest` with `expiration=*` returns
+  the **whole chain's** open interest per ticker-day in one call (full
+  chain, not a traded-only approximation).
+- **Price** — `/v3/option/history/eod` with `expiration=*` returns
+  per-contract bid/ask/close for the whole chain.
+- **IV** — ThetaData exposes no usable IV/greeks endpoint at this tier
+  (`implied_volatility` → 404), so IV is **Black-Scholes-inverted** from
+  the eod mid (bisection), and gamma computed from that IV. Parity spot
+  comes from the bulk data we already own.
+
+GEX is computed over contracts that have OI **and** a quotable mid (→
+invertible IV). Validated end-to-end on real data: JNJ 2025-07-08, 469
+usable contracts → net_gamma ≈ +$32.8M/1%, flip 153.01 vs spot 155.73
+(1.7%) — sane dealer-positioning output from the 3.6.1 helpers.
 
 ## Threshold discipline (D4 — falsification-critical)
 
@@ -163,8 +174,11 @@ discipline above.
 
 - **3.6.1** — `ThetaDataDealerPositioningProvider` (provider + BS gamma +
   flip + as-of) and unit tests. No wiring yet.
-- **3.6.2** — `scripts/compute_chain_snapshots.py` → per-ticker daily
-  chain snapshots; provider loads them.
+- **3.6.2** — `scripts/download_chain_snapshots.py`: per ticker, fetch
+  full-chain daily OI + eod prices from ThetaData v3, BS-invert IV from
+  the mid, join with parity spot → per-ticker daily chain snapshot parquet
+  the `DailyChainSnapshotSource` loads. (The download is small — chain
+  metadata, not per-trade — dozens of calls.)
 - **3.6.3** — wire the provider into the replay fusion path, add
   `v6_thetadata_confluence.yaml`, run the 4-cell (no `--uw-enrichment`) →
   falsification verdict to `docs/phase-3.6-results.md`, run the 3.5.7
