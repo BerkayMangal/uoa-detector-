@@ -781,6 +781,15 @@ def backtest_run_4cell(
              "historical data access is granted; before that the "
              "providers return only the last few days.",
     ),
+    chain_snapshots: Path | None = typer.Option(
+        None,
+        "--chain-snapshots",
+        help="Phase 3.6: directory of per-ticker daily chain snapshots "
+             "(scripts/download_chain_snapshots.py). When set, the fusion "
+             "cells' dealer-gamma axis (M21) is fed by the self-derived "
+             "GEX provider instead of Unusual Whales — a real confluence "
+             "verdict without UW. Takes precedence over --uw-enrichment.",
+    ),
     min_premium: float | None = typer.Option(
         None,
         "--min-premium",
@@ -872,6 +881,7 @@ def backtest_run_4cell(
             tier2_tickers=tickers_only(read_universe(tier2_csv)),
             medians_csv=medians_csv,
             use_uw_enrichment=uw_enrichment,
+            chain_snapshots_dir=chain_snapshots,
             min_premium_usd=(
                 Decimal(str(min_premium)) if min_premium is not None else None
             ),

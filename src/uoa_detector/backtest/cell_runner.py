@@ -487,10 +487,45 @@ def fusion_stages_with_uw(
     ]
 
 
+def fusion_stages_with_thetadata_gex(
+    snapshots_dir: Path,
+) -> list[EnrichmentStage]:
+    """Build the fusion pipeline with M21 fed by the self-derived GEX
+    provider (Phase 3.6) — no Unusual Whales.
+
+    The dealer-gamma axis is computed from the ThetaData chain snapshots
+    (``DailyChainSnapshotSource`` → ``ThetaDataDealerPositioningProvider``);
+    every other enrichment axis stays on its NoOp default (dark pool and
+    peer flow are deferred; IV / OI / catalyst land in later sub-phases).
+    So the fusion cell exercises a real multi-source confluence —
+    core flow + spot + sweep + convexity + self-derived dealer gamma —
+    without UW.
+    """
+    from uoa_detector.pipeline.stages import (
+        DealerGammaStage,
+        default_stage_pipeline,
+    )
+    from uoa_detector.sources.thetadata_derived.dealer_gamma import (
+        ThetaDataDealerPositioningProvider,
+    )
+    from uoa_detector.sources.thetadata_derived.snapshot_reader import (
+        DailyChainSnapshotSource,
+    )
+
+    gex = ThetaDataDealerPositioningProvider(
+        DailyChainSnapshotSource(snapshots_dir),
+    )
+    return [
+        DealerGammaStage(gex) if isinstance(st, DealerGammaStage) else st
+        for st in default_stage_pipeline()
+    ]
+
+
 def _replay_stages(
     fusion: CellFusion,
     uw_client: object | None = None,
     uw_settings: object | None = None,
+    chain_snapshots_dir: Path | None = None,
 ) -> list[EnrichmentStage]:
     """Return the stage list for a cell's fusion coordinate.
 
@@ -516,6 +551,8 @@ def _replay_stages(
     )
 
     if fusion == "fusion":
+        if chain_snapshots_dir is not None:
+            return fusion_stages_with_thetadata_gex(chain_snapshots_dir)
         if uw_client is not None and uw_settings is not None:
             return fusion_stages_with_uw(uw_client, uw_settings)
         return list(default_stage_pipeline())
@@ -538,6 +575,7 @@ def replay_trade_producer(
     medians_csv: Path | None = None,
     source_id: str = "thetadata",
     use_uw_enrichment: bool = False,
+    chain_snapshots_dir: Path | None = None,
     min_premium_usd: Decimal | None = None,
 ) -> Callable[
     [CellSpec, tuple[WalkForwardWindow, ...], CalibrationProfile],
@@ -643,6 +681,7 @@ def replay_trade_producer(
                 cell.fusion,
                 uw_client,
                 profile.data_sources.unusual_whales,
+                chain_snapshots_dir,
             ),
             profile=profile,
             store=store,
