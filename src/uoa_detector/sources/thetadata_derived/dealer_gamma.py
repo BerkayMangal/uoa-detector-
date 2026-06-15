@@ -22,12 +22,14 @@ Methodology is frozen in ``docs/phase-3.6-acceptance.md``:
 
 from __future__ import annotations
 
-import math
 from typing import TYPE_CHECKING
 
 from uoa_detector.providers.dealer_positioning import (
     DealerExposureAggregate,
     DealerPositioning,
+)
+from uoa_detector.sources.thetadata_derived.black_scholes import (
+    gamma as _bs_gamma,
 )
 
 if TYPE_CHECKING:
@@ -40,21 +42,7 @@ if TYPE_CHECKING:
         ChainSnapshotSource,
     )
 
-_SQRT_2PI = math.sqrt(2.0 * math.pi)
 _FLIP_SCAN_STEPS = 300
-
-
-def _norm_pdf(x: float) -> float:
-    return math.exp(-0.5 * x * x) / _SQRT_2PI
-
-
-def _bs_gamma(spot: float, strike: float, t_years: float, iv: float) -> float:
-    """Black-Scholes gamma (calls == puts), r = 0. Degenerate inputs → 0."""
-    if spot <= 0.0 or strike <= 0.0 or t_years <= 0.0 or iv <= 0.0:
-        return 0.0
-    sqrt_t = math.sqrt(t_years)
-    d1 = (math.log(spot / strike) + 0.5 * iv * iv * t_years) / (iv * sqrt_t)
-    return _norm_pdf(d1) / (spot * iv * sqrt_t)
 
 
 def _contract_dollar_gamma(
