@@ -117,20 +117,39 @@ not part of the MVP.
 
 ## Threshold discipline (D4 — falsification-critical)
 
-M21's score depends only on the **sign** of `net_gamma_dollars` and the
-**flip-proximity distance** `|spot − flip_strike| / spot` (vs
-`extreme_distance_pct`). Neither depends on the *magnitude/scale* of GEX.
-Therefore the existing v5_gamma_squeeze M21 thresholds **transfer
-unchanged** — there is no GEX-scale calibration to do, and so no
-opportunity to curve-fit. We freeze the M21 config as-is in the new
-profile.
+M21 uses three `M21Settings` knobs, and they split on scale-dependence:
+
+- `flip_proximity_pct`, `extreme_distance_pct` — both operate on the
+  flip-proximity *distance* `|spot − flip_strike| / spot`, which is
+  **scale-free**. These transfer from v5_gamma_squeeze **unchanged**.
+- `short_gamma_threshold` — `is_short_gamma = net_gamma_dollars <
+  short_gamma_threshold`. This **is** scale-dependent. v5's value
+  (−$50M, calibrated for UW's GEX units) does NOT transfer to our
+  self-derived GEX, whose units differ and whose magnitude is biased low
+  by the OI-coverage approximation. Reusing −$50M would be wrong.
+
+**Resolution (a priori, no curve-fit):** the MVP sets
+`short_gamma_threshold = 0` in v6 — pure **sign** ("dealers net short at
+all"), which is scale-free and parameter-free. The "materially short"
+nuance is then carried by the flip-proximity requirement: M21 awards 1.0
+only when dealers are short **and** spot is near the flip, so a
+marginal-but-near setup and a deep-but-far setup both score 0.5, not 1.0.
+A distributional threshold — a fixed a-priori percentile of our own
+`net_gamma_dollars` distribution across the chain snapshots, computed
+**before** the run and frozen (the `compute_medians.py` pattern) — is an
+optional 3.6.x refinement if the verdict warrants; it would still be set
+from the feature distribution, never from trade outcomes.
 
 For the axes added later (IV regime, OI delta) the same rule binds: every
-threshold must be a **scale-free feature cutoff** (percentile / z-score /
-price-distance) set a priori from the feature definition, frozen in the
-profile **before** the run. No threshold is ever moved after seeing a
-backtest result. If results are weak the verdict is "edge rejected /
+threshold must be a **scale-free feature cutoff** (sign / percentile /
+z-score / price-distance) set a priori from the feature definition, frozen
+in the profile **before** the run. No threshold is ever moved after seeing
+a backtest result. If results are weak the verdict is "edge rejected /
 hypothesis revision", never "retune".
+
+(`net_gamma_dollars` is in USD per 1% spot move — the `·S²·0.01` factor in
+the GEX formula — matching the UW convention, so the sign and any future
+distributional cut are computed on a well-defined quantity.)
 
 ## Profile
 
