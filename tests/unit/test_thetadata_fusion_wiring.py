@@ -11,11 +11,19 @@ from pathlib import Path
 
 from uoa_detector.backtest.cell_runner import (
     _replay_stages,
-    fusion_stages_with_thetadata_gex,
+    fusion_stages_with_thetadata,
 )
-from uoa_detector.pipeline.stages import DealerGammaStage
+from uoa_detector.pipeline.stages import (
+    DealerGammaStage,
+    IVExhaustionStage,
+    OpeningClosingStage,
+)
 from uoa_detector.sources.thetadata_derived.dealer_gamma import (
     ThetaDataDealerPositioningProvider,
+)
+from uoa_detector.sources.thetadata_derived.iv_oi import (
+    ThetaDataIVHistoryProvider,
+    ThetaDataOpenInterestProvider,
 )
 
 
@@ -23,10 +31,18 @@ def _m21(stages: list[object]) -> DealerGammaStage:
     return next(s for s in stages if isinstance(s, DealerGammaStage))
 
 
-def test_fusion_stages_with_thetadata_gex_wires_m21(tmp_path: Path) -> None:
-    stages = fusion_stages_with_thetadata_gex(tmp_path)
+def test_fusion_stages_with_thetadata_wires_m21(tmp_path: Path) -> None:
+    stages = fusion_stages_with_thetadata(tmp_path)
     m21 = _m21(list(stages))
     assert isinstance(m21._provider, ThetaDataDealerPositioningProvider)
+
+
+def test_fusion_stages_with_thetadata_wires_iv_and_oi(tmp_path: Path) -> None:
+    stages = list(fusion_stages_with_thetadata(tmp_path))
+    m24 = next(s for s in stages if isinstance(s, IVExhaustionStage))
+    m27 = next(s for s in stages if isinstance(s, OpeningClosingStage))
+    assert isinstance(m24._iv_provider, ThetaDataIVHistoryProvider)
+    assert isinstance(m27._provider, ThetaDataOpenInterestProvider)
 
 
 def test_replay_stages_fusion_routes_to_gex_when_snapshots_given(

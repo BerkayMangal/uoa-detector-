@@ -487,26 +487,35 @@ def fusion_stages_with_uw(
     ]
 
 
-def fusion_stages_with_thetadata_gex(
+def fusion_stages_with_thetadata(
     snapshots_dir: Path,
 ) -> list[EnrichmentStage]:
-    """Build the fusion pipeline with M21 fed by the self-derived GEX
-    provider (Phase 3.6) — no Unusual Whales.
+    """Build the fusion pipeline with the self-derived axes (Phase 3.6) —
+    no Unusual Whales.
 
-    The dealer-gamma axis is computed from the ThetaData chain snapshots
-    (``DailyChainSnapshotSource`` → ``ThetaDataDealerPositioningProvider``);
-    every other enrichment axis stays on its NoOp default (dark pool and
-    peer flow are deferred; IV / OI / catalyst land in later sub-phases).
-    So the fusion cell exercises a real multi-source confluence —
-    core flow + spot + sweep + convexity + self-derived dealer gamma —
-    without UW.
+    Dealer gamma (M21), IV regime (M24) and OI delta (M27) are computed
+    from the ThetaData chain snapshots; every other enrichment axis stays
+    on its NoOp default (dark pool + sector peer flow deferred; catalyst
+    is 3.6.5). The M21/M24/M27 stage scoring is untouched — only the data
+    source changes. So the fusion cell exercises a real multi-source
+    confluence (core flow + spot + sweep + convexity + dealer gamma + IV
+    regime + OI delta) without UW.
     """
     from uoa_detector.pipeline.stages import (
         DealerGammaStage,
+        IVExhaustionStage,
+        OpeningClosingStage,
         default_stage_pipeline,
+    )
+    from uoa_detector.sources.thetadata_derived.chain_history import (
+        ChainHistory,
     )
     from uoa_detector.sources.thetadata_derived.dealer_gamma import (
         ThetaDataDealerPositioningProvider,
+    )
+    from uoa_detector.sources.thetadata_derived.iv_oi import (
+        ThetaDataIVHistoryProvider,
+        ThetaDataOpenInterestProvider,
     )
     from uoa_detector.sources.thetadata_derived.snapshot_reader import (
         DailyChainSnapshotSource,
@@ -515,10 +524,21 @@ def fusion_stages_with_thetadata_gex(
     gex = ThetaDataDealerPositioningProvider(
         DailyChainSnapshotSource(snapshots_dir),
     )
-    return [
-        DealerGammaStage(gex) if isinstance(st, DealerGammaStage) else st
-        for st in default_stage_pipeline()
-    ]
+    history = ChainHistory(snapshots_dir)
+    iv_provider = ThetaDataIVHistoryProvider(history)
+    oi_provider = ThetaDataOpenInterestProvider(history)
+
+    stages: list[EnrichmentStage] = []
+    for st in default_stage_pipeline():
+        if isinstance(st, DealerGammaStage):
+            stages.append(DealerGammaStage(gex))
+        elif isinstance(st, IVExhaustionStage):
+            stages.append(IVExhaustionStage(iv_provider))
+        elif isinstance(st, OpeningClosingStage):
+            stages.append(OpeningClosingStage(oi_provider))
+        else:
+            stages.append(st)
+    return stages
 
 
 def _replay_stages(
@@ -552,7 +572,7 @@ def _replay_stages(
 
     if fusion == "fusion":
         if chain_snapshots_dir is not None:
-            return fusion_stages_with_thetadata_gex(chain_snapshots_dir)
+            return fusion_stages_with_thetadata(chain_snapshots_dir)
         if uw_client is not None and uw_settings is not None:
             return fusion_stages_with_uw(uw_client, uw_settings)
         return list(default_stage_pipeline())
