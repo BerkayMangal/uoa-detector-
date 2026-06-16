@@ -790,6 +790,14 @@ def backtest_run_4cell(
              "GEX provider instead of Unusual Whales — a real confluence "
              "verdict without UW. Takes precedence over --uw-enrichment.",
     ),
+    spot_series: Path | None = typer.Option(
+        None,
+        "--spot-series",
+        help="Phase 3.6.5: directory of per-ticker minute-bar spot series "
+             "(scripts/compute_spot_series.py). When set alongside "
+             "--chain-snapshots, the price-confirmation axis (M23, a "
+             "weighted axis) is fed by the self-derived intraday spot.",
+    ),
     min_premium: float | None = typer.Option(
         None,
         "--min-premium",
@@ -882,6 +890,7 @@ def backtest_run_4cell(
             medians_csv=medians_csv,
             use_uw_enrichment=uw_enrichment,
             chain_snapshots_dir=chain_snapshots,
+            spot_series_dir=spot_series,
             min_premium_usd=(
                 Decimal(str(min_premium)) if min_premium is not None else None
             ),

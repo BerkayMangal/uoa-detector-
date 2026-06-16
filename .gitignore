@@ -24,3 +24,4 @@ creds.txt
 lib/
 reports/
 data/chain_snapshots/
+data/spot_series/

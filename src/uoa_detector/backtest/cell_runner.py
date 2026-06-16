@@ -489,22 +489,24 @@ def fusion_stages_with_uw(
 
 def fusion_stages_with_thetadata(
     snapshots_dir: Path,
+    spot_series_dir: Path | None = None,
 ) -> list[EnrichmentStage]:
     """Build the fusion pipeline with the self-derived axes (Phase 3.6) —
     no Unusual Whales.
 
     Dealer gamma (M21), IV regime (M24) and OI delta (M27) are computed
-    from the ThetaData chain snapshots; every other enrichment axis stays
-    on its NoOp default (dark pool + sector peer flow deferred; catalyst
-    is 3.6.5). The M21/M24/M27 stage scoring is untouched — only the data
-    source changes. So the fusion cell exercises a real multi-source
-    confluence (core flow + spot + sweep + convexity + dealer gamma + IV
-    regime + OI delta) without UW.
+    from the ThetaData chain snapshots. When ``spot_series_dir`` is given,
+    the price-confirmation axis (M23, a *weighted* combined-score axis) is
+    also wired to the self-derived intraday spot series. Every remaining
+    enrichment axis stays on its NoOp default (catalyst + sector + dark
+    pool deferred). The stage scoring is untouched — only the data source
+    changes.
     """
     from uoa_detector.pipeline.stages import (
         DealerGammaStage,
         IVExhaustionStage,
         OpeningClosingStage,
+        PriceConfirmationStage,
         default_stage_pipeline,
     )
     from uoa_detector.sources.thetadata_derived.chain_history import (
@@ -517,6 +519,10 @@ def fusion_stages_with_thetadata(
         ThetaDataIVHistoryProvider,
         ThetaDataOpenInterestProvider,
     )
+    from uoa_detector.sources.thetadata_derived.price_action import (
+        SpotSeries,
+        ThetaDataPriceActionProvider,
+    )
     from uoa_detector.sources.thetadata_derived.snapshot_reader import (
         DailyChainSnapshotSource,
     )
@@ -527,6 +533,10 @@ def fusion_stages_with_thetadata(
     history = ChainHistory(snapshots_dir)
     iv_provider = ThetaDataIVHistoryProvider(history)
     oi_provider = ThetaDataOpenInterestProvider(history)
+    price_provider = (
+        ThetaDataPriceActionProvider(SpotSeries(spot_series_dir))
+        if spot_series_dir is not None else None
+    )
 
     stages: list[EnrichmentStage] = []
     for st in default_stage_pipeline():
@@ -536,6 +546,8 @@ def fusion_stages_with_thetadata(
             stages.append(IVExhaustionStage(iv_provider))
         elif isinstance(st, OpeningClosingStage):
             stages.append(OpeningClosingStage(oi_provider))
+        elif isinstance(st, PriceConfirmationStage) and price_provider is not None:
+            stages.append(PriceConfirmationStage(price_provider))
         else:
             stages.append(st)
     return stages
@@ -546,6 +558,7 @@ def _replay_stages(
     uw_client: object | None = None,
     uw_settings: object | None = None,
     chain_snapshots_dir: Path | None = None,
+    spot_series_dir: Path | None = None,
 ) -> list[EnrichmentStage]:
     """Return the stage list for a cell's fusion coordinate.
 
@@ -572,7 +585,9 @@ def _replay_stages(
 
     if fusion == "fusion":
         if chain_snapshots_dir is not None:
-            return fusion_stages_with_thetadata(chain_snapshots_dir)
+            return fusion_stages_with_thetadata(
+                chain_snapshots_dir, spot_series_dir,
+            )
         if uw_client is not None and uw_settings is not None:
             return fusion_stages_with_uw(uw_client, uw_settings)
         return list(default_stage_pipeline())
@@ -596,6 +611,7 @@ def replay_trade_producer(
     source_id: str = "thetadata",
     use_uw_enrichment: bool = False,
     chain_snapshots_dir: Path | None = None,
+    spot_series_dir: Path | None = None,
     min_premium_usd: Decimal | None = None,
 ) -> Callable[
     [CellSpec, tuple[WalkForwardWindow, ...], CalibrationProfile],
@@ -702,6 +718,7 @@ def replay_trade_producer(
                 uw_client,
                 profile.data_sources.unusual_whales,
                 chain_snapshots_dir,
+                spot_series_dir,
             ),
             profile=profile,
             store=store,

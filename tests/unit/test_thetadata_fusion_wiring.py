@@ -17,6 +17,7 @@ from uoa_detector.pipeline.stages import (
     DealerGammaStage,
     IVExhaustionStage,
     OpeningClosingStage,
+    PriceConfirmationStage,
 )
 from uoa_detector.sources.thetadata_derived.dealer_gamma import (
     ThetaDataDealerPositioningProvider,
@@ -24,6 +25,9 @@ from uoa_detector.sources.thetadata_derived.dealer_gamma import (
 from uoa_detector.sources.thetadata_derived.iv_oi import (
     ThetaDataIVHistoryProvider,
     ThetaDataOpenInterestProvider,
+)
+from uoa_detector.sources.thetadata_derived.price_action import (
+    ThetaDataPriceActionProvider,
 )
 
 
@@ -43,6 +47,17 @@ def test_fusion_stages_with_thetadata_wires_iv_and_oi(tmp_path: Path) -> None:
     m27 = next(s for s in stages if isinstance(s, OpeningClosingStage))
     assert isinstance(m24._iv_provider, ThetaDataIVHistoryProvider)
     assert isinstance(m27._provider, ThetaDataOpenInterestProvider)
+
+
+def test_price_axis_wired_only_with_spot_series(tmp_path: Path) -> None:
+    # Without spot_series_dir, M23 stays on its NoOp default.
+    without = list(fusion_stages_with_thetadata(tmp_path))
+    m23 = next(s for s in without if isinstance(s, PriceConfirmationStage))
+    assert not isinstance(m23._provider, ThetaDataPriceActionProvider)
+    # With spot_series_dir, M23 is fed by the self-derived provider.
+    with_spot = list(fusion_stages_with_thetadata(tmp_path, tmp_path))
+    m23b = next(s for s in with_spot if isinstance(s, PriceConfirmationStage))
+    assert isinstance(m23b._provider, ThetaDataPriceActionProvider)
 
 
 def test_replay_stages_fusion_routes_to_gex_when_snapshots_given(
