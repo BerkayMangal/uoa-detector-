@@ -297,7 +297,7 @@ def render_verdict_report(
     """
     by_name = {r.cell.name: r for r in results}
     lines: list[str] = []
-    lines.append("# Phase 3.5 — falsification verdict")
+    lines.append("# Falsification verdict")
     lines.append("")
     if period_label:
         lines.append(f"Backtest period: {period_label}")
