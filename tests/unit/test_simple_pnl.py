@@ -233,6 +233,32 @@ def test_fixed_window_exit_capped_by_dte_floor() -> None:
     assert out.exit_ts == floor_exit
 
 
+def test_signal_inside_dte_floor_stays_open_no_lookahead() -> None:
+    """Phase 3.6 leak fix: a signal whose DTE is already at/inside the
+    exit_on_dte_lte floor has its scheduled exit at or before entry.
+
+    Realizing it would price the exit off a PRE-ENTRY quote (a negative
+    holding period — look-ahead). It must stay open (realized_r None).
+    """
+    entry_ts = datetime(2025, 6, 11, 15, 30, tzinfo=UTC)
+    # Expiry one day out; with exit_on_dte_lte=2 the floor exit lands at
+    # expiry-2 = 2025-06-10, i.e. before entry.
+    sig = _build_signal(
+        entry_ts=entry_ts, expiry_d=date(2025, 6, 12), max_r=1.0,
+    )
+    # A juicy stale bid exists a day BEFORE entry — the bug would have
+    # closed against it for a fabricated winner.
+    quotes = _quotes_with_one_exit(
+        exit_ts=entry_ts - timedelta(days=1),
+        bid=Decimal("9.99"),
+        expiry_d=date(2025, 6, 12),
+    )
+    out = SimplePnLProvider(_config(exit_on_dte_lte=2), quotes).provide(sig)
+    assert out.realized_r is None
+    assert out.exit_ts is None
+    assert out.exit_reason == "holding_window_open"
+
+
 def test_fixed_window_normal_exit_uses_window_days() -> None:
     """With expiry far away, the window decides — 5 days from entry."""
     entry_ts = datetime(2025, 6, 11, 15, 30, tzinfo=UTC)

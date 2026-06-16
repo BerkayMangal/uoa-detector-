@@ -173,6 +173,15 @@ class SimplePnLProvider:
 
         exit_ts, exit_reason = exit_plan
 
+        # Phase 3.6 leak fix: a signal already at/inside the DTE floor has
+        # no forward holding window — its scheduled exit lands at or before
+        # entry. Realizing it would price the exit off a pre-entry quote
+        # (``get_bid`` walks back to the latest bid ≤ exit_ts), i.e.
+        # look-ahead: a negative holding period and a fabricated PnL. Keep
+        # such a signal open/un-realized instead of inventing a past exit.
+        if exit_ts <= signal.timestamp:
+            return self._open_trade(signal)
+
         # Look up the exit bid. None → mark as open (data not available).
         exit_bid = self._quotes.get_bid(
             ticker=signal.ticker,
