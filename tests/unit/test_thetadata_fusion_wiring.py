@@ -15,9 +15,13 @@ from uoa_detector.backtest.cell_runner import (
 )
 from uoa_detector.pipeline.stages import (
     DealerGammaStage,
+    EventCalendarStage,
     IVExhaustionStage,
     OpeningClosingStage,
     PriceConfirmationStage,
+)
+from uoa_detector.sources.thetadata_derived.catalyst_calendar import (
+    CSVCatalystCalendarProvider,
 )
 from uoa_detector.sources.thetadata_derived.dealer_gamma import (
     ThetaDataDealerPositioningProvider,
@@ -58,6 +62,24 @@ def test_price_axis_wired_only_with_spot_series(tmp_path: Path) -> None:
     with_spot = list(fusion_stages_with_thetadata(tmp_path, tmp_path))
     m23b = next(s for s in with_spot if isinstance(s, PriceConfirmationStage))
     assert isinstance(m23b._provider, ThetaDataPriceActionProvider)
+
+
+def test_catalyst_axis_wired_with_csv(tmp_path: Path) -> None:
+    csv = tmp_path / "earnings.csv"
+    csv.write_text(
+        "ticker,when,kind,title\n"
+        "JNJ,2025-07-16T21:00:00+00:00,earnings,JNJ\n",
+        encoding="utf-8",
+    )
+    with_cat = list(
+        fusion_stages_with_thetadata(tmp_path, catalyst_csv=csv),
+    )
+    m22 = next(s for s in with_cat if isinstance(s, EventCalendarStage))
+    assert isinstance(m22._provider, CSVCatalystCalendarProvider)
+    # Without the CSV, M22 stays NoOp.
+    without = list(fusion_stages_with_thetadata(tmp_path))
+    m22b = next(s for s in without if isinstance(s, EventCalendarStage))
+    assert not isinstance(m22b._provider, CSVCatalystCalendarProvider)
 
 
 def test_replay_stages_fusion_routes_to_gex_when_snapshots_given(

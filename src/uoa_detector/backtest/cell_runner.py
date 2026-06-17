@@ -490,24 +490,29 @@ def fusion_stages_with_uw(
 def fusion_stages_with_thetadata(
     snapshots_dir: Path,
     spot_series_dir: Path | None = None,
+    catalyst_csv: Path | None = None,
 ) -> list[EnrichmentStage]:
     """Build the fusion pipeline with the self-derived axes (Phase 3.6) —
     no Unusual Whales.
 
-    Dealer gamma (M21), IV regime (M24) and OI delta (M27) are computed
-    from the ThetaData chain snapshots. When ``spot_series_dir`` is given,
-    the price-confirmation axis (M23, a *weighted* combined-score axis) is
-    also wired to the self-derived intraday spot series. Every remaining
-    enrichment axis stays on its NoOp default (catalyst + sector + dark
-    pool deferred). The stage scoring is untouched — only the data source
-    changes.
+    Dealer gamma (M21), IV regime (M24) and OI delta (M27) come from the
+    ThetaData chain snapshots. ``spot_series_dir`` adds the
+    price-confirmation axis (M23, weighted) from the intraday spot series.
+    ``catalyst_csv`` adds the event-calendar axis (M22, weighted) from the
+    committed earnings calendar — and feeds M24's post-earnings penalty
+    gate. Remaining axes (sector, dark pool) stay NoOp. Stage scoring is
+    untouched — only the data source changes.
     """
     from uoa_detector.pipeline.stages import (
         DealerGammaStage,
+        EventCalendarStage,
         IVExhaustionStage,
         OpeningClosingStage,
         PriceConfirmationStage,
         default_stage_pipeline,
+    )
+    from uoa_detector.sources.thetadata_derived.catalyst_calendar import (
+        CSVCatalystCalendarProvider,
     )
     from uoa_detector.sources.thetadata_derived.chain_history import (
         ChainHistory,
@@ -537,17 +542,26 @@ def fusion_stages_with_thetadata(
         ThetaDataPriceActionProvider(SpotSeries(spot_series_dir))
         if spot_series_dir is not None else None
     )
+    catalyst = (
+        CSVCatalystCalendarProvider(catalyst_csv)
+        if catalyst_csv is not None else None
+    )
 
     stages: list[EnrichmentStage] = []
     for st in default_stage_pipeline():
         if isinstance(st, DealerGammaStage):
             stages.append(DealerGammaStage(gex))
         elif isinstance(st, IVExhaustionStage):
-            stages.append(IVExhaustionStage(iv_provider))
+            stages.append(
+                IVExhaustionStage(iv_provider, catalyst)
+                if catalyst is not None else IVExhaustionStage(iv_provider),
+            )
         elif isinstance(st, OpeningClosingStage):
             stages.append(OpeningClosingStage(oi_provider))
         elif isinstance(st, PriceConfirmationStage) and price_provider is not None:
             stages.append(PriceConfirmationStage(price_provider))
+        elif isinstance(st, EventCalendarStage) and catalyst is not None:
+            stages.append(EventCalendarStage(catalyst))
         else:
             stages.append(st)
     return stages
@@ -559,6 +573,7 @@ def _replay_stages(
     uw_settings: object | None = None,
     chain_snapshots_dir: Path | None = None,
     spot_series_dir: Path | None = None,
+    catalyst_csv: Path | None = None,
 ) -> list[EnrichmentStage]:
     """Return the stage list for a cell's fusion coordinate.
 
@@ -586,7 +601,7 @@ def _replay_stages(
     if fusion == "fusion":
         if chain_snapshots_dir is not None:
             return fusion_stages_with_thetadata(
-                chain_snapshots_dir, spot_series_dir,
+                chain_snapshots_dir, spot_series_dir, catalyst_csv,
             )
         if uw_client is not None and uw_settings is not None:
             return fusion_stages_with_uw(uw_client, uw_settings)
@@ -612,6 +627,7 @@ def replay_trade_producer(
     use_uw_enrichment: bool = False,
     chain_snapshots_dir: Path | None = None,
     spot_series_dir: Path | None = None,
+    catalyst_csv: Path | None = None,
     min_premium_usd: Decimal | None = None,
 ) -> Callable[
     [CellSpec, tuple[WalkForwardWindow, ...], CalibrationProfile],
@@ -719,6 +735,7 @@ def replay_trade_producer(
                 profile.data_sources.unusual_whales,
                 chain_snapshots_dir,
                 spot_series_dir,
+                catalyst_csv,
             ),
             profile=profile,
             store=store,

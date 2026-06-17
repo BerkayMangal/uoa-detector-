@@ -798,6 +798,15 @@ def backtest_run_4cell(
              "--chain-snapshots, the price-confirmation axis (M23, a "
              "weighted axis) is fed by the self-derived intraday spot.",
     ),
+    catalyst_calendar: Path | None = typer.Option(
+        None,
+        "--catalyst-calendar",
+        help="Phase 3.6.6: earnings-calendar CSV "
+             "(scripts/fetch_earnings_calendar.py → "
+             "data/earnings_calendar.csv). When set, the event-calendar "
+             "axis (M22, a weighted axis) + M24's post-earnings gate are "
+             "fed by the self-derived catalyst dates.",
+    ),
     min_premium: float | None = typer.Option(
         None,
         "--min-premium",
@@ -891,6 +900,7 @@ def backtest_run_4cell(
             use_uw_enrichment=uw_enrichment,
             chain_snapshots_dir=chain_snapshots,
             spot_series_dir=spot_series,
+            catalyst_csv=catalyst_calendar,
             min_premium_usd=(
                 Decimal(str(min_premium)) if min_premium is not None else None
             ),
