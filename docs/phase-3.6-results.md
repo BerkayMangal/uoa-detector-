@@ -4,16 +4,16 @@ Backtest period: 2025-05-01 → 2026-04-30
 
 ## Verdict: **EDGE REJECTED**
 
-REJECTED — S4: best cell (tier2_fusion) Sharpe=0.54, walk-forward=0.38.
+REJECTED — S4: best cell (tier2_fusion) Sharpe=0.63, walk-forward=0.38.
 
 ## Cells
 
 | cell | closed trades | Sharpe | walk-forward | state |
 |---|---|---|---|---|
 | `tier1_single` | 0 | n/a | n/a | INSUFFICIENT |
-| `tier1_fusion` | 956 | -5.292 | +0.25 | computable |
+| `tier1_fusion` | 993 | -5.416 | +0.12 | computable |
 | `tier2_single` | 0 | n/a | n/a | INSUFFICIENT |
-| `tier2_fusion` | 253 | +0.541 | +0.38 | computable |
+| `tier2_fusion` | 257 | +0.633 | +0.38 | computable |
 
 ## Triggered reject scenarios
 
