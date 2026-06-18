@@ -97,6 +97,28 @@ verdict · **`b5fcd7a` leak fix** · `673e5d2` 3.6.4 IV/OI · `5aa9596`/
 Verified clean at close: `pytest` 1559 passed / 20 skipped, `mypy
 --strict` clean, `ruff` clean.
 
+## Addendum — the raw signal has no market-neutral edge either
+
+After the confluence verdict, we tested the rawest form of the thesis,
+bypassing the pipeline entirely: do large aggressive ISO sweeps (≥$100k,
+fill at/above ask) predict the underlying's direction? Forward spot
+returns, signed by option type.
+
+First pass looked like a find — call sweeps showed +0.97% direction-
+aligned 5-day return (hit 54%, de-replicated t-stat 2.76). But the
+skeptical control killed it: **subtract the universe-mean forward return
+(market drift) and the call-sweep EXCESS return is -0.046%, t-stat
+-0.20 — zero.** The "edge" was the 2025-26 up-drift; the aligned-return
+sign convention made "calls are long in a rising market" look like
+prediction. Put sweeps: +0.30% excess, t-stat 1.24 — also insignificant.
+
+So **the unusual options flow in this data has no market-neutral
+directional edge** — not as confluence, not as raw aggressive flow.
+
+Second fake edge caught this phase (after the look-ahead leak's Sharpe
+4.9). The lesson holds: be most skeptical of the best-looking result, and
+control for the obvious confound (here, market beta) before believing it.
+
 ## Verdict and next step
 
 **Track B (gamma-squeeze confluence) does not have a robust edge derivable
