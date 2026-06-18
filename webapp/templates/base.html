@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>UOA Screener</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://unpkg.com/htmx.org@1.9.12"></script>
   <script>
     tailwind.config = { darkMode: 'class' }
   </script>
@@ -18,14 +17,17 @@
   <header class="border-b border-gray-800 px-6 py-4">
     <div class="flex items-baseline gap-3">
       <h1 class="text-2xl font-bold text-white">UOA Screener</h1>
-      <span class="text-sm text-gray-500">Unusual Options Activity &middot; decision support</span>
+      <span class="text-sm text-gray-500">Institutional &amp; unusual options flow, scored across independent axes</span>
     </div>
-    <!-- Honest framing: this is a screener, not a proven edge. -->
-    <div class="mt-3 rounded-md border border-amber-700/40 bg-amber-900/20 px-4 py-2 text-sm text-amber-200">
-      <strong>This is a screener, not a buy signal.</strong>
-      Backtesting (Phases 3.5&ndash;3.6) found <em>no proven mechanical edge</em> in these raw signals.
-      The dashboard surfaces &ldquo;what is unusual right now&rdquo; with a full per-axis breakdown so
-      <em>you</em> apply your own judgment. It never auto-trades.
+    <!-- Honest, calm framing: a discretionary tool, not an auto-trader. -->
+    <div class="mt-3 rounded-md border border-gray-700/50 bg-gray-900/40 px-4 py-2 text-sm text-gray-300">
+      A discretionary screening terminal: it surfaces unusual options activity and breaks each print
+      down across flow, convexity, dealer gamma and catalyst timing &mdash; so <em>you</em> read it and decide.
+      <span class="text-gray-500">
+        The combined score ranks how unusual the flow is; it is not a standalone buy signal, and the
+        system never auto-trades. (In backtests the raw score alone showed no mechanical edge &mdash; which
+        is precisely why the full per-axis context lives here, for a trader&rsquo;s judgment.)
+      </span>
     </div>
   </header>
 

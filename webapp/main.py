@@ -12,10 +12,8 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-import traceback
-
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse, PlainTextResponse
+from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
 from webapp import explanations
@@ -26,12 +24,6 @@ if TYPE_CHECKING:
 
 _BASE = Path(__file__).parent
 app = FastAPI(title="UOA Screener")
-
-
-@app.exception_handler(Exception)
-async def _show_errors(request: Request, exc: Exception) -> PlainTextResponse:
-    # TEMP debug: surface the traceback so we can see Railway-side failures.
-    return PlainTextResponse(traceback.format_exc(), status_code=500)
 templates = Jinja2Templates(directory=str(_BASE / "templates"))
 # Disable Jinja's template cache: its LRU cache key path errors on Python
 # 3.14. Templates are tiny, so re-parsing per request is negligible.
@@ -56,7 +48,8 @@ def _repo() -> SignalRepo:
 
 
 def _filters(
-    ticker: str, label: str, min_score: float | None, since_min: int | None,
+    ticker: str, label: str, min_score: float | None,
+    since_min: int | None, sort: str,
 ) -> SignalFilters:
     since = (
         datetime.now(UTC) - timedelta(minutes=since_min)
@@ -64,7 +57,7 @@ def _filters(
     )
     return SignalFilters(
         ticker=ticker or None, label=label or None,
-        min_score=min_score, since=since, limit=150,
+        min_score=min_score, since=since, sort=sort or "score", limit=150,
     )
 
 
@@ -72,34 +65,24 @@ def _filters(
 def dashboard(
     request: Request, ticker: str = "", label: str = "",
     min_score: float | None = None, since_min: int | None = None,
+    sort: str = "score",
 ) -> HTMLResponse:
     repo = _repo()
-    flt = _filters(ticker, label, min_score, since_min)
+    flt = _filters(ticker, label, min_score, since_min, sort)
+    matched = repo.signals(flt)
     return templates.TemplateResponse(
         request,
         "dashboard.html",
         {
-            "signals": repo.signals(flt),
+            "signals": matched,
             "tickers": repo.tickers(),
             "labels": repo.labels(),
             "total": repo.count(),
+            "shown": len(matched),
             "ticker": ticker, "label": label, "min_score": min_score,
-            "since_min": since_min,
+            "since_min": since_min, "sort": sort,
             **_EXPLAIN,
         },
-    )
-
-
-@app.get("/signals", response_class=HTMLResponse)
-def signals(
-    request: Request, ticker: str = "", label: str = "",
-    min_score: float | None = None, since_min: int | None = None,
-) -> HTMLResponse:
-    flt = _filters(ticker, label, min_score, since_min)
-    return templates.TemplateResponse(
-        request,
-        "_signals.html",
-        {"signals": _repo().signals(flt), **_EXPLAIN},
     )
 
 

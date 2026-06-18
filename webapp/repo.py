@@ -34,12 +34,24 @@ def _normalize_url(url: str) -> str:
     return url
 
 
+# Sort key -> (column, descending). Only SQL-backed columns so ORDER BY +
+# LIMIT stay correct (no post-load reordering of a truncated page).
+_SORTS = {
+    "score": (SignalRow.combined_score_post, True),
+    "newest": (SignalRow.ts, True),
+    "oldest": (SignalRow.ts, False),
+    "size": (SignalRow.max_r, True),
+}
+DEFAULT_SORT = "score"
+
+
 @dataclass(frozen=True)
 class SignalFilters:
     ticker: str | None = None
     label: str | None = None
     min_score: float | None = None
     since: datetime | None = None
+    sort: str = DEFAULT_SORT
     limit: int = 100
 
 
@@ -54,7 +66,9 @@ class SignalRepo:
         self._session = sessionmaker(self._engine, future=True)
 
     def signals(self, filters: SignalFilters) -> list[StoredSignal]:
-        stmt = select(SignalRow).order_by(SignalRow.ts.desc())
+        column, descending = _SORTS.get(filters.sort, _SORTS[DEFAULT_SORT])
+        order = column.desc() if descending else column.asc()
+        stmt = select(SignalRow).order_by(order)
         if filters.ticker:
             stmt = stmt.where(SignalRow.ticker == filters.ticker.upper())
         if filters.label:
