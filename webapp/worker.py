@@ -82,16 +82,24 @@ async def run_live_worker(
     profile = load_profile(profile_path)
     store = SqliteBacktestStore(_normalize_pg(database_url))
     run_id = f"live-{datetime.now(UTC).date().isoformat()}"
-    store.start_run(
-        profile=profile,
-        universe_id="live",
-        run_id=run_id,
-        dataset_window_start=datetime.now(UTC),
-    )
     _logger.info("live worker started: run_id=%s tickers=%s", run_id, tickers)
+
+    def _ensure_run() -> None:
+        # One run per day. On a same-day restart (redeploy / crash) the run
+        # already exists — adopt it so signals keep appending, rather than
+        # colliding on the run_id primary key. pipeline.run() finishes the run
+        # in its finally, so we re-adopt at the top of every loop iteration.
+        if store.get_run(run_id) is None:
+            store.start_run(
+                profile=profile, universe_id="live", run_id=run_id,
+                dataset_window_start=datetime.now(UTC),
+            )
+        else:
+            store._active_run_id = run_id
 
     try:
         while True:
+            _ensure_run()
             client = UnusualWhalesClient(
                 api_key=Credentials().unusual_whales_api_key,
                 settings=profile.data_sources.unusual_whales,
