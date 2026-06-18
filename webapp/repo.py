@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import create_engine, select
+from sqlalchemy import create_engine, func, select
 from sqlalchemy.orm import sessionmaker
 
 from uoa_detector.backtest.sqlite_models import SignalRow
@@ -52,7 +52,27 @@ class SignalFilters:
     min_score: float | None = None
     since: datetime | None = None
     sort: str = DEFAULT_SORT
+    run_id: str | None = None
     limit: int = 100
+
+
+@dataclass(frozen=True)
+class RunInfo:
+    run_id: str
+    count: int
+    latest_ts: datetime | None
+
+    @property
+    def is_live(self) -> bool:
+        return self.run_id.startswith("live-")
+
+    @property
+    def label(self) -> str:
+        if self.is_live:
+            return f"Live · {self.run_id.removeprefix('live-')}"
+        if self.run_id == "seed":
+            return "Sample (Jul 2025 backtest)"
+        return self.run_id
 
 
 class SignalRepo:
@@ -77,27 +97,50 @@ class SignalRepo:
             stmt = stmt.where(SignalRow.combined_score_post >= filters.min_score)
         if filters.since is not None:
             stmt = stmt.where(SignalRow.ts >= filters.since)
+        if filters.run_id:
+            stmt = stmt.where(SignalRow.run_id == filters.run_id)
         stmt = stmt.limit(filters.limit)
         with self._session() as session:
             rows: Sequence[SignalRow] = session.execute(stmt).scalars().all()
             return [StoredSignal.model_validate_json(r.full_record_json) for r in rows]
 
-    def tickers(self) -> list[str]:
+    def tickers(self, run_id: str | None = None) -> list[str]:
+        stmt = select(SignalRow.ticker).distinct()
+        if run_id:
+            stmt = stmt.where(SignalRow.run_id == run_id)
         with self._session() as session:
-            return sorted(
-                r[0] for r in session.execute(
-                    select(SignalRow.ticker).distinct(),
-                ).all()
-            )
+            return sorted(r[0] for r in session.execute(stmt).all())
 
-    def labels(self) -> list[str]:
+    def labels(self, run_id: str | None = None) -> list[str]:
+        stmt = select(SignalRow.label).distinct()
+        if run_id:
+            stmt = stmt.where(SignalRow.run_id == run_id)
         with self._session() as session:
-            return sorted(
-                r[0] for r in session.execute(
-                    select(SignalRow.label).distinct(),
-                ).all()
-            )
+            return sorted(r[0] for r in session.execute(stmt).all())
 
-    def count(self) -> int:
+    def count(self, run_id: str | None = None) -> int:
+        stmt = select(func.count()).select_from(SignalRow)
+        if run_id:
+            stmt = stmt.where(SignalRow.run_id == run_id)
         with self._session() as session:
-            return len(session.execute(select(SignalRow.event_id)).all())
+            return int(session.execute(stmt).scalar_one())
+
+    def runs(self) -> list[RunInfo]:
+        """All runs with signal counts + latest event time, newest first.
+
+        Live runs (``live-YYYY-MM-DD``) sort to the top by latest_ts, so the
+        dashboard defaults to today's live flow when the worker is running.
+        """
+        stmt = (
+            select(
+                SignalRow.run_id,
+                func.count().label("n"),
+                func.max(SignalRow.ts).label("latest"),
+            )
+            .group_by(SignalRow.run_id)
+        )
+        with self._session() as session:
+            rows = session.execute(stmt).all()
+        infos = [RunInfo(run_id=r[0], count=int(r[1]), latest_ts=r[2]) for r in rows]
+        infos.sort(key=lambda i: (i.latest_ts is not None, i.latest_ts), reverse=True)
+        return infos

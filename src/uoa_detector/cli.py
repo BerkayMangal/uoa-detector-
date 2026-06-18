@@ -396,6 +396,14 @@ def _build_store(store_url: str) -> BacktestStoreProtocol:
     """
     if store_url == ":memory:":
         return BacktestStore()
+    if store_url.startswith(("postgres://", "postgresql://", "postgresql+")):
+        # Postgres (e.g. the Railway live sink). Normalise to the psycopg
+        # (v3) driver; the store creates the schema via ORM metadata.
+        for prefix in ("postgres://", "postgresql://"):
+            if store_url.startswith(prefix):
+                store_url = "postgresql+psycopg://" + store_url[len(prefix):]
+                break
+        return SqliteBacktestStore(store_url)
     if store_url.startswith("sqlite:"):
         # Already-canonical forms pass through.
         if store_url.startswith(("sqlite:///", "sqlite:////")):
@@ -409,7 +417,7 @@ def _build_store(store_url: str) -> BacktestStoreProtocol:
         return SqliteBacktestStore(url)
     msg = (
         f"Unrecognized --store value {store_url!r}. "
-        "Use ':memory:' or 'sqlite:path/to/db'."
+        "Use ':memory:', 'sqlite:path/to/db', or a 'postgresql://' URL."
     )
     raise typer.BadParameter(msg, param_hint="--store")
 

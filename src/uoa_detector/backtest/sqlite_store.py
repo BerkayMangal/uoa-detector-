@@ -50,6 +50,7 @@ from uoa_detector.backtest.models import ErrorRecord, RunMetadata
 from uoa_detector.backtest.sqlite_models import (
     BacktestRunErrorRow,
     BacktestRunRow,
+    Base,
     SignalRow,
 )
 from uoa_detector.backtest.store import StoredSignal
@@ -113,15 +114,18 @@ class SqliteBacktestStore:
         self._flush_threshold = flush_threshold or self._DEFAULT_FLUSH_THRESHOLD
 
         # Set WAL mode at connection open. This applies to every
-        # connection from the pool, not just the first.
-        @event.listens_for(self._engine, "connect")
-        def _set_pragmas(dbapi_conn: object, _conn_record: object) -> None:
-            cursor = dbapi_conn.cursor()  # type: ignore[attr-defined]
-            try:
-                cursor.execute("PRAGMA journal_mode=WAL")
-                cursor.execute("PRAGMA foreign_keys=ON")
-            finally:
-                cursor.close()
+        # connection from the pool, not just the first. SQLite-only:
+        # PRAGMA is not valid on Postgres, so guard by dialect (this
+        # store also backs the live Postgres sink — Phase 4).
+        if self._engine.dialect.name == "sqlite":
+            @event.listens_for(self._engine, "connect")
+            def _set_pragmas(dbapi_conn: object, _conn_record: object) -> None:
+                cursor = dbapi_conn.cursor()  # type: ignore[attr-defined]
+                try:
+                    cursor.execute("PRAGMA journal_mode=WAL")
+                    cursor.execute("PRAGMA foreign_keys=ON")
+                finally:
+                    cursor.close()
 
         self._session_factory = sessionmaker(
             bind=self._engine, expire_on_commit=False, future=True,
@@ -154,6 +158,13 @@ class SqliteBacktestStore:
             raise RuntimeError(msg)
 
     def _migrate_to_head(self) -> None:
+        # Alembic migration scripts are authored against SQLite. For other
+        # dialects (Postgres, the Phase 4 live sink) create the schema
+        # directly from the ORM metadata — idempotent, so it is a no-op
+        # when the tables already exist.
+        if self._engine.dialect.name != "sqlite":
+            Base.metadata.create_all(self._engine)
+            return
         cfg = _make_alembic_config(self._database_url)
         command.upgrade(cfg, "head")
 
