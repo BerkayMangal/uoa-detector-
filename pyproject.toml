@@ -18,6 +18,15 @@ dependencies = [
     "websockets>=13.0",
 ]
 
+[project.optional-dependencies]
+# Phase 4 screener web app (FastAPI dashboard). Install with `.[web]`.
+web = [
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.29",
+    "jinja2>=3.1",
+    "psycopg[binary]>=3.1",
+]
+
 [project.scripts]
 uoa-detector = "uoa_detector.cli:app"
 

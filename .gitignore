@@ -25,3 +25,6 @@ lib/
 reports/
 data/chain_snapshots/
 data/spot_series/
+
+# Phase 4 screener: generated local seed DB (Railway uses Postgres)
+webapp/*.db

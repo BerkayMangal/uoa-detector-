@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>UOA Screener</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+  <script>
+    tailwind.config = { darkMode: 'class' }
+  </script>
+  <style>
+    body { background:#0b0e14; color:#e6e6e6; }
+    .tip { border-bottom:1px dotted #5b6472; cursor:help; }
+  </style>
+</head>
+<body class="min-h-screen">
+  <header class="border-b border-gray-800 px-6 py-4">
+    <div class="flex items-baseline gap-3">
+      <h1 class="text-2xl font-bold text-white">UOA Screener</h1>
+      <span class="text-sm text-gray-500">Unusual Options Activity &middot; decision support</span>
+    </div>
+    <!-- Honest framing: this is a screener, not a proven edge. -->
+    <div class="mt-3 rounded-md border border-amber-700/40 bg-amber-900/20 px-4 py-2 text-sm text-amber-200">
+      <strong>This is a screener, not a buy signal.</strong>
+      Backtesting (Phases 3.5&ndash;3.6) found <em>no proven mechanical edge</em> in these raw signals.
+      The dashboard surfaces &ldquo;what is unusual right now&rdquo; with a full per-axis breakdown so
+      <em>you</em> apply your own judgment. It never auto-trades.
+    </div>
+  </header>
+
+  <main class="px-6 py-6">
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="border-t border-gray-800 px-6 py-6 mt-10 text-sm text-gray-400">
+    <details>
+      <summary class="cursor-pointer font-semibold text-gray-300">Glossary &mdash; what the terms mean</summary>
+      <dl class="mt-3 grid gap-3 md:grid-cols-2">
+        {% for term, meaning in glossary.items() %}
+        <div>
+          <dt class="font-semibold text-gray-200">{{ term }}</dt>
+          <dd class="text-gray-400">{{ meaning }}</dd>
+        </div>
+        {% endfor %}
+      </dl>
+    </details>
+    <p class="mt-4 text-xs text-gray-600">
+      Signals are decision support only. You decide whether to trade, manually, through your own broker.
+    </p>
+  </footer>
+</body>
+</html>

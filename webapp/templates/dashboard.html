@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block content %}
+
+<!-- Filters. The form triggers /signals on any change AND every 5s (live poll),
+     always including its own fields so the filters persist across polls. -->
+<form hx-get="/signals" hx-target="#signals" hx-swap="innerHTML"
+      hx-trigger="change, every 5s"
+      class="flex flex-wrap items-end gap-4 mb-5">
+
+  <label class="text-sm">
+    <span class="block text-gray-400 mb-1">Ticker</span>
+    <select name="ticker" class="bg-gray-900 border border-gray-700 rounded px-2 py-1 text-gray-100">
+      <option value="">All</option>
+      {% for t in tickers %}
+      <option value="{{ t }}" {% if t == ticker %}selected{% endif %}>{{ t }}</option>
+      {% endfor %}
+    </select>
+  </label>
+
+  <label class="text-sm">
+    <span class="block text-gray-400 mb-1">Label</span>
+    <select name="label" class="bg-gray-900 border border-gray-700 rounded px-2 py-1 text-gray-100">
+      <option value="">All</option>
+      {% for l in labels %}
+      <option value="{{ l }}" {% if l == label %}selected{% endif %}>{{ label_meaning(l) and l }}</option>
+      {% endfor %}
+    </select>
+  </label>
+
+  <label class="text-sm">
+    <span class="block text-gray-400 mb-1">Min combined score</span>
+    <input type="number" name="min_score" step="0.05" min="0" max="1"
+           value="{{ min_score if min_score is not none else '' }}"
+           class="w-24 bg-gray-900 border border-gray-700 rounded px-2 py-1 text-gray-100">
+  </label>
+
+  <label class="text-sm">
+    <span class="block text-gray-400 mb-1">Window</span>
+    <select name="since_min" class="bg-gray-900 border border-gray-700 rounded px-2 py-1 text-gray-100">
+      <option value="">All time</option>
+      <option value="60"   {% if since_min == 60 %}selected{% endif %}>Last hour</option>
+      <option value="240"  {% if since_min == 240 %}selected{% endif %}>Last 4 hours</option>
+      <option value="1440" {% if since_min == 1440 %}selected{% endif %}>Today</option>
+    </select>
+  </label>
+
+  <span class="text-xs text-gray-500 ml-auto">
+    <span class="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+    live &middot; auto-refresh 5s &middot; {{ total }} signals in store
+  </span>
+</form>
+
+<div id="signals">
+  {% include "_signals.html" %}
+</div>
+
+{% endblock %}
