@@ -16,11 +16,9 @@ dependencies = [
     "alembic>=1.13",
     "httpx>=0.27",
     "websockets>=13.0",
-]
-
-[project.optional-dependencies]
-# Phase 4 screener web app (FastAPI dashboard). Install with `.[web]`.
-web = [
+    # Phase 4 screener web app (FastAPI dashboard). Kept in the main
+    # dependency set so any builder (Railpack, Nixpacks) installs them with
+    # a plain `pip install .` — the deploy needs no extras flag.
     "fastapi>=0.110",
     "uvicorn[standard]>=0.29",
     "jinja2>=3.1",
