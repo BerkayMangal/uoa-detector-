@@ -12,8 +12,10 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+import traceback
+
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, PlainTextResponse
 from fastapi.templating import Jinja2Templates
 
 from webapp import explanations
@@ -24,6 +26,12 @@ if TYPE_CHECKING:
 
 _BASE = Path(__file__).parent
 app = FastAPI(title="UOA Screener")
+
+
+@app.exception_handler(Exception)
+async def _show_errors(request: Request, exc: Exception) -> PlainTextResponse:
+    # TEMP debug: surface the traceback so we can see Railway-side failures.
+    return PlainTextResponse(traceback.format_exc(), status_code=500)
 templates = Jinja2Templates(directory=str(_BASE / "templates"))
 # Disable Jinja's template cache: its LRU cache key path errors on Python
 # 3.14. Templates are tiny, so re-parsing per request is negligible.
