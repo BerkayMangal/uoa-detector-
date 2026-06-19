@@ -19,7 +19,7 @@ from fastapi import FastAPI, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
-from webapp import explanations, journal, pricing
+from webapp import explanations, gamma, journal, pricing
 from webapp.repo import SignalFilters, SignalRepo
 from webapp.worker import live_config_from_env, run_live_worker
 
@@ -82,6 +82,16 @@ def _journal() -> journal.JournalRepo:
     return _JOURNAL
 
 
+_GAMMA: gamma.GammaRepo | None = None
+
+
+def _gamma() -> gamma.GammaRepo:
+    global _GAMMA
+    if _GAMMA is None:
+        _GAMMA = gamma.GammaRepo()
+    return _GAMMA
+
+
 def _filters(
     ticker: str, label: str, min_score: float | None,
     since_min: int | None, sort: str, run_id: str | None,
@@ -124,6 +134,7 @@ def dashboard(
             "runs": runs, "current": current, "run": active or "",
             "ticker": ticker, "label": label, "min_score": min_score,
             "since_min": since_min, "sort": sort,
+            "gamma": _gamma().latest(),
             **_EXPLAIN,
         },
     )
