@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block content %}
+
+{% set dir = 'bullish' if (signal and signal.option_type == 'call') else ('bearish' if signal else '') %}
+
+<div class="max-w-2xl">
+  <div class="flex items-center justify-between mb-4">
+    <h2 class="text-xl font-bold text-white">Log a trade</h2>
+    <a href="/journal" class="text-sm text-gray-400 hover:text-gray-200">&larr; Back to journal</a>
+  </div>
+
+  {% if signal %}
+  <p class="text-sm text-gray-400 mb-4 rounded border border-gray-800 bg-gray-900/40 px-3 py-2">
+    Pre-filled from screener signal: <span class="text-gray-200 font-semibold">{{ signal.ticker }} {{ signal.option_type }}</span>
+    &middot; {{ signal.label.value }} (score {{ '%.2f'|format(signal.combined_score_post_penalty) if signal.combined_score_post_penalty is not none else '—' }}).
+    Adjust the entry price to your actual fill, set your size, and write your thesis.
+  </p>
+  {% endif %}
+
+  <form method="post" action="/journal" class="grid gap-4 sm:grid-cols-2">
+    <label class="text-sm">
+      <span class="block text-gray-400 mb-1">Ticker</span>
+      <input name="ticker" required value="{{ signal.ticker if signal else '' }}"
+             class="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1.5 text-gray-100 uppercase">
+    </label>
+
+    <label class="text-sm">
+      <span class="block text-gray-400 mb-1">Thesis direction</span>
+      <select name="direction" class="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1.5 text-gray-100">
+        <option value="bullish" {% if dir == 'bullish' %}selected{% endif %}>Bullish (expect up)</option>
+        <option value="bearish" {% if dir == 'bearish' %}selected{% endif %}>Bearish (expect down)</option>
+      </select>
+    </label>
+
+    <label class="text-sm">
+      <span class="block text-gray-400 mb-1">Instrument</span>
+      <select name="instrument" class="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1.5 text-gray-100">
+        <option value="call" {% if signal and signal.option_type == 'call' %}selected{% endif %}>Call</option>
+        <option value="put" {% if signal and signal.option_type == 'put' %}selected{% endif %}>Put</option>
+        <option value="shares">Shares</option>
+      </select>
+    </label>
+
+    <label class="text-sm">
+      <span class="block text-gray-400 mb-1">Strike (blank for shares)</span>
+      <input type="number" step="0.01" name="strike" value="{{ '%.2f'|format(signal.strike|float) if signal else '' }}"
+             class="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1.5 text-gray-100">
+    </label>
+
+    <label class="text-sm">
+      <span class="block text-gray-400 mb-1">Expiry (YYYY-MM-DD)</span>
+      <input name="expiry" value="{{ signal.expiry if signal else '' }}"
+             class="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1.5 text-gray-100">
+    </label>
+
+    <label class="text-sm">
+      <span class="block text-gray-400 mb-1">Contracts / shares</span>
+      <input type="number" step="0.01" name="contracts" required value="1"
+             class="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1.5 text-gray-100">
+    </label>
+
+    <label class="text-sm">
+      <span class="block text-gray-400 mb-1">Your entry price (premium/share)</span>
+      <input type="number" step="0.01" name="entry_price" required value="{{ '%.2f'|format(signal.option_price|float) if signal else '' }}"
+             class="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1.5 text-gray-100">
+    </label>
+
+    <label class="text-sm sm:col-span-2">
+      <span class="block text-gray-400 mb-1">Thesis &mdash; why are you taking this? (your read)</span>
+      <textarea name="thesis" rows="2" class="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1.5 text-gray-100"></textarea>
+    </label>
+
+    <input type="hidden" name="signal_run_id" value="{{ run }}">
+    <input type="hidden" name="signal_event_id" value="{{ event }}">
+    <input type="hidden" name="signal_score" value="{{ signal.combined_score_post_penalty if signal and signal.combined_score_post_penalty is not none else '' }}">
+    <input type="hidden" name="signal_label" value="{{ signal.label.value if signal else '' }}">
+
+    <div class="sm:col-span-2">
+      <button type="submit" class="rounded bg-emerald-600 hover:bg-emerald-500 px-5 py-2 text-sm font-semibold text-white">Log trade</button>
+      <span class="text-xs text-gray-500 ml-3">SPY &amp; {{ signal.ticker if signal else 'underlying' }} prices are snapshotted now for the market-neutral metric.</span>
+    </div>
+  </form>
+</div>
+
+{% endblock %}

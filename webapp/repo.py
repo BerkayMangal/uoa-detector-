@@ -104,6 +104,14 @@ class SignalRepo:
             rows: Sequence[SignalRow] = session.execute(stmt).scalars().all()
             return [StoredSignal.model_validate_json(r.full_record_json) for r in rows]
 
+    def get_signal(self, run_id: str, event_id: str) -> StoredSignal | None:
+        stmt = select(SignalRow).where(
+            SignalRow.run_id == run_id, SignalRow.event_id == event_id,
+        )
+        with self._session() as session:
+            row = session.execute(stmt).scalar_one_or_none()
+            return StoredSignal.model_validate_json(row.full_record_json) if row else None
+
     def tickers(self, run_id: str | None = None) -> list[str]:
         stmt = select(SignalRow.ticker).distinct()
         if run_id:

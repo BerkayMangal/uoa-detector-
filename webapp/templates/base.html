@@ -15,9 +15,13 @@
 </head>
 <body class="min-h-screen">
   <header class="border-b border-gray-800 px-6 py-4">
-    <div class="flex items-baseline gap-3">
+    <div class="flex items-baseline gap-4">
       <h1 class="text-2xl font-bold text-white">UOA Screener</h1>
-      <span class="text-sm text-gray-500">Institutional &amp; unusual options flow, scored across independent axes</span>
+      <nav class="flex gap-3 text-sm">
+        <a href="/" class="text-gray-300 hover:text-white">Screener</a>
+        <a href="/journal" class="text-gray-300 hover:text-white">Trade journal</a>
+      </nav>
+      <span class="text-sm text-gray-500 hidden md:inline">Institutional &amp; unusual options flow, scored across independent axes</span>
     </div>
     <!-- Honest, calm framing: a discretionary tool, not an auto-trader. -->
     <div class="mt-3 rounded-md border border-gray-700/50 bg-gray-900/40 px-4 py-2 text-sm text-gray-300">
@@ -36,6 +40,7 @@
   </main>
 
   <footer class="border-t border-gray-800 px-6 py-6 mt-10 text-sm text-gray-400">
+    {% if glossary %}
     <details>
       <summary class="cursor-pointer font-semibold text-gray-300">Glossary &mdash; what the terms mean</summary>
       <dl class="mt-3 grid gap-3 md:grid-cols-2">
@@ -47,6 +52,7 @@
         {% endfor %}
       </dl>
     </details>
+    {% endif %}
     <p class="mt-4 text-xs text-gray-600">
       Signals are decision support only. You decide whether to trade, manually, through your own broker.
     </p>

@@ -15,11 +15,11 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse
+from fastapi import FastAPI, Form, Request
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
-from webapp import explanations
+from webapp import explanations, journal, pricing
 from webapp.repo import SignalFilters, SignalRepo
 from webapp.worker import live_config_from_env, run_live_worker
 
@@ -63,6 +63,7 @@ _EXPLAIN = {
 }
 
 _REPO: SignalRepo | None = None
+_JOURNAL: journal.JournalRepo | None = None
 
 
 def _repo() -> SignalRepo:
@@ -70,6 +71,13 @@ def _repo() -> SignalRepo:
     if _REPO is None:
         _REPO = SignalRepo()
     return _REPO
+
+
+def _journal() -> journal.JournalRepo:
+    global _JOURNAL
+    if _JOURNAL is None:
+        _JOURNAL = journal.JournalRepo()
+    return _JOURNAL
 
 
 def _filters(
@@ -117,6 +125,92 @@ def dashboard(
             **_EXPLAIN,
         },
     )
+
+
+# ---------------------------------------------------------------------------
+# Trade journal — forward edge measurement
+# ---------------------------------------------------------------------------
+
+
+@app.get("/journal", response_class=HTMLResponse)
+def journal_page(request: Request) -> HTMLResponse:
+    repo = _journal()
+    trades = repo.list()
+    return templates.TemplateResponse(
+        request,
+        "journal.html",
+        {
+            "open_trades": [t for t in trades if t.status == "open"],
+            "closed_trades": [t for t in trades if t.status == "closed"],
+            "stats": journal.aggregate(trades),
+            "pnl": journal.option_pnl_usd,
+            "excess": journal.directional_excess,
+        },
+    )
+
+
+@app.get("/journal/new", response_class=HTMLResponse)
+def journal_new(request: Request, run: str = "", event: str = "") -> HTMLResponse:
+    signal = _repo().get_signal(run, event) if run and event else None
+    return templates.TemplateResponse(
+        request, "trade_form.html", {"signal": signal, "run": run, "event": event},
+    )
+
+
+@app.post("/journal")
+def journal_create(
+    ticker: str = Form(...),
+    direction: str = Form(...),
+    instrument: str = Form(...),
+    contracts: float = Form(...),
+    entry_price: float = Form(...),
+    strike: float | None = Form(None),
+    expiry: str = Form(""),
+    thesis: str = Form(""),
+    signal_run_id: str = Form(""),
+    signal_event_id: str = Form(""),
+    signal_score: float | None = Form(None),
+    signal_label: str = Form(""),
+) -> RedirectResponse:
+    underlying, spy = pricing.snapshot(ticker)
+    _journal().add(
+        entry_ts=datetime.now(UTC),
+        ticker=ticker.upper(),
+        direction=direction,
+        instrument=instrument,
+        contracts=contracts,
+        entry_price=entry_price,
+        strike=strike,
+        expiry=expiry or None,
+        entry_underlying_px=underlying,
+        entry_spy_px=spy,
+        signal_run_id=signal_run_id or None,
+        signal_event_id=signal_event_id or None,
+        signal_score=signal_score,
+        signal_label=signal_label or None,
+        thesis=thesis,
+    )
+    return RedirectResponse("/journal", status_code=303)
+
+
+@app.post("/journal/{trade_id}/close")
+def journal_close(
+    trade_id: str,
+    exit_price: float = Form(...),
+    exit_reason: str = Form(""),
+) -> RedirectResponse:
+    trade = _journal().get(trade_id)
+    if trade is not None:
+        underlying, spy = pricing.snapshot(trade.ticker)
+        _journal().close(
+            trade_id,
+            exit_ts=datetime.now(UTC),
+            exit_price=exit_price,
+            exit_underlying_px=underlying,
+            exit_spy_px=spy,
+            exit_reason=exit_reason or None,
+        )
+    return RedirectResponse("/journal", status_code=303)
 
 
 @app.get("/health")

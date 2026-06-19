@@ -77,6 +77,8 @@
       {% if s.sweep_classification %}<span class="px-1.5 py-0.5 rounded bg-gray-800 text-gray-300">{{ s.sweep_classification }}</span>{% endif %}
       {% if s.gamma_flag %}<span class="px-1.5 py-0.5 rounded bg-purple-900/40 text-purple-300" title="Dealer-gamma acceleration risk on this event">gamma risk</span>{% endif %}
       {% if s.dark_pool_confirmation %}<span class="px-1.5 py-0.5 rounded bg-gray-800 text-gray-300">dark pool</span>{% endif %}
+      <a href="/journal/new?run={{ run }}&amp;event={{ s.event_id }}"
+         class="ml-auto px-2 py-0.5 rounded border border-emerald-700/50 text-emerald-300 hover:bg-emerald-900/30">+ Log trade</a>
     </div>
   </article>
 {% endfor %}
