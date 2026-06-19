@@ -45,6 +45,8 @@ class GammaRow(_Base):
     flip: Mapped[float | None] = mapped_column(Float, nullable=True)
     call_wall: Mapped[float | None] = mapped_column(Float, nullable=True)
     put_wall: Mapped[float | None] = mapped_column(Float, nullable=True)
+    atm_iv: Mapped[float | None] = mapped_column(Float, nullable=True)
+    iv_pct: Mapped[float | None] = mapped_column(Float, nullable=True)  # 0..1 within own history
 
 
 @dataclass(frozen=True)
@@ -56,6 +58,8 @@ class GammaContext:
     flip: float | None
     call_wall: float | None
     put_wall: float | None
+    atm_iv: float | None = None
+    iv_pct: float | None = None
 
     @property
     def regime(self) -> str:
@@ -64,6 +68,44 @@ class GammaContext:
     @property
     def regime_label(self) -> str:
         return "amplifies moves" if self.net_gex < 0 else "suppresses moves"
+
+    @property
+    def vol_signal(self) -> str:
+        """The study-backed vol read: sell vol in long-gamma + rich IV; buy in
+        short-gamma + cheap IV. Only the sell side survived robustness — buy is
+        shown as a weak/watch lead. Returns 'sell' | 'buy' | 'neutral'."""
+        if self.iv_pct is None:
+            return "neutral"
+        if self.regime == "long" and self.iv_pct >= 0.75:
+            return "sell"
+        if self.regime == "short" and self.iv_pct <= 0.25:
+            return "buy"
+        return "neutral"
+
+    @property
+    def vol_label(self) -> str:
+        return {
+            "sell": "Options rich — vol-selling candidate (defined-risk)",
+            "buy": "Options cheap — vol-buying lead (weak, watch)",
+            "neutral": "Vol fairly priced",
+        }[self.vol_signal]
+
+
+def atm_iv(chain: pd.DataFrame, *, as_of: str) -> float | None:
+    """Median ATM implied vol (DTE 10-45, within 5% of spot) — the market's
+    annualised vol charge. Used for the vol-premium read + IV percentile."""
+    df = chain.copy()
+    for c in ("strike", "implied_volatility", "spot"):
+        df[c] = pd.to_numeric(df[c], errors="coerce")
+    df["expiry"] = pd.to_datetime(df["expiry"])
+    df["dte"] = (df["expiry"] - pd.Timestamp(as_of)).dt.days
+    spot = df["spot"].dropna()
+    if spot.empty:
+        return None
+    s = float(spot.iloc[0])
+    df = df[(df["dte"] >= 10) & (df["dte"] <= 45) & (df["implied_volatility"] > 0)]
+    df = df[(df["strike"] - s).abs() <= 0.05 * s]
+    return float(df["implied_volatility"].median()) if not df.empty else None
 
 
 def _bs_gamma_vec(spot: float, k: np.ndarray, t: np.ndarray, iv: np.ndarray) -> np.ndarray:
@@ -128,6 +170,7 @@ def compute_gamma(chain: pd.DataFrame, *, as_of: str) -> dict[str, float | None]
         "flip": round(flip, 2) if flip is not None else None,
         "call_wall": float(calls.idxmax()) if not calls.empty else None,
         "put_wall": float(puts.idxmax()) if not puts.empty else None,
+        "atm_iv": atm_iv(chain, as_of=as_of),
     }
 
 
@@ -140,6 +183,12 @@ class GammaRepo:
         _Base.metadata.create_all(self._engine)
         self._session = sessionmaker(self._engine, future=True)
 
+    def reset(self) -> None:
+        """Drop + recreate the table — the snapshot is a full daily rebuild, and
+        this picks up schema changes (new columns) without a migration."""
+        GammaRow.__table__.drop(self._engine, checkfirst=True)
+        _Base.metadata.create_all(self._engine)
+
     def upsert(self, ticker: str, as_of: str, m: dict[str, float | None]) -> None:
         with self._session() as s:
             row = s.get(GammaRow, ticker.upper()) or GammaRow(ticker=ticker.upper())
@@ -149,6 +198,8 @@ class GammaRepo:
             row.flip = m["flip"]
             row.call_wall = m["call_wall"]
             row.put_wall = m["put_wall"]
+            row.atm_iv = m.get("atm_iv")
+            row.iv_pct = m.get("iv_pct")
             s.add(row)
             s.commit()
 
@@ -159,6 +210,7 @@ class GammaRepo:
             r.ticker: GammaContext(
                 ticker=r.ticker, as_of=r.as_of, spot=r.spot, net_gex=r.net_gex,
                 flip=r.flip, call_wall=r.call_wall, put_wall=r.put_wall,
+                atm_iv=r.atm_iv, iv_pct=r.iv_pct,
             )
             for r in rows
         }

@@ -17,7 +17,7 @@ import argparse
 from pathlib import Path
 
 import pandas as pd
-from webapp.gamma import GammaRepo, compute_gamma
+from webapp.gamma import GammaRepo, atm_iv, compute_gamma
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -26,6 +26,7 @@ def main(argv: list[str] | None = None) -> int:
     args = p.parse_args(argv)
 
     repo = GammaRepo()
+    repo.reset()  # full daily rebuild; picks up schema changes
     done = 0
     for path in sorted(args.chains.glob("*.parquet")):
         ticker = path.stem
@@ -37,11 +38,21 @@ def main(argv: list[str] | None = None) -> int:
         if result is None:
             print(f"{ticker}: no usable chain rows")
             continue
+
+        # IV percentile of the latest ATM IV within this ticker's own history.
+        hist = [
+            v for d, g in chain.groupby("snapshot_date")
+            if (v := atm_iv(g, as_of=str(pd.Timestamp(d).date()))) is not None
+        ]
+        cur = result.get("atm_iv")
+        if cur is not None and hist:
+            result["iv_pct"] = sum(1 for v in hist if v <= cur) / len(hist)
+
         repo.upsert(ticker, str(latest.date()), result)
-        regime = "SHORT (amplify)" if result["net_gex"] < 0 else "long (suppress)"
-        print(f"{ticker}: {regime}  spot={result['spot']:.2f}  "
-              f"flip={result['flip']}  call_wall={result['call_wall']}  "
-              f"put_wall={result['put_wall']}  ({latest.date()})")
+        regime = "SHORT" if result["net_gex"] < 0 else "long"
+        ivp = result.get("iv_pct")
+        print(f"{ticker}: {regime:5}  spot={result['spot']:.2f}  flip={result['flip']}  "
+              f"IV={result.get('atm_iv')}  IVpct={f'{ivp:.0%}' if ivp is not None else '—'}")
         done += 1
     print(f"\nstored {done} tickers")
     return 0

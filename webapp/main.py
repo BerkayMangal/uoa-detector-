@@ -226,6 +226,20 @@ def journal_close(
     return RedirectResponse("/journal", status_code=303)
 
 
+# ---------------------------------------------------------------------------
+# Gamma + vol overview board
+# ---------------------------------------------------------------------------
+
+
+@app.get("/gamma", response_class=HTMLResponse)
+def gamma_page(request: Request) -> HTMLResponse:
+    rows = list(_gamma().latest().values())
+    # Sell-vol candidates first, then by IV percentile (richest first).
+    order = {"sell": 0, "buy": 1, "neutral": 2}
+    rows.sort(key=lambda g: (order[g.vol_signal], -(g.iv_pct or 0)))
+    return templates.TemplateResponse(request, "gamma.html", {"rows": rows})
+
+
 @app.get("/health")
 def health() -> dict[str, bool]:
     return {"ok": True}

@@ -51,6 +51,26 @@ def test_walls_are_valid_strikes() -> None:
     assert m["put_wall"] in range(80, 121)
 
 
+def _ctx(net_gex: float, iv_pct: float | None) -> object:
+    from webapp.gamma import GammaContext
+    return GammaContext(ticker="X", as_of="2026-06-22", spot=100.0, net_gex=net_gex,
+                        flip=None, call_wall=None, put_wall=None, atm_iv=0.4, iv_pct=iv_pct)
+
+
+def test_vol_signal_sell_long_gamma_rich_iv() -> None:
+    assert _ctx(net_gex=1.0, iv_pct=0.85).vol_signal == "sell"  # type: ignore[attr-defined]
+
+
+def test_vol_signal_buy_short_gamma_cheap_iv() -> None:
+    assert _ctx(net_gex=-1.0, iv_pct=0.10).vol_signal == "buy"  # type: ignore[attr-defined]
+
+
+def test_vol_signal_neutral_otherwise() -> None:
+    assert _ctx(net_gex=1.0, iv_pct=0.50).vol_signal == "neutral"  # type: ignore[attr-defined]
+    assert _ctx(net_gex=-1.0, iv_pct=0.90).vol_signal == "neutral"  # type: ignore[attr-defined]
+    assert _ctx(net_gex=1.0, iv_pct=None).vol_signal == "neutral"  # type: ignore[attr-defined]
+
+
 def test_empty_chain_returns_none() -> None:
     empty = pd.DataFrame({
         "strike": [100.0], "expiry": ["2020-01-01"], "option_type": ["call"],
