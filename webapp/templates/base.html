@@ -14,25 +14,17 @@
   </style>
 </head>
 <body class="min-h-screen">
-  <header class="border-b border-gray-800 px-6 py-4">
-    <div class="flex items-baseline gap-4">
+  {% set path = request.url.path %}
+  <header class="border-b border-gray-800 px-6 pt-4">
+    <div class="flex items-baseline gap-4 flex-wrap">
       <h1 class="text-2xl font-bold text-white">UOA Screener</h1>
-      <nav class="flex gap-3 text-sm">
-        <a href="/" class="text-gray-300 hover:text-white">Screener</a>
-        <a href="/journal" class="text-gray-300 hover:text-white">Trade journal</a>
-      </nav>
-      <span class="text-sm text-gray-500 hidden md:inline">Institutional &amp; unusual options flow, scored across independent axes</span>
+      <span class="text-sm text-gray-500">Unusual options flow you review by hand &mdash;
+        <span class="text-gray-400">a screening tool, not a buy signal. It never auto-trades.</span></span>
     </div>
-    <!-- Honest, calm framing: a discretionary tool, not an auto-trader. -->
-    <div class="mt-3 rounded-md border border-gray-700/50 bg-gray-900/40 px-4 py-2 text-sm text-gray-300">
-      A discretionary screening terminal: it surfaces unusual options activity and breaks each print
-      down across flow, convexity, dealer gamma and catalyst timing &mdash; so <em>you</em> read it and decide.
-      <span class="text-gray-500">
-        The combined score ranks how unusual the flow is; it is not a standalone buy signal, and the
-        system never auto-trades. (In backtests the raw score alone showed no mechanical edge &mdash; which
-        is precisely why the full per-axis context lives here, for a trader&rsquo;s judgment.)
-      </span>
-    </div>
+    <nav class="flex gap-1 mt-4 -mb-px text-sm font-medium">
+      <a href="/" class="px-4 py-2 rounded-t-lg border-b-2 {{ 'border-emerald-500 text-white bg-gray-900/60' if path == '/' else 'border-transparent text-gray-400 hover:text-gray-200' }}">Screener</a>
+      <a href="/journal" class="px-4 py-2 rounded-t-lg border-b-2 {{ 'border-emerald-500 text-white bg-gray-900/60' if path.startswith('/journal') else 'border-transparent text-gray-400 hover:text-gray-200' }}">Trade journal</a>
+    </nav>
   </header>
 
   <main class="px-6 py-6">

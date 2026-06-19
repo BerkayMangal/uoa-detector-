@@ -60,6 +60,8 @@ _EXPLAIN = {
     "axes": explanations.AXES,
     "glossary": explanations.GLOSSARY,
     "label_meaning": explanations.label_meaning,
+    "headline": explanations.headline,
+    "conviction": explanations.conviction,
 }
 
 _REPO: SignalRepo | None = None

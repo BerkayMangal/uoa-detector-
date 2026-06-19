@@ -1,6 +1,20 @@
 {% extends "base.html" %}
 {% block content %}
 
+<!-- How to read a card — the colour/conviction key, always visible. -->
+<div class="rounded-lg border border-gray-800 bg-gray-900/40 px-4 py-3 mb-5 text-sm text-gray-300">
+  <span class="font-semibold text-gray-200">How to read a card:</span>
+  <span class="inline-flex items-center gap-1 ml-2"><span style="color:#10b981">▲</span> green = <strong class="text-emerald-300">bullish</strong> (calls)</span>
+  <span class="text-gray-600 mx-1">·</span>
+  <span class="inline-flex items-center gap-1"><span style="color:#ef4444">▼</span> red = <strong class="text-red-300">bearish</strong> (puts)</span>
+  <span class="text-gray-600 mx-1">·</span>
+  <span><strong class="text-sky-300">Conviction</strong> (blue) = how strong/corroborated, <em>not</em> odds of profit</span>
+  <span class="text-gray-600 mx-1">·</span>
+  <span><strong class="text-white">Premium</strong> = real money behind it</span>
+  <span class="text-gray-600 mx-1">·</span>
+  <span>hit <strong class="text-white">Log this trade</strong> to track it</span>
+</div>
+
 <!-- Plain GET form -> "/". A normal browser submit (no JS needed), so the
      filters and sort always work. Changing any control auto-submits; the
      Apply button is the fallback. -->

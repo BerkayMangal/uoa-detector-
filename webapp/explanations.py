@@ -85,3 +85,49 @@ LABEL_MEANINGS: dict[str, str] = {
 
 def label_meaning(label: str) -> str:
     return LABEL_MEANINGS.get(label, label.replace("_", " ").title())
+
+
+# Short phrase per label for the one-line plain-English card headline.
+_LABEL_PHRASE: dict[str, str] = {
+    "SWEEP_UOA": "aggressive sweep",
+    "CONVEXITY_CLUSTER": "cluster of convex bets",
+    "CONVEXITY_BURST": "burst of convex positioning",
+    "PRE_CATALYST_FLOW": "positioning before a catalyst",
+    "STANDARD_UOA": "unusual options activity",
+    "LEAP_POSITIONING": "long-dated positioning",
+    "HIGH_CONVICTION_SEQUENCE": "high-conviction sequence",
+    "HIGH_CONVICTION_INITIAL": "high-conviction opener",
+    "PENALIZED_BELOW_THRESHOLD": "flow below the action threshold",
+    "OPENING_UNCONFIRMED": "an opening position",
+    "IGNORE_NOISE": "background noise",
+}
+
+
+def headline(option_type: str, label: str, swept: bool, dte: int) -> str:
+    """One plain-English sentence: what this card is, at a glance."""
+    side = "Bullish call" if option_type == "call" else "Bearish put"
+    phrase = _LABEL_PHRASE.get(label, label.replace("_", " ").lower())
+    bits = [f"{side} — {phrase}"]
+    if swept:
+        bits.append("swept across venues (urgent)")
+    bits.append("expires today" if dte == 0 else f"{dte} days to expiry")
+    return " · ".join(bits)
+
+
+def conviction(score: float | None) -> tuple[str, int]:
+    """Map the combined score to a (tier word, 0-100 meter %) for display.
+
+    Conviction = how strong / corroborated the signal is. Deliberately NOT a
+    probability of profit — the backtest found no mechanical edge.
+    """
+    if score is None:
+        return ("—", 0)
+    pct = max(0, min(100, round(score / 0.5 * 100)))
+    if score >= 0.40:
+        return ("Strong", pct)
+    if score >= 0.30:
+        return ("Moderate", pct)
+    if score >= 0.20:
+        return ("Weak", pct)
+    return ("Noise", pct)
+

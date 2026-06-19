@@ -1,84 +1,107 @@
-{% set label_colors = {
-  'HIGH_CONVICTION_SEQUENCE':'#10b981', 'HIGH_CONVICTION_INITIAL':'#10b981',
-  'CONVEXITY_CLUSTER':'#a855f7', 'CONVEXITY_BURST':'#a855f7',
-  'SWEEP_UOA':'#38bdf8', 'STANDARD_UOA':'#9ca3af', 'PRE_CATALYST_FLOW':'#f59e0b',
-  'LEAP_POSITIONING':'#9ca3af', 'PENALIZED_BELOW_THRESHOLD':'#6b7280',
-  'DISCARD_OR_LOG':'#6b7280', 'REJECTED':'#ef4444'
-} %}
-{% macro score_color(v) %}{% if v is none %}#6b7280{% elif v >= 0.55 %}#10b981{% elif v >= 0.3 %}#f59e0b{% else %}#6b7280{% endif %}{% endmacro %}
+{% macro axis_word(v) %}
+  {%- if v is none -%}<span class="text-gray-600">—</span>
+  {%- elif v >= 0.55 -%}<span class="text-sky-300 font-semibold">Strong</span>
+  {%- elif v >= 0.35 -%}<span class="text-sky-400">Moderate</span>
+  {%- else -%}<span class="text-gray-500">Weak</span>{%- endif -%}
+{% endmacro %}
 
 {% if not signals %}
-  <div class="rounded-lg border border-gray-800 bg-gray-900/40 p-8 text-center text-gray-400">
-    No signals match these filters. The detector hasn&rsquo;t flagged anything here &mdash;
-    that&rsquo;s normal in a quiet window.
+  <div class="rounded-xl border border-gray-800 bg-gray-900/40 p-10 text-center">
+    <p class="text-gray-300 text-lg">No signals match these filters.</p>
+    <p class="text-gray-500 text-sm mt-1">The detector hasn&rsquo;t flagged anything here &mdash; that&rsquo;s normal in a quiet window. Try widening the filters or lowering the minimum score.</p>
   </div>
 {% endif %}
 
-<div class="grid gap-4 lg:grid-cols-2">
+<div class="grid gap-4 xl:grid-cols-2">
 {% for s in signals %}
-  {% set lv = s.label.value %}
-  {% set lc = label_colors.get(lv, '#9ca3af') %}
+  {% set is_call = s.option_type == 'call' %}
+  {% set dir_color = '#10b981' if is_call else '#ef4444' %}
+  {% set conv = conviction(s.combined_score_post_penalty) %}
   {% set cs = s.combined_score_post_penalty %}
-  <article class="rounded-lg border border-gray-800 bg-gray-900/50 p-4">
 
-    <!-- Header -->
-    <div class="flex items-start justify-between gap-3">
-      <div>
-        <div class="flex items-center gap-2">
-          <span class="text-xl font-bold text-white">{{ s.ticker }}</span>
-          <span class="px-1.5 py-0.5 rounded text-xs font-semibold"
-                style="background:{{ lc }}22;color:{{ lc }};border:1px solid {{ lc }}55">
-            {{ s.option_type|upper }}
-          </span>
-          <span class="text-sm text-gray-400">${{ '%.2f'|format(s.strike|float) }} &middot; exp {{ s.expiry }} &middot; {{ s.dte }} DTE</span>
-        </div>
-        <div class="mt-1 text-xs text-gray-500">{{ s.timestamp.strftime('%Y-%m-%d %H:%M:%S UTC') }}</div>
-      </div>
-      <div class="text-right">
-        <div class="text-2xl font-bold" style="color:{{ score_color(cs) }}">
-          {{ '%.2f'|format(cs) if cs is not none else '—' }}
-        </div>
-        <div class="text-[10px] uppercase tracking-wide text-gray-500">combined score</div>
-      </div>
-    </div>
+  <article class="rounded-xl border border-gray-800 bg-gray-900/60 flex overflow-hidden hover:border-gray-700">
+    <!-- Direction accent: green = bullish (call), red = bearish (put) -->
+    <div class="w-1.5 shrink-0" style="background:{{ dir_color }}"></div>
 
-    <!-- Label + what it means -->
-    <div class="mt-3">
-      <span class="inline-block px-2 py-0.5 rounded text-xs font-bold"
-            style="background:{{ lc }}22;color:{{ lc }};border:1px solid {{ lc }}55">{{ lv }}</span>
-      <p class="mt-1 text-sm text-gray-300">{{ label_meaning(lv) }}</p>
-      {% if s.label_reason %}<p class="text-xs text-gray-500 mt-0.5">{{ s.label_reason }}</p>{% endif %}
-    </div>
-
-    <!-- Per-axis breakdown (hover a title for what it means) -->
-    <div class="mt-4 grid gap-2 sm:grid-cols-2">
-      {% for key, title, what in axes %}
-        {% set v = s|attr(key) %}
-        <div class="rounded border border-gray-800 bg-gray-950/60 px-2.5 py-1.5">
-          <div class="flex items-center justify-between">
-            <span class="text-xs font-semibold text-gray-300 tip" title="{{ what }}">{{ title }}</span>
-            <span class="text-xs font-mono" style="color:{{ score_color(v) }}">
-              {{ '%.2f'|format(v) if v is not none else '—' }}
+    <div class="flex-1 p-4">
+      <!-- Top line: ticker + direction + conviction -->
+      <div class="flex items-start justify-between gap-3">
+        <div>
+          <div class="flex items-center gap-2 flex-wrap">
+            <span class="text-2xl font-bold text-white">{{ s.ticker }}</span>
+            <span class="px-2 py-0.5 rounded-full text-xs font-bold"
+                  style="background:{{ dir_color }}22;color:{{ dir_color }}">
+              {{ '▲ BULLISH' if is_call else '▼ BEARISH' }}
             </span>
           </div>
-          <div class="mt-1 h-1 rounded bg-gray-800 overflow-hidden">
-            <div class="h-full rounded" style="width:{{ ((v or 0)*100)|round }}%;background:{{ score_color(v) }}"></div>
+          <div class="text-sm text-gray-400 mt-1">
+            {{ s.option_type|capitalize }} &middot; strike ${{ '%.0f'|format(s.strike|float) }}
+            &middot; expires {{ s.expiry }} <span class="text-gray-500">({{ s.dte }} days)</span>
           </div>
         </div>
-      {% endfor %}
-    </div>
+        <div class="text-right shrink-0">
+          <div class="text-[10px] text-gray-500 uppercase tracking-wide">Conviction</div>
+          <div class="text-lg font-bold leading-tight text-sky-300">{{ conv[0] }}</div>
+          <div class="mt-1 w-24 h-1.5 rounded-full bg-gray-800 overflow-hidden ml-auto">
+            <div class="h-full bg-sky-400 rounded-full" style="width:{{ conv[1] }}%"></div>
+          </div>
+          <div class="text-[10px] text-gray-500 mt-0.5">score {{ '%.2f'|format(cs) if cs is not none else '—' }}</div>
+        </div>
+      </div>
 
-    <!-- Print detail + flags -->
-    <div class="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-400">
-      <span><span class="text-gray-500">premium</span> ${{ '{:,.0f}'.format(s.premium|float) }}</span>
-      <span><span class="text-gray-500">moneyness</span> {{ '%.3f'|format(s.moneyness|float) }}</span>
-      <span><span class="text-gray-500">size (R)</span> {{ '%.2f'|format(s.max_r) }}</span>
-      {% if s.is_iso %}<span class="tip px-1.5 py-0.5 rounded bg-sky-900/40 text-sky-300" title="{{ glossary['ISO'] }}">ISO sweep</span>{% endif %}
-      {% if s.sweep_classification %}<span class="px-1.5 py-0.5 rounded bg-gray-800 text-gray-300">{{ s.sweep_classification }}</span>{% endif %}
-      {% if s.gamma_flag %}<span class="px-1.5 py-0.5 rounded bg-purple-900/40 text-purple-300" title="Dealer-gamma acceleration risk on this event">gamma risk</span>{% endif %}
-      {% if s.dark_pool_confirmation %}<span class="px-1.5 py-0.5 rounded bg-gray-800 text-gray-300">dark pool</span>{% endif %}
-      <a href="/journal/new?run={{ run }}&amp;event={{ s.event_id }}"
-         class="ml-auto px-2 py-0.5 rounded border border-emerald-700/50 text-emerald-300 hover:bg-emerald-900/30">+ Log trade</a>
+      <!-- Plain-English headline -->
+      <p class="mt-3 text-[15px] leading-snug text-gray-100">
+        {{ headline(s.option_type, s.label.value, s.is_iso, s.dte) }}
+      </p>
+
+      <!-- Key facts -->
+      <div class="mt-3 flex flex-wrap gap-x-6 gap-y-2">
+        <div>
+          <div class="text-[10px] text-gray-500 uppercase tracking-wide">Premium (money at risk)</div>
+          <div class="text-base font-semibold text-white">${{ '{:,.0f}'.format(s.premium|float) }}</div>
+        </div>
+        <div>
+          <div class="text-[10px] text-gray-500 uppercase tracking-wide">Size (R)</div>
+          <div class="text-base font-semibold text-gray-200">{{ '%.2f'|format(s.max_r) }}</div>
+        </div>
+        <div>
+          <div class="text-[10px] text-gray-500 uppercase tracking-wide">Time on book</div>
+          <div class="text-base font-semibold text-gray-200">{{ s.timestamp.strftime('%H:%M UTC') }}</div>
+        </div>
+      </div>
+
+      <!-- Plain-language flags: only the meaningful ones -->
+      <div class="mt-3 flex flex-wrap gap-1.5 text-xs">
+        {% if s.is_iso %}<span class="px-2 py-0.5 rounded-full bg-sky-900/40 text-sky-300 border border-sky-800/50">Swept venues &middot; urgent</span>{% endif %}
+        {% if s.gamma_flag %}<span class="px-2 py-0.5 rounded-full bg-purple-900/40 text-purple-300 border border-purple-800/50">Dealer short gamma &middot; squeeze-prone</span>{% endif %}
+        {% if s.sector_confirmation %}<span class="px-2 py-0.5 rounded-full bg-gray-800 text-gray-300">Peers aligned</span>{% endif %}
+        {% if s.dark_pool_confirmation %}<span class="px-2 py-0.5 rounded-full bg-gray-800 text-gray-300">Dark-pool print</span>{% endif %}
+        {% if cs is not none and cs < 0.3 %}<span class="px-2 py-0.5 rounded-full bg-gray-800 text-gray-500">below action threshold</span>{% endif %}
+      </div>
+
+      <!-- Expandable signal breakdown (clean by default) -->
+      <details class="mt-3 group">
+        <summary class="text-xs text-gray-400 cursor-pointer select-none hover:text-gray-200">▸ Why it scored this — axis breakdown</summary>
+        <div class="mt-2 grid gap-x-5 gap-y-1.5 sm:grid-cols-2">
+          {% for key, title, what in axes %}
+            {% set v = s|attr(key) %}
+            <div class="flex items-center justify-between border-b border-gray-800/60 pb-1">
+              <span class="text-xs text-gray-400 tip" title="{{ what }}">{{ title }}</span>
+              <span class="text-xs">{{ axis_word(v) }}</span>
+            </div>
+          {% endfor %}
+        </div>
+      </details>
+
+      <!-- Action -->
+      <div class="mt-4 flex items-center justify-between">
+        <a href="/journal/new?run={{ run }}&amp;event={{ s.event_id }}"
+           class="inline-flex items-center gap-1 rounded-lg px-4 py-2 text-sm font-semibold text-white"
+           style="background:{{ dir_color }};">
+          Log this trade →
+        </a>
+        <span class="text-xs text-gray-500">{{ label_meaning(s.label.value) }}</span>
+      </div>
     </div>
   </article>
 {% endfor %}
