@@ -2,14 +2,15 @@
 
 The UW realtime websocket surface (``UnusualWhalesLiveSource``) targets an
 endpoint that is not validated against the live API. This source instead polls
-the proven REST endpoint ``GET /api/stock/{ticker}/flow-recent`` on a fixed
-interval and emits new prints as a ``RawFlowSource`` stream. A few seconds of
-latency is irrelevant for a discretionary screener, and REST is the path the
-integration smoke test exercises end-to-end.
+the curated REST endpoint ``GET /api/stock/{ticker}/flow-alerts`` on a fixed
+interval and emits new alerts as a ``RawFlowSource`` stream. A few seconds of
+latency is irrelevant for a discretionary screener.
 
-The flow-recent records carry the flow print *plus* greeks, IV, OI, the
-underlying price and UW's classification ``tags`` — so each ``RawPrint`` is
-richer than the websocket shape (real spot, IV and OI ride along).
+flow-alerts is UW's *unusual*-flow feed (each record already matched an
+``alert_rule``), so it is far higher-signal than the raw last-50 tape: it is
+100-deep per ticker, aggregates a cluster of trades, and carries the
+underlying price, IV, OI, side-premium split (aggressor) and a sweep flag —
+so each ``RawPrint`` rides with real spot, IV and OI.
 """
 
 from __future__ import annotations
@@ -34,16 +35,6 @@ if TYPE_CHECKING:
 
 _logger = logging.getLogger(__name__)
 
-# UW's ``tags`` carry the aggressor side; map to the canonical FillSide.
-_TAG_TO_FILL_SIDE: dict[str, FillSide] = {
-    "ask_side": "at_ask",
-    "above_ask": "above_ask",
-    "bid_side": "at_bid",
-    "below_bid": "below_bid",
-    "mid": "midpoint",
-    "no_side": "unknown",
-}
-
 # Cap the dedupe set so a long-running process never grows unbounded.
 _SEEN_CAP = 50_000
 
@@ -57,11 +48,15 @@ def _decimal_or_none(raw: object) -> Decimal | None:
         return None
 
 
-def _fill_side_from_tags(tags: Iterable[object]) -> FillSide:
-    lowered = {str(t).lower() for t in tags}
-    for tag, side in _TAG_TO_FILL_SIDE.items():
-        if tag in lowered:
-            return side
+def _fill_side_from_prems(ask_prem: object, bid_prem: object) -> FillSide:
+    # flow-alerts splits premium by aggressor side; the dominant side is the
+    # aggressor. Ask-side dominant = buyers lifting the offer (urgent/long).
+    ask = _decimal_or_none(ask_prem) or Decimal(0)
+    bid = _decimal_or_none(bid_prem) or Decimal(0)
+    if ask > bid:
+        return "at_ask"
+    if bid > ask:
+        return "at_bid"
     return "unknown"
 
 
@@ -115,10 +110,10 @@ class UnusualWhalesFlowPollSource:
     async def _fetch(self, ticker: str) -> list[dict[str, object]]:
         try:
             resp = await self._client.request_json(
-                f"/api/stock/{ticker}/flow-recent",
+                f"/api/stock/{ticker}/flow-alerts",
             )
         except Exception as exc:
-            _logger.warning("UW flow-recent fetch failed for %s: %s", ticker, exc)
+            _logger.warning("UW flow-alerts fetch failed for %s: %s", ticker, exc)
             return []
         data = resp.get("data") if isinstance(resp, dict) else resp
         return data if isinstance(data, list) else []
@@ -129,22 +124,22 @@ class UnusualWhalesFlowPollSource:
         record: dict[str, object],
         cutoff: datetime | None,
     ) -> RawPrint | None:
-        raw_id = record.get("id") or record.get("flow_alert_id")
-        if raw_id is None:
-            return None
-        event_id = f"uw-{raw_id}"
+        # flow-alerts has no stable id; key on the option chain + alert time.
+        chain = str(record.get("option_chain", ""))
+        created = str(record.get("created_at", ""))
+        event_id = f"uw-{ticker}-{chain}-{created}"
         if event_id in self._seen:
             return None
 
         try:
-            timestamp = _parse_iso_utc(str(record["executed_at"]))
-            option_type = _coerce_option_type(str(record["option_type"]).lower())
+            timestamp = _parse_iso_utc(created)
+            option_type = _coerce_option_type(str(record["type"]).lower())
             strike = Decimal(str(record["strike"]))
             expiry = _parse_expiry(record["expiry"])
-            premium = Decimal(str(record["premium"]))
+            premium = Decimal(str(record["total_premium"]))
             option_price = Decimal(str(record["price"]))
         except (KeyError, ValueError, TypeError, ArithmeticError) as exc:
-            _logger.warning("Dropping malformed UW flow record: %s", exc)
+            _logger.warning("Dropping malformed UW alert: %s", exc)
             return None
 
         # Mark seen only once it parses, so a transient bad record can recover.
@@ -159,18 +154,30 @@ class UnusualWhalesFlowPollSource:
         if dte < 0:
             return None
 
-        bid = _decimal_or_none(record.get("nbbo_bid")) or Decimal(0)
-        ask = _decimal_or_none(record.get("nbbo_ask")) or Decimal(0)
+        # flow-alerts omits NBBO; fall back to the alert's print price.
+        bid = _decimal_or_none(record.get("bid")) or option_price
+        ask = _decimal_or_none(record.get("ask")) or option_price
         spot = _decimal_or_none(record.get("underlying_price")) or Decimal(0)
 
-        iv_raw = _decimal_or_none(record.get("implied_volatility"))
+        iv_raw = _decimal_or_none(record.get("iv_end"))
         implied_volatility = float(iv_raw) if iv_raw is not None and iv_raw >= 0 else None
         oi_raw = record.get("open_interest")
         open_interest = int(oi_raw) if isinstance(oi_raw, (int, float)) else None
 
-        raw_tags = record.get("tags")
-        tags = tuple(str(t) for t in raw_tags) if isinstance(raw_tags, list) else ()
-        fill_side = _fill_side_from_tags(tags)
+        fill_side = _fill_side_from_prems(
+            record.get("total_ask_side_prem"), record.get("total_bid_side_prem"),
+        )
+        has_sweep = bool(record.get("has_sweep", False))
+
+        tags: list[str] = []
+        rule = record.get("alert_rule")
+        if isinstance(rule, str) and rule:
+            tags.append(f"uw:{rule}")
+        if has_sweep:
+            tags.append("uw:sweep")
+        sector = record.get("sector")
+        if isinstance(sector, str) and sector:
+            tags.append(f"sector:{sector}")
 
         return RawPrint(
             source_id=self.source_id,
@@ -187,9 +194,9 @@ class UnusualWhalesFlowPollSource:
             bid=bid,
             ask=ask,
             fill_side=fill_side,
-            exchange=str(record.get("exchange", "UNKNOWN")),
+            exchange="UNKNOWN",
             implied_volatility=implied_volatility,
             open_interest=open_interest,
-            is_iso=False,
-            source_tags=tags,
+            is_iso=has_sweep,
+            source_tags=tuple(tags),
         )

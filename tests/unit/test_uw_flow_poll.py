@@ -1,4 +1,7 @@
-"""Unit tests for UnusualWhalesFlowPollSource (Phase 4 live REST poller)."""
+"""Unit tests for UnusualWhalesFlowPollSource (Phase 4 live REST poller).
+
+Drives the curated ``/api/stock/{ticker}/flow-alerts`` shape.
+"""
 
 from __future__ import annotations
 
@@ -12,22 +15,33 @@ from uoa_detector.sources.unusual_whales.flow_poll import UnusualWhalesFlowPollS
 _NOW = datetime(2026, 6, 18, 19, 0, tzinfo=UTC)
 
 
-def _record(rid: str, *, executed_at: str, premium: str = "50000") -> dict[str, object]:
+def _alert(
+    chain: str,
+    *,
+    created_at: str,
+    premium: str = "50000",
+    ask_prem: str = "40000",
+    bid_prem: str = "10000",
+    has_sweep: bool = False,
+) -> dict[str, object]:
     return {
-        "id": rid,
-        "executed_at": executed_at,
-        "option_type": "call",
+        "option_chain": chain,
+        "type": "call",
         "strike": "250",
         "expiry": "2026-07-17",
-        "premium": premium,
+        "total_premium": premium,
         "price": "3.20",
-        "nbbo_bid": "3.10",
-        "nbbo_ask": "3.30",
+        "bid": None,
+        "ask": None,
         "underlying_price": "248.50",
-        "implied_volatility": "0.42",
+        "iv_end": "0.42",
         "open_interest": 1200,
-        "tags": ["ask_side", "bullish"],
-        "exchange": "OPRA",
+        "total_ask_side_prem": ask_prem,
+        "total_bid_side_prem": bid_prem,
+        "has_sweep": has_sweep,
+        "alert_rule": "RepeatedHits",
+        "sector": "Consumer Cyclical",
+        "created_at": created_at,
     }
 
 
@@ -56,96 +70,89 @@ async def _collect(source: UnusualWhalesFlowPollSource) -> list[object]:
     return [p async for p in source.stream()]
 
 
-async def test_maps_record_to_raw_print() -> None:
-    client = _FakeClient([_record("A", executed_at="2026-06-18T18:55:00Z")])
-    source = UnusualWhalesFlowPollSource(
-        client, ["TSLA"], min_premium=Decimal(25000),
-        backfill=timedelta(minutes=10), now=lambda: _NOW,
+def _source(data: list[dict[str, object]], **kw: object) -> UnusualWhalesFlowPollSource:
+    passes = int(kw.pop("_passes", 1))  # type: ignore[arg-type]
+    src = UnusualWhalesFlowPollSource(
+        _FakeClient(data), ["TSLA"],
+        backfill=timedelta(minutes=10), now=lambda: _NOW, **kw,  # type: ignore[arg-type]
     )
-    source._sleep = _stop_after(1, source)  # type: ignore[assignment]
-    prints = await _collect(source)
+    src._sleep = _stop_after(passes, src)  # type: ignore[assignment]
+    return src
+
+
+async def test_maps_alert_to_raw_print() -> None:
+    src = _source([_alert("TSLA260717C00250000", created_at="2026-06-18T18:55:00Z")],
+                  min_premium=Decimal(25000))
+    prints = await _collect(src)
     assert len(prints) == 1
     p = prints[0]
     assert p.ticker == "TSLA"
     assert p.strike == Decimal("250")
     assert p.premium_paid == Decimal("50000")
     assert p.spot_price == Decimal("248.50")
-    assert p.fill_side == "at_ask"
+    assert p.fill_side == "at_ask"  # ask-side premium dominant
     assert p.open_interest == 1200
-    assert p.source_event_id == "uw-A"
+    assert p.source_event_id == "uw-TSLA-TSLA260717C00250000-2026-06-18T18:55:00Z"
+    assert "uw:RepeatedHits" in p.source_tags
 
 
-async def test_backfill_window_filters_old_prints() -> None:
-    client = _FakeClient([
-        _record("recent", executed_at="2026-06-18T18:55:00Z"),
-        _record("old", executed_at="2026-06-18T18:30:00Z"),  # before cutoff
-    ])
-    source = UnusualWhalesFlowPollSource(
-        client, ["TSLA"], min_premium=Decimal(0),
-        backfill=timedelta(minutes=10), now=lambda: _NOW,
-    )
-    source._sleep = _stop_after(1, source)  # type: ignore[assignment]
-    prints = await _collect(source)
-    assert [p.source_event_id for p in prints] == ["uw-recent"]
+async def test_backfill_window_filters_old_alerts() -> None:
+    src = _source([
+        _alert("CH-recent", created_at="2026-06-18T18:55:00Z"),
+        _alert("CH-old", created_at="2026-06-18T18:30:00Z"),  # before cutoff
+    ], min_premium=Decimal(0))
+    prints = await _collect(src)
+    assert [p.source_event_id.split("-")[2] for p in prints] == ["CH"]
 
 
 async def test_min_premium_filter() -> None:
-    client = _FakeClient([
-        _record("big", executed_at="2026-06-18T18:55:00Z", premium="80000"),
-        _record("small", executed_at="2026-06-18T18:55:00Z", premium="900"),
-    ])
-    source = UnusualWhalesFlowPollSource(
-        client, ["TSLA"], min_premium=Decimal(25000),
-        backfill=timedelta(minutes=10), now=lambda: _NOW,
-    )
-    source._sleep = _stop_after(1, source)  # type: ignore[assignment]
-    prints = await _collect(source)
-    assert [p.source_event_id for p in prints] == ["uw-big"]
+    src = _source([
+        _alert("CH-big", created_at="2026-06-18T18:55:00Z", premium="80000"),
+        _alert("CH-small", created_at="2026-06-18T18:55:00Z", premium="900"),
+    ], min_premium=Decimal(25000))
+    prints = await _collect(src)
+    assert [p.premium_paid for p in prints] == [Decimal("80000")]
+
+
+async def test_sweep_flag_maps_to_is_iso() -> None:
+    src = _source([_alert("CH", created_at="2026-06-18T18:55:00Z", has_sweep=True)],
+                  min_premium=Decimal(0))
+    prints = await _collect(src)
+    assert prints[0].is_iso is True
+    assert "uw:sweep" in prints[0].source_tags
 
 
 async def test_dedupes_across_polls() -> None:
-    client = _FakeClient([_record("A", executed_at="2026-06-18T18:55:00Z")])
-    source = UnusualWhalesFlowPollSource(
-        client, ["TSLA"], min_premium=Decimal(0),
-        backfill=timedelta(minutes=10), now=lambda: _NOW,
-    )
-    source._sleep = _stop_after(3, source)  # type: ignore[assignment]
-    prints = await _collect(source)
-    # Same record returned on every poll, emitted exactly once.
+    src = _source([_alert("CH", created_at="2026-06-18T18:55:00Z")],
+                  min_premium=Decimal(0), _passes=3)
+    prints = await _collect(src)
     assert len(prints) == 1
-    assert client.calls >= 2
+    assert src._client.calls >= 2  # type: ignore[attr-defined]
 
 
-async def test_malformed_record_dropped_not_fatal() -> None:
-    client = _FakeClient([
-        {"id": "bad"},  # missing required fields
-        _record("good", executed_at="2026-06-18T18:55:00Z"),
-    ])
-    source = UnusualWhalesFlowPollSource(
-        client, ["TSLA"], min_premium=Decimal(0),
-        backfill=timedelta(minutes=10), now=lambda: _NOW,
-    )
-    source._sleep = _stop_after(1, source)  # type: ignore[assignment]
-    prints = await _collect(source)
-    assert [p.source_event_id for p in prints] == ["uw-good"]
+async def test_malformed_alert_dropped_not_fatal() -> None:
+    src = _source([
+        {"option_chain": "bad", "created_at": "2026-06-18T18:55:00Z"},  # missing fields
+        _alert("CH-good", created_at="2026-06-18T18:55:00Z"),
+    ], min_premium=Decimal(0))
+    prints = await _collect(src)
+    assert [p.source_event_id.split("-")[2] for p in prints] == ["CH"]
 
 
 @pytest.mark.parametrize(
-    ("tags", "expected"),
+    ("ask_prem", "bid_prem", "expected"),
     [
-        (["ask_side"], "at_ask"),
-        (["bid_side"], "at_bid"),
-        (["bullish"], "unknown"),
+        ("90000", "10000", "at_ask"),
+        ("10000", "90000", "at_bid"),
+        ("50000", "50000", "unknown"),
     ],
 )
-async def test_fill_side_from_tags(tags: list[str], expected: str) -> None:
-    rec = _record("t", executed_at="2026-06-18T18:55:00Z")
-    rec["tags"] = tags
-    client = _FakeClient([rec])
-    source = UnusualWhalesFlowPollSource(
-        client, ["TSLA"], min_premium=Decimal(0),
-        backfill=timedelta(minutes=10), now=lambda: _NOW,
+async def test_fill_side_from_side_premium(
+    ask_prem: str, bid_prem: str, expected: str,
+) -> None:
+    src = _source(
+        [_alert("CH", created_at="2026-06-18T18:55:00Z", ask_prem=ask_prem, bid_prem=bid_prem)],
+        min_premium=Decimal(0),
     )
-    source._sleep = _stop_after(1, source)  # type: ignore[assignment]
-    prints = await _collect(source)
+    prints = await _collect(src)
     assert prints[0].fill_side == expected
