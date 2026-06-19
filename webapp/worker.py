@@ -19,12 +19,12 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
 
+from uoa_detector.backtest.cell_runner import fusion_stages_with_uw
 from uoa_detector.backtest.sqlite_store import SqliteBacktestStore
 from uoa_detector.calibration import load_profile
 from uoa_detector.config.credentials import Credentials
 from uoa_detector.pipeline.orchestrator import Pipeline
 from uoa_detector.pipeline.stage import PipelineContext
-from uoa_detector.pipeline.stages import default_stage_pipeline
 from uoa_detector.sources.unusual_whales.client import UnusualWhalesClient
 from uoa_detector.sources.unusual_whales.flow_poll import UnusualWhalesFlowPollSource
 
@@ -108,9 +108,16 @@ async def run_live_worker(
                 client, tickers,
                 poll_interval_s=poll_interval_s, min_premium=min_premium,
             )
+            # Full 8-axis enrichment wired to live UW (gamma, IV, OI, catalyst,
+            # price, sector, dark pool). Providers are cached per-ticker, so the
+            # per-print API load stays bounded. They degrade to neutral on
+            # timeout/error (D7), so a slow axis never stalls the stream.
+            stages = fusion_stages_with_uw(
+                client, profile.data_sources.unusual_whales,
+            )
             pipeline = Pipeline(
                 [source],
-                list(default_stage_pipeline()),
+                stages,
                 profile=profile,
                 store=store,
                 context=PipelineContext(profile=profile),
