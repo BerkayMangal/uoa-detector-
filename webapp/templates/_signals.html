@@ -93,7 +93,7 @@
             {{ '⚡ Short gamma — amplifies moves' if gx.regime == 'short' else 'Long gamma — suppresses moves' }}
           </span>
           {% if gx.flip %}<span class="text-gray-400">flip <span class="text-gray-100 font-semibold">${{ '%.0f'|format(gx.flip) }}</span>
-            <span class="text-gray-600">(spot {{ 'above &middot; calmer' if gx.spot > gx.flip else 'below &middot; jumpier' }})</span></span>{% endif %}
+            <span class="text-gray-600">(spot {{ 'above flip · calmer' if gx.spot > gx.flip else 'below flip · jumpier' }})</span></span>{% endif %}
           {% if gx.call_wall %}<span class="text-gray-400">call wall <span class="text-emerald-300 font-semibold">${{ '%.0f'|format(gx.call_wall) }}</span></span>{% endif %}
           {% if gx.put_wall %}<span class="text-gray-400">put wall <span class="text-red-300 font-semibold">${{ '%.0f'|format(gx.put_wall) }}</span></span>{% endif %}
           {% if gx.iv_pct is not none %}<span class="text-gray-400">IV rank <span class="text-gray-100 font-semibold">{{ '%.0f%%'|format(gx.iv_pct*100) }}</span></span>{% endif %}
