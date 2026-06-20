@@ -102,6 +102,31 @@
         {% set vc = '#f59e0b' if gx.vol_signal == 'sell' else '#38bdf8' %}
         <div class="mt-1.5 text-xs"><span class="px-2 py-0.5 rounded font-semibold" style="background:{{ vc }}22;color:{{ vc }};border:1px solid {{ vc }}55">{{ gx.vol_label }}</span></div>
         {% endif %}
+
+        <!-- Plain-English explainer, collapsed by default. -->
+        <details class="mt-2">
+          <summary class="text-xs text-sky-400 cursor-pointer select-none hover:text-sky-300">+ What this means &amp; what to do</summary>
+          <div class="mt-2 text-xs text-gray-400 space-y-1.5 leading-relaxed">
+            <p><strong class="text-gray-300">Gamma tells you how it MOVES, not which way.</strong>
+              {% if gx.regime == 'short' %}<span class="text-amber-300">Short gamma</span> = dealers amplify moves → expect bigger, trendier swings (squeeze-prone).
+              {% else %}<span class="text-gray-300">Long gamma</span> = dealers dampen moves → expect calmer, range-bound action, often pinned near the walls.{% endif %}
+              The <strong>flip</strong> is the line between calm and jumpy; the <strong>walls</strong> are price magnets — rough support (put wall) &amp; resistance (call wall).</p>
+            <p><strong class="text-gray-300">IV rank</strong> = how expensive these options are vs this name's own past year. High = rich, low = cheap.</p>
+            {% if gx.vol_signal == 'sell' %}
+            <p><strong class="text-amber-300">This name: sell-vol candidate.</strong> Long gamma + IV rank {{ '%.0f%%'|format(gx.iv_pct*100) }} = options look over-priced for the calm move that's likely. The research edge is to <strong>sell that rich vol — defined-risk only</strong>:</p>
+            <ul class="list-disc ml-4 space-y-0.5">
+              <li>e.g. an <strong>iron condor / credit spread</strong> around the current price → collect the fat premium; win if it stays calm &amp; IV falls.</li>
+              <li>Max loss is <strong>capped</strong> by the spread width. Size tiny.</li>
+              <li>This is <strong>NOT</strong> "buy the call/put above" — different trade, can coexist with any direction.</li>
+              <li>⚠ Tail risk: a surprise gap can blow through your short strikes. Research lead, not a green light — forward-test it in the journal first.</li>
+            </ul>
+            {% elif gx.vol_signal == 'buy' %}
+            <p><strong class="text-sky-300">This name: vol-buying lead (weak).</strong> Short gamma + cheap IV → options may be under-priced for the move that follows. Buying vol (long options / a debit structure) <em>could</em> pay — but this side did <strong>not</strong> survive our robustness tests, so treat it as a watch, not a signal.</p>
+            {% else %}
+            <p>Vol looks fairly priced here — no vol edge flagged. Use the gamma structure as context for your own read of the flow signal above.</p>
+            {% endif %}
+          </div>
+        </details>
       </div>
       {% endif %}
 
