@@ -76,6 +76,7 @@ _EXPLAIN = {
     "label_meaning": explanations.label_meaning,
     "headline": explanations.headline,
     "conviction": explanations.conviction,
+    "offline_axes": explanations.OFFLINE_LIVE_AXES,
 }
 
 _REPO: SignalRepo | None = None

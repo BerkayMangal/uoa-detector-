@@ -2,7 +2,28 @@
 
 from __future__ import annotations
 
-from webapp.explanations import conviction, headline
+from webapp.explanations import (
+    AXES,
+    LABEL_MEANINGS,
+    OFFLINE_LIVE_AXES,
+    conviction,
+    headline,
+)
+
+from uoa_detector.domain.labels import SignalLabel
+
+
+def test_label_meanings_cover_every_real_label() -> None:
+    # Every enum label must have an honest meaning (no fallback for real labels),
+    # and no meaning may reference a label that doesn't exist (drift guard).
+    enum_values = {l.value for l in SignalLabel}
+    assert enum_values <= set(LABEL_MEANINGS), enum_values - set(LABEL_MEANINGS)
+    assert set(LABEL_MEANINGS) <= enum_values, set(LABEL_MEANINGS) - enum_values
+
+
+def test_offline_axes_are_real_axis_keys() -> None:
+    axis_keys = {key for key, _, _ in AXES}
+    assert axis_keys >= OFFLINE_LIVE_AXES
 
 
 def test_conviction_tiers() -> None:

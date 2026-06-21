@@ -136,9 +136,11 @@
         <div class="mt-2 grid gap-x-5 gap-y-1.5 sm:grid-cols-2">
           {% for key, title, what in axes %}
             {% set v = s|attr(key) %}
+            {% set offline = v is none and key in offline_axes %}
             <div class="flex items-center justify-between border-b border-gray-800/60 pb-1">
               <span class="text-xs text-gray-400 tip" title="{{ what }}">{{ title }}</span>
-              <span class="text-xs">{{ axis_word(v) }}</span>
+              {% if offline %}<span class="text-xs text-gray-600 tip" title="No data feed in our live tier — not measured here.">n/a · live tier</span>
+              {% else %}<span class="text-xs">{{ axis_word(v) }}</span>{% endif %}
             </div>
           {% endfor %}
         </div>

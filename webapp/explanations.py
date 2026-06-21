@@ -7,38 +7,47 @@ the wording is consistent and easy to edit.
 
 from __future__ import annotations
 
+# Axes that have NO live data source in our current tier — they are only
+# populated for the sample backtest (computed from the ThetaData chain we own).
+# Live, they read '—' and do NOT contribute real signal to the combined score.
+OFFLINE_LIVE_AXES: frozenset[str] = frozenset(
+    {"convexity_score", "gamma_score", "relative_premium_score"},
+)
+
 # One entry per StoredSignal sub-score, in display order. (key, title, what)
 AXES: list[tuple[str, str, str]] = [
     ("uoa_score", "Unusual Options Activity",
-     "How abnormal this options flow is versus the ticker's own norm. "
-     "High = someone is doing something out of the ordinary here."),
+     "How aggressive this specific options print is — a sweep, a block, or "
+     "lifting the offer (paying up). NOT a vs-history comparison; that is the "
+     "separate Relative Premium axis."),
     ("convexity_score", "Convexity",
-     "Whether this looks like a cheap, asymmetric, high-payoff bet "
-     "(small risk, large potential) — the kind of position informed "
-     "traders use to express conviction. This is the detector's prize axis."),
+     "Whether this looks like a cheap, asymmetric, high-payoff bet (small "
+     "risk, large potential). The detector's prize axis — but it is computed "
+     "from the option chain and is NOT in our live data tier, so it reads '—' "
+     "on live cards (populated only for the sample backtest)."),
     ("gamma_score", "Dealer Gamma (GEX)",
-     "Are options market-makers positioned 'short gamma' near a flip point? "
-     "If so, their hedging can amplify a move — a squeeze-prone setup. "
-     "Computed from the whole option chain's open interest."),
+     "Whether market-makers are 'short gamma' near a flip — squeeze-prone. "
+     "Needs the dealer-gamma feed, which is NOT in our live tier, so it reads "
+     "'—' live. Use the Gamma & vol board for the chain-derived map instead."),
     ("price_confirmation_score", "Price Confirmation",
-     "Did the underlying's spot move in the SAME direction as the bet "
-     "around the time of the print? Confirmation strengthens the signal; "
-     "a contradiction weakens it."),
+     "Did the underlying's spot move the SAME way as the bet around the print? "
+     "Confirmation strengthens it. Live; defaults to neutral (0.5) when the "
+     "move is flat or data is thin."),
     ("sector_confirmation_score", "Sector / Peer Flow",
-     "Is similar flow showing up in the ticker's sector peers? Aligned "
-     "peer flow suggests a theme, not a one-off."),
+     "Is similar flow showing up in the ticker's sector peers? Aligned peer "
+     "flow suggests a theme. Live; neutral (0.5) when peers are quiet."),
     ("cluster_density_score", "Cluster / Sequence",
-     "Is this print part of a cluster of related trades (a building "
-     "sequence), or an isolated one-off? Clusters score higher."),
+     "Is this print part of a cluster of related trades (a building sequence) "
+     "or an isolated one-off? Clusters score higher. Live."),
     ("relative_premium_score", "Relative Premium",
-     "How large is the dollars-at-risk versus this ticker's typical trade? "
-     "A print many times the median is what 'unusual size' means."),
+     "Dollars-at-risk vs this ticker's typical trade size. Needs per-ticker "
+     "median sizes, which are NOT wired live, so it reads '—' on live cards."),
     ("event_score", "Event Calendar",
-     "Proximity to a scheduled catalyst (earnings). Flow right before a "
-     "known event reads differently than flow in a quiet window."),
+     "Proximity to a scheduled catalyst (earnings/FDA). Live; defaults to "
+     "neutral (0.3) when no catalyst is near — the common case."),
     ("time_of_day_weight", "Time of Day",
-     "When in the session it fired. Prime-session prints are weighted "
-     "higher than open-auction or after-hours noise."),
+     "When in the session it fired. Prime-session prints weigh higher than "
+     "open-auction or after-hours. Fully live — the one always-varying axis."),
 ]
 
 # Tooltip glossary: term -> definition.
@@ -64,21 +73,29 @@ GLOSSARY: dict[str, str] = {
                  "aggressive buying; at/below bid = aggressive selling.",
 }
 
-# SignalLabel value -> one-line meaning. Unknown labels fall back to the raw value.
+# SignalLabel value -> one-line meaning (all 18 enum values). Unknown labels
+# fall back to the prettified raw value via label_meaning().
 LABEL_MEANINGS: dict[str, str] = {
-    "HIGH_CONVICTION_SEQUENCE": "Top of the stack — strong, corroborated, "
-                                "part of a building sequence.",
-    "HIGH_CONVICTION_INITIAL": "Strong first print of a potential sequence.",
+    "HIGH_CONVICTION_SEQUENCE": "Top of the stack — strong, corroborated, part "
+                                "of a building sequence.",
     "CONVEXITY_CLUSTER": "A cluster of convex, asymmetric bets — the prize "
                          "pattern.",
     "CONVEXITY_BURST": "A sudden burst of convex positioning.",
+    "CONVEXITY_WATCH": "Convex-looking, but not yet corroborated — worth watching.",
     "SWEEP_UOA": "Aggressive sweep with unusual size.",
     "STANDARD_UOA": "Unusual activity, but without strong corroboration.",
     "PRE_CATALYST_FLOW": "Flow positioned ahead of a scheduled catalyst.",
+    "SECTOR_FLOW_CLUSTER": "Part of a cluster of aligned flow across sector peers.",
+    "CONFIRMED_OPENING_FLOW": "A new opening position, confirmed by OI change.",
+    "OPENING_UNCONFIRMED": "Looks like an opening position, pending OI confirmation.",
+    "OPTIONS_EQUITY_TAPE_CONFIRMATION": "Options flow confirmed by the equity tape.",
+    "GAMMA_ACCELERATION_RISK": "Dealer-gamma setup that could accelerate a move.",
     "LEAP_POSITIONING": "Long-dated positioning (not the short-dated thesis).",
     "PENALIZED_BELOW_THRESHOLD": "Scored, but below the profile's bar — logged, "
                                  "not actioned.",
-    "DISCARD_OR_LOG": "Below the noise floor.",
+    "LIKELY_CLOSING_OR_NOISE": "Probably a closing trade or noise, not new conviction.",
+    "POST_EVENT_NOISE": "Flow after the catalyst already passed — usually noise.",
+    "IGNORE_NOISE": "Below the noise floor — ignore.",
     "REJECTED": "Rejected by a hard rule.",
 }
 

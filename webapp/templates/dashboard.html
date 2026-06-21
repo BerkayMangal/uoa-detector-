@@ -15,6 +15,19 @@
   <span>hit <strong class="text-white">Log this trade</strong> to track it</span>
 </div>
 
+<!-- Honest live-scoring caveat: on a live run, three axes have no data feed in
+     our tier, so the combined score is partial. Never let the trader over-trust
+     the headline conviction number. -->
+{% if current and current.is_live %}
+<div class="rounded-lg border border-amber-800/40 bg-amber-900/15 px-4 py-2.5 mb-5 text-sm text-amber-200/90">
+  <strong class="text-amber-200">Live scoring is partial.</strong>
+  Convexity, Dealer-Gamma and Relative-Premium aren't in our live data tier — they read &lsquo;—&rsquo; here, so the
+  combined score is built only from flow, price-confirmation, sector, event and time-of-day. Treat the conviction number
+  as a <em>partial</em> read, not full confluence. The one research-validated edge is the vol-premium read on the
+  <a href="/gamma" class="underline hover:text-amber-100">Gamma &amp; vol</a> tab.
+</div>
+{% endif %}
+
 <!-- Plain GET form -> "/". A normal browser submit (no JS needed), so the
      filters and sort always work. Changing any control auto-submits; the
      Apply button is the fallback. -->
