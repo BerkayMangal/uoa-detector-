@@ -8,6 +8,7 @@ top-level columns for filtering + ``full_record_json`` holding the full
 
 from __future__ import annotations
 
+import logging
 import os
 from dataclasses import dataclass
 from datetime import datetime
@@ -22,6 +23,7 @@ from uoa_detector.backtest.store import StoredSignal
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
+_logger = logging.getLogger(__name__)
 _DEFAULT_URL = "sqlite:///webapp/seed.db"
 
 
@@ -102,7 +104,14 @@ class SignalRepo:
         stmt = stmt.limit(filters.limit)
         with self._session() as session:
             rows: Sequence[SignalRow] = session.execute(stmt).scalars().all()
-            return [StoredSignal.model_validate_json(r.full_record_json) for r in rows]
+            out: list[StoredSignal] = []
+            for r in rows:
+                # One schema-drifted / malformed row must not blank the page.
+                try:
+                    out.append(StoredSignal.model_validate_json(r.full_record_json))
+                except Exception:
+                    _logger.warning("skipping unparseable signal %s/%s", r.run_id, r.event_id)
+            return out
 
     def get_signal(self, run_id: str, event_id: str) -> StoredSignal | None:
         stmt = select(SignalRow).where(
@@ -110,7 +119,13 @@ class SignalRepo:
         )
         with self._session() as session:
             row = session.execute(stmt).scalar_one_or_none()
-            return StoredSignal.model_validate_json(row.full_record_json) if row else None
+            if row is None:
+                return None
+            try:
+                return StoredSignal.model_validate_json(row.full_record_json)
+            except Exception:
+                _logger.warning("unparseable signal %s/%s", run_id, event_id)
+                return None
 
     def tickers(self, run_id: str | None = None) -> list[str]:
         stmt = select(SignalRow.ticker).distinct()

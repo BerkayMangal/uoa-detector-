@@ -27,10 +27,12 @@ def latest_close(ticker: str) -> float | None:
     if not key:
         return None
     try:
+        # 3s cap: this runs on the request thread (journal POST); a slow/blocked
+        # UW must not hang the submit or starve the threadpool.
         resp = httpx.get(
             f"{_BASE}/api/stock/{ticker.upper()}/ohlc/1d",
             headers={"Authorization": f"Bearer {key}"},
-            timeout=8.0,
+            timeout=3.0,
         )
         resp.raise_for_status()
         data = resp.json().get("data", [])
@@ -42,5 +44,10 @@ def latest_close(ticker: str) -> float | None:
 
 
 def snapshot(ticker: str) -> tuple[float | None, float | None]:
-    """Return ``(underlying_close, spy_close)`` — either may be None."""
+    """Return ``(underlying_close, spy_close)`` — either may be None.
+
+    Best-effort: a missing key or slow feed yields (None, None) within ~3s each,
+    so a journal entry always saves (option P&L is manual); only the
+    market-neutral metric is left uncomputed.
+    """
     return latest_close(ticker), latest_close(_BENCHMARK)

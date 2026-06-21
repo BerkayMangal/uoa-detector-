@@ -13,6 +13,7 @@ time-of-day, sweep/size). Wiring live UW enrichment providers is the next step.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 import os
 from datetime import UTC, datetime
@@ -99,41 +100,48 @@ async def run_live_worker(
 
     try:
         while True:
-            _ensure_run()
-            client = UnusualWhalesClient(
-                api_key=Credentials().unusual_whales_api_key,
-                settings=profile.data_sources.unusual_whales,
-            )
-            source = UnusualWhalesFlowPollSource(
-                client, tickers,
-                poll_interval_s=poll_interval_s, min_premium=min_premium,
-            )
-            # Full 8-axis enrichment wired to live UW (gamma, IV, OI, catalyst,
-            # price, sector, dark pool). Providers are cached per-ticker, so the
-            # per-print API load stays bounded. They degrade to neutral on
-            # timeout/error (D7), so a slow axis never stalls the stream.
-            stages = fusion_stages_with_uw(
-                client, profile.data_sources.unusual_whales,
-            )
-            pipeline = Pipeline(
-                [source],
-                stages,
-                profile=profile,
-                store=store,
-                context=PipelineContext(profile=profile),
-            )
+            client = None
+            source = None
+            # Whole loop body in the restart try: a transient DB/UW blip during
+            # setup (run adoption, client, stage wiring) must back off + retry,
+            # not kill live ingestion permanently (it would freeze silently
+            # while the LIVE badge keeps pulsing).
             try:
+                _ensure_run()
+                client = UnusualWhalesClient(
+                    api_key=Credentials().unusual_whales_api_key,
+                    settings=profile.data_sources.unusual_whales,
+                )
+                source = UnusualWhalesFlowPollSource(
+                    client, tickers,
+                    poll_interval_s=poll_interval_s, min_premium=min_premium,
+                )
+                # Full 8-axis enrichment wired to live UW. Providers are cached
+                # per-ticker and degrade to neutral on timeout/error (D7), so a
+                # slow or 401-gated axis never stalls the stream.
+                stages = fusion_stages_with_uw(
+                    client, profile.data_sources.unusual_whales,
+                )
+                pipeline = Pipeline(
+                    [source], stages, profile=profile, store=store,
+                    context=PipelineContext(profile=profile),
+                )
                 await pipeline.run()
             except asyncio.CancelledError:
                 raise
             except Exception:
-                _logger.exception("live pipeline crashed; restarting in %ss", _RESTART_BACKOFF_S)
-                await source.close()
-                await client.aclose()
+                _logger.exception("live worker error; restarting in %ss", _RESTART_BACKOFF_S)
+                if source is not None:
+                    with contextlib.suppress(Exception):
+                        await source.close()
+                if client is not None:
+                    with contextlib.suppress(Exception):
+                        await client.aclose()
                 await asyncio.sleep(_RESTART_BACKOFF_S)
                 continue
     except asyncio.CancelledError:
         _logger.info("live worker cancelled; shutting down")
         raise
     finally:
-        store.close()
+        with contextlib.suppress(Exception):
+            store.close()
