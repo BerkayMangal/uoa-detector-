@@ -95,10 +95,14 @@
 
   <span class="text-xs text-gray-500 ml-auto self-center text-right">
     {% if current and current.is_live %}
-      <span class="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-      <span class="text-emerald-400 font-semibold">LIVE</span> &middot;
-      {% if current.latest_ts %}last print {{ current.latest_ts.strftime('%H:%M:%S UTC') }} &middot;{% endif %}
-      auto-refresh 30s &middot;
+      {% if fresh %}
+        <span class="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+        <span class="text-emerald-400 font-semibold">LIVE</span> &middot; auto-refresh 30s &middot;
+      {% else %}
+        <span class="inline-block w-2 h-2 rounded-full bg-amber-500"></span>
+        <span class="text-amber-400 font-semibold" title="No new prints recently — the feed may be paused (after hours) or down.">STALE</span> &middot;
+      {% endif %}
+      {% if current.latest_ts %}last print {{ current.latest_ts.strftime('%H:%M UTC') }}{% if age_min is not none %} ({{ age_min|int }}m ago){% endif %} &middot;{% endif %}
     {% endif %}
     Showing <strong class="text-gray-300">{{ shown }}</strong> of {{ total }}
     {% if shown == 150 %}<span class="text-gray-600">(capped at 150 &mdash; narrow the filter)</span>{% endif %}

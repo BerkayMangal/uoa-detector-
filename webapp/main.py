@@ -140,6 +140,15 @@ def dashboard(
     run_ids = {r.run_id for r in runs}  # type: ignore[attr-defined]
     active = run if run in run_ids else (runs[0].run_id if runs else None)  # type: ignore[index]
     current = next((r for r in runs if r.run_id == active), None)  # type: ignore[attr-defined]
+    # Freshness: show a pulsing LIVE only if the newest print is recent; a
+    # frozen feed (e.g. UW down) must read STALE, not a misleading LIVE.
+    fresh, age_min = False, None
+    if current is not None and current.latest_ts is not None:  # type: ignore[attr-defined]
+        ts = current.latest_ts  # type: ignore[attr-defined]
+        if ts.tzinfo is None:
+            ts = ts.replace(tzinfo=UTC)  # Postgres stores naive UTC
+        age_min = (datetime.now(UTC) - ts).total_seconds() / 60.0
+        fresh = age_min < 15
     flt = _filters(ticker, label, min_score, sort, active)
     matched = _safe(lambda: repo.signals(flt), [])
     return templates.TemplateResponse(
@@ -152,6 +161,7 @@ def dashboard(
             "total": _safe(lambda: repo.count(active), 0),
             "shown": len(matched),  # type: ignore[arg-type]
             "runs": runs, "current": current, "run": active or "",
+            "fresh": fresh, "age_min": age_min,
             "ticker": ticker, "label": label, "min_score": min_score,
             "sort": sort,
             "gamma": _safe(lambda: _gamma().latest(), {}),
