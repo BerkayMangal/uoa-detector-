@@ -16,7 +16,7 @@ from uoa_detector.domain.labels import SignalLabel
 def test_label_meanings_cover_every_real_label() -> None:
     # Every enum label must have an honest meaning (no fallback for real labels),
     # and no meaning may reference a label that doesn't exist (drift guard).
-    enum_values = {l.value for l in SignalLabel}
+    enum_values = {lbl.value for lbl in SignalLabel}
     assert enum_values <= set(LABEL_MEANINGS), enum_values - set(LABEL_MEANINGS)
     assert set(LABEL_MEANINGS) <= enum_values, set(LABEL_MEANINGS) - enum_values
 
