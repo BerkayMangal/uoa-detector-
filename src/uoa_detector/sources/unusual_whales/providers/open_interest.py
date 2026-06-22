@@ -61,6 +61,7 @@ from decimal import Decimal
 from typing import TYPE_CHECKING, Any, Literal
 
 from uoa_detector.providers.open_interest import OpenInterestSnapshot
+from uoa_detector.sources.unusual_whales.client import UnusualWhalesError
 from uoa_detector.sources.unusual_whales.providers._cache import TTLCache
 
 if TYPE_CHECKING:
@@ -140,7 +141,10 @@ class UnusualWhalesOpenInterestProvider:
     ) -> dict[str, Any] | None:
         params = {"date": when.date().isoformat()}
         path = f"/api/option-contract/{symbol}/historic"
-        resp = await self._client.request_json(path, params=params)
+        try:
+            resp = await self._client.request_json(path, params=params)
+        except UnusualWhalesError:
+            return None  # 401/429/breaker/network -> no data, never crash
         return _coerce_first_chain(resp)
 
     async def _fetch_eod(

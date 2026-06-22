@@ -293,7 +293,7 @@ data_sources:
     live_reconnect_initial_backoff_s: 1.0
     live_reconnect_max_backoff_s: 60.0
   unusual_whales:
-    rate_limit_requests_per_second: 2.0    # ~120/min API-Plus tier
+    rate_limit_requests_per_second: 1.5    # 90/min — 25% headroom under the 120/min API-Plus burst limit (margin for jitter + concurrent MCP/manual use on the shared key). Operational rate cap, not a scoring threshold.
     historical_concurrency: 2              # aggregated endpoints, slower
     live_reconnect_max_attempts: 5
     live_reconnect_initial_backoff_s: 1.0

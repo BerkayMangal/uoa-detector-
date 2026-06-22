@@ -71,6 +71,7 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 from uoa_detector.providers.sector_map import PeerFlowEvent
+from uoa_detector.sources.unusual_whales.client import UnusualWhalesError
 from uoa_detector.sources.unusual_whales.providers._cache import TTLCache
 
 if TYPE_CHECKING:
@@ -145,7 +146,10 @@ class UnusualWhalesSectorMapProvider:
 
     async def _fetch_info(self, ticker: str) -> dict[str, Any]:
         path = f"/api/stock/{ticker.upper()}/info"
-        resp = await self._client.request_json(path)
+        try:
+            resp = await self._client.request_json(path)
+        except UnusualWhalesError:
+            return {}  # 401/429/breaker/network -> no data, never crash
         data = resp.get("data", {})
         if isinstance(data, dict):
             return data

@@ -75,6 +75,7 @@ from uoa_detector.providers.dealer_positioning import (
     DealerExposureAggregate,
     DealerPositioning,
 )
+from uoa_detector.sources.unusual_whales.client import UnusualWhalesError
 from uoa_detector.sources.unusual_whales.providers._cache import TTLCache
 
 if TYPE_CHECKING:
@@ -178,7 +179,12 @@ class UnusualWhalesDealerGammaProvider:
 
     async def _fetch(self, ticker: str) -> list[dict[str, Any]]:
         path = f"/api/stock/{ticker.upper()}/greek-exposure/strike"
-        resp = await self._client.request_json(path)
+        try:
+            resp = await self._client.request_json(path)
+        except UnusualWhalesError:
+            # 401/429/breaker/network — degrade to no data (neutral score),
+            # never crash the live pipeline.
+            return []
         data = resp.get("data", [])
         if not isinstance(data, list):
             return []

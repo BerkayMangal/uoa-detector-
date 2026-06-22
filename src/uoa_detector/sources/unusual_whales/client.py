@@ -219,6 +219,13 @@ class UnusualWhalesClient:
                         f"HTTP {response.status_code}"
                     )
                     raise UnusualWhalesTransientError(msg)
+                if response.status_code == 429:
+                    # Rate limit — retryable with backoff (not a hard 4xx).
+                    msg = (
+                        f"UnusualWhales {method} {path} rate-limited "
+                        f"(HTTP 429): {response.text[:120]}"
+                    )
+                    raise UnusualWhalesRateLimitError(msg)
                 if response.status_code >= 400:
                     msg = (
                         f"UnusualWhales {method} {path} returned "
@@ -240,14 +247,20 @@ class UnusualWhalesClient:
                     )
                     raise UnusualWhalesTransientError(msg)
                 return parsed
-            except (httpx.RequestError, UnusualWhalesTransientError) as exc:
+            except (
+                httpx.RequestError,
+                UnusualWhalesTransientError,
+                UnusualWhalesRateLimitError,
+            ) as exc:
                 last_error = exc
                 self._breaker.record_failure()
                 if attempt + 1 < self._retry.max_attempts:
-                    backoff = min(
-                        self._retry.initial_backoff_s * (2 ** attempt),
-                        self._retry.max_backoff_s,
+                    # Rate limits need a longer cool-off than a network blip.
+                    base = (
+                        1.0 if isinstance(exc, UnusualWhalesRateLimitError)
+                        else self._retry.initial_backoff_s
                     )
+                    backoff = min(base * (2 ** attempt), self._retry.max_backoff_s)
                     await asyncio.sleep(backoff)
                 continue
             except UnusualWhalesAuthError:
