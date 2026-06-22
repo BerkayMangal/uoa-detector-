@@ -11,7 +11,7 @@ from __future__ import annotations
 # populated for the sample backtest (computed from the ThetaData chain we own).
 # Live, they read '—' and do NOT contribute real signal to the combined score.
 OFFLINE_LIVE_AXES: frozenset[str] = frozenset(
-    {"convexity_score", "gamma_score", "relative_premium_score"},
+    {"convexity_score", "relative_premium_score"},
 )
 
 # One entry per StoredSignal sub-score, in display order. (key, title, what)
@@ -26,9 +26,9 @@ AXES: list[tuple[str, str, str]] = [
      "from the option chain and is NOT in our live data tier, so it reads '—' "
      "on live cards (populated only for the sample backtest)."),
     ("gamma_score", "Dealer Gamma (GEX)",
-     "Whether market-makers are 'short gamma' near a flip — squeeze-prone. "
-     "Needs the dealer-gamma feed, which is NOT in our live tier, so it reads "
-     "'—' live. Use the Gamma & vol board for the chain-derived map instead."),
+     "Whether market-makers are 'short gamma' near a flip — squeeze-prone, "
+     "computed from the dealer GEX across the chain. Live (from UW). The Gamma "
+     "& vol board shows the full per-name map (regime, flip, walls)."),
     ("price_confirmation_score", "Price Confirmation",
      "Did the underlying's spot move the SAME way as the bet around the print? "
      "Confirmation strengthens it. Live; defaults to neutral (0.5) when the "

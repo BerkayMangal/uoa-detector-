@@ -20,10 +20,10 @@
      the headline conviction number. -->
 {% if current and current.is_live %}
 <div class="rounded-lg border border-amber-800/40 bg-amber-900/15 px-4 py-2.5 mb-5 text-sm text-amber-200/90">
-  <strong class="text-amber-200">Live scoring is partial.</strong>
-  Convexity, Dealer-Gamma and Relative-Premium aren't in our live data tier — they read &lsquo;—&rsquo; here, so the
-  combined score is built only from flow, price-confirmation, sector, event and time-of-day. Treat the conviction number
-  as a <em>partial</em> read, not full confluence. The one research-validated edge is the vol-premium read on the
+  <strong class="text-amber-200">Live scoring note.</strong>
+  Most axes are live (flow, dealer-gamma, IV, price-confirmation, sector, event, time-of-day). Two aren't wired live yet
+  &mdash; <strong>Convexity</strong> and <strong>Relative-Premium</strong> read &lsquo;—&rsquo; &mdash; so treat the combined score as a
+  near-complete, not full, read. The one research-validated edge is the vol-premium read on the
   <a href="/gamma" class="underline hover:text-amber-100">Gamma &amp; vol</a> tab.
 </div>
 {% endif %}

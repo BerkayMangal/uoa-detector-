@@ -21,6 +21,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from webapp import explanations, gamma, journal, pricing
+from webapp.gamma_live import gamma_refresh_loop
 from webapp.repo import SignalFilters, SignalRepo
 from webapp.worker import live_config_from_env, run_live_worker
 
@@ -33,18 +34,24 @@ _BASE = Path(__file__).parent
 
 @contextlib.asynccontextmanager
 async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
-    # Opt-in live worker: only starts when LIVE_TICKERS (+ UW key + DB) is set.
+    # Opt-in live tasks: only start when LIVE_TICKERS (+ UW key + DB) is set.
     # Otherwise the app just serves stored signals (local dev, sample data).
     config = live_config_from_env()
-    task: asyncio.Task[None] | None = None
+    tasks: list[asyncio.Task[None]] = []
     if config is not None:
-        _logger.info("starting live worker for %s", config["tickers"])
-        task = asyncio.create_task(run_live_worker(**config))  # type: ignore[arg-type]
+        _logger.info("starting live worker + gamma refresh for %s", config["tickers"])
+        tasks.append(asyncio.create_task(run_live_worker(**config)))  # type: ignore[arg-type]
+        # Live gamma map straight from UW (no ThetaData Terminal needed).
+        tasks.append(asyncio.create_task(gamma_refresh_loop(
+            tickers=config["tickers"],  # type: ignore[arg-type]
+            database_url=config["database_url"],  # type: ignore[arg-type]
+        )))
     try:
         yield
     finally:
-        if task is not None:
+        for task in tasks:
             task.cancel()
+        for task in tasks:
             with contextlib.suppress(asyncio.CancelledError):
                 await task
 
