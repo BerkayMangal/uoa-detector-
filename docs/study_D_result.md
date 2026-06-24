@@ -1,99 +1,92 @@
-# Study D — Result
+# Study D — Result (fresh-window run, 2024-05-01 → 2025-04-30)
 
-**Pre-registered:** `docs/preregister_D.md` (commit `2e3094a`, before any computation).
+**Pre-registered:** `docs/preregister_D.md` (`2e3094a`) + addendum
+`docs/preregister_D_addendum.md` (`6c189e4`, **causal trailing iv_pct = decision
+metric**, inherited look-ahead = reference-only). Single run, no re-tuning, no
+post-hoc window/ticker/threshold change. Supersedes the prior BLOCKED status.
 
-## Top-line verdict: NOT YET TESTABLE — execution BLOCKED on fresh data
+## Top-line verdict: **WEAK / BORDERLINE — does NOT by itself justify C**
 
-**D was not run on a fresh window, because no fresh data exists locally.** Per the
-pre-registered rule "if there isn't enough fresh, non-overlapping data, STOP — do not
-proceed on a bad window," the verdict is **withheld**. D is neither SURVIVED nor DEAD.
-**B and C remain GATED — they are neither cleared nor killed.** Nothing is started.
-
-This is the honest outcome, not a failure: the design is frozen and the instrument is
-verified, so the moment a fresh window is downloaded the test produces a clean,
-single-shot answer with zero researcher degrees of freedom.
+The conditioning's **look-ahead-free incremental edge over blind vol-selling is
+not statistically significant** on the fresh window. It passes the *letter* of the
+pre-committed `t_cond`/DSR gate, but the metric that actually tests D's question —
+does conditioning **beat** blind vol-selling — is insignificant (Welch t **+1.47**,
+< 2) and has **degraded out-of-sample** vs the in-sample causal reference
+(+0.51 → +0.22). **Decision returns to Berkay. C is NOT started.**
 
 ---
 
-## Why blocked — the data wall (evidence)
+## 0. Data (validated, `scripts/validate_fresh_window.py`)
 
-All local option data ends **2026-04-30** and lies entirely inside the burned panel:
+24/24 tickers present, full 2024-05..2025-04 coverage, 5514 panel-eligible obs
+(burned-panel comparator: 5342). Only gap: 6 heavy days dropped on bulk
+JSONDecodeError (TSLA 5, CRWD 1) = 0.1% — not a broken universe. Built panel after
+the inherited gamma/iv liquidity drops: **5301 valid ticker-days**.
 
-| Source | Coverage | Overlap with burned panel |
+## 1. The single run
+
+```
+panel: 5301 valid ticker-days · SELL(inherited)=1078 · SELL(causal)=1566
+n_UNCOND (non-overlap) = 278 · n_COND(causal) = 101 · n_COND(inherited) = 61
+```
+
+## 2. PRIMARY — causal trailing iv_pct (THE decision metric)
+
+| Arm | Sharpe | t_arm | n |
+|---|---|---|---|
+| UNCOND (blind vol-sell, all obs) | +1.44 | +6.75 | 278 |
+| COND (long-gamma + high-IV, causal) | +1.66 | +4.69 | 101 |
+
+- **SPREAD_causal = +0.22** · IC = +0.094 · **t_cond = +4.69** · **DSR = 1.000**
+- **Welch t (COND − UNCOND) = +1.47**  ← the value-add significance; **< 2, NOT significant**
+
+## 3. REFERENCE ONLY — inherited full-window iv_pct (look-ahead, decides nothing)
+
+| Arm | Sharpe | t_arm | n |
+|---|---|---|---|
+| UNCOND | +1.44 | +6.75 | 278 |
+| COND (inherited look-ahead) | +1.86 | +4.09 | 61 |
+
+- SPREAD_inherited = +0.42 · IC = +0.155 · Welch +2.07 · DSR 0.999. The look-ahead
+  variant looks "more significant" (Welch 2.07 vs causal 1.47) — confirming the
+  look-ahead inflates the apparent edge, exactly why the addendum demoted it.
+
+## 4. Why WEAK, not SURVIVED (honest reading of the frozen gate)
+
+By the **letter** of the pre-committed addendum gate the causal arm passes all
+three (`SPREAD>0` ✓, `|t_cond|≥2` ✓ 4.69, `DSR>0.95` ✓ 1.000) → mechanically
+"SURVIVED". **But that gate is weak and I will not hide it:**
+
+- `t_cond` only tests that the conditioned cell is profitable — it is, but **the
+  *unconditioned* cell is even more so** (Sharpe +1.44, t +6.75). The vol-risk
+  premium is strong *everywhere*; selling vol blindly already works.
+- D's real question is whether conditioning **adds** information. That is the
+  **COND−UNCOND Welch t = +1.47**, which is **not significant**.
+- Out-of-sample decay: causal spread **+0.51 (in-sample) → +0.22 (fresh)**; causal
+  Welch **+1.88 → +1.47**. The conditioning edge is shrinking, not replicating.
+
+| Causal metric | In-sample (burned) | Fresh 2024 |
 |---|---|---|
-| `data/chain_snapshots` (the panel) | 2025-05-01 → 2026-04-30, 24 tickers, ~8.0M rows | IS the burned panel |
-| `data/historical/bulk/<T>/YYYY-MM` | 2025-05 → 2026-04 (raw source of the panel) | full overlap |
-| `data/historical/dry-run*` | 2026-04 only | full overlap |
+| COND−UNCOND spread | +0.51 | **+0.22** |
+| Welch t (cond−uncond) | +1.88 | **+1.47** |
+| t_cond | +4.76 | +4.69 |
+| DSR | 1.000 | 1.000 |
 
-There is **zero** local data before 2025-05 or after 2026-04. A clean replication is
-therefore impossible without a new download. The forward window (2026-05-01 → today)
-is only ~7 weeks → ~1 non-overlap obs/ticker → underpowered, disqualified (pre-reg §1).
+**Honest verdict: WEAK / borderline.** Positive-signed, look-ahead-free, but the
+incremental edge over blind vol-selling is statistically insignificant and
+decaying OOS. Per the pre-reg's "weak/borderline → no automatic green light;
+decision to Berkay." **C is not started; B and C remain gated.**
 
----
+One thing the run *does* establish cleanly: the **unconditioned** vol-risk premium
+is large and highly significant on a fresh window (Sharpe +1.44, t +6.75) — the
+edge is in selling vol, the gamma/IV *conditioning* adds little look-ahead-free.
 
-## Instrument check (IN-SAMPLE, burned panel) — NOT the D verdict
+## 5. Discipline check
 
-To verify the script is correctly wired *before* anyone spends a fresh download, the
-exact study code was run **once** on the burned panel. This reproduces a *known*
-in-sample result; it draws **no inference about D** (D is out-of-sample by definition).
-
-```
-panel: 5342 valid ticker-days · SELL(primary)=1082 · SELL(causal)=1442
-
-PRIMARY (inherited iv_pct, full-window rank):
-  UNCOND (blind, all obs)    Sharpe +1.19  (t=+5.57, n=278)
-  COND  (long-gamma+high-IV) Sharpe +1.99  (t=+4.62, n=68)
-  SPREAD = +0.80   IC=+0.122   t_cond=+4.62   Welch_t=+2.06   DSR(n_trials=1)=1.000
-
-SECONDARY (causal trailing iv_pct, look-ahead-free):
-  COND  Sharpe +1.70 (t=+4.76, n=99)
-  SPREAD = +0.51   IC=+0.113   t_cond=+4.76   Welch_t=+1.88   DSR=1.000
-```
-
-**What this does and does not establish:**
-
-- ✅ **The instrument is correct.** The pure-information VRP Sharpe-spread **+0.80**
-  reproduces the documented **+0.77** fly-return spread almost exactly — the same
-  conditioning, computed independently, recovers the same in-sample signal. The script
-  is trustworthy for the fresh run.
-- ✅ **The look-ahead bracket works.** Stripping the inherited full-window IV-rank
-  look-ahead (causal variant) shrinks the spread **+0.80 → +0.51** and the cond-vs-
-  uncond Welch t **+2.06 → +1.88** (drops below 2). So a meaningful slice of the
-  in-sample spread is look-ahead; the causal number is the more honest one to expect.
-- ❌ **This is NOT evidence the conditioning replicates.** It is in-sample on the
-  burned panel — the conditioning was *defined* on this data, so detecting it here is
-  circular by construction. Replication = the same spread surviving on the **untouched
-  2024 window**, which has not been run.
-
----
-
-## Deviation log (pre-reg §6 / CLAUDE.md D1)
-
-- **DSR at `n_trials=1`.** The inherited `edge_validation._deflated_sharpe` divides by
-  `log(1 − 1/n_trials)` and hits a `log(0)` singularity at `n_trials=1`. Mathematically
-  the expected max over a single trial is 0, so the deflation benchmark `SR0=0` and DSR
-  reduces to the Probabilistic Sharpe Ratio vs 0. Implemented as `_dsr()` in the study
-  script with the **same** skew/kurtosis/length adjustment; `edge_validation.py` (the
-  frozen artifact) was **not** modified. This is the faithful realization of
-  "DSR n_trials=1," not a design change.
-
----
-
-## What is needed to run D (the real test)
-
-Download the pre-registered fresh window (operator's job — historical ThetaData pull,
-CLAUDE.md):
-
-- **Window:** 2024-05-01 → 2025-04-30 · **Tickers:** the same 24 (pre-reg §1).
-- **Into:** `data/chain_snapshots_2024/` + `data/spot_series_2024/` (NOT the burned dirs).
-- **Pipeline:** `scripts/download_chain_snapshots.py` → `scripts/compute_spot_series.py`
-  (Terminal :25503). Magnitude ≈ the existing bulk download.
-- **Then run once:**
-  ```
-  PYTHONPATH=src:. .venv/bin/python scripts/study_D_conditioning_replication.py \
-      --chains data/chain_snapshots_2024 --spots data/spot_series_2024 --mode fresh-run
-  ```
-- Apply the pre-registered verdict table (pre-reg §6) to the **fresh** SPREAD / t_cond /
-  DSR. If the causal secondary flips it, downgrade to WEAK.
-
-**Until that runs, D is open and B + C stay gated. No study is started.**
+- [x] Single run, single window, single hypothesis (n_trials=1).
+- [x] Conditioning inherited verbatim; no threshold re-tuned.
+- [x] Causal metric primary; inherited look-ahead reference-only.
+- [x] Frozen gate reported by its letter (SURVIVED-by-t_cond) AND the honest
+      caveat (Welch insignificant) — verdict NOT shaved either way.
+- [x] No window/ticker/threshold change after seeing the number.
+- [ ] **Push pending — Berkay sees this report first. C NOT started.**
