@@ -49,11 +49,17 @@ def _expected_trading_days() -> pd.DatetimeIndex:
 
 
 def _daily_close(spot_path: Path) -> pd.Series:
-    """Last spot per calendar day from the minute series (mirrors
-    edge_validation._daily_close semantics: one close per trading day)."""
+    """Daily close from the minute series — mirrors edge_validation._daily_close
+    VERBATIM (tz-localize to naive, resample 1D last, >0) so the eligible-obs
+    count matches what _build_panel will actually keep. Naive index is required:
+    snapshot_date is tz-naive, so the close index must be naive too or nothing
+    matches (the bug the first run exposed)."""
     s = pd.read_parquet(spot_path)
-    s["day"] = pd.to_datetime(s["minute"]).dt.normalize()
-    return s.groupby("day")["spot"].last()
+    s["minute"] = pd.to_datetime(s["minute"], utc=True).dt.tz_localize(None)
+    s["spot"] = pd.to_numeric(s["spot"], errors="coerce")
+    d = s.dropna(subset=["spot"]).set_index("minute")["spot"].resample("1D").last().dropna()
+    d.index = d.index.normalize()
+    return d[d > 0]
 
 
 def _validate_ticker(ticker: str, chains: Path, spots: Path) -> dict[str, object]:
