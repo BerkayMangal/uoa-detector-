@@ -156,3 +156,50 @@ async def test_fill_side_from_side_premium(
     )
     prints = await _collect(src)
     assert prints[0].fill_side == expected
+
+
+async def test_skips_fetch_when_market_closed() -> None:
+    # Saturday 19:00 UTC — in the intraday window but a weekend, so the gate
+    # is closed: the loop must idle without spending a single UW request.
+    closed = datetime(2026, 6, 20, 19, 0, tzinfo=UTC)
+    client = _FakeClient([_alert("CH", created_at="2026-06-20T18:55:00Z")])
+    src = UnusualWhalesFlowPollSource(
+        client, ["TSLA"], backfill=timedelta(minutes=10), now=lambda: closed,
+    )
+    src._sleep = _stop_after(1, src)  # type: ignore[assignment]
+    prints = await _collect(src)
+    assert prints == []
+    assert client.calls == 0
+
+
+async def test_daily_limit_triggers_long_backoff() -> None:
+    # When UW returns the daily-limit 429, the loop must take the long
+    # daily-limit backoff (not the short poll interval) so it stops eating the
+    # next reset's budget — the death-spiral fix.
+    class _LimitClient:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        async def request_json(self, path: str) -> dict[str, object]:
+            self.calls += 1
+            raise RuntimeError(
+                "UnusualWhales GET /api/stock/TSLA/flow-alerts rate-limited "
+                '(HTTP 429): {"code":"daily_request_limit_hit"}'
+            )
+
+    client = _LimitClient()
+    durations: list[float] = []
+    src = UnusualWhalesFlowPollSource(
+        client, ["TSLA"], now=lambda: _NOW,
+        poll_interval_s=60.0, daily_limit_backoff_s=1800.0,
+    )
+
+    async def _sleep(seconds: float) -> None:
+        durations.append(seconds)
+        src._closed = True
+
+    src._sleep = _sleep  # type: ignore[assignment]
+    prints = await _collect(src)
+    assert prints == []
+    assert client.calls == 1
+    assert durations == [1800.0]  # took the daily-limit backoff, not 60s

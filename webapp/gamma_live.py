@@ -15,10 +15,12 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
+from datetime import UTC, datetime
 from pathlib import Path
 
 from uoa_detector.calibration import load_profile
 from uoa_detector.config.credentials import Credentials
+from uoa_detector.sources.market_hours import is_market_open
 from uoa_detector.sources.unusual_whales.client import (
     UnusualWhalesClient,
     UnusualWhalesError,
@@ -28,6 +30,9 @@ from webapp.gamma import GammaRepo
 _logger = logging.getLogger(__name__)
 _DEFAULT_PROFILE = Path("profiles/v5_default.yaml")
 _REFRESH_BACKOFF_S = 60.0
+# Outside RTH the gamma board is static and UW would only burn the daily
+# request budget — idle this long between market-closed checks (Phase 4.28).
+_CLOSED_MARKET_SLEEP_S = 300.0
 
 
 def _f(value: object) -> float | None:
@@ -139,6 +144,9 @@ async def gamma_refresh_loop(
     _logger.info("gamma refresh loop started for %s", tickers)
     while True:
         try:
+            if not is_market_open(datetime.now(UTC)):
+                await asyncio.sleep(_CLOSED_MARKET_SLEEP_S)
+                continue
             client = UnusualWhalesClient(
                 api_key=Credentials().unusual_whales_api_key,
                 settings=profile.data_sources.unusual_whales,

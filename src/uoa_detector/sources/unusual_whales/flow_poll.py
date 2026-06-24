@@ -24,6 +24,7 @@ from typing import TYPE_CHECKING
 
 from uoa_detector.domain.events import FillSide
 from uoa_detector.domain.raw_print import RawPrint
+from uoa_detector.sources.market_hours import is_market_open
 from uoa_detector.sources.unusual_whales.live import (
     _coerce_option_type,
     _parse_expiry,
@@ -74,6 +75,8 @@ class UnusualWhalesFlowPollSource:
         source_id: str = "unusual_whales",
         now: Callable[[], datetime] | None = None,
         sleep: Callable[[float], Awaitable[None]] | None = None,
+        closed_market_sleep_s: float = 300.0,
+        daily_limit_backoff_s: float = 1800.0,
     ) -> None:
         self.source_id = source_id
         self._client = client
@@ -85,6 +88,13 @@ class UnusualWhalesFlowPollSource:
         self._sleep = sleep or asyncio.sleep
         self._seen: set[str] = set()
         self._closed = False
+        # Budget guards (Phase 4.28): outside RTH there is no new flow, so
+        # polling only burns the UW 15k/day quota; and once UW returns the
+        # daily-limit 429, hammering every interval eats the NEXT day's budget
+        # too. Both back off hard instead.
+        self._closed_market_sleep_s = closed_market_sleep_s
+        self._daily_limit_backoff_s = daily_limit_backoff_s
+        self._daily_limit_hit = False
 
     async def stream(self) -> AsyncIterator[RawPrint]:
         # On boot, only emit prints within the backfill window so we don't
@@ -92,6 +102,11 @@ class UnusualWhalesFlowPollSource:
         cutoff = self._now() - self._backfill
         first_pass = True
         while not self._closed:
+            # Market-hours gate: no new options flow outside RTH, so don't
+            # spend the daily UW request budget — idle until the next check.
+            if not is_market_open(self._now()):
+                await self._sleep(self._closed_market_sleep_s)
+                continue
             for ticker in self._tickers:
                 if self._closed:
                     break
@@ -102,6 +117,13 @@ class UnusualWhalesFlowPollSource:
             first_pass = False
             if len(self._seen) > _SEEN_CAP:
                 self._seen.clear()
+            # Daily-limit 429: the quota is gone until UW's reset. Backing off
+            # hard (instead of re-polling every interval) stops the retry storm
+            # from consuming the next reset's budget — the death-spiral fix.
+            if self._daily_limit_hit:
+                self._daily_limit_hit = False
+                await self._sleep(self._daily_limit_backoff_s)
+                continue
             await self._sleep(self._poll_interval_s)
 
     async def close(self) -> None:
@@ -113,6 +135,11 @@ class UnusualWhalesFlowPollSource:
                 f"/api/stock/{ticker}/flow-alerts",
             )
         except Exception as exc:
+            # The UW daily request cap surfaces as a 429 carrying
+            # "daily_request_limit_hit"; flag it so stream() backs off until
+            # the quota resets rather than re-polling every interval.
+            if "daily_request_limit" in str(exc):
+                self._daily_limit_hit = True
             _logger.warning("UW flow-alerts fetch failed for %s: %s", ticker, exc)
             return []
         data = resp.get("data") if isinstance(resp, dict) else resp
