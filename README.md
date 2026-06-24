@@ -1,11 +1,37 @@
-# UOA + Convexity Detector v5 — Phase 1 Scaffold
+# UOA + Convexity Detector v5
 
-Foundational scaffold for a multi-module options-flow signal-detection system,
-built to the v5 spec (`UOA_Convexity_Detector_v5.docx`). This is **Phase 1**:
-project skeleton, core domain types, the pluggable data-source interface, the
-scoring engine, the labeler, the risk sizer, and an end-to-end smoke test
-driven by synthetic data. Individual enrichment modules (Modules 21–28, 34–39)
-are stubs in this phase; real implementations land in Phase 2.
+**What this is:** a discretionary options-flow **screener and context tool**. It
+surfaces unusual options activity and overlays structural context (dealer-gamma
+regime, IV rank, sector/peer flow, dark-pool corroboration) to inform a human's
+discretionary read. The one piece of *validated* information it carries is
+**conditioning**: selecting long-gamma + high-IV-rank names beats blind vol-
+selling by **+0.77 Sharpe** — useful context for the operator's judgment.
+
+**What this is NOT:** a mechanical, money-printing alpha engine. The vol-premium
+edge was put through a full cost / tail / multiple-testing / walk-forward gate
+and **rejected as untradeable** — out-of-sample Sharpe **−0.56**, Bonferroni ×30
+**p=1.00**, Deflated Sharpe **0.13**, and a single −20% gap ≈ **5× the credit**
+collected (full evidence: [`docs/edge_to_money.md`](docs/edge_to_money.md)). Raw
+UOA output is **never** auto-traded: the system does not execute, size, or
+recommend trades — entry is always a manual decision through the operator's own
+broker. This matches the live UI (`webapp/templates/base.html`) and the
+dealer-gamma map (`webapp/gamma.py`), which say the same thing.
+
+---
+
+> **Historical note.** The sections below are the original **Phase 1 scaffold**
+> architecture reference (synthetic-data skeleton; the enrichment modules were
+> stubs at the time). The enrichment modules (M21–M28, M34–M39) and the live
+> Phase 4 screener have since been built — this document is kept as the
+> architecture map, not a current status report. For current state see `git log`
+> and `docs/`.
+
+Foundational scaffold for a multi-module options-flow detection system, built to
+the v5 spec (`UOA_Convexity_Detector_v5.docx`). This is **Phase 1**: project
+skeleton, core domain types, the pluggable data-source interface, the scoring
+engine, the labeler, the risk sizer, and an end-to-end smoke test driven by
+synthetic data. Individual enrichment modules (Modules 21–28, 34–39) are stubs
+in this phase; real implementations land in Phase 2.
 
 ---
 
@@ -156,8 +182,12 @@ label to a `PositionSize`. The result is persisted to the in-memory
 **Phase 3+** — production concerns:
 - Real adapters: Polygon, Unusual Whales, IBKR, CSV replay
 - Postgres / TimescaleDB persistence (drop-in replacement for `BacktestStore`)
-- Web API + dashboard for live signal monitoring
-- Live broker execution layer
+- Web API + dashboard for discretionary screening / context (decision support)
+- **No broker execution layer.** Entry is always a manual decision through the
+  operator's own broker; the system never auto-trades (see the positioning
+  banner at the top). The vol-premium edge was validated and rejected as
+  untradeable (`docs/edge_to_money.md`), so there is no mechanical signal to
+  execute.
 - Outcome backfill (1h/1d/3d/5d/10d returns, IV change, MFE/MAE) for the
   backtest schema fields that are `None` in Phase 1
 
