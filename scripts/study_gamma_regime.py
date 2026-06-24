@@ -130,7 +130,19 @@ def main() -> int:
     # Welch t for difference of means
     se = math.sqrt(sv.var(ddof=1) / sv.size + lv.var(ddof=1) / lv.size)
     print(f"  diff (short-long): {diff:+.4f}   t={diff / se:.2f}   "
-          f"=> {'CONFIRMS' if diff > 0 and diff / se > 2 else 'no clear effect'}\n")
+          f"=> {'CONFIRMS' if diff > 0 and diff / se > 2 else 'no clear effect'}")
+    # H1 honesty: the 5d realised-vol windows OVERLAP, so the full-sample t is
+    # autocorrelation-inflated. Apply the SAME non-overlap gauntlet that killed
+    # the directional claim (every 5th day per ticker = the 5d horizon).
+    nonov = data.sort_values(["ticker", "date"]).groupby("ticker", group_keys=False).apply(
+        lambda g: g.iloc[::5], include_groups=False)
+    nsv = nonov[nonov["regime"] == "short"]["fwd_vol5"].dropna()
+    nlv = nonov[nonov["regime"] == "long"]["fwd_vol5"].dropna()
+    nse = math.sqrt(nsv.var(ddof=1) / nsv.size + nlv.var(ddof=1) / nlv.size)
+    ndiff = nsv.mean() - nlv.mean()
+    nt = ndiff / nse if nse else float("nan")
+    print(f"  NON-OVERLAP (honest): diff={ndiff:+.4f}  t={nt:.2f}  n_short={nsv.size}  "
+          f"=> {'survives' if abs(nt) > 2 else 'does NOT survive — the vol effect is NOT robust'}\n")
 
     print("=== H2: market-neutral forward return by regime (directional edge?) ===")
     for col, horizon in (("r1_mn", "1d"), ("r5_mn", "5d")):

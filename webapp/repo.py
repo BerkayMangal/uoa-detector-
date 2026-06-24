@@ -127,26 +127,19 @@ class SignalRepo:
                 _logger.warning("unparseable signal %s/%s", run_id, event_id)
                 return None
 
-    def tickers(self, run_id: str | None = None) -> list[str]:
-        stmt = select(SignalRow.ticker).distinct()
+    def ticker_label_options(
+        self, run_id: str | None = None,
+    ) -> tuple[list[str], list[str]]:
+        """Distinct tickers + labels for the filter dropdowns, in ONE DB
+        round-trip (the dashboard hot path; remote Postgres RTT dominates, so
+        merging two SELECTs into one DISTINCT (ticker,label) query halves it).
+        Cross-DB (plain SQL) — no Postgres-only array_agg."""
+        stmt = select(SignalRow.ticker, SignalRow.label).distinct()
         if run_id:
             stmt = stmt.where(SignalRow.run_id == run_id)
         with self._session() as session:
-            return sorted(r[0] for r in session.execute(stmt).all())
-
-    def labels(self, run_id: str | None = None) -> list[str]:
-        stmt = select(SignalRow.label).distinct()
-        if run_id:
-            stmt = stmt.where(SignalRow.run_id == run_id)
-        with self._session() as session:
-            return sorted(r[0] for r in session.execute(stmt).all())
-
-    def count(self, run_id: str | None = None) -> int:
-        stmt = select(func.count()).select_from(SignalRow)
-        if run_id:
-            stmt = stmt.where(SignalRow.run_id == run_id)
-        with self._session() as session:
-            return int(session.execute(stmt).scalar_one())
+            rows = session.execute(stmt).all()
+        return sorted({r[0] for r in rows}), sorted({r[1] for r in rows})
 
     def runs(self) -> list[RunInfo]:
         """All runs with signal counts + latest event time, newest first.

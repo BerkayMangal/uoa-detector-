@@ -152,7 +152,7 @@ def aggregate(trades: Sequence[TradeRow]) -> EdgeStats:
     gross_loss = -sum(losses)
     profit_factor = (gross_win / gross_loss) if gross_loss > 0 else None
 
-    tier, verdict = _verdict(len(closed), len(excess), excess_mean, excess_t)
+    tier, verdict = _verdict(len(excess), excess_mean, excess_t)
     return EdgeStats(
         n_closed=len(closed),
         excess_n=len(excess),
@@ -167,7 +167,7 @@ def aggregate(trades: Sequence[TradeRow]) -> EdgeStats:
 
 
 def _verdict(
-    n_closed: int, excess_n: int, mean: float | None, t: float | None,
+    excess_n: int, mean: float | None, t: float | None,
 ) -> tuple[str, str]:
     if excess_n < _MIN_SAMPLE or mean is None or t is None:
         return "building", (

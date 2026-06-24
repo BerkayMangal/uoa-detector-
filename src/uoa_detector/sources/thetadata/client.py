@@ -102,16 +102,6 @@ class ThetaDataAuthError(ThetaDataError):
     """Authentication or authorisation failure (4xx)."""
 
 
-class ThetaDataRateLimitError(ThetaDataError):
-    """The configured token bucket would be exceeded.
-
-    Raised when a request is attempted while the bucket is empty
-    AND the client is configured to fail-fast on rate-limit
-    rather than wait. Default behaviour is to wait; this exception
-    exists for tests and for callers who want hard limits.
-    """
-
-
 class ThetaDataTransientError(ThetaDataError):
     """Retryable failure: 5xx, network error, timeout."""
 

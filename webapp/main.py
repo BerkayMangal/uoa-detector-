@@ -179,14 +179,18 @@ def dashboard(
         fresh = age_min < 15
     flt = _filters(ticker, label, min_score, sort, active)
     matched = _safe(lambda: repo.signals(flt), [])
+    options = _safe(lambda: repo.ticker_label_options(active), ([], []))
+    # `total` comes from the run's own count (already loaded in runs()) — no
+    # extra round-trip. One DISTINCT query covers both filter dropdowns.
+    total = current.count if current is not None else 0  # type: ignore[attr-defined]
     return templates.TemplateResponse(
         request,
         "dashboard.html",
         {
             "signals": matched,
-            "tickers": _safe(lambda: repo.tickers(active), []),
-            "labels": _safe(lambda: repo.labels(active), []),
-            "total": _safe(lambda: repo.count(active), 0),
+            "tickers": options[0],  # type: ignore[index]
+            "labels": options[1],  # type: ignore[index]
+            "total": total,
             "shown": len(matched),  # type: ignore[arg-type]
             "runs": runs, "current": current, "run": active or "",
             "fresh": fresh, "age_min": age_min,

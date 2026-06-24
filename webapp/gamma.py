@@ -1,18 +1,20 @@
 """Dealer-gamma map — structural CONTEXT for the screener (Phase 4.10).
 
-NOT a directional edge. The historical study (scripts/study_gamma_regime.py)
-rejected gamma as a mechanical directional signal — the apparent edge was a
-single-name squeeze (LCID), first-half only, and insignificant once
-overlapping windows were removed. What survived is the vol/structure read:
-extreme-gamma names move more, and the flip / walls mark where dealer hedging
-amplifies vs pins. So this surfaces gamma as a SpotGamma-style daily context
-map (regime, flip, call/put walls) to inform the discretionary read — clearly
-labelled as context, never as a buy signal.
+NOT a directional edge, and NOT a validated signal of any kind. The studies
+rejected BOTH tradeable gamma claims: direction (study_gamma_regime — the
+apparent edge was an LCID squeeze, first-half only, non-overlap t=0.94) and
+pinning (study_gamma_pinning — corr ~0, sign-flips across halves). The vol
+effect (H1, "extreme-gamma names move more") looks significant full-sample
+(t=2.60) but does NOT survive the same non-overlap gauntlet that killed the
+others (t=1.08) — so it is NOT robustly established either. The ONE thing that
+survived robustness is a separate, different claim: the vol-RISK-premium
+(sell vol in long-gamma + high-IV names, study_vol_premium, non-overlap t=2.64,
+small and tail-risky). So this map is purely SpotGamma-style structural context
+(regime, flip, walls, IV rank) to inform a discretionary read — NEVER a signal.
 
-GEX is computed from the full option chain (OI x Black-Scholes gamma), the data
-ThetaData gives us. UW's gamma endpoints are not in our tier (HTTP 401), so the
-map is refreshed by a snapshot job (scripts/gamma_snapshot.py) wherever the
-ThetaData chain is available, and the cloud screener just reads the result.
+GEX is computed from per-strike dealer exposure: live from UW greek-exposure
+(webapp/gamma_live.py, full-tier key) refreshed in-process, OR offline from the
+ThetaData option chain (OI x Black-Scholes gamma; scripts/gamma_snapshot.py).
 """
 
 from __future__ import annotations
@@ -150,8 +152,17 @@ def compute_gamma(chain: pd.DataFrame, *, as_of: str) -> dict[str, float | None]
     net_gex = gex_at(spot)
 
     # Flip: scan hypothetical spot, take the zero-crossing nearest current spot.
+    # Vectorised over the full (grid x contracts) broadcast — one exp instead of
+    # 161 Python-loop calls (compute_gamma runs ~6000x in the studies). Same math
+    # as gex_at, batched.
     grid = np.linspace(spot * 0.6, spot * 1.4, 161)
-    vals = np.array([gex_at(s) for s in grid])
+    s_col = grid[:, None]
+    with np.errstate(divide="ignore", invalid="ignore"):
+        vol_t = iv[None, :] * np.sqrt(t[None, :])
+        d1 = (np.log(s_col / k[None, :]) + 0.5 * iv[None, :] ** 2 * t[None, :]) / vol_t
+        g_grid = (_NORM * np.exp(-0.5 * d1 * d1)) / (s_col * vol_t)
+    g_grid = np.where(np.isfinite(g_grid), g_grid, 0.0)
+    vals = np.sum(sign[None, :] * oi[None, :] * g_grid, axis=1)
     crossings = [
         float(grid[i] - vals[i] * (grid[i] - grid[i - 1]) / (vals[i] - vals[i - 1]))
         for i in range(1, len(vals))

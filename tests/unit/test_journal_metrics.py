@@ -111,22 +111,22 @@ def test_t_stat_positive_for_consistent_positive() -> None:
 
 
 def test_verdict_building_below_min_sample() -> None:
-    tier, _ = _verdict(n_closed=5, excess_n=5, mean=0.05, t=10.0)
+    tier, _ = _verdict(excess_n=5, mean=0.05, t=10.0)
     assert tier == "building"
 
 
 def test_verdict_none_when_insignificant() -> None:
-    tier, _ = _verdict(n_closed=20, excess_n=20, mean=0.01, t=1.2)
+    tier, _ = _verdict(excess_n=20, mean=0.01, t=1.2)
     assert tier == "none"
 
 
 def test_verdict_edge_when_significant_positive() -> None:
-    tier, _ = _verdict(n_closed=20, excess_n=20, mean=0.02, t=3.1)
+    tier, _ = _verdict(excess_n=20, mean=0.02, t=3.1)
     assert tier == "edge"
 
 
 def test_verdict_negative_when_significant_negative() -> None:
-    tier, _ = _verdict(n_closed=20, excess_n=20, mean=-0.02, t=-3.1)
+    tier, _ = _verdict(excess_n=20, mean=-0.02, t=-3.1)
     assert tier == "negative"
 
 

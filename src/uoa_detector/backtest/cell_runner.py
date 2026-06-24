@@ -70,7 +70,6 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
     from uoa_detector.backtest.protocol import BacktestStoreProtocol
-    from uoa_detector.backtest.store import StoredSignal
     from uoa_detector.calibration.profile import CalibrationProfile
     from uoa_detector.pipeline.stage import EnrichmentStage
 
@@ -325,11 +324,6 @@ def noop_trade_producer(
     plumbing — start_run / finish_run / RunMetadata — is exercised.
     """
     return []
-
-
-def noop_pnl_signal_to_trade(signal: StoredSignal) -> RealizedTrade:
-    """Convert a StoredSignal to a NoOp open trade (helper for callers)."""
-    return NoOpPnLProvider().provide(signal)
 
 
 # ---------------------------------------------------------------------------
