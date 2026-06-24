@@ -32,6 +32,23 @@ _logger = logging.getLogger(__name__)
 _BASE = Path(__file__).parent
 
 
+async def _supervise(make_coro: object, name: str) -> None:
+    """Keep a long-running background coroutine alive forever: if it ever exits
+    (clean return OR an exception that escaped its own loop), log and restart it
+    after a backoff. Cancellation (shutdown) propagates. This self-heals the
+    'worker silently died and live data went stale' failure mode."""
+    while True:
+        try:
+            await make_coro()  # type: ignore[operator]
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            _logger.exception("%s crashed; restarting in 30s", name)
+        else:
+            _logger.warning("%s exited unexpectedly; restarting in 30s", name)
+        await asyncio.sleep(30)
+
+
 @contextlib.asynccontextmanager
 async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
     # Opt-in live tasks: only start when LIVE_TICKERS (+ UW key + DB) is set.
@@ -40,11 +57,15 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
     tasks: list[asyncio.Task[None]] = []
     if config is not None:
         _logger.info("starting live worker + gamma refresh for %s", config["tickers"])
-        tasks.append(asyncio.create_task(run_live_worker(**config)))  # type: ignore[arg-type]
-        # Live gamma map straight from UW (no ThetaData Terminal needed).
-        tasks.append(asyncio.create_task(gamma_refresh_loop(
-            tickers=config["tickers"],  # type: ignore[arg-type]
-            database_url=config["database_url"],  # type: ignore[arg-type]
+        tasks.append(asyncio.create_task(_supervise(
+            lambda: run_live_worker(**config), "live-worker",  # type: ignore[arg-type]
+        )))
+        tasks.append(asyncio.create_task(_supervise(
+            lambda: gamma_refresh_loop(
+                tickers=config["tickers"],  # type: ignore[arg-type]
+                database_url=config["database_url"],  # type: ignore[arg-type]
+            ),
+            "gamma-refresh",
         )))
     try:
         yield

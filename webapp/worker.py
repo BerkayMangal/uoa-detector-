@@ -82,14 +82,14 @@ async def run_live_worker(
     """
     profile = load_profile(profile_path)
     store = SqliteBacktestStore(_normalize_pg(database_url))
-    run_id = f"live-{datetime.now(UTC).date().isoformat()}"
-    _logger.info("live worker started: run_id=%s tickers=%s", run_id, tickers)
+    _logger.info("live worker started: tickers=%s", tickers)
 
-    def _ensure_run() -> None:
-        # One run per day. On a same-day restart (redeploy / crash) the run
-        # already exists — adopt it so signals keep appending, rather than
-        # colliding on the run_id primary key. pipeline.run() finishes the run
-        # in its finally, so we re-adopt at the top of every loop iteration.
+    def _ensure_run() -> str:
+        # One run per UTC day, recomputed each iteration so a worker that runs
+        # for days ROLLS OVER at midnight (a fixed start-of-process run_id would
+        # keep dumping later days into the first day's run). On a same-day
+        # restart the run exists -> adopt it (append) rather than collide on PK.
+        run_id = f"live-{datetime.now(UTC).date().isoformat()}"
         if store.get_run(run_id) is None:
             store.start_run(
                 profile=profile, universe_id="live", run_id=run_id,
@@ -97,6 +97,7 @@ async def run_live_worker(
             )
         else:
             store._active_run_id = run_id
+        return run_id
 
     try:
         while True:
