@@ -14,7 +14,7 @@ import contextlib
 import logging
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from fastapi import FastAPI, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -22,7 +22,9 @@ from fastapi.templating import Jinja2Templates
 
 from webapp import explanations, gamma, journal, pricing
 from webapp.gamma_live import gamma_refresh_loop
+from webapp.notability import notability_score
 from webapp.repo import SignalFilters, SignalRepo
+from webapp.vol_board import build_vol_board
 from webapp.worker import live_config_from_env, run_live_worker
 
 if TYPE_CHECKING:
@@ -156,6 +158,41 @@ def _safe(fn: object, default: object) -> object:
         return default
 
 
+def _signal_notability(sig: object) -> float:
+    """Map a ``StoredSignal`` (webapp.repo.signals -> StoredSignal) to the
+    notability primitives. Real field names verified against
+    ``uoa_detector.backtest.store.StoredSignal``:
+      - premium      -> ``premium`` (Decimal, $ paid)
+      - aggressive   -> ``sweep_classification`` present OR ``is_iso`` (there is
+                        NO fill_side/at-ask field on StoredSignal)
+      - cluster_count-> no count field exists (only the float
+                        ``cluster_density_score``); default 1
+      - age_minutes  -> derived from ``timestamp`` vs now(UTC) (no age field)
+      - dte          -> ``dte`` (int)
+    getattr defaults keep ordering safe if any field is missing/renamed."""
+    premium_raw = getattr(sig, "premium", 0.0)
+    try:
+        premium = float(premium_raw) if premium_raw is not None else 0.0
+    except (TypeError, ValueError):
+        premium = 0.0
+    aggressive = bool(getattr(sig, "sweep_classification", None)) or bool(
+        getattr(sig, "is_iso", False),
+    )
+    ts = getattr(sig, "timestamp", None)
+    age_minutes = 0.0
+    if isinstance(ts, datetime):
+        if ts.tzinfo is None:
+            ts = ts.replace(tzinfo=UTC)  # Postgres stores naive UTC
+        age_minutes = max((datetime.now(UTC) - ts).total_seconds() / 60.0, 0.0)
+    return notability_score(
+        premium=premium,
+        aggressive=aggressive,
+        cluster_count=int(getattr(sig, "cluster_count", 1) or 1),
+        age_minutes=age_minutes,
+        dte=int(getattr(sig, "dte", 30) or 30),
+    )
+
+
 @app.get("/", response_class=HTMLResponse)
 def dashboard(
     request: Request, ticker: str = "", label: str = "",
@@ -178,8 +215,24 @@ def dashboard(
         age_min = (datetime.now(UTC) - ts).total_seconds() / 60.0
         fresh = age_min < 15
     flt = _filters(ticker, label, min_score, sort, active)
-    matched = _safe(lambda: repo.signals(flt), [])
+    matched_raw = _safe(lambda: repo.signals(flt), [])
+    # Re-order the flow feed by descriptive notability (loudest/most unusual
+    # first); the SQL sort still drives the page (truncation), this only
+    # reorders the already-loaded page for the "Notable flow" section.
+    matched = sorted(
+        cast("list[object]", matched_raw), key=_signal_notability, reverse=True,
+    )
     options = _safe(lambda: repo.ticker_label_options(active), ([], []))
+    # Build the gamma context ONCE and reuse it for both the vol board and the
+    # existing "gamma" key (avoid a second latest() round-trip).
+    gamma_ctx = cast(
+        "dict[str, gamma.GammaContext]", _safe(lambda: _gamma().latest(), {}),
+    )
+    vol_rows = _safe(lambda: build_vol_board(
+        gamma_ctx,
+        earnings={t: c.next_earnings for t, c in gamma_ctx.items()},
+        now=datetime.now(UTC).date(),
+    ), [])
     # `total` comes from the run's own count (already loaded in runs()) — no
     # extra round-trip. One DISTINCT query covers both filter dropdowns.
     total = current.count if current is not None else 0  # type: ignore[attr-defined]
@@ -196,7 +249,12 @@ def dashboard(
             "fresh": fresh, "age_min": age_min,
             "ticker": ticker, "label": label, "min_score": min_score,
             "sort": sort,
-            "gamma": _safe(lambda: _gamma().latest(), {}),
+            "gamma": gamma_ctx,
+            "vol_board": vol_rows,
+            # Vol-board copy helpers (Task 7 template needs these callable).
+            "vol_structure": explanations.vol_structure,
+            "vol_read": explanations.vol_read,
+            "vol_caveat": explanations.vol_caveat,
             **_EXPLAIN,
         },
     )
