@@ -22,6 +22,7 @@ from __future__ import annotations
 import math
 import os
 from dataclasses import dataclass
+from datetime import date
 
 import numpy as np
 import pandas as pd
@@ -49,6 +50,7 @@ class GammaRow(_Base):
     put_wall: Mapped[float | None] = mapped_column(Float, nullable=True)
     atm_iv: Mapped[float | None] = mapped_column(Float, nullable=True)
     iv_pct: Mapped[float | None] = mapped_column(Float, nullable=True)  # 0..1 within own history
+    next_earnings: Mapped[str | None] = mapped_column(String, nullable=True)  # ISO date
 
 
 @dataclass(frozen=True)
@@ -62,6 +64,7 @@ class GammaContext:
     put_wall: float | None
     atm_iv: float | None = None
     iv_pct: float | None = None
+    next_earnings: date | None = None
 
     @property
     def regime(self) -> str:
@@ -211,6 +214,7 @@ class GammaRepo:
             row.put_wall = m["put_wall"]
             row.atm_iv = m.get("atm_iv")
             row.iv_pct = m.get("iv_pct")
+            row.next_earnings = m.get("next_earnings")  # type: ignore[assignment]
             s.add(row)
             s.commit()
 
@@ -222,6 +226,7 @@ class GammaRepo:
                 ticker=r.ticker, as_of=r.as_of, spot=r.spot, net_gex=r.net_gex,
                 flip=r.flip, call_wall=r.call_wall, put_wall=r.put_wall,
                 atm_iv=r.atm_iv, iv_pct=r.iv_pct,
+                next_earnings=date.fromisoformat(r.next_earnings) if r.next_earnings else None,
             )
             for r in rows
         }
