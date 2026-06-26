@@ -162,6 +162,14 @@ async def gamma_refresh_loop(
     """
     profile = load_profile(profile_path)
     repo = GammaRepo(database_url)
+    # Drop + recreate gamma_regime on startup so a schema change (the Phase 4.34
+    # next_earnings column) is picked up WITHOUT a manual migration — same
+    # full-rebuild pattern as scripts/gamma_snapshot.py. create_all alone does
+    # NOT add a column to an existing table, so without this the first upsert
+    # against the old prod table would fail and stall the gamma refresh. The
+    # table is a full live rebuild each cycle, so dropping it costs only the few
+    # seconds until the first refresh_all repopulates it.
+    repo.reset()
     _logger.info("gamma refresh loop started for %s", tickers)
     while True:
         try:
