@@ -148,3 +148,24 @@ def conviction(score: float | None) -> tuple[str, int]:
         return ("Weak", pct)
     return ("Noise", pct)
 
+
+def vol_structure(*, regime: str) -> str:
+    """Defined-risk structure TEMPLATE (type, not strikes) for harvesting vol
+    premium. Honesty: a template the user sizes/strikes — never a recommendation."""
+    base = "~30 DTE, ~30Δ iron fly or credit spread — collect vol premium, defined risk"
+    return base if regime == "long" else base + " (short-gamma: moves amplify, keep size small)"
+
+
+def vol_read(*, iv_rank: int, earnings_in_window: bool) -> str:
+    """Plain-English description of WHY this name is on the board. Descriptive."""
+    rich = f"IV-rank {iv_rank} — implied vol is high in its own 1y range, so the vol here is rich to sell."
+    earn = (" ⚠ Earnings inside the window — the high IV is a justified charge, not free premium."
+            if earnings_in_window else " No earnings in the window.")
+    return rich + earn
+
+
+def vol_caveat() -> str:
+    """Fixed honesty line shown on every vol-board row."""
+    return ("The base vol premium is the tested edge; the gamma regime is context, "
+            "not extra return. Size for a vol spike (fat left tail).")
+

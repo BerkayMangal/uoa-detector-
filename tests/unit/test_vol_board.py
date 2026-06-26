@@ -90,3 +90,27 @@ def test_row_carries_regime_and_walls() -> None:
     assert r.regime == "short"
     assert r.call_wall == 110.0 and r.put_wall == 90.0
     assert isinstance(r, VolBoardRow)
+
+
+from webapp.explanations import vol_caveat, vol_read, vol_structure  # noqa: E402
+
+
+def test_vol_structure_is_defined_risk_template_no_buy_word() -> None:
+    txt = vol_structure(regime="long")
+    assert "iron fly" in txt or "credit spread" in txt
+    assert "DTE" in txt
+    assert "buy" not in txt.lower()
+
+
+def test_vol_read_mentions_iv_rank_and_earnings_flag() -> None:
+    clean = vol_read(iv_rank=88, earnings_in_window=False)
+    assert "88" in clean and "earnings" in clean.lower()
+    flagged = vol_read(iv_rank=88, earnings_in_window=True)
+    assert "earnings" in flagged.lower()
+    assert clean != flagged
+
+
+def test_vol_caveat_is_honest_and_static() -> None:
+    c = vol_caveat()
+    assert "context" in c.lower()
+    assert "tail" in c.lower() or "spike" in c.lower()
