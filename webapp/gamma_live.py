@@ -99,6 +99,20 @@ def context_from_uw(
     }
 
 
+def _next_earnings_date(resp: object, *, today: str) -> str | None:
+    """Soonest report_date >= today from a UW /api/earnings payload; None if
+    absent/garbage."""
+    data = resp.get("data") if isinstance(resp, dict) else None
+    if not isinstance(data, list):
+        return None
+    future = sorted(
+        str(r["report_date"]) for r in data
+        if isinstance(r, dict) and isinstance(r.get("report_date"), str)
+        and str(r["report_date"]) >= today
+    )
+    return future[0] if future else None
+
+
 async def fetch_one(client: UnusualWhalesClient, ticker: str) -> tuple[str, dict[str, float | None]] | None:
     try:
         gex = await client.request_json(f"/api/stock/{ticker.upper()}/greek-exposure/strike")
@@ -114,6 +128,13 @@ async def fetch_one(client: UnusualWhalesClient, ticker: str) -> tuple[str, dict
     ctx = context_from_uw(rows, iv0)
     if ctx is None:
         return None
+    today = datetime.now(UTC).date().isoformat()
+    try:
+        e_resp = await client.request_json(f"/api/earnings/{ticker.upper()}")
+        ctx["next_earnings"] = _next_earnings_date(e_resp, today=today)  # type: ignore[assignment]
+    except UnusualWhalesError as exc:
+        _logger.warning("earnings fetch failed for %s: %s", ticker, exc)
+        ctx["next_earnings"] = None
     return str(iv0.get("date", "")), ctx
 
 
