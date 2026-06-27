@@ -6,7 +6,7 @@ from webapp.notability import notability_score
 
 
 def _base() -> dict[str, float | bool | int]:
-    return dict(premium=50_000.0, aggressive=False, cluster_count=1,
+    return dict(premium=50_000.0, aggressive=False, cluster_density=0.0,
                 age_minutes=30.0, dte=30)
 
 
@@ -22,8 +22,8 @@ def test_aggressive_scores_higher() -> None:
 
 
 def test_more_clustering_scores_higher() -> None:
-    assert notability_score(**{**_base(), "cluster_count": 5}) > \
-           notability_score(**{**_base(), "cluster_count": 1})
+    assert notability_score(**{**_base(), "cluster_density": 0.8}) > \
+           notability_score(**{**_base(), "cluster_density": 0.0})
 
 
 def test_fresher_scores_higher() -> None:

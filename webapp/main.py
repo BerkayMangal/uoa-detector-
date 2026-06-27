@@ -165,8 +165,7 @@ def _signal_notability(sig: object) -> float:
       - premium      -> ``premium`` (Decimal, $ paid)
       - aggressive   -> ``sweep_classification`` present OR ``is_iso`` (there is
                         NO fill_side/at-ask field on StoredSignal)
-      - cluster_count-> no count field exists (only the float
-                        ``cluster_density_score``); default 1
+      - cluster_density-> ``cluster_density_score`` (0..1; 0.0 if absent)
       - age_minutes  -> derived from ``timestamp`` vs now(UTC) (no age field)
       - dte          -> ``dte`` (int)
     getattr defaults keep ordering safe if any field is missing/renamed."""
@@ -187,7 +186,7 @@ def _signal_notability(sig: object) -> float:
     return notability_score(
         premium=premium,
         aggressive=aggressive,
-        cluster_count=int(getattr(sig, "cluster_count", 1) or 1),
+        cluster_density=float(getattr(sig, "cluster_density_score", 0.0) or 0.0),
         age_minutes=age_minutes,
         dte=int(getattr(sig, "dte", 30) or 30),
     )
