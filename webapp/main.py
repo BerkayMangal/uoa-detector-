@@ -283,11 +283,27 @@ def journal_page(request: Request) -> HTMLResponse:
 
 
 @app.get("/journal/new", response_class=HTMLResponse)
-def journal_new(request: Request, run: str = "", event: str = "") -> HTMLResponse:
+def journal_new(
+    request: Request, run: str = "", event: str = "", ticker: str = "",
+) -> HTMLResponse:
     signal = _safe(lambda: _repo().get_signal(run, event), None) if run and event else None
+    # Vol-board "Log to journal" links here with ?ticker=; with no signal, prefill
+    # the ticker (and a vol-structure thesis from its live gamma regime, if any)
+    # so the form isn't blank — closing the board -> journal loop.
+    prefill_ticker = ticker.upper() if ticker and signal is None else ""
+    prefill_thesis = ""
+    if prefill_ticker:
+        g = _safe(lambda: _gamma().latest().get(prefill_ticker), None)
+        if g is not None:
+            prefill_thesis = (
+                f"Vol-premium board: {prefill_ticker} — "
+                f"{explanations.vol_structure(regime=g.regime)}"
+            )
     return templates.TemplateResponse(
         request, "trade_form.html",
-        {"signal": signal, "run": run, "event": event, **_EXPLAIN},
+        {"signal": signal, "run": run, "event": event,
+         "prefill_ticker": prefill_ticker, "prefill_thesis": prefill_thesis,
+         **_EXPLAIN},
     )
 
 

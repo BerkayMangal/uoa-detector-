@@ -15,12 +15,17 @@
     &middot; {{ signal.label.value }} (score {{ '%.2f'|format(signal.combined_score_post_penalty) if signal.combined_score_post_penalty is not none else '—' }}).
     Adjust the entry price to your actual fill, set your size, and write your thesis.
   </p>
+  {% elif prefill_ticker %}
+  <p class="text-sm text-gray-400 mb-4 rounded border border-gray-800 bg-gray-900/40 px-3 py-2">
+    Pre-filled from the vol-premium board: <span class="text-gray-200 font-semibold">{{ prefill_ticker }}</span>.
+    Set your structure, size, and entry, and confirm your thesis.
+  </p>
   {% endif %}
 
   <form method="post" action="/journal" class="grid gap-4 sm:grid-cols-2">
     <label class="text-sm">
       <span class="block text-gray-400 mb-1">Ticker</span>
-      <input name="ticker" required value="{{ signal.ticker if signal else '' }}"
+      <input name="ticker" required value="{{ signal.ticker if signal else prefill_ticker }}"
              class="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1.5 text-gray-100 uppercase">
     </label>
 
@@ -67,7 +72,7 @@
 
     <label class="text-sm sm:col-span-2">
       <span class="block text-gray-400 mb-1">Thesis &mdash; why are you taking this? (your read)</span>
-      <textarea name="thesis" rows="2" class="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1.5 text-gray-100"></textarea>
+      <textarea name="thesis" rows="2" class="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1.5 text-gray-100">{{ prefill_thesis }}</textarea>
     </label>
 
     <input type="hidden" name="signal_run_id" value="{{ run }}">

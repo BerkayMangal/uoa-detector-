@@ -57,3 +57,21 @@ def test_threshold_divider_between_rich_and_thin(monkeypatch) -> None:
     # threshold divider is rendered once between them.
     body = _body(monkeypatch, {"RICH": _ctx("RICH", 0.9), "THIN": _ctx("THIN", 0.5)})
     assert "rich-vol threshold" in body
+
+
+def test_journal_new_prefills_from_vol_board_ticker(monkeypatch) -> None:
+    # The vol-board "Log to journal" link is /journal/new?ticker=X. With no
+    # signal, the form must prefill the ticker + a vol-structure thesis (was a
+    # blank form — the broken loop this fixes).
+    import webapp.main as m
+
+    class _G:
+        def latest(self) -> dict[str, object]:
+            return {"NVDA": _ctx("NVDA", 0.9)}  # net_gex>0 -> long regime
+
+    monkeypatch.setattr(m, "_gamma", lambda: _G())
+    body = TestClient(m.app).get("/journal/new?ticker=nvda").text
+    assert 'value="NVDA"' in body                       # ticker prefilled
+    assert "Vol-premium board: NVDA" in body            # thesis prefilled
+    assert "iron fly" in body                            # long-gamma structure
+    assert "Pre-filled from the vol-premium board" in body
