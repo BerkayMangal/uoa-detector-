@@ -24,7 +24,7 @@ from webapp import explanations, gamma, journal, pricing
 from webapp.gamma_live import gamma_refresh_loop
 from webapp.notability import notability_score
 from webapp.repo import SignalFilters, SignalRepo
-from webapp.vol_board import build_vol_board
+from webapp.vol_board import build_vol_board, vol_board_summary
 from webapp.worker import live_config_from_env, run_live_worker
 
 if TYPE_CHECKING:
@@ -250,6 +250,7 @@ def dashboard(
             "sort": sort,
             "gamma": gamma_ctx,
             "vol_board": vol_rows,
+            "vol_summary": vol_board_summary(vol_rows),
             # Vol-board copy helpers (Task 7 template needs these callable).
             "vol_structure": explanations.vol_structure,
             "vol_read": explanations.vol_read,

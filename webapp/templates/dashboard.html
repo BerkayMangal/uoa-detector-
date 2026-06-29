@@ -116,9 +116,10 @@
      charge, not free premium). Descriptive only — no prescriptive language. -->
 {% if vol_board %}
 <section class="mb-8">
-  <div class="flex items-center justify-between mb-3">
+  <div class="flex items-center justify-between mb-1">
     <h2 class="text-lg font-bold text-white">Vol-premium board <span class="text-sm font-normal text-gray-500">· ranked by IV-rank · context only</span></h2>
   </div>
+  {% if vol_summary %}<p class="text-sm text-gray-400 mb-3">{{ vol_summary }}</p>{% endif %}
   <div class="grid gap-4 xl:grid-cols-2">
   {% set ns = namespace(crossed=false) %}
   {% for row in vol_board %}

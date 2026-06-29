@@ -6,7 +6,7 @@ import math
 from datetime import date
 
 from webapp.gamma import GammaContext
-from webapp.vol_board import VolBoardRow, build_vol_board
+from webapp.vol_board import VolBoardRow, build_vol_board, vol_board_summary
 
 
 def _ctx(ticker: str, iv_pct: float | None, *, net_gex: float = 1.0,
@@ -81,6 +81,20 @@ def test_none_atm_iv_gives_none_expected_move() -> None:
         now=date(2026, 6, 26),
     )
     assert rows[0].expected_move_pct is None
+
+
+def test_vol_board_summary_counts() -> None:
+    rows = build_vol_board(
+        {"A": _ctx("A", 0.90), "B": _ctx("B", 0.50),
+         "C": _ctx("C", 0.95, net_gex=-1.0)},
+        earnings={"C": date(2026, 7, 5)}, now=date(2026, 6, 26),
+    )
+    s = vol_board_summary(rows)
+    assert "3 names" in s
+    assert "1 rich-vol clean" in s          # A only (B below thresh, C earnings)
+    assert "1 with earnings in window" in s  # C
+    assert "regime: 2 long / 1 short" in s
+    assert vol_board_summary([]) == ""
 
 
 def test_row_carries_regime_and_walls() -> None:

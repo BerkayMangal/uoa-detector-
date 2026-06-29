@@ -72,5 +72,23 @@ def build_vol_board(
     return rows
 
 
+def vol_board_summary(rows: list[VolBoardRow]) -> str:
+    """One-line descriptive triage of the board (NOT a call). Empty for no rows."""
+    if not rows:
+        return ""
+    total = len(rows)
+    rich_clean = sum(1 for r in rows if not r.below_threshold and not r.earnings_in_window)
+    earnings_n = sum(1 for r in rows if r.earnings_in_window)
+    longs = sum(1 for r in rows if r.regime == "long")
+    parts = [
+        f"{total} name{'s' if total != 1 else ''}",
+        f"{rich_clean} rich-vol clean (IV-rank ≥75)",
+    ]
+    if earnings_n:
+        parts.append(f"{earnings_n} with earnings in window")
+    parts.append(f"regime: {longs} long / {total - longs} short")
+    return " · ".join(parts)
+
+
 def _add_days(d: date, n: int) -> date:
     return date.fromordinal(d.toordinal() + n)
