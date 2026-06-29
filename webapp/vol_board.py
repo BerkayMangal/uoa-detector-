@@ -28,6 +28,8 @@ class VolBoardRow:
     put_wall: float | None
     earnings_in_window: bool
     earnings_date: date | None
+    catalyst_in_window: bool         # a non-earnings catalyst (fomc/fda/...) in window
+    catalyst_kind: str | None        # kind of that catalyst, when flagged
     below_threshold: bool            # iv_pct < rich_threshold
     as_of: str                       # gamma snapshot date (freshness)
     realized_vol: float | None       # annualised ~21d realised vol
@@ -51,9 +53,15 @@ def build_vol_board(
     """Order names for the board: clean (no earnings in window) first, then
     earnings names; within each group, IV-rank descending (None last)."""
     rows: list[VolBoardRow] = []
+    horizon = _add_days(now, window_days)
     for ticker, ctx in contexts.items():
         edate = earnings.get(ticker)
-        in_window = edate is not None and now <= edate <= _add_days(now, window_days)
+        in_window = edate is not None and now <= edate <= horizon
+        # Any catalyst (fomc/fda/M&A/...) in window also justifies the high IV.
+        cdate = ctx.next_catalyst
+        cat_in_window = cdate is not None and now <= cdate <= horizon
+        # Earnings badge takes priority; only flag a *non-earnings* catalyst here.
+        cat_flag = cat_in_window and not in_window
         iv_rank = None if ctx.iv_pct is None else round(ctx.iv_pct * 100)
         rows.append(VolBoardRow(
             ticker=ticker,
@@ -66,13 +74,19 @@ def build_vol_board(
             put_wall=ctx.put_wall,
             earnings_in_window=in_window,
             earnings_date=edate,
+            catalyst_in_window=cat_flag,
+            catalyst_kind=ctx.catalyst_kind if cat_flag else None,
             below_threshold=(ctx.iv_pct is None or ctx.iv_pct < rich_threshold),
             as_of=ctx.as_of,
             realized_vol=ctx.realized_vol,
             vrp_pct=ctx.vrp_pct,
         ))
-    # Sort key: clean before earnings; then IV-rank desc (None -> -1, sorts last).
-    rows.sort(key=lambda r: (r.earnings_in_window, -(r.iv_rank if r.iv_rank is not None else -1)))
+    # Sort key: clean (no catalyst) before names with an earnings/catalyst in
+    # window; then IV-rank desc (None -> -1, sorts last).
+    rows.sort(key=lambda r: (
+        r.earnings_in_window or r.catalyst_in_window,
+        -(r.iv_rank if r.iv_rank is not None else -1),
+    ))
     return rows
 
 
@@ -81,7 +95,10 @@ def vol_board_summary(rows: list[VolBoardRow]) -> str:
     if not rows:
         return ""
     total = len(rows)
-    rich_clean = sum(1 for r in rows if not r.below_threshold and not r.earnings_in_window)
+    rich_clean = sum(
+        1 for r in rows
+        if not r.below_threshold and not r.earnings_in_window and not r.catalyst_in_window
+    )
     earnings_n = sum(1 for r in rows if r.earnings_in_window)
     longs = sum(1 for r in rows if r.regime == "long")
     parts = [

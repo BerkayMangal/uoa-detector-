@@ -52,6 +52,8 @@ class GammaRow(_Base):
     iv_pct: Mapped[float | None] = mapped_column(Float, nullable=True)  # 0..1 within own history
     realized_vol: Mapped[float | None] = mapped_column(Float, nullable=True)  # annualised, ~21d
     next_earnings: Mapped[str | None] = mapped_column(String, nullable=True)  # ISO date
+    next_catalyst: Mapped[str | None] = mapped_column(String, nullable=True)  # ISO date, any kind
+    catalyst_kind: Mapped[str | None] = mapped_column(String, nullable=True)  # earnings/fomc/fda/...
 
 
 @dataclass(frozen=True)
@@ -67,6 +69,8 @@ class GammaContext:
     iv_pct: float | None = None
     realized_vol: float | None = None
     next_earnings: date | None = None
+    next_catalyst: date | None = None
+    catalyst_kind: str | None = None
 
     @property
     def vrp_pct(self) -> float | None:
@@ -226,6 +230,8 @@ class GammaRepo:
             row.iv_pct = m.get("iv_pct")
             row.realized_vol = m.get("realized_vol")
             row.next_earnings = m.get("next_earnings")  # type: ignore[assignment]
+            row.next_catalyst = m.get("next_catalyst")  # type: ignore[assignment]
+            row.catalyst_kind = m.get("catalyst_kind")  # type: ignore[assignment]
             s.add(row)
             s.commit()
 
@@ -238,6 +244,8 @@ class GammaRepo:
                 flip=r.flip, call_wall=r.call_wall, put_wall=r.put_wall,
                 atm_iv=r.atm_iv, iv_pct=r.iv_pct, realized_vol=r.realized_vol,
                 next_earnings=date.fromisoformat(r.next_earnings) if r.next_earnings else None,
+                next_catalyst=date.fromisoformat(r.next_catalyst) if r.next_catalyst else None,
+                catalyst_kind=r.catalyst_kind,
             )
             for r in rows
         }

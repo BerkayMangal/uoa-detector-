@@ -39,6 +39,19 @@ def test_realized_vol_persist_and_vrp_property(tmp_path) -> None:
     assert ctx.vrp_pct == 15.0  # (0.50 - 0.35) * 100
 
 
+def test_catalyst_persist_and_parse(tmp_path) -> None:
+    repo = GammaRepo(f"sqlite:///{tmp_path/'g.db'}")
+    repo.reset()
+    repo.upsert("SPY", "2026-06-26", {
+        "spot": 500.0, "net_gex": 1.0, "flip": None, "call_wall": None,
+        "put_wall": None, "atm_iv": 0.18, "iv_pct": 0.6,
+        "next_catalyst": "2026-07-29", "catalyst_kind": "fomc",
+    })
+    ctx = repo.latest()["SPY"]
+    assert ctx.next_catalyst == date(2026, 7, 29)
+    assert ctx.catalyst_kind == "fomc"
+
+
 def test_vrp_pct_none_without_both_legs() -> None:
     from webapp.gamma import GammaContext
     c = GammaContext(ticker="X", as_of="d", spot=1.0, net_gex=1.0, flip=None,

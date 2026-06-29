@@ -47,6 +47,23 @@ def test_earnings_outside_window_not_demoted() -> None:
     assert rows[0].earnings_in_window is False
 
 
+def test_non_earnings_catalyst_in_window_demotes_and_flags() -> None:
+    with_cat = GammaContext(
+        ticker="CAT", as_of="2026-06-26", spot=100.0, net_gex=1.0, flip=None,
+        call_wall=110.0, put_wall=90.0, atm_iv=0.5, iv_pct=0.97,
+        next_catalyst=date(2026, 7, 5), catalyst_kind="fomc")  # 9d out, in window
+    rows = build_vol_board(
+        {"CLEAN": _ctx("CLEAN", 0.95), "CAT": with_cat},
+        earnings={}, now=date(2026, 6, 26),
+    )
+    # CLEAN (no catalyst) ranks above CAT despite lower IV-rank.
+    assert [r.ticker for r in rows] == ["CLEAN", "CAT"]
+    cat = next(r for r in rows if r.ticker == "CAT")
+    assert cat.catalyst_in_window is True
+    assert cat.catalyst_kind == "fomc"
+    assert next(r for r in rows if r.ticker == "CLEAN").catalyst_in_window is False
+
+
 def test_below_threshold_flag() -> None:
     rows = build_vol_board(
         {"RICH": _ctx("RICH", 0.80), "THIN": _ctx("THIN", 0.50)},

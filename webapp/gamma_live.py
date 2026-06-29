@@ -26,6 +26,9 @@ from uoa_detector.sources.unusual_whales.client import (
     UnusualWhalesClient,
     UnusualWhalesError,
 )
+from uoa_detector.sources.unusual_whales.providers.catalyst_calendar import (
+    UnusualWhalesCatalystCalendarProvider,
+)
 from webapp.gamma import GammaRepo
 
 _logger = logging.getLogger(__name__)
@@ -141,7 +144,11 @@ def _realized_vol(resp: object, *, window: int = 21) -> float | None:
     return math.sqrt(var) * math.sqrt(252)
 
 
-async def fetch_one(client: UnusualWhalesClient, ticker: str) -> tuple[str, dict[str, float | None]] | None:
+async def fetch_one(
+    client: UnusualWhalesClient,
+    ticker: str,
+    catalyst_provider: UnusualWhalesCatalystCalendarProvider | None = None,
+) -> tuple[str, dict[str, float | None]] | None:
     try:
         gex = await client.request_json(f"/api/stock/{ticker.upper()}/greek-exposure/strike")
         ivr = await client.request_json(f"/api/stock/{ticker.upper()}/iv-rank")
@@ -169,13 +176,28 @@ async def fetch_one(client: UnusualWhalesClient, ticker: str) -> tuple[str, dict
     except UnusualWhalesError as exc:
         _logger.warning("ohlc/realized-vol fetch failed for %s: %s", ticker, exc)
         ctx["realized_vol"] = None
+    ctx["next_catalyst"] = None
+    ctx["catalyst_kind"] = None
+    if catalyst_provider is not None:
+        try:
+            cat = await catalyst_provider.next_catalyst(ticker.upper(), datetime.now(UTC))
+            if cat is not None:
+                ctx["next_catalyst"] = cat.when.date().isoformat()
+                ctx["catalyst_kind"] = cat.kind
+        except UnusualWhalesError as exc:
+            _logger.warning("catalyst fetch failed for %s: %s", ticker, exc)
     return str(iv0.get("date", "")), ctx
 
 
-async def refresh_all(client: UnusualWhalesClient, tickers: list[str], repo: GammaRepo) -> int:
+async def refresh_all(
+    client: UnusualWhalesClient,
+    tickers: list[str],
+    repo: GammaRepo,
+    catalyst_provider: UnusualWhalesCatalystCalendarProvider | None = None,
+) -> int:
     done = 0
     for ticker in tickers:
-        result = await fetch_one(client, ticker)
+        result = await fetch_one(client, ticker, catalyst_provider)
         if result is not None:
             as_of, ctx = result
             repo.upsert(ticker, as_of, ctx)
@@ -214,8 +236,11 @@ async def gamma_refresh_loop(
                 api_key=Credentials().unusual_whales_api_key,
                 settings=profile.data_sources.unusual_whales,
             )
+            catalyst_provider = UnusualWhalesCatalystCalendarProvider(
+                client, profile.data_sources.unusual_whales,
+            )
             try:
-                n = await refresh_all(client, tickers, repo)
+                n = await refresh_all(client, tickers, repo, catalyst_provider)
                 _logger.info("gamma map refreshed: %d/%d tickers", n, len(tickers))
             finally:
                 await client.aclose()
