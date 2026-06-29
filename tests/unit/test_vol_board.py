@@ -102,6 +102,15 @@ def test_vol_structure_is_defined_risk_template_no_buy_word() -> None:
     assert "buy" not in txt.lower()
 
 
+def test_vol_structure_differs_by_regime() -> None:
+    long_t = vol_structure(regime="long")
+    short_t = vol_structure(regime="short")
+    assert long_t != short_t
+    assert "iron fly" in long_t        # long-gamma suppresses -> symmetric body
+    assert "credit spread" in short_t  # short-gamma amplifies -> one-sided
+    assert "buy" not in short_t.lower()
+
+
 def test_vol_read_mentions_iv_rank_and_earnings_flag() -> None:
     clean = vol_read(iv_rank=88, earnings_in_window=False)
     assert "88" in clean and "earnings" in clean.lower()

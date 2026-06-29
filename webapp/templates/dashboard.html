@@ -120,7 +120,16 @@
     <h2 class="text-lg font-bold text-white">Vol-premium board <span class="text-sm font-normal text-gray-500">· ranked by IV-rank · context only</span></h2>
   </div>
   <div class="grid gap-4 xl:grid-cols-2">
+  {% set ns = namespace(crossed=false) %}
   {% for row in vol_board %}
+    {% if row.below_threshold and not ns.crossed %}
+    <div class="xl:col-span-2 flex items-center gap-3 text-xs text-gray-600 my-1">
+      <span class="flex-1 h-px bg-gray-800"></span>
+      <span class="shrink-0">rich-vol threshold · IV-rank 75 — below here vol is less rich to sell</span>
+      <span class="flex-1 h-px bg-gray-800"></span>
+    </div>
+    {% set ns.crossed = true %}
+    {% endif %}
     <article class="rounded-xl border border-gray-800 bg-gray-900/60 p-4 {{ 'opacity-50' if row.below_threshold else '' }}">
       <!-- Top line: ticker · IV-rank bar · ATM IV · expected move -->
       <div class="flex items-start justify-between gap-3">
@@ -184,6 +193,17 @@
       </div>
     </article>
   {% endfor %}
+  </div>
+</section>
+{% else %}
+<!-- Empty state: gamma_regime is only populated from live dealer-gamma during US
+     market hours, so the board is empty pre-open / overnight / weekends. Show the
+     header + an honest reason instead of hiding the section entirely. -->
+<section class="mb-8">
+  <h2 class="text-lg font-bold text-white mb-2">Vol-premium board <span class="text-sm font-normal text-gray-500">· ranked by IV-rank · context only</span></h2>
+  <div class="rounded-xl border border-gray-800 bg-gray-900/40 p-4 text-sm text-gray-400">
+    No live vol data right now — the board is built from live dealer-gamma and
+    populates during US market hours (13:30–21:00 UTC). Check back after the open.
   </div>
 </section>
 {% endif %}

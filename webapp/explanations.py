@@ -151,9 +151,17 @@ def conviction(score: float | None) -> tuple[str, int]:
 
 def vol_structure(*, regime: str) -> str:
     """Defined-risk structure TEMPLATE (type, not strikes) for harvesting vol
-    premium. Honesty: a template the user sizes/strikes — never a recommendation."""
-    base = "~30 DTE, ~30Δ iron fly or credit spread — collect vol premium, defined risk"
-    return base if regime == "long" else base + " (short-gamma: moves amplify, keep size small)"
+    premium, tailored to the gamma regime. Honesty: a template the user
+    sizes/strikes — never a recommendation."""
+    if regime == "long":
+        # Dealers long gamma -> moves suppressed / range-bound: a symmetric body
+        # collects the most premium, wings cap the risk.
+        return ("~30 DTE ~30Δ iron fly — long-gamma suppresses moves, so a pinned "
+                "range favours the short body; the wings cap the risk. You size/strike it.")
+    # Dealers short gamma -> moves amplified / breakout risk: skip the symmetric
+    # fly, take one side, keep size small.
+    return ("~30 DTE ~30Δ credit spread (one side) — short-gamma amplifies moves, "
+            "so skip the symmetric fly; defined risk, keep size small. You size/strike it.")
 
 
 def vol_read(*, iv_rank: int, earnings_in_window: bool) -> str:
