@@ -89,6 +89,7 @@ def test_row_carries_regime_and_walls() -> None:
     r = rows[0]
     assert r.regime == "short"
     assert r.call_wall == 110.0 and r.put_wall == 90.0
+    assert r.as_of == "2026-06-26"  # freshness carried from the gamma snapshot
     assert isinstance(r, VolBoardRow)
 
 
