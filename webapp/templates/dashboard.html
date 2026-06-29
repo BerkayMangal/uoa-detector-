@@ -170,6 +170,18 @@
           <div class="text-base font-semibold text-gray-200">±{{ row.expected_move_pct }}% /30d</div>
         </div>
         {% endif %}
+        {% if row.realized_vol is not none %}
+        <div>
+          <div class="text-[10px] text-gray-500 uppercase tracking-wide">Realized vol</div>
+          <div class="text-base font-semibold text-gray-200">{{ '%.0f'|format(row.realized_vol*100) }}%</div>
+        </div>
+        {% endif %}
+        {% if row.vrp_pct is not none %}
+        <div>
+          <div class="text-[10px] text-gray-500 uppercase tracking-wide">Premium (IV−RV)</div>
+          <div class="text-base font-semibold {{ 'text-emerald-300' if row.vrp_pct > 0 else 'text-red-300' }}">{{ '%+.1f'|format(row.vrp_pct) }} pts</div>
+        </div>
+        {% endif %}
       </div>
 
       <!-- Defined-risk structure template (type, not strikes) -->

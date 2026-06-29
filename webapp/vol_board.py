@@ -30,6 +30,8 @@ class VolBoardRow:
     earnings_date: date | None
     below_threshold: bool            # iv_pct < rich_threshold
     as_of: str                       # gamma snapshot date (freshness)
+    realized_vol: float | None       # annualised ~21d realised vol
+    vrp_pct: float | None            # implied − realized, vol points (the premium)
 
 
 def _expected_move_pct(atm_iv: float | None, window_days: int) -> float | None:
@@ -66,6 +68,8 @@ def build_vol_board(
             earnings_date=edate,
             below_threshold=(ctx.iv_pct is None or ctx.iv_pct < rich_threshold),
             as_of=ctx.as_of,
+            realized_vol=ctx.realized_vol,
+            vrp_pct=ctx.vrp_pct,
         ))
     # Sort key: clean before earnings; then IV-rank desc (None -> -1, sorts last).
     rows.sort(key=lambda r: (r.earnings_in_window, -(r.iv_rank if r.iv_rank is not None else -1)))

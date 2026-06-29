@@ -15,6 +15,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
+import math
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -113,6 +114,33 @@ def _next_earnings_date(resp: object, *, today: str) -> str | None:
     return future[0] if future else None
 
 
+def _realized_vol(resp: object, *, window: int = 21) -> float | None:
+    """Annualised close-to-close realised vol from a UW /api/stock/{t}/ohlc/1d
+    payload (last ~window closes). None if too little data. Pure."""
+    data = resp.get("data") if isinstance(resp, dict) else None
+    if not isinstance(data, list):
+        return None
+    closes: list[float] = []
+    for d in data:
+        if not isinstance(d, dict):
+            continue
+        try:
+            c = float(d["close"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        if c > 0:
+            closes.append(c)
+    closes = closes[-window:]
+    if len(closes) < 5:
+        return None
+    rets = [math.log(closes[i] / closes[i - 1]) for i in range(1, len(closes))]
+    if len(rets) < 2:
+        return None
+    mean = sum(rets) / len(rets)
+    var = sum((r - mean) ** 2 for r in rets) / (len(rets) - 1)
+    return math.sqrt(var) * math.sqrt(252)
+
+
 async def fetch_one(client: UnusualWhalesClient, ticker: str) -> tuple[str, dict[str, float | None]] | None:
     try:
         gex = await client.request_json(f"/api/stock/{ticker.upper()}/greek-exposure/strike")
@@ -135,6 +163,12 @@ async def fetch_one(client: UnusualWhalesClient, ticker: str) -> tuple[str, dict
     except UnusualWhalesError as exc:
         _logger.warning("earnings fetch failed for %s: %s", ticker, exc)
         ctx["next_earnings"] = None
+    try:
+        o_resp = await client.request_json(f"/api/stock/{ticker.upper()}/ohlc/1d")
+        ctx["realized_vol"] = _realized_vol(o_resp)
+    except UnusualWhalesError as exc:
+        _logger.warning("ohlc/realized-vol fetch failed for %s: %s", ticker, exc)
+        ctx["realized_vol"] = None
     return str(iv0.get("date", "")), ctx
 
 
