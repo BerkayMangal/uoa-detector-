@@ -18,9 +18,10 @@ The four data dependencies Phase 3.5 needs:
      into `Credentials` and the live HTTP client connects.
   2. **`THETADATA_API_KEY` + `THETADATA_USERNAME`** — ThetaData Pro
      credentials in `.env` resolve and ThetaData smokes pass.
-  3. **Theta Terminal running locally** — Java app reachable on
-     `127.0.0.1:25510`, logged in cleanly. ThetaData historical
-     smokes fail to connect without it.
+  3. **Theta Terminal v3 running locally** — Java app reachable on
+     `127.0.0.1:25503` (v3 default; v2's 25510 is retired per Phase
+     3.3.7), logged in cleanly. ThetaData historical smokes fail to
+     connect without it.
   4. **All eight per-module integration smokes** — M21 through M28
      smokes hit live UW (and ThetaData for M23) endpoints and
      return well-formed responses.
@@ -42,11 +43,11 @@ Berkay confirms each item before starting:
   THETADATA_USERNAME=<your_thetadata_email>
   ```
   (`.env` is gitignored — verified via Phase 3.3.1 pre-commit hook)
-- [ ] Theta Terminal running on this machine:
+- [ ] Theta Terminal v3 running on this machine:
   - Download from thetadata.net dashboard if not installed
-  - Launch with `java -jar ThetaTerminal.jar`
+  - Launch with `java -jar ThetaTerminalv3.jar`
   - Verify it logs in cleanly (no auth errors in its console)
-  - Verify reachable: `curl http://127.0.0.1:25510/v2/list/exchanges`
+  - Verify reachable: `curl http://127.0.0.1:25503/v3/option/list/symbols?format=json`
     returns JSON, not connection refused
 - [ ] Local `phase-3` branch checked out at HEAD `559e4f5` or later
   (Phase 3.5 acceptance contract committed)
@@ -136,9 +137,11 @@ uv run mypy --strict src/
 uv run ruff check .
 ```
 
-Expected: `1391 passed, 0 skipped` (or `1 skipped` outside market
-hours), mypy clean, ruff clean. If anything else changed, that's
-unexpected — investigate before continuing.
+Expected: ~`1429 passed` with the integration smokes now also passing
+(they skip only when keys are absent), `0-1 skipped` (the lone
+live_market test skips outside market hours), mypy clean, ruff clean.
+If anything else changed, that's unexpected — investigate before
+continuing.
 
 ---
 
@@ -208,7 +211,7 @@ If you encounter one of these, the fix is documented:
 
 | Symptom | Likely cause | Fix |
 |---------|--------------|-----|
-| ThetaData smokes fail with `connection refused` to 127.0.0.1:25510 | Theta Terminal not running | Launch `java -jar ThetaTerminal.jar`, wait for "logged in" message, retry |
+| ThetaData smokes fail with `connection refused` to 127.0.0.1:25503 | Theta Terminal v3 not running | Launch `java -jar ThetaTerminalv3.jar`, wait for "logged in" message, retry |
 | UW smokes fail with HTTP 403 | UW API key invalid or wrong tier | Verify key in UW dashboard; ensure Pro tier subscription active |
 | UW smokes fail with HTTP 429 | Rate limit hit | Lower `data_sources.unusual_whales.rate_limit_requests_per_second` in profile (default in v5_default.yaml); wait 60s and retry |
 | Credentials load tests skip | `.env` not at repo root or wrong variable names | Check `.env` exists; variable names exactly match the three documented above |
