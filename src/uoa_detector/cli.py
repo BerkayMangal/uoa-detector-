@@ -583,8 +583,23 @@ def backtest_report(
         help="PnL provider for the report. 'noop' (default) treats every "
              "decision as an open trade — useful for confirming wiring and "
              "diagnosing whether decisions reached the store at all. "
-             "'simple' (Phase 3.3+) needs an exit-quote source; not "
-             "available in 3.2.3.",
+             "'simple' (Phase 3.5.0) prices positioned signals with "
+             "SimplePnL + the parquet exit-quote source (needs "
+             "--replay-data).",
+    ),
+    replay_data: Path | None = typer.Option(
+        None,
+        "--replay-data",
+        help="--pnl simple only: per-source parquet root the exit-quote "
+             "source reads (layout {root}/{ticker}/{YYYY-MM}.parquet). "
+             "Required when --pnl simple.",
+    ),
+    profile_path: Path | None = typer.Option(
+        None,
+        "--profile",
+        help="--pnl simple only: CalibrationProfile YAML supplying the "
+             "backtest config (slippage / holding strategy). Defaults to "
+             "v5_default.",
     ),
     walk_forward_windows: int = typer.Option(
         8,
@@ -596,21 +611,21 @@ def backtest_report(
     """Read signals for a run from the store, compute metrics, print
     a pass/fail table to stdout.
 
-    Phase 3.2.3.5 scope: report rendering only. The default ``--pnl
-    noop`` reports every decision as open and is intended to confirm
-    that the run made it to the store. ``--pnl simple`` requires an
-    exit-quote source from the replay stream (Phase 3.3).
+    The default ``--pnl noop`` reports every decision as an open trade —
+    a wiring check. ``--pnl simple`` (Phase 3.5.0) prices every
+    positioned signal (``max_r > 0``, pinned decision #1) with
+    ``SimplePnLProvider`` fed by a ``ParquetExitQuoteProvider`` over
+    ``--replay-data``.
     """
-    if pnl == "simple":
-        msg = (
-            "--pnl simple requires an exit-quote source wired from the "
-            "replay stream. Not available in Phase 3.2.3 — the first "
-            "real-quote-driven backtest report lands in Phase 3.3."
-        )
+    if pnl not in ("noop", "simple"):
+        msg = f"--pnl must be 'noop' or 'simple'; got {pnl!r}"
         raise typer.BadParameter(msg, param_hint="--pnl")
-    if pnl != "noop":
-        msg = f"--pnl must be 'noop' (or 'simple', not yet wired); got {pnl!r}"
-        raise typer.BadParameter(msg, param_hint="--pnl")
+    if pnl == "simple" and replay_data is None:
+        msg = "--replay-data is required when --pnl simple"
+        raise typer.BadParameter(msg, param_hint="--replay-data")
+    if pnl == "simple" and replay_data is not None and not replay_data.exists():
+        msg = f"--replay-data path does not exist: {replay_data}"
+        raise typer.BadParameter(msg, param_hint="--replay-data")
 
     store = _build_store(store_url)
     try:
@@ -622,8 +637,22 @@ def backtest_report(
         typer.echo(f"No signals found for run_id={run_id!r} in {store_url!r}.")
         raise typer.Exit(code=1)
 
-    provider = NoOpPnLProvider()
-    trades = [provider.provide(s) for s in signals]
+    if pnl == "simple":
+        assert replay_data is not None  # guarded above
+        from uoa_detector.backtest import (
+            ParquetExitQuoteProvider,
+            SimplePnLProvider,
+        )
+
+        profile = _resolve_profile(profile_path)
+        exit_quotes = ParquetExitQuoteProvider(replay_data)
+        simple = SimplePnLProvider(profile.backtest, exit_quotes)
+        # Pinned decision #1: one trade per positioned signal.
+        trades = [simple.provide(s) for s in signals if s.max_r > 0.0]
+    else:
+        noop = NoOpPnLProvider()
+        trades = [noop.provide(s) for s in signals]
+
     metrics = compute_metrics(
         trades, walk_forward_windows=walk_forward_windows,
     )
