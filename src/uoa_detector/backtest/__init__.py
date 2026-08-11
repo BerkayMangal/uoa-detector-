@@ -51,6 +51,7 @@ from uoa_detector.backtest.protocol import BacktestStoreProtocol
 from uoa_detector.backtest.simple_pnl import (
     DictExitQuoteProvider,
     ExitQuoteProvider,
+    ParquetExitQuoteProvider,
     SimplePnLProvider,
 )
 from uoa_detector.backtest.sqlite_store import SqliteBacktestStore
@@ -80,6 +81,7 @@ __all__ = [
     "MetricThresholds",
     "MockPnLProvider",
     "NoOpPnLProvider",
+    "ParquetExitQuoteProvider",
     "ParquetSchemaMismatchError",
     "PnLProvider",
     "RealizedTrade",
