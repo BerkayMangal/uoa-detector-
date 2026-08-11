@@ -276,3 +276,88 @@ def test_run_4cell_is_deterministic_byte_identical_reports(
     bytes_a = report_a.read_bytes()
     bytes_b = report_b.read_bytes()
     assert bytes_a == bytes_b, "4-cell report is not byte-deterministic"
+
+
+# ---------------------------------------------------------------------------
+# Phase 3.5.0.5 — historical producer end-to-end proof over the synthetic
+# 4-cell engine fixture (SPY tier1 + PLTR tier2).
+# ---------------------------------------------------------------------------
+
+_FOURCELL_FIXTURE = "tests/fixtures/historical/synthetic_4cell"
+
+
+def _parse_metrics_table(report: str) -> dict[str, tuple[str, ...]]:
+    """Extract the metrics table rows keyed by cell name.
+
+    Each value is the tuple of stripped column cells:
+    (total_trades, sharpe, expectancy, walk_forward, max_dd, overall).
+    """
+    rows: dict[str, tuple[str, ...]] = {}
+    for line in report.splitlines():
+        stripped = line.strip()
+        if not stripped.startswith("| `") or "tier" not in stripped:
+            continue
+        cols = [c.strip() for c in stripped.strip("|").split("|")]
+        cell = cols[0].strip("`")
+        # The metrics table (total trades in col 1) is rendered before the
+        # per-metric pass/fail table; keep the first occurrence per cell.
+        rows.setdefault(cell, tuple(cols[1:]))
+    return rows
+
+
+def test_run_4cell_historical_produces_trades_per_cell(tmp_path: Path) -> None:
+    """>= 1 trade per cell and numeric falsification metrics (E, max DD)."""
+    report = tmp_path / "report.md"
+    result = runner.invoke(
+        app, [
+            "backtest", "run-4cell",
+            "--store", ":memory:",
+            "--report-path", str(report),
+            "--from", "2025-06-01", "--to", "2025-07-01",
+            "--walk-forward-windows", "4",
+            "--trades", "historical",
+            "--replay-data", _FOURCELL_FIXTURE,
+        ],
+    )
+    assert result.exit_code == 0, result.output
+
+    content = report.read_text(encoding="utf-8")
+    table = _parse_metrics_table(content)
+    assert set(table) == {
+        "tier1_single", "tier1_fusion", "tier2_single", "tier2_fusion",
+    }
+    for cell, cols in table.items():
+        total_trades = int(cols[0])
+        assert total_trades >= 1, f"cell {cell} produced no closed trades"
+        # Falsification-feeding metrics must be numeric, not n/a.
+        expectancy = cols[2]
+        max_dd = cols[4]
+        assert "n/a" not in expectancy, f"{cell} expectancy is n/a"
+        assert "n/a" not in max_dd, f"{cell} max DD is n/a"
+        float(expectancy.split()[0])  # parses as a number
+        float(max_dd.split()[0])
+
+    # The falsification section is always present.
+    assert "What would falsify Formülasyon A" in content
+
+
+def test_run_4cell_historical_report_is_byte_deterministic(
+    tmp_path: Path,
+) -> None:
+    report_a = tmp_path / "a.md"
+    report_b = tmp_path / "b.md"
+    common = [
+        "backtest", "run-4cell",
+        "--store", ":memory:",
+        "--from", "2025-06-01", "--to", "2025-07-01",
+        "--walk-forward-windows", "4",
+        "--trades", "historical",
+        "--replay-data", _FOURCELL_FIXTURE,
+    ]
+    result_a = runner.invoke(app, [*common, "--report-path", str(report_a)])
+    result_b = runner.invoke(app, [*common, "--report-path", str(report_b)])
+    assert result_a.exit_code == 0, result_a.output
+    assert result_b.exit_code == 0, result_b.output
+    assert report_a.read_bytes() == report_b.read_bytes(), (
+        "historical 4-cell report is not byte-deterministic"
+    )
