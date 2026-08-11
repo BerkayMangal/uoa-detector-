@@ -82,6 +82,11 @@ def test_run_4cell_rejects_invalid_iso_date(tmp_path: Path) -> None:
 
 
 def test_run_4cell_rejects_unknown_trades_mode(tmp_path: Path) -> None:
+    """Phase 3.5.0.3: 'historical' is now a valid producer, so the old
+
+    'must be noop / Phase 3.3 deferral' message is gone. An UNKNOWN mode
+    is still rejected, now naming the two valid modes.
+    """
     result = runner.invoke(
         app, [
             "backtest", "run-4cell",
@@ -93,13 +98,32 @@ def test_run_4cell_rejects_unknown_trades_mode(tmp_path: Path) -> None:
     )
     assert result.exit_code != 0
     # Typer box-wraps long error messages — strip the box-drawing
-    # characters and whitespace before asserting the deferral
-    # message is present.
+    # characters and whitespace before asserting on the message.
     cleaned = result.output.translate(
         str.maketrans({"│": " ", "╭": " ", "╮": " ", "╰": " ", "╯": " ", "─": " "}),
     )
     flat = " ".join(cleaned.split())
-    assert "Phase 3.3" in flat
+    assert "noop" in flat
+    assert "historical" in flat
+
+
+def test_run_4cell_historical_requires_replay_data(tmp_path: Path) -> None:
+    """--trades historical without --replay-data is rejected up front."""
+    result = runner.invoke(
+        app, [
+            "backtest", "run-4cell",
+            "--store", f"sqlite:{tmp_path}/x.db",
+            "--report-path", str(tmp_path / "r.md"),
+            "--from", "2025-06-01", "--to", "2025-07-01",
+            "--trades", "historical",
+        ],
+    )
+    assert result.exit_code != 0
+    cleaned = result.output.translate(
+        str.maketrans({"│": " ", "╭": " ", "╮": " ", "╰": " ", "╯": " ", "─": " "}),
+    )
+    flat = " ".join(cleaned.split())
+    assert "--replay-data is required" in flat
 
 
 # ---------------------------------------------------------------------------

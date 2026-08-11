@@ -41,11 +41,13 @@ import structlog
 import typer
 
 from uoa_detector.backtest import (
+    BacktestDataHandle,
     BacktestMetrics,
     BacktestStore,
     NoOpPnLProvider,
     SqliteBacktestStore,
     compute_metrics,
+    historical_trade_producer,
     noop_trade_producer,
     render_4cell_comparison_report,
     run_4cell_backtest,
@@ -732,8 +734,24 @@ def backtest_run_4cell(
         help="Trade producer. 'noop' (default) returns zero trades for "
              "every cell — the 4-cell plumbing runs end-to-end (start_run, "
              "finish_run, RunMetadata persisted, comparison report "
-             "rendered) but every cell reports 0 trades. Real trade "
-             "producers wired from the replay stream land in Phase 3.3.",
+             "rendered) but every cell reports 0 trades. 'historical' "
+             "(Phase 3.5.0) replays --replay-data through the pipeline, "
+             "prices positioned signals with SimplePnL + the parquet "
+             "exit-quote source, and reports real trades per cell.",
+    ),
+    replay_data: Path | None = typer.Option(
+        None,
+        "--replay-data",
+        help="Per-source parquet root for --trades historical, e.g. "
+             "data/historical/thetadata (layout "
+             "{root}/{ticker}/{YYYY-MM}.parquet). Required when "
+             "--trades historical; ignored for --trades noop.",
+    ),
+    source_id: str = typer.Option(
+        "historical",
+        "--source-id",
+        help="--trades historical only: source_id tag for the replay "
+             "harness. Defaults to 'historical'.",
     ),
 ) -> None:
     """Run the Formülasyon A 4-cell combinatorial backtest end-to-end.
@@ -743,18 +761,30 @@ def backtest_run_4cell(
     run_id in the SQLite store with universe_id = cell name. The
     comparison report is written to ``--report-path`` as markdown.
 
-    Phase 3.2.4 scope: orchestration + windowing + report rendering.
-    Real trade producers (driving the full pipeline through
-    fusion+orchestrator and writing signals to the store) land in
-    Phase 3.3 alongside the SimplePnL exit-quote source.
+    ``--trades noop`` (default) exercises orchestration + windowing +
+    report rendering with zero trades. ``--trades historical``
+    (Phase 3.5.0) replays ``--replay-data`` through the full pipeline
+    and prices positioned signals with SimplePnL + the parquet
+    exit-quote source, producing real per-cell trades.
     """
-    if trades != "noop":
+    if trades not in ("noop", "historical"):
         msg = (
-            f"--trades must be 'noop' in Phase 3.2.4; got {trades!r}. "
-            "Real trade producers wired from the replay stream land in "
-            "Phase 3.3."
+            f"--trades must be 'noop' or 'historical'; got {trades!r}."
         )
         raise typer.BadParameter(msg, param_hint="--trades")
+
+    data_handle: BacktestDataHandle | None = None
+    if trades == "historical":
+        if replay_data is None:
+            msg = "--replay-data is required when --trades historical"
+            raise typer.BadParameter(msg, param_hint="--replay-data")
+        if not replay_data.exists():
+            msg = f"--replay-data path does not exist: {replay_data}"
+            raise typer.BadParameter(msg, param_hint="--replay-data")
+        data_handle = BacktestDataHandle(
+            data_dir=replay_data,
+            source_id=source_id,
+        )
 
     # Parse period dates as UTC midnight.
     try:
@@ -771,6 +801,10 @@ def backtest_run_4cell(
     profile = _resolve_profile(profile_path)
     store = _build_store(store_url)
 
+    producer = (
+        historical_trade_producer if trades == "historical"
+        else noop_trade_producer
+    )
     try:
         results = run_4cell_backtest(
             profile=profile,
@@ -778,7 +812,8 @@ def backtest_run_4cell(
             period_start=start_dt,
             period_end=end_dt,
             walk_forward_windows=walk_forward_windows,
-            trade_producer=noop_trade_producer,
+            trade_producer=producer,
+            data_handle=data_handle,
             seed=seed,
         )
     finally:
