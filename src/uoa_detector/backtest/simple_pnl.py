@@ -44,15 +44,32 @@ Realized R formula:
 
 from __future__ import annotations
 
+import logging
+import re
 from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
+from uoa_detector.backtest.parquet_schema import validate_schema_or_raise
 from uoa_detector.backtest.pnl_provider import RealizedTrade
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable
+    from pathlib import Path
+
     from uoa_detector.backtest.store import StoredSignal
     from uoa_detector.calibration.profile import BacktestConfig
+
+
+_logger = logging.getLogger(__name__)
+
+# Same layout convention as ``ParquetReplaySource``:
+# ``{data_dir}/{ticker}/{YYYY-MM}.parquet``.
+_FILENAME_RE = re.compile(r"^(\d{4})-(\d{2})\.parquet$")
+
+# Cache key for a single option contract inside one ticker's index.
+# ``(option_type, strike, expiry_iso)`` — matches ``DictExitQuoteProvider``.
+_ContractKey = tuple[str, Decimal, str]
 
 
 @runtime_checkable
@@ -134,6 +151,158 @@ class DictExitQuoteProvider:
             else:
                 break
         return latest
+
+
+class ParquetExitQuoteProvider:
+    """``ExitQuoteProvider`` backed by ThetaData v3 replay parquet.
+
+    Phase 3.5.0.1: the real, non-mock exit-quote source the Phase 3.5
+    blocker flagged as missing. Reads option ``bid`` quotes from the
+    same on-disk layout ``ParquetReplaySource`` consumes —
+    ``{data_dir}/{ticker}/{YYYY-MM}.parquet`` conforming to
+    ``RAWPRINT_PARQUET_SCHEMA`` — and answers ``get_bid`` with a
+    walking-back lookup that mirrors ``DictExitQuoteProvider``.
+
+    Indexing:
+      On first lookup for a ticker, every matching parquet file is read
+      once and folded into a per-contract index
+      ``(option_type, strike, expiry_iso) -> [(timestamp, bid), ...]``
+      sorted ascending by timestamp. The index is cached so repeated
+      lookups across a backtest do not re-read the files.
+
+    Staleness tolerance (pinned decision #2 in
+    ``docs/phase-3.5.0-acceptance.md``):
+      ``get_bid`` returns the latest bid at-or-before ``at`` **only when
+      that quote falls on the same trading day (calendar date, UTC) as
+      ``at``**. If the newest quote at-or-before ``at`` is from an
+      earlier day — i.e. the option did not trade/quote on the exit day
+      — the bid is considered too stale and ``None`` is returned. The
+      trade is then marked ``open`` and excluded from win/loss tallies.
+      A quote is **never** fabricated.
+
+    ``tickers`` / ``from_month`` / ``to_month`` mirror
+    ``ParquetReplaySource``'s file filters so an exit-quote source can be
+    scoped to exactly the same slice a cell replayed.
+    """
+
+    def __init__(
+        self,
+        data_dir: Path,
+        *,
+        tickers: Iterable[str] | None = None,
+        from_month: str | None = None,
+        to_month: str | None = None,
+    ) -> None:
+        self._data_dir = data_dir
+        self._tickers: frozenset[str] | None = (
+            frozenset(t.upper() for t in tickers) if tickers is not None else None
+        )
+        self._from_month = from_month
+        self._to_month = to_month
+        # Lazily-built per-ticker index. ``None`` means "not yet read".
+        self._index: dict[str, dict[_ContractKey, list[tuple[datetime, Decimal]]]] = {}
+
+    def get_bid(
+        self,
+        *,
+        ticker: str,
+        strike: Decimal,
+        expiry: datetime,
+        option_type: str,
+        at: datetime,
+    ) -> Decimal | None:
+        """Return the option bid at ``at``, or ``None`` if unavailable.
+
+        See the class docstring for the walking-back + same-trading-day
+        staleness contract.
+        """
+        ticker_up = ticker.upper()
+        if self._tickers is not None and ticker_up not in self._tickers:
+            return None
+        contract_index = self._ticker_index(ticker_up)
+        expiry_iso = (
+            expiry.date().isoformat() if hasattr(expiry, "date") else str(expiry)
+        )
+        series = contract_index.get((option_type, strike, expiry_iso))
+        if not series:
+            return None
+        # Walking-back lookup: latest quote with timestamp <= at.
+        latest_ts: datetime | None = None
+        latest_bid: Decimal | None = None
+        for ts, bid in series:
+            if ts <= at:
+                latest_ts = ts
+                latest_bid = bid
+            else:
+                break
+        if latest_ts is None or latest_bid is None:
+            return None
+        # Staleness tolerance: the quote must be from the exit day itself.
+        if latest_ts.date() != at.date():
+            return None
+        return latest_bid
+
+    # ---- Index construction -------------------------------------------
+
+    def _ticker_index(
+        self, ticker: str,
+    ) -> dict[_ContractKey, list[tuple[datetime, Decimal]]]:
+        """Return (building on first use) the per-contract index for a ticker."""
+        cached = self._index.get(ticker)
+        if cached is not None:
+            return cached
+        built = self._build_ticker_index(ticker)
+        self._index[ticker] = built
+        return built
+
+    def _build_ticker_index(
+        self, ticker: str,
+    ) -> dict[_ContractKey, list[tuple[datetime, Decimal]]]:
+        import pyarrow.parquet as pq  # local: pyarrow.parquet pulls heavy deps
+
+        from uoa_detector.backtest.parquet_schema import _ensure_utc
+
+        index: dict[_ContractKey, list[tuple[datetime, Decimal]]] = {}
+        ticker_dir = self._data_dir / ticker
+        if not ticker_dir.is_dir():
+            return index
+
+        for path in sorted(ticker_dir.iterdir()):
+            m = _FILENAME_RE.match(path.name)
+            if m is None:
+                continue
+            month_key = f"{m.group(1)}-{m.group(2)}"
+            if self._from_month is not None and month_key < self._from_month:
+                continue
+            if self._to_month is not None and month_key > self._to_month:
+                continue
+            pf = pq.ParquetFile(path)  # type: ignore[no-untyped-call]
+            validate_schema_or_raise(pf.schema_arrow, file_path=path)
+            table = pf.read(  # type: ignore[no-untyped-call]
+                columns=["option_type", "strike", "expiry", "timestamp", "bid"],
+            )
+            for row in table.to_pylist():
+                key: _ContractKey = (
+                    str(row["option_type"]),
+                    Decimal(str(row["strike"])),
+                    _expiry_iso(row["expiry"]),
+                )
+                ts = _ensure_utc(row["timestamp"])
+                bid = Decimal(str(row["bid"]))
+                index.setdefault(key, []).append((ts, bid))
+
+        # Sort each contract's price path ascending by timestamp so the
+        # walking-back lookup can short-circuit on the first future quote.
+        for series in index.values():
+            series.sort(key=lambda pair: pair[0])
+        return index
+
+
+def _expiry_iso(value: object) -> str:
+    """Normalise a parquet ``expiry`` cell (a ``date``) to an ISO string."""
+    if hasattr(value, "isoformat"):
+        return value.isoformat()  # type: ignore[no-any-return]
+    return str(value)
 
 
 class SimplePnLProvider:

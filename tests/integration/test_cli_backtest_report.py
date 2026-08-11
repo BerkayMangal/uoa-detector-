@@ -77,8 +77,8 @@ def test_report_rejects_unknown_pnl_value(tmp_path: Path) -> None:
     assert "--pnl" in result.output
 
 
-def test_report_simple_pnl_deferred_to_phase_3_3(tmp_path: Path) -> None:
-    """--pnl simple raises with the Phase 3.3 deferral message."""
+def test_report_simple_pnl_requires_replay_data(tmp_path: Path) -> None:
+    """Phase 3.5.0.4: --pnl simple now works, but needs --replay-data."""
     db_path = tmp_path / "store.db"
     _populate_store(db_path)
 
@@ -92,7 +92,70 @@ def test_report_simple_pnl_deferred_to_phase_3_3(tmp_path: Path) -> None:
         ],
     )
     assert result.exit_code != 0
-    assert "Phase 3.3" in result.output
+    assert "--replay-data is required" in result.output
+
+
+def test_report_simple_pnl_prices_positioned_signals(tmp_path: Path) -> None:
+    """--pnl simple runs end-to-end over the AAPL fixture.
+
+    The AAPL fixture's positioned signals all exit off-data (their
+    5-day windows land past the fixture's last quote), so SimplePnL
+    marks them open — never fabricating a quote. The report still
+    renders and exits 0.
+    """
+    db_path = tmp_path / "store.db"
+    _populate_store(db_path)
+
+    result = runner.invoke(
+        app,
+        [
+            "backtest", "report",
+            "--run-id", "implicit-default",
+            "--store", f"sqlite:{db_path}",
+            "--pnl", "simple",
+            "--replay-data", "tests/fixtures/historical/synthetic",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert "Backtest report" in result.output
+    # Positioned AAPL signals price as open (exits off-data), so there
+    # are 0 closed trades but a non-zero open count.
+    assert "Total trades:       0" in result.output
+    assert "Open trades:" in result.output
+
+
+def test_report_simple_pnl_closes_trades_on_4cell_fixture(tmp_path: Path) -> None:
+    """--pnl simple closes real trades over the engine-proof fixture.
+
+    The 4-cell fixture is built with exit-day quotes, so its positioned
+    entry signals close (2 winners + 2 losers across SPY + PLTR); the
+    exit-day rows open. Total closed trades = 4.
+    """
+    db_path = tmp_path / "store4.db"
+    result = runner.invoke(
+        app,
+        [
+            "run",
+            "--source", "historical",
+            "--data-dir", "tests/fixtures/historical/synthetic_4cell",
+            "--store", f"sqlite:{db_path}",
+            "--output", "json",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+
+    result = runner.invoke(
+        app,
+        [
+            "backtest", "report",
+            "--run-id", "implicit-default",
+            "--store", f"sqlite:{db_path}",
+            "--pnl", "simple",
+            "--replay-data", "tests/fixtures/historical/synthetic_4cell",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert "Total trades:       4" in result.output
 
 
 # ---------------------------------------------------------------------------
