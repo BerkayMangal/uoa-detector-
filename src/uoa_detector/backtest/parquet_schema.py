@@ -327,3 +327,135 @@ def make_synthetic_aapl_2025_06_fixture() -> list[RawPrint]:
     # Reference base_ts so it isn't unused.
     _ = base_ts
     return rows
+
+
+# Phase 3.5.0.2: 4-cell backtest-engine proof fixture. Distinct from the
+# AAPL smoke fixture above — this one is purpose-built so the historical
+# trade producer + SimplePnLProvider + ParquetExitQuoteProvider close
+# real trades on BOTH tiers of the 4-cell matrix.
+#
+# It lives in its own directory (``tests/fixtures/historical/synthetic_4cell/``)
+# because the AAPL smoke fixture directory is pinned to exactly 10 rows by
+# ``tests/integration/test_cli_historical.py`` and cannot gain siblings.
+# See the Phase 3.5.0 closeout for why a dedicated fixture is required
+# (AAPL-only data closes zero trades: its 5-day exits land off-data).
+
+# Contract shared by every option in the 4-cell fixture: a short-dated
+# call expiring 2025-06-27. Entry on 2025-06-18 (Wed) → the 5-day
+# fixed_window exit lands on 2025-06-23 (Mon), before the DTE floor
+# (expiry-2 = 2025-06-25), so the window binds and the exit-day quote
+# resolves a real bid.
+_FOURCELL_EXPIRY = date(2025, 6, 27)
+_FOURCELL_ENTRY_DAY = date(2025, 6, 18)
+_FOURCELL_EXIT_DAY = date(2025, 6, 23)
+
+
+def _fourcell_row(
+    *,
+    ticker: str,
+    source_event_id: str,
+    ts: datetime,
+    strike: Decimal,
+    spot: Decimal,
+    option_price: Decimal,
+    bid: Decimal,
+    ask: Decimal,
+) -> RawPrint:
+    """One 4-cell fixture print. ISO + above-ask so it labels SWEEP_UOA."""
+    return RawPrint(
+        source_id="synthetic_replay",
+        source_event_id=source_event_id,
+        timestamp=ts,
+        ticker=ticker,
+        option_type="call",
+        strike=strike,
+        expiry=_FOURCELL_EXPIRY,
+        dte=(_FOURCELL_EXPIRY - ts.date()).days,
+        spot_price=spot,
+        premium_paid=Decimal("100000"),
+        option_price=option_price,
+        bid=bid,
+        ask=ask,
+        fill_side="above_ask",
+        exchange="CBOE",
+        implied_volatility=0.45,
+        open_interest=2000,
+        is_iso=True,
+        source_tags=(),
+    )
+
+
+def _fourcell_ticker_rows(ticker: str, spot: Decimal) -> list[RawPrint]:
+    """Two contracts (a winner + a loser) per ticker, entry + exit-day quote.
+
+    Winner: entry ask 2.00 → exit bid 3.00 (realized R > 0).
+    Loser:  entry ask 2.00 → exit bid 1.00 (realized R < 0).
+    Each entry takes a SWEEP_UOA position; SimplePnLProvider closes it at
+    the +5-day window with the exit-day bid. The two exit-day rows also
+    label SWEEP_UOA but their own +5-day exits land off-data, so they
+    round-trip as open (excluded from win/loss) — per pinned decision #1
+    (one trade per positioned signal, no cross-signal dedup).
+    """
+    entry_ts = datetime(
+        _FOURCELL_ENTRY_DAY.year,
+        _FOURCELL_ENTRY_DAY.month,
+        _FOURCELL_ENTRY_DAY.day,
+        14, 35, tzinfo=UTC,
+    )
+    entry_ts_b = entry_ts.replace(hour=20)
+    exit_ts = datetime(
+        _FOURCELL_EXIT_DAY.year,
+        _FOURCELL_EXIT_DAY.month,
+        _FOURCELL_EXIT_DAY.day,
+        14, 35, tzinfo=UTC,
+    )
+    exit_ts_b = exit_ts.replace(hour=20)
+    win_strike = spot + Decimal("5")
+    lose_strike = spot + Decimal("10")
+    return [
+        _fourcell_row(
+            ticker=ticker, source_event_id=f"{ticker}-win-entry", ts=entry_ts,
+            strike=win_strike, spot=spot,
+            option_price=Decimal("2.00"), bid=Decimal("1.95"), ask=Decimal("2.05"),
+        ),
+        _fourcell_row(
+            ticker=ticker, source_event_id=f"{ticker}-lose-entry", ts=entry_ts_b,
+            strike=lose_strike, spot=spot,
+            option_price=Decimal("2.00"), bid=Decimal("1.95"), ask=Decimal("2.05"),
+        ),
+        _fourcell_row(
+            ticker=ticker, source_event_id=f"{ticker}-win-exit", ts=exit_ts,
+            strike=win_strike, spot=spot,
+            option_price=Decimal("3.00"), bid=Decimal("3.00"), ask=Decimal("3.05"),
+        ),
+        _fourcell_row(
+            ticker=ticker, source_event_id=f"{ticker}-lose-exit", ts=exit_ts_b,
+            strike=lose_strike, spot=spot,
+            option_price=Decimal("1.00"), bid=Decimal("1.00"), ask=Decimal("1.05"),
+        ),
+    ]
+
+
+def make_synthetic_4cell_fixture() -> dict[str, list[RawPrint]]:
+    """4-cell engine-proof fixture keyed by ticker.
+
+    ``SPY`` is a Tier-1 anchor ticker; ``PLTR`` is a Tier-2 starter
+    ticker. The historical producer filters the replay by each cell's
+    universe, so the Tier-1 cells trade SPY and the Tier-2 cells trade
+    PLTR — giving every cell of the matrix ≥ 1 closed trade.
+    """
+    return {
+        "SPY": _fourcell_ticker_rows("SPY", Decimal("200")),
+        "PLTR": _fourcell_ticker_rows("PLTR", Decimal("50")),
+    }
+
+
+def write_synthetic_4cell_fixture(root: Path) -> None:
+    """Write the 4-cell fixture under ``{root}/{ticker}/2025-06.parquet``.
+
+    Deterministic: same bytes on every regeneration. A pin test asserts
+    the committed files match this generator (mirroring the AAPL fixture
+    pin in ``tests/unit/test_parquet_schema.py``).
+    """
+    for ticker, rows in make_synthetic_4cell_fixture().items():
+        write_parquet(rows, root / ticker / "2025-06.parquet")
