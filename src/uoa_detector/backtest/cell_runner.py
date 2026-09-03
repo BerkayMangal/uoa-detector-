@@ -166,24 +166,41 @@ class CellRunResult:
 # ---------------------------------------------------------------------------
 
 
-class _TradeProducerProto:
-    """Internal documentation for the trade-producer callable shape.
+@dataclass(frozen=True)
+class BacktestDataHandle:
+    """The data inputs a real (replay-driven) trade producer needs.
 
-    The cell runner is intentionally agnostic about how trades come
-    out of the pipeline. A trade producer is a callable that takes
-    a CellSpec + a list of WalkForwardWindow + a CalibrationProfile,
-    runs the pipeline, and returns the closed/open trades to feed
-    the metric calculator. Real producers (live replay) land in
-    Phase 3.3 alongside the SimplePnL exit-quote source; for 3.2.4
-    the only producer is a fixture-driven mock used by tests and
-    by the CLI's smoke run.
+    Phase 3.5.0.2: ``run_4cell_backtest``'s producer callable was
+    widened from ``(cell, windows, profile)`` to
+    ``(cell, windows, profile, data_handle)`` so a producer can reach
+    the historical parquet the cell replays. The ``noop`` / ``fixture``
+    producers ignore the handle (they accept it and default it to
+    ``None``); the ``historical`` producer requires it.
+
+    ``data_dir`` is the per-source parquet root
+    (``{data_dir}/{ticker}/{YYYY-MM}.parquet``), the same layout
+    ``ParquetReplaySource`` and ``ParquetExitQuoteProvider`` consume.
+    ``source_id`` labels the replay source dimension. ``from_month`` /
+    ``to_month`` (``"YYYY-MM"``) optionally clip the replay + the
+    exit-quote lookup to the same slice.
     """
 
+    data_dir: Path
+    source_id: str = "historical"
+    from_month: str | None = None
+    to_month: str | None = None
 
-# Type alias for the callable shape.
+
+# Type alias for the callable shape. Widened in Phase 3.5.0.2 to carry
+# the optional data handle a replay-driven producer needs.
 if TYPE_CHECKING:
     TradeProducer = Callable[
-        [CellSpec, "tuple[WalkForwardWindow, ...]", "CalibrationProfile"],
+        [
+            CellSpec,
+            "tuple[WalkForwardWindow, ...]",
+            "CalibrationProfile",
+            "BacktestDataHandle | None",
+        ],
         list[RealizedTrade],
     ]
 
@@ -191,19 +208,24 @@ if TYPE_CHECKING:
 def fixture_trade_producer(
     fixtures: dict[str, list[RealizedTrade]],
 ) -> Callable[
-    [CellSpec, tuple[WalkForwardWindow, ...], CalibrationProfile],
+    [
+        CellSpec,
+        tuple[WalkForwardWindow, ...],
+        CalibrationProfile,
+        BacktestDataHandle | None,
+    ],
     list[RealizedTrade],
 ]:
     """Build a TradeProducer that returns the fixture trades for a cell.
 
-    Used by tests + the CLI smoke path. Production-shape producers
-    that drive the full pipeline land in Phase 3.3.
+    Used by tests + the CLI smoke path. Ignores the ``data`` handle.
     """
 
     def _producer(
         cell: CellSpec,
         windows: tuple[WalkForwardWindow, ...],
         profile: CalibrationProfile,
+        data: BacktestDataHandle | None = None,
     ) -> list[RealizedTrade]:
         return list(fixtures.get(cell.name, []))
 
@@ -223,9 +245,15 @@ def run_4cell_backtest(
     period_end: datetime,
     walk_forward_windows: int,
     trade_producer: Callable[
-        [CellSpec, tuple[WalkForwardWindow, ...], CalibrationProfile],
+        [
+            CellSpec,
+            tuple[WalkForwardWindow, ...],
+            CalibrationProfile,
+            BacktestDataHandle | None,
+        ],
         list[RealizedTrade],
     ],
+    data_handle: BacktestDataHandle | None = None,
     thresholds: MetricThresholds | None = None,
     cells: tuple[CellSpec, ...] | None = None,
     seed: int = 0,
@@ -276,7 +304,7 @@ def run_4cell_backtest(
             source_config_hash=f"cell-{cell.fusion}",
         )
 
-        trades = trade_producer(cell, windows, profile)
+        trades = trade_producer(cell, windows, profile, data_handle)
         # Note: we DON'T write StoredSignals here — the trade producer
         # is the integration boundary. In 3.3 the producer will drive
         # the full pipeline (which writes signals to the store as a
@@ -315,14 +343,107 @@ def noop_trade_producer(
     cell: CellSpec,
     windows: tuple[WalkForwardWindow, ...],
     profile: CalibrationProfile,
+    data: BacktestDataHandle | None = None,
 ) -> list[RealizedTrade]:
     """Return zero trades for any cell.
 
     Used by the CLI smoke path when no real trade source is wired.
     Cell runs produce empty metrics (insufficient sample) but the
     plumbing — start_run / finish_run / RunMetadata — is exercised.
+    Ignores the ``data`` handle.
     """
     return []
+
+
+def historical_trade_producer(
+    cell: CellSpec,
+    windows: tuple[WalkForwardWindow, ...],
+    profile: CalibrationProfile,
+    data: BacktestDataHandle | None = None,
+) -> list[RealizedTrade]:
+    """Produce real ``RealizedTrade``s for a cell from historical parquet.
+
+    Phase 3.5.0.2 — the replay-driven producer the Phase 3.5 blocker
+    flagged as missing. Per cell:
+
+      1. Resolve the cell's universe tickers (Tier-1 anchor / Tier-2
+         starter) and replay the matching parquet under
+         ``data.data_dir`` through the full detection pipeline. The
+         cell's fusion coordinate drives ``force_multi_source``
+         (``single`` → fast path, ``fusion`` → windowed fusion).
+      2. Take every stored signal that took a position
+         (``max_r > 0``) — pinned decision #1: one trade per
+         positioned signal, no cross-signal dedup.
+      3. Price each with ``SimplePnLProvider`` fed by a
+         ``ParquetExitQuoteProvider`` over the same parquet slice.
+         Signals whose exit bid is unavailable round-trip as ``open``.
+
+    ``windows`` is unused (walk-forward slicing happens in the metric
+    calculator); it is part of the pinned producer signature.
+
+    A ``BacktestDataHandle`` is required — this producer cannot run
+    without data, unlike the ``noop`` / ``fixture`` producers.
+    """
+    import asyncio
+
+    from uoa_detector.backtest.simple_pnl import (
+        ParquetExitQuoteProvider,
+        SimplePnLProvider,
+    )
+    from uoa_detector.pipeline.orchestrator import Pipeline
+    from uoa_detector.pipeline.stages import default_stage_pipeline
+    from uoa_detector.sources.parquet_replay import ParquetReplaySource
+
+    if data is None:
+        msg = (
+            "historical_trade_producer requires a BacktestDataHandle "
+            "(pass data_handle= to run_4cell_backtest). It replays parquet "
+            "historical data; there is nothing to replay without it."
+        )
+        raise ValueError(msg)
+
+    tickers = load_universe_tickers(cell.universe)
+
+    src = ParquetReplaySource(
+        data.source_id,
+        data.data_dir,
+        tickers=tickers,
+        from_month=data.from_month,
+        to_month=data.to_month,
+    )
+    # Let the pipeline own its store: an empty in-memory BacktestStore is
+    # falsy (``__len__ == 0``), so passing one in would be discarded by the
+    # ``store or BacktestStore()`` default. We read signals back off
+    # ``pipeline.store`` instead.
+    pipeline = Pipeline(
+        [src],
+        list(default_stage_pipeline()),
+        profile=profile,
+        force_multi_source=(cell.fusion == "fusion"),
+    )
+    asyncio.run(pipeline.run())
+
+    # Read positioned signals back off the store the pipeline actually
+    # used. (An empty in-memory store is falsy, so the pipeline replaced
+    # any we passed with its own — we go through the Protocol surface
+    # rather than assume a concrete type.) The pipeline drove exactly one
+    # run; iterate every run defensively so this stays correct if that
+    # ever changes.
+    signals: list[StoredSignal] = [
+        s
+        for run in pipeline.store.list_runs()
+        for s in pipeline.store.iter_records(run.run_id)
+        if s.max_r > 0.0
+    ]
+
+    exit_quotes = ParquetExitQuoteProvider(
+        data.data_dir,
+        tickers=tickers,
+        from_month=data.from_month,
+        to_month=data.to_month,
+    )
+    pnl = SimplePnLProvider(profile.backtest, exit_quotes)
+    return [pnl.provide(s) for s in signals]
 
 
 def noop_pnl_signal_to_trade(signal: StoredSignal) -> RealizedTrade:

@@ -19,10 +19,12 @@ from uoa_detector.backtest.cell_report import render_4cell_comparison_report
 from uoa_detector.backtest.cell_runner import (
     CANONICAL_CELLS,
     CELL_NAMES,
+    BacktestDataHandle,
     CellRunResult,
     CellSpec,
     cell_name,
     fixture_trade_producer,
+    historical_trade_producer,
     load_universe_tickers,
     noop_trade_producer,
     run_4cell_backtest,
@@ -51,6 +53,7 @@ from uoa_detector.backtest.protocol import BacktestStoreProtocol
 from uoa_detector.backtest.simple_pnl import (
     DictExitQuoteProvider,
     ExitQuoteProvider,
+    ParquetExitQuoteProvider,
     SimplePnLProvider,
 )
 from uoa_detector.backtest.sqlite_store import SqliteBacktestStore
@@ -66,6 +69,7 @@ __all__ = [
     "CANONICAL_CELLS",
     "CELL_NAMES",
     "RAWPRINT_PARQUET_SCHEMA",
+    "BacktestDataHandle",
     "BacktestMetrics",
     "BacktestStore",
     "BacktestStoreProtocol",
@@ -80,6 +84,7 @@ __all__ = [
     "MetricThresholds",
     "MockPnLProvider",
     "NoOpPnLProvider",
+    "ParquetExitQuoteProvider",
     "ParquetSchemaMismatchError",
     "PnLProvider",
     "RealizedTrade",
@@ -93,6 +98,7 @@ __all__ = [
     "equal_time_slices",
     "equal_trade_count_slices",
     "fixture_trade_producer",
+    "historical_trade_producer",
     "load_universe_tickers",
     "no_op_tuner",
     "noop_trade_producer",
