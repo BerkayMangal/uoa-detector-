@@ -158,6 +158,150 @@ _UW_SIDE_TO_FILL_SIDE: dict[str, FillSide] = {
 }
 
 
+# Required fields on a UW flow object. Absence/unparse of any of these
+# makes the event unmappable; the shared mapper logs the row's actual keys
+# and returns None (Phase 3.7.2). WS field names; the REST recent-flow
+# endpoint is expected to carry the same names (see phase-3.7 acceptance §5).
+_REQUIRED_FLOW_FIELDS: tuple[str, ...] = (
+    "ticker",
+    "executed_at",
+    "option_type",
+    "strike",
+    "expiry",
+    "premium",
+    "price",
+    "bid",
+    "ask",
+)
+
+
+def map_uw_flow_event(
+    event: dict[str, object],
+    *,
+    source_id: str,
+    source_event_id_fallback: str,
+) -> RawPrint | None:
+    """Map a UW flow event dict (WS or REST shape) to a canonical RawPrint.
+
+    Shared by ``UnusualWhalesLiveSource`` (WS) and
+    ``UnusualWhalesRestFlowSource`` (REST) so the two feeds normalise flow
+    identically. Pure function: no I/O, no mutation of ``event``.
+
+    Field-name robustness (Phase 3.7):
+      - Fill side is read from ``side`` (WS) **or** ``side_classification``
+        (the recent-flow REST endpoint). An unrecognised value maps to
+        ``fill_side="unknown"`` — we never fabricate a fill side. Note that
+        on the recent-flow endpoint ``side_classification`` is directional
+        (bullish/bearish/neutral), which is not a fill label and therefore
+        degrades to "unknown"; direction is derived downstream from
+        ``option_type``, so this is safe (see acceptance §4).
+      - If any **required** field (``_REQUIRED_FLOW_FIELDS``) is absent or
+        unparseable, log an ERROR that names ``sorted(event.keys())`` and
+        return None. A shape mismatch is then a named one-line fix, never a
+        silent drop and never a guessed value.
+
+    :param source_id: value written to ``RawPrint.source_id``.
+    :param source_event_id_fallback: ``source_event_id`` to use when the
+        event carries neither ``id`` nor ``event_id``. The caller owns
+        uniqueness of this string.
+    :returns: a ``RawPrint``, or None if the event is unmappable or the
+        contract already expired at execution time (DTE < 0).
+    """
+    try:
+        ticker = str(event["ticker"]).upper()
+        executed_at_raw = str(event["executed_at"])
+        timestamp = _parse_iso_utc(executed_at_raw)
+        option_type_raw = str(event["option_type"]).lower()
+        option_type = _coerce_option_type(option_type_raw)
+        strike = Decimal(str(event["strike"]))
+        expiry = _parse_expiry(event["expiry"])
+        premium = Decimal(str(event["premium"]))
+        price = Decimal(str(event["price"]))
+        bid = Decimal(str(event["bid"]))
+        ask = Decimal(str(event["ask"]))
+    except (KeyError, ValueError, TypeError, ArithmeticError) as exc:
+        _logger.error(
+            "Dropping unmappable UW flow event (source_id=%s): %s; "
+            "row keys=%s; required=%s",
+            source_id,
+            exc,
+            sorted(event.keys()),
+            list(_REQUIRED_FLOW_FIELDS),
+        )
+        return None
+
+    # Optional fields
+    oi_raw = event.get("open_interest")
+    open_interest = int(oi_raw) if isinstance(oi_raw, (int, float)) else None
+    iv_raw = event.get("implied_volatility")
+    implied_volatility = (
+        float(iv_raw) if isinstance(iv_raw, (int, float)) else None
+    )
+    is_iso = bool(event.get("is_iso", False))
+    exchange = str(event.get("exchange", "UNKNOWN"))
+
+    # Side mapping — WS 'side' or REST 'side_classification' (accept both
+    # names; unrecognised value → "unknown", never fabricated).
+    side_raw = str(
+        event.get("side") or event.get("side_classification") or "",
+    ).upper()
+    fill_side: FillSide = _UW_SIDE_TO_FILL_SIDE.get(side_raw, "unknown")
+
+    # DTE — drop if already expired at execution time.
+    dte = (expiry - timestamp.date()).days
+    if dte < 0:
+        return None
+
+    # Source event id
+    event_id_raw = event.get("id") or event.get("event_id")
+    source_event_id = (
+        source_event_id_fallback
+        if event_id_raw is None
+        else f"uw-{event_id_raw}"
+    )
+
+    # Source tags — preserve UW's classification labels.
+    tags: list[str] = []
+    alert_type = event.get("alert_type")
+    if isinstance(alert_type, str) and alert_type:
+        tags.append(f"uw:{alert_type.lower()}")
+    # Spot price not provided by the UW flow feed in general.
+    spot_raw = event.get("spot_price")
+    if isinstance(spot_raw, (int, float, str)):
+        try:
+            spot_price = Decimal(str(spot_raw))
+        except ArithmeticError:
+            spot_price = Decimal("0")
+            tags.append("uw:no-spot")
+    else:
+        spot_price = Decimal("0")
+        tags.append("uw:no-spot")
+
+    # premium_paid from UW: total notional dollars; option_price: per-share
+    # mid-ish price. RawPrint expects both.
+    return RawPrint(
+        source_id=source_id,
+        source_event_id=source_event_id,
+        timestamp=timestamp,
+        ticker=ticker,
+        option_type=option_type,
+        strike=strike,
+        expiry=expiry,
+        dte=dte,
+        spot_price=spot_price,
+        premium_paid=premium,
+        option_price=price,
+        bid=bid,
+        ask=ask,
+        fill_side=fill_side,
+        exchange=exchange,
+        implied_volatility=implied_volatility,
+        open_interest=open_interest,
+        is_iso=is_iso,
+        source_tags=tuple(tags),
+    )
+
+
 class UnusualWhalesLiveSource:
     """``RawFlowSource`` implementation backed by the UW flow WebSocket.
 
@@ -320,92 +464,19 @@ class UnusualWhalesLiveSource:
     def _map_event_to_raw_print(
         self, event: dict[str, object],
     ) -> RawPrint | None:
-        """Map a UW flow event dict to a canonical RawPrint."""
-        try:
-            ticker = str(event["ticker"]).upper()
-            executed_at_raw = str(event["executed_at"])
-            timestamp = _parse_iso_utc(executed_at_raw)
-            option_type_raw = str(event["option_type"]).lower()
-            option_type = _coerce_option_type(option_type_raw)
-            strike = Decimal(str(event["strike"]))
-            expiry = _parse_expiry(event["expiry"])
-            premium = Decimal(str(event["premium"]))
-            price = Decimal(str(event["price"]))
-            bid = Decimal(str(event["bid"]))
-            ask = Decimal(str(event["ask"]))
-        except (KeyError, ValueError, TypeError, ArithmeticError) as exc:
-            _logger.warning("Dropping malformed UW event: %s", exc)
-            return None
+        """Map a UW flow event dict to a canonical RawPrint.
 
-        # Optional fields
-        oi_raw = event.get("open_interest")
-        open_interest = (
-            int(oi_raw) if isinstance(oi_raw, (int, float)) else None
-        )
-        iv_raw = event.get("implied_volatility")
-        implied_volatility = (
-            float(iv_raw) if isinstance(iv_raw, (int, float)) else None
-        )
-        is_iso = bool(event.get("is_iso", False))
-        exchange = str(event.get("exchange", "UNKNOWN"))
-
-        # Side mapping
-        side_raw = str(event.get("side", "")).upper()
-        fill_side: FillSide = _UW_SIDE_TO_FILL_SIDE.get(side_raw, "unknown")
-
-        # DTE — drop if expired
-        timestamp_date = timestamp.date()
-        dte = (expiry - timestamp_date).days
-        if dte < 0:
-            return None
-
-        # Source event id
-        event_id_raw = event.get("id") or event.get("event_id")
-        if event_id_raw is None:
-            self._fallback_seq += 1
-            source_event_id = f"uw-fallback-{self._fallback_seq}"
-        else:
-            source_event_id = f"uw-{event_id_raw}"
-
-        # Source tags — preserve UW's classification labels
-        tags: list[str] = []
-        alert_type = event.get("alert_type")
-        if isinstance(alert_type, str) and alert_type:
-            tags.append(f"uw:{alert_type.lower()}")
-        # Spot price not provided by UW flow stream
-        spot_raw = event.get("spot_price")
-        if isinstance(spot_raw, (int, float, str)):
-            try:
-                spot_price = Decimal(str(spot_raw))
-            except ArithmeticError:
-                spot_price = Decimal("0")
-                tags.append("uw:no-spot")
-        else:
-            spot_price = Decimal("0")
-            tags.append("uw:no-spot")
-
-        # premium_paid from UW: total notional dollars; option_price: per-share
-        # mid-ish price. RawPrint expects both.
-        return RawPrint(
+        Thin wrapper over the shared ``map_uw_flow_event`` pure function
+        (Phase 3.7.2). The WS source owns the fallback-id sequence so
+        every emitted print stays globally unique even when UW omits an
+        ``id`` on a malformed frame; the counter is bumped per mapped
+        event and handed to the shared mapper as the candidate fallback.
+        """
+        self._fallback_seq += 1
+        return map_uw_flow_event(
+            event,
             source_id=self.source_id,
-            source_event_id=source_event_id,
-            timestamp=timestamp,
-            ticker=ticker,
-            option_type=option_type,
-            strike=strike,
-            expiry=expiry,
-            dte=dte,
-            spot_price=spot_price,
-            premium_paid=premium,
-            option_price=price,
-            bid=bid,
-            ask=ask,
-            fill_side=fill_side,
-            exchange=exchange,
-            implied_volatility=implied_volatility,
-            open_interest=open_interest,
-            is_iso=is_iso,
-            source_tags=tuple(tags),
+            source_event_id_fallback=f"uw-fallback-{self._fallback_seq}",
         )
 
 
