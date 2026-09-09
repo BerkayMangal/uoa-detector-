@@ -32,7 +32,7 @@ import asyncio
 import contextlib
 import logging
 import sys
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from enum import StrEnum
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -74,6 +74,10 @@ from uoa_detector.sources.scenarios import (
     overrides_lookup,
 )
 from uoa_detector.sources.synthetic import SyntheticRawFlowSource, to_raw_print
+from uoa_detector.sources.unusual_whales.client import UnusualWhalesClient
+from uoa_detector.sources.unusual_whales.rest_flow import (
+    UnusualWhalesRestFlowSource,
+)
 
 if TYPE_CHECKING:
     from uoa_detector.backtest import BacktestStoreProtocol
@@ -367,10 +371,12 @@ def screener(
         "live",
         "--source",
         help=(
-            "Flow source, same wiring as `run`. 'live' (default) connects "
-            "the configured --feeds and screens real market flow; "
-            "'synthetic' drives the in-memory scenario (no credentials); "
-            "'historical' replays parquet under --data-dir."
+            "Flow source, same wiring as `run` plus 'rest'. 'live' (default) "
+            "connects the configured --feeds via WebSocket; 'rest' does a "
+            "one-shot Unusual Whales REST fetch (UW API key only, no WS, no "
+            "ThetaData Terminal) — ideal for the daily snapshot; 'synthetic' "
+            "drives the in-memory scenario (no credentials); 'historical' "
+            "replays parquet under --data-dir."
         ),
     ),
     report_path: Path | None = typer.Option(
@@ -402,7 +408,19 @@ def screener(
     live_tickers: str | None = typer.Option(
         None,
         "--live-tickers",
-        help="Live mode only: comma-separated tickers to subscribe.",
+        help=(
+            "Live/REST mode: comma-separated tickers to fetch. Required for "
+            "--source live and --source rest."
+        ),
+    ),
+    since_minutes: int | None = typer.Option(
+        None,
+        "--since-minutes",
+        help=(
+            "REST mode only: keep only flow from the last N minutes "
+            "(client-side window over /api/option-flow/recent). Default: no "
+            "window filter — take whatever the endpoint returns as recent."
+        ),
     ),
     data_dir: Path | None = typer.Option(
         None,
@@ -443,17 +461,17 @@ def screener(
     stdout plus a markdown twin at --report-path. This is a candidate
     funnel, NOT a proven-profitable signal set.
     """
-    if source not in ("synthetic", "historical", "live"):
+    if source not in ("synthetic", "historical", "live", "rest"):
         msg = (
-            f"--source must be 'synthetic', 'historical', or 'live'; "
+            f"--source must be 'synthetic', 'historical', 'live', or 'rest'; "
             f"got {source!r}"
         )
         raise typer.BadParameter(msg, param_hint="--source")
     if source == "historical" and data_dir is None:
         msg = "--data-dir is required when --source=historical"
         raise typer.BadParameter(msg, param_hint="--data-dir")
-    if source == "live" and not live_tickers:
-        msg = "--live-tickers is required when --source=live"
+    if source in ("live", "rest") and not live_tickers:
+        msg = f"--live-tickers is required when --source={source}"
         raise typer.BadParameter(msg, param_hint="--live-tickers")
 
     # Keep stdout clean for the digest — structlog goes to stderr.
@@ -498,6 +516,20 @@ def screener(
                         tickers=ticker_list,
                     ),
                 )
+        elif source == "rest":
+            assert live_tickers is not None  # typer guarantees by check above
+            ticker_list = [
+                t.strip().upper() for t in live_tickers.split(",") if t.strip()
+            ]
+            asyncio.run(
+                _run_rest(
+                    profile=profile,
+                    writer=collector,
+                    store=store,
+                    tickers=ticker_list,
+                    since_minutes=since_minutes,
+                ),
+            )
         else:
             asyncio.run(_run_default_synthetic(profile, collector, store))
     finally:
@@ -720,6 +752,60 @@ async def _run_live(
         install_signal_handlers=True,
     )
     await observer.run()
+
+
+async def _run_rest(
+    *,
+    profile: CalibrationProfile,
+    writer: DecisionRecordWriter,
+    store: BacktestStoreProtocol,
+    tickers: list[str],
+    since_minutes: int | None,
+) -> None:
+    """Drive the pipeline against a one-shot Unusual Whales REST fetch.
+
+    Phase 3.7: builds a ``UnusualWhalesRestFlowSource`` over the shared UW
+    HTTP client and runs the SAME ``default_stage_pipeline()`` + digest as
+    the other sources. UW API key only — no WebSocket, no ThetaData Terminal.
+    The CLI owns the client's lifecycle (aclose in ``finally``); the source's
+    ``close()`` does not touch it.
+    """
+    from uoa_detector.config.credentials import Credentials
+
+    creds = Credentials()
+    api_key = creds.unusual_whales_api_key
+    if api_key is None:
+        msg = (
+            "--source rest requires the UNUSUAL_WHALES_API_KEY environment "
+            "variable (or an entry in .env at the repo root); it is not set."
+        )
+        raise typer.BadParameter(msg, param_hint="--source")
+
+    lookback = (
+        timedelta(minutes=since_minutes)
+        if since_minutes is not None
+        else None
+    )
+    client = UnusualWhalesClient(
+        api_key=api_key,
+        settings=profile.data_sources.unusual_whales,
+    )
+    try:
+        src = UnusualWhalesRestFlowSource(
+            client=client,
+            tickers=tickers,
+            lookback=lookback,
+        )
+        pipeline = Pipeline(
+            [src],
+            list(default_stage_pipeline()),
+            profile=profile,
+            store=store,
+            decision_record_writer=writer,
+        )
+        await pipeline.run()
+    finally:
+        await client.aclose()
 
 
 # ---------------------------------------------------------------------------
