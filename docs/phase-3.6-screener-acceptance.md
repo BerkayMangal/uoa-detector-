@@ -125,4 +125,60 @@ string for context.
 
 ## 7. Closeout (paket-mode)
 
-*(appended when the sub-phase closes — Phase 3.6.4.)*
+**Status: KAPALI.** `screener` command shipped; `run` untouched. Synthetic
+path renders a digest with no credentials.
+
+Commits (branch `phase-3.6-screener`):
+
+- `Phase 3.6.1` — frozen acceptance contract (this doc, §1–§6).
+- `Phase 3.6.2` — `observability/digest.py` renderer + `CollectingWriter` +
+  observability exports + 9 unit tests.
+- `Phase 3.6.3` — `screener` CLI command + 7 integration tests.
+- `Phase 3.6.4` — this closeout.
+
+Green state (whole tree, HEAD): `uv run pytest -q` → 1477 passed, 20 skipped
+(credential-gated smokes); `uv run mypy --strict src/` → clean, 113 files;
+`uv run ruff check .` → clean.
+
+New tests: 16 total.
+- Unit (`tests/unit/test_digest.py`, 9): ranking order; zero-size + noise
+  label filtering; empty result (stdout + markdown); all-filtered → empty;
+  columns/header/legend present; markdown shape; contract + LONG-side
+  derivation (incl. a put → `P`); deterministic tiebreak on equal scores;
+  top-reasons excludes penalties and caps at 2.
+- Integration (`tests/integration/test_cli_screener.py`, 7): synthetic
+  digest to stdout; markdown report written (nested dir created); profile_id
+  in header; `--data-dir` / `--live-tickers` / bad-source validation;
+  regression guard that `run --output json` still streams 8 raw records.
+
+Judgment calls:
+
+1. **SIDE column is always `LONG`.** The detector only surfaces
+   option-buying flow; there is no short-option signal to disambiguate.
+   `LONG` = long the contract; bullish/bearish is the C/P in CONTRACT, made
+   explicit by the printed legend. (Acceptance §4.1.) Not a blocker → not
+   escalated.
+2. **Rank on `combined_score_post_penalty`.** The pipeline's final,
+   post-penalty score — the number the labeler and sizer already used. No
+   new scoring, no new thresholds (D8).
+3. **Dual filter** (`max_r > 0` AND label ∉ noise set) is intentional
+   belt-and-suspenders: `max_r > 0` handles today's DISCARD-bucket zeros,
+   the label set guards against a future profile giving a noise label a
+   non-zero R.
+4. **`CollectingWriter`** added to `output.py` implementing the existing
+   `DecisionRecordWriter` Protocol, so the screener reuses the pipeline's
+   writer rail unchanged. Its `close()` retains the buffer (the pipeline
+   owns the writer's lifecycle and closes it before the CLI reads records).
+5. **structlog → stderr** in `screener` so stdout carries only the digest
+   (matches `run`'s stdout-hygiene convention).
+6. **Top reasons = top-2 positive `score_breakdown` contributors**
+   (penalties excluded); the markdown twin additionally carries the
+   labeler's `LabelDecision.reason` string.
+
+Note on the task brief vs. code: the brief referenced
+`LabelDecision.reasoning`; the real field is `LabelDecision.reason` (single
+string) — used as the "Labeler note" column in markdown.
+
+Sıradaki: Phase 3.5 remains the gating question (does the strategy have an
+edge). The screener is decision-support tooling and makes no edge claim;
+its ranking is confluence, not expected PnL.
