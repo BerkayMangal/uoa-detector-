@@ -49,6 +49,37 @@ class DecisionRecordWriter(Protocol):
 
 
 # ---------------------------------------------------------------------------
+# Collecting (in-memory)
+# ---------------------------------------------------------------------------
+
+
+class CollectingWriter:
+    """Buffer every record in memory instead of writing to a sink.
+
+    Phase 3.6: the ``screener`` command needs the *whole* batch of decision
+    records before it can rank them into a digest, unlike the streaming
+    writers. This writer implements the ``DecisionRecordWriter`` Protocol so
+    it drops straight into the existing pipeline wiring; ``close()`` is a
+    no-op that preserves the buffer so the caller can read ``records`` after
+    the pipeline (which owns the writer's lifecycle) has closed it.
+    """
+
+    def __init__(self) -> None:
+        self.records: list[SignalDecisionRecord] = []
+        self._closed = False
+
+    def write(self, record: SignalDecisionRecord) -> None:
+        if self._closed:
+            msg = "CollectingWriter is closed"
+            raise RuntimeError(msg)
+        self.records.append(record)
+
+    def close(self) -> None:
+        # Idempotent; the buffer is intentionally retained for the caller.
+        self._closed = True
+
+
+# ---------------------------------------------------------------------------
 # NDJSON
 # ---------------------------------------------------------------------------
 

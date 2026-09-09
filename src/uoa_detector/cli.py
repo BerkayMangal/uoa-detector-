@@ -55,10 +55,14 @@ from uoa_detector.backtest import (
 from uoa_detector.calibration import load_default_profile
 from uoa_detector.calibration.loader import load_profile
 from uoa_detector.observability import (
+    CollectingWriter,
     NDJSONWriter,
     ParquetWriter,
     PrettyWriter,
     redact_secrets,
+    render_markdown,
+    render_stdout,
+    screen_records,
 )
 from uoa_detector.pipeline.orchestrator import Pipeline
 from uoa_detector.pipeline.stages import default_stage_pipeline
@@ -355,6 +359,168 @@ def run(
             asyncio.run(_run_default_synthetic(profile, writer, store))
     finally:
         store.close()
+
+
+@app.command()
+def screener(
+    source: str = typer.Option(
+        "live",
+        "--source",
+        help=(
+            "Flow source, same wiring as `run`. 'live' (default) connects "
+            "the configured --feeds and screens real market flow; "
+            "'synthetic' drives the in-memory scenario (no credentials); "
+            "'historical' replays parquet under --data-dir."
+        ),
+    ),
+    report_path: Path | None = typer.Option(
+        None,
+        "--report-path",
+        help=(
+            "Where the markdown digest is written. Defaults to "
+            "reports/screener_<YYYY-MM-DD>.md."
+        ),
+    ),
+    profile_path: Path | None = typer.Option(
+        None,
+        "--profile",
+        help="Path to a CalibrationProfile YAML; defaults to v5_default.",
+    ),
+    store_url: str = typer.Option(
+        ":memory:",
+        "--store",
+        help="Backtest store URL. ':memory:' (default) or 'sqlite:path/to/db'.",
+    ),
+    feeds: str = typer.Option(
+        "thetadata,unusual_whales",
+        "--feeds",
+        help=(
+            "Live mode only: comma-separated feeds to connect. Supported: "
+            "'thetadata', 'unusual_whales'. Each needs its credential in env."
+        ),
+    ),
+    live_tickers: str | None = typer.Option(
+        None,
+        "--live-tickers",
+        help="Live mode only: comma-separated tickers to subscribe.",
+    ),
+    data_dir: Path | None = typer.Option(
+        None,
+        "--data-dir",
+        help="Historical replay only: per-source parquet root.",
+    ),
+    tickers: str | None = typer.Option(
+        None,
+        "--tickers",
+        help="Historical replay only: comma-separated ticker filter.",
+    ),
+    from_month: str | None = typer.Option(
+        None,
+        "--from",
+        help="Historical replay only: earliest month (YYYY-MM). Inclusive.",
+    ),
+    to_month: str | None = typer.Option(
+        None,
+        "--to",
+        help="Historical replay only: latest month (YYYY-MM). Inclusive.",
+    ),
+    replay_speed: float = typer.Option(
+        float("inf"),
+        "--replay-speed",
+        help="Historical replay only: pacing multiplier (inf = as fast as possible).",
+    ),
+    source_id: str = typer.Option(
+        "historical",
+        "--source-id",
+        help="Historical replay only: source_id tag for the harness.",
+    ),
+) -> None:
+    """Collect the FULL pipeline output and render a ranked candidate digest.
+
+    Same pipeline/source wiring as `run`, but instead of streaming raw
+    records it collects every ``SignalDecisionRecord`` and renders a daily
+    decision-support digest (ranked by the pipeline's confluence score) to
+    stdout plus a markdown twin at --report-path. This is a candidate
+    funnel, NOT a proven-profitable signal set.
+    """
+    if source not in ("synthetic", "historical", "live"):
+        msg = (
+            f"--source must be 'synthetic', 'historical', or 'live'; "
+            f"got {source!r}"
+        )
+        raise typer.BadParameter(msg, param_hint="--source")
+    if source == "historical" and data_dir is None:
+        msg = "--data-dir is required when --source=historical"
+        raise typer.BadParameter(msg, param_hint="--data-dir")
+    if source == "live" and not live_tickers:
+        msg = "--live-tickers is required when --source=live"
+        raise typer.BadParameter(msg, param_hint="--live-tickers")
+
+    # Keep stdout clean for the digest — structlog goes to stderr.
+    _configure_logging(log_to_stderr=True)
+    profile = _resolve_profile(profile_path)
+    store = _build_store(store_url)
+    collector = CollectingWriter()
+
+    try:
+        if source == "historical":
+            assert data_dir is not None  # typer guarantees by check above
+            ticker_list = (
+                [t.strip().upper() for t in tickers.split(",") if t.strip()]
+                if tickers
+                else None
+            )
+            asyncio.run(
+                _run_historical(
+                    profile=profile,
+                    writer=collector,
+                    store=store,
+                    data_dir=data_dir,
+                    tickers=ticker_list,
+                    from_month=from_month,
+                    to_month=to_month,
+                    replay_speed=replay_speed,
+                    source_id=source_id,
+                ),
+            )
+        elif source == "live":
+            assert live_tickers is not None  # typer guarantees by check above
+            ticker_list = [
+                t.strip().upper() for t in live_tickers.split(",") if t.strip()
+            ]
+            with contextlib.suppress(KeyboardInterrupt):
+                asyncio.run(
+                    _run_live(
+                        profile=profile,
+                        writer=collector,
+                        store=store,
+                        feeds_arg=feeds,
+                        tickers=ticker_list,
+                    ),
+                )
+        else:
+            asyncio.run(_run_default_synthetic(profile, collector, store))
+    finally:
+        store.close()
+
+    run_ts = datetime.now(tz=UTC)
+    rows = screen_records(collector.records)
+    typer.echo(
+        render_stdout(rows, profile_id=profile.profile_id, run_timestamp=run_ts),
+        nl=False,
+    )
+
+    resolved_report = report_path or Path(
+        f"reports/screener_{run_ts.date().isoformat()}.md",
+    )
+    resolved_report.parent.mkdir(parents=True, exist_ok=True)
+    resolved_report.write_text(
+        render_markdown(
+            rows, profile_id=profile.profile_id, run_timestamp=run_ts,
+        ),
+        encoding="utf-8",
+    )
+    typer.echo(f"Digest written to {resolved_report}", err=True)
 
 
 def _build_store(store_url: str) -> BacktestStoreProtocol:
