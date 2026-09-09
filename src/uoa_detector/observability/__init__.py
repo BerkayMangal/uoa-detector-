@@ -14,7 +14,14 @@ from uoa_detector.observability.decision_record import (
     StageExecutionEntry,
     build_decision_record,
 )
+from uoa_detector.observability.digest import (
+    DigestRow,
+    render_markdown,
+    render_stdout,
+    screen_records,
+)
 from uoa_detector.observability.output import (
+    CollectingWriter,
     DecisionRecordWriter,
     NDJSONWriter,
     ParquetWriter,
@@ -23,7 +30,9 @@ from uoa_detector.observability.output import (
 from uoa_detector.observability.redact import redact_secrets
 
 __all__ = [
+    "CollectingWriter",
     "DecisionRecordWriter",
+    "DigestRow",
     "NDJSONWriter",
     "ParquetWriter",
     "PrettyWriter",
@@ -31,4 +40,7 @@ __all__ = [
     "StageExecutionEntry",
     "build_decision_record",
     "redact_secrets",
+    "render_markdown",
+    "render_stdout",
+    "screen_records",
 ]
