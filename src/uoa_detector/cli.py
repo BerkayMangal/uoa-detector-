@@ -65,7 +65,10 @@ from uoa_detector.observability import (
     screen_records,
 )
 from uoa_detector.pipeline.orchestrator import Pipeline
-from uoa_detector.pipeline.stages import default_stage_pipeline
+from uoa_detector.pipeline.stages import (
+    build_live_stage_pipeline,
+    default_stage_pipeline,
+)
 from uoa_detector.sources.multi_source_scenario import multi_source_scenario
 from uoa_detector.sources.parquet_replay import ParquetReplaySource
 from uoa_detector.sources.scenarios import (
@@ -738,20 +741,41 @@ async def _run_live(
     except FeedConfigurationError as exc:
         raise typer.BadParameter(str(exc), param_hint="--feeds") from exc
 
-    pipeline = Pipeline(
-        bundle.sources,
-        list(default_stage_pipeline()),
-        profile=profile,
-        store=store,
-        decision_record_writer=writer,
-        force_multi_source=len(bundle.sources) > 1,
+    # Phase 3.8: enrichment (M21-M27) is UW-REST-only, independent of the
+    # live flow feed. Build a dedicated UW client for the enrichment
+    # providers so the live screener uses the multi-source engine instead
+    # of NoOp defaults. The flow WS source owns its own connection; this
+    # client is only for the REST enrichment calls and is closed here.
+    enrich_api_key = creds.unusual_whales_api_key
+    if enrich_api_key is None:
+        msg = (
+            "screener enrichment (M21-M27) requires the "
+            "UNUSUAL_WHALES_API_KEY environment variable (or an entry in "
+            ".env at the repo root); it is not set."
+        )
+        raise typer.BadParameter(msg, param_hint="--source")
+    enrich_client = UnusualWhalesClient(
+        api_key=enrich_api_key,
+        settings=profile.data_sources.unusual_whales,
     )
-    observer = LiveObserver(
-        pipeline=pipeline,
-        sources=bundle.sources,
-        install_signal_handlers=True,
-    )
-    await observer.run()
+
+    try:
+        pipeline = Pipeline(
+            bundle.sources,
+            build_live_stage_pipeline(enrich_client, profile),
+            profile=profile,
+            store=store,
+            decision_record_writer=writer,
+            force_multi_source=len(bundle.sources) > 1,
+        )
+        observer = LiveObserver(
+            pipeline=pipeline,
+            sources=bundle.sources,
+            install_signal_handlers=True,
+        )
+        await observer.run()
+    finally:
+        await enrich_client.aclose()
 
 
 async def _run_rest(
@@ -796,9 +820,12 @@ async def _run_rest(
             tickers=tickers,
             lookback=lookback,
         )
+        # Phase 3.8: share ONE client across the flow source and every
+        # enrichment provider so the daily screener actually uses the
+        # multi-source engine (M21-M27) instead of NoOp defaults.
         pipeline = Pipeline(
             [src],
-            list(default_stage_pipeline()),
+            build_live_stage_pipeline(client, profile),
             profile=profile,
             store=store,
             decision_record_writer=writer,
