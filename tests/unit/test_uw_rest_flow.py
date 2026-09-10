@@ -208,6 +208,72 @@ async def test_empty_tickers_makes_no_request() -> None:
 
 
 @pytest.mark.asyncio
+async def test_diagnostic_counters_fetched_mapped_dropped() -> None:
+    """Phase 3.8: counters expose flow ingestion health after draining.
+
+    fetched = every row the endpoint returned; mapped = rows that produced a
+    RawPrint; dropped = non-dict rows + unmappable dict rows. dropped_key
+    samples record the KEYS of unmappable dict rows (never values).
+    """
+    bad = _rest_row(id="bad")
+    del bad["strike"]  # unmappable: missing required field
+    payload = {
+        "data": [
+            _rest_row(id="ok1"),
+            bad,
+            "not-a-dict",  # non-dict row → dropped, no key sample
+            _rest_row(id="ok2", ticker="MSFT"),
+        ],
+    }
+    client = _FakeClient(payload)
+    src = UnusualWhalesRestFlowSource(client=client, tickers=["AAPL"])  # type: ignore[arg-type]
+    prints = await _drain(src)
+
+    assert len(prints) == 2
+    assert src.rows_fetched == 4
+    assert src.rows_mapped == 2
+    assert src.rows_dropped == 2
+    # Only the unmappable DICT row yields a key sample (keys, sorted).
+    assert len(src.dropped_key_samples) == 1
+    assert "strike" not in src.dropped_key_samples[0]
+    assert "ticker" in src.dropped_key_samples[0]
+
+
+@pytest.mark.asyncio
+async def test_counters_start_zero_before_stream() -> None:
+    client = _FakeClient({"data": [_rest_row()]})
+    src = UnusualWhalesRestFlowSource(client=client, tickers=["AAPL"])  # type: ignore[arg-type]
+    assert src.rows_fetched == 0
+    assert src.rows_mapped == 0
+    assert src.rows_dropped == 0
+    assert src.dropped_key_samples == []
+
+
+@pytest.mark.asyncio
+async def test_lookback_filtered_rows_still_count_as_mapped() -> None:
+    """Windowed-out rows mapped fine; they are not a data-health drop."""
+    before = datetime(2024, 1, 15, 20, 0, tzinfo=UTC)
+    payload = {
+        "data": [
+            _rest_row(id="fresh", executed_at="2024-01-15T19:30:00Z"),
+            _rest_row(id="stale", executed_at="2024-01-15T10:00:00Z"),
+        ],
+    }
+    client = _FakeClient(payload)
+    src = UnusualWhalesRestFlowSource(
+        client=client,  # type: ignore[arg-type]
+        tickers=["AAPL"],
+        lookback=timedelta(hours=2),
+        before=before,
+    )
+    prints = await _drain(src)
+    assert len(prints) == 1  # stale windowed out
+    assert src.rows_fetched == 2
+    assert src.rows_mapped == 2  # both mapped; one just fell outside the window
+    assert src.rows_dropped == 0
+
+
+@pytest.mark.asyncio
 async def test_custom_source_id() -> None:
     client = _FakeClient({"data": [_rest_row()]})
     src = UnusualWhalesRestFlowSource(

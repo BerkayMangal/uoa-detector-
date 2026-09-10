@@ -124,6 +124,54 @@ def test_screener_rest_renders_digest(tmp_path: Path) -> None:
     assert _FakeClient.aclose_calls == 1
 
 
+def test_screener_rest_emits_diagnostic_lines(tmp_path: Path) -> None:
+    """Phase 3.8: one run prints flow + per-module health to stderr."""
+    result = runner.invoke(
+        app,
+        [
+            "screener",
+            "--source", "rest",
+            "--live-tickers", "AAPL,MSFT",
+            "--report-path", str(tmp_path / "d.md"),
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    err = result.stderr or result.output
+    # Flow ingestion line: 2 canned rows fetched + mapped, none dropped.
+    assert "flow rows fetched=2, mapped=2, dropped=0" in err
+    # Per-module enrichment health line names every wired M-module.
+    assert "enrichment:" in err
+    for short in ("M21", "M22", "M23", "M24", "M25", "M26", "M27"):
+        assert short in err
+
+
+def test_screener_rest_top_n_and_strict(tmp_path: Path) -> None:
+    """--top-n renders rows; --strict changes the candidate count meta."""
+    top = runner.invoke(
+        app,
+        [
+            "screener", "--source", "rest",
+            "--live-tickers", "AAPL,MSFT",
+            "--top-n", "1",
+            "--report-path", str(tmp_path / "t.md"),
+        ],
+    )
+    assert top.exit_code == 0, top.output
+    # Exactly one candidate row rendered under --top-n 1.
+    assert "candidates: 1" in top.stdout
+
+    strict = runner.invoke(
+        app,
+        [
+            "screener", "--source", "rest",
+            "--live-tickers", "AAPL,MSFT",
+            "--strict",
+            "--report-path", str(tmp_path / "s.md"),
+        ],
+    )
+    assert strict.exit_code == 0, strict.output
+
+
 def test_screener_rest_requires_tickers() -> None:
     result = runner.invoke(app, ["screener", "--source", "rest"])
     assert result.exit_code != 0

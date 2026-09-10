@@ -56,13 +56,17 @@ from uoa_detector.calibration import load_default_profile
 from uoa_detector.calibration.loader import load_profile
 from uoa_detector.observability import (
     CollectingWriter,
+    FlowStats,
     NDJSONWriter,
     ParquetWriter,
     PrettyWriter,
+    format_enrichment_line,
+    format_flow_line,
     redact_secrets,
     render_markdown,
     render_stdout,
     screen_records,
+    screen_top_n,
 )
 from uoa_detector.pipeline.orchestrator import Pipeline
 from uoa_detector.pipeline.stages import (
@@ -425,6 +429,24 @@ def screener(
             "window filter — take whatever the endpoint returns as recent."
         ),
     ),
+    top_n: int = typer.Option(
+        15,
+        "--top-n",
+        help=(
+            "Display policy: show the top N signals ranked by confluence "
+            "score, regardless of label (each row still shows its LABEL and "
+            "MAX_R). Keeps the page non-empty when flow exists. Changes no "
+            "scoring and no threshold. Ignored when --strict is set."
+        ),
+    ),
+    strict: bool = typer.Option(
+        False,
+        "--strict",
+        help=(
+            "Restore the actionable-only filter (max_r>0 + non-noise labels) "
+            "instead of the top-N view. Same ranking; fewer rows."
+        ),
+    ),
     data_dir: Path | None = typer.Option(
         None,
         "--data-dir",
@@ -482,6 +504,7 @@ def screener(
     profile = _resolve_profile(profile_path)
     store = _build_store(store_url)
     collector = CollectingWriter()
+    flow_stats: FlowStats | None = None
 
     try:
         if source == "historical":
@@ -524,7 +547,7 @@ def screener(
             ticker_list = [
                 t.strip().upper() for t in live_tickers.split(",") if t.strip()
             ]
-            asyncio.run(
+            flow_stats = asyncio.run(
                 _run_rest(
                     profile=profile,
                     writer=collector,
@@ -539,7 +562,14 @@ def screener(
         store.close()
 
     run_ts = datetime.now(tz=UTC)
-    rows = screen_records(collector.records)
+    # Display policy (Phase 3.8): default top-N view is never empty when flow
+    # exists; --strict restores the actionable-only funnel. Neither changes
+    # any score or profile threshold (D4/D8).
+    rows = (
+        screen_records(collector.records)
+        if strict
+        else screen_top_n(collector.records, top_n=top_n)
+    )
     typer.echo(
         render_stdout(rows, profile_id=profile.profile_id, run_timestamp=run_ts),
         nl=False,
@@ -556,6 +586,24 @@ def screener(
         encoding="utf-8",
     )
     typer.echo(f"Digest written to {resolved_report}", err=True)
+
+    # Self-diagnostic (Phase 3.8): one run reveals end-to-end data health.
+    if flow_stats is not None:
+        typer.echo(
+            format_flow_line(
+                fetched=flow_stats.fetched,
+                mapped=flow_stats.mapped,
+                dropped=flow_stats.dropped,
+                dropped_sample=flow_stats.dropped_sample,
+            ),
+            err=True,
+        )
+    else:
+        typer.echo(
+            format_flow_line(fetched=None, mapped=None, dropped=None),
+            err=True,
+        )
+    typer.echo(format_enrichment_line(collector.records), err=True)
 
 
 def _build_store(store_url: str) -> BacktestStoreProtocol:
@@ -785,7 +833,7 @@ async def _run_rest(
     store: BacktestStoreProtocol,
     tickers: list[str],
     since_minutes: int | None,
-) -> None:
+) -> FlowStats:
     """Drive the pipeline against a one-shot Unusual Whales REST fetch.
 
     Phase 3.7: builds a ``UnusualWhalesRestFlowSource`` over the shared UW
@@ -833,6 +881,13 @@ async def _run_rest(
         await pipeline.run()
     finally:
         await client.aclose()
+
+    return FlowStats(
+        fetched=src.rows_fetched,
+        mapped=src.rows_mapped,
+        dropped=src.rows_dropped,
+        dropped_sample=tuple(src.dropped_key_samples),
+    )
 
 
 # ---------------------------------------------------------------------------

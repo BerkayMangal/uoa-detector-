@@ -31,6 +31,7 @@ from uoa_detector.observability.digest import (
     render_markdown,
     render_stdout,
     screen_records,
+    screen_top_n,
 )
 
 RUN_TS = datetime(2026, 9, 9, 13, 30, tzinfo=UTC)
@@ -197,6 +198,69 @@ def test_deterministic_tiebreak_on_equal_scores(profile: CalibrationProfile) -> 
     assert screen_records([a, b])[0].rank == 1
     assert [row.rank for row in backward] == [1, 2]
     assert forward == [r.reasons for r in screen_records([b, a])]
+
+
+# --------------------------------------------------------------------------
+# Phase 3.8 — screen_top_n display policy
+# --------------------------------------------------------------------------
+
+
+def test_top_n_ranks_all_regardless_of_label(profile: CalibrationProfile) -> None:
+    """top-N ranks every record by score desc, ignoring the strict filter."""
+    records = [
+        _record(profile=profile, ticker="ACT", label=SignalLabel.SWEEP_UOA,
+                score=0.5, max_r=0.85, event_id="act"),
+        # Noise + zero R: strict would drop this, top-N keeps it, marked.
+        _record(profile=profile, ticker="NOISE", label=SignalLabel.IGNORE_NOISE,
+                score=0.95, max_r=0.0, bucket=RiskBucket.DISCARD, event_id="ns"),
+        _record(profile=profile, ticker="PEN",
+                label=SignalLabel.PENALIZED_BELOW_THRESHOLD,
+                score=0.7, max_r=0.0, bucket=RiskBucket.DISCARD, event_id="pn"),
+    ]
+    rows = screen_top_n(records, top_n=15)
+    # All three present, ranked by score desc.
+    assert [r.ticker for r in rows] == ["NOISE", "PEN", "ACT"]
+    assert [r.rank for r in rows] == [1, 2, 3]
+    # Each row still carries its true label + max_r so it is visibly marked.
+    by_ticker = {r.ticker: r for r in rows}
+    assert by_ticker["NOISE"].label == SignalLabel.IGNORE_NOISE.value
+    assert by_ticker["NOISE"].max_r == 0.0
+
+
+def test_top_n_never_empty_when_flow_exists(profile: CalibrationProfile) -> None:
+    """A batch of only non-actionable records still yields rows under top-N."""
+    records = [
+        _record(profile=profile, ticker="N1", label=SignalLabel.IGNORE_NOISE,
+                score=0.4, max_r=0.0, bucket=RiskBucket.DISCARD, event_id="n1"),
+        _record(profile=profile, ticker="N2", label=SignalLabel.REJECTED,
+                score=0.3, max_r=0.0, bucket=RiskBucket.REJECTED, event_id="n2"),
+    ]
+    # Strict view is empty (the pre-3.8 hollow page)...
+    assert screen_records(records) == []
+    # ...but top-N surfaces both, so the operator sees the flow that arrived.
+    rows = screen_top_n(records, top_n=15)
+    assert [r.ticker for r in rows] == ["N1", "N2"]
+
+
+def test_top_n_caps_at_n(profile: CalibrationProfile) -> None:
+    records = [
+        _record(profile=profile, ticker=f"T{i}", label=SignalLabel.STANDARD_UOA,
+                score=0.1 * i, max_r=0.5, event_id=f"e{i}")
+        for i in range(1, 6)
+    ]
+    rows = screen_top_n(records, top_n=2)
+    assert len(rows) == 2
+    # Highest scores first: T5 (0.5), T4 (0.4).
+    assert [r.ticker for r in rows] == ["T5", "T4"]
+
+
+def test_top_n_zero_or_negative_returns_empty(profile: CalibrationProfile) -> None:
+    records = [
+        _record(profile=profile, ticker="A", label=SignalLabel.STANDARD_UOA,
+                score=0.5, max_r=0.5, event_id="a"),
+    ]
+    assert screen_top_n(records, top_n=0) == []
+    assert screen_top_n(records, top_n=-3) == []
 
 
 def test_top_reasons_excludes_penalties_and_is_capped(

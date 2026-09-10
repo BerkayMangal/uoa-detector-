@@ -14,11 +14,19 @@ from uoa_detector.observability.decision_record import (
     StageExecutionEntry,
     build_decision_record,
 )
+from uoa_detector.observability.diagnostics import (
+    FlowStats,
+    ModuleHealth,
+    format_enrichment_line,
+    format_flow_line,
+    module_health,
+)
 from uoa_detector.observability.digest import (
     DigestRow,
     render_markdown,
     render_stdout,
     screen_records,
+    screen_top_n,
 )
 from uoa_detector.observability.output import (
     CollectingWriter,
@@ -33,14 +41,20 @@ __all__ = [
     "CollectingWriter",
     "DecisionRecordWriter",
     "DigestRow",
+    "FlowStats",
+    "ModuleHealth",
     "NDJSONWriter",
     "ParquetWriter",
     "PrettyWriter",
     "SignalDecisionRecord",
     "StageExecutionEntry",
     "build_decision_record",
+    "format_enrichment_line",
+    "format_flow_line",
+    "module_health",
     "redact_secrets",
     "render_markdown",
     "render_stdout",
     "screen_records",
+    "screen_top_n",
 ]

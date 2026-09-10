@@ -34,8 +34,34 @@ def test_screener_synthetic_renders_digest(tmp_path: Path) -> None:
     # The default synthetic scenario surfaces actionable candidates.
     assert "candidates:" in result.stdout
     assert "GOOGL" in result.stdout  # HIGH_CONVICTION_SEQUENCE, top-ranked
-    # Noise / zero-size names must NOT appear as ranked rows.
-    assert "XYZ" not in result.stdout  # PENALIZED_BELOW_THRESHOLD
+
+
+def test_screener_default_top_n_shows_non_actionable_rows(
+    tmp_path: Path,
+) -> None:
+    """Phase 3.8: default (top-N) view shows every ranked signal with its label.
+
+    A penalized/noise name (XYZ) is now visible AND marked, so the page is
+    never hollow. Under --strict it is filtered out again.
+    """
+    report = tmp_path / "digest.md"
+    default_run = runner.invoke(
+        app,
+        ["screener", "--source", "synthetic", "--report-path", str(report)],
+    )
+    assert default_run.exit_code == 0, default_run.output
+    assert "XYZ" in default_run.stdout  # PENALIZED_BELOW_THRESHOLD, shown+marked
+
+    strict_run = runner.invoke(
+        app,
+        [
+            "screener", "--source", "synthetic",
+            "--strict", "--report-path", str(report),
+        ],
+    )
+    assert strict_run.exit_code == 0, strict_run.output
+    assert "GOOGL" in strict_run.stdout  # actionable, still present
+    assert "XYZ" not in strict_run.stdout  # non-actionable, filtered
 
 
 def test_screener_writes_markdown_report(tmp_path: Path) -> None:

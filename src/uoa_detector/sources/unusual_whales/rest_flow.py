@@ -58,6 +58,11 @@ if TYPE_CHECKING:
 # change if UW ever moves it.
 RECENT_FLOW_PATH = "/api/option-flow/recent"
 
+# How many dropped-row key-sets to retain for the diagnostic (Phase 3.8). A
+# rendering cap for the stderr line, not a scoring threshold — a handful of
+# samples names a schema mismatch without flooding the log.
+_MAX_DROPPED_SAMPLES = 5
+
 
 class UnusualWhalesRestFlowSource:
     """One-shot ``RawFlowSource`` over UW's ``/api/option-flow/recent``.
@@ -91,6 +96,11 @@ class UnusualWhalesRestFlowSource:
         self._before = before
         self.source_id = source_id
         self._closed = False
+        # Phase 3.8 self-diagnostic counters (read after stream() drains).
+        self.rows_fetched = 0
+        self.rows_mapped = 0
+        self.rows_dropped = 0
+        self.dropped_key_samples: list[tuple[str, ...]] = []
 
     async def stream(self) -> AsyncIterator[RawPrint]:
         """Fetch recent flow once, yield every mapped ``RawPrint``, complete."""
@@ -107,11 +117,13 @@ class UnusualWhalesRestFlowSource:
         if not isinstance(data, list):
             return
 
+        self.rows_fetched = len(data)
         cutoff = before - self._lookback if self._lookback is not None else None
         for index, row in enumerate(data):
             if self._closed:
                 return
             if not isinstance(row, dict):
+                self.rows_dropped += 1
                 continue
             rp = map_uw_flow_event(
                 row,
@@ -119,7 +131,13 @@ class UnusualWhalesRestFlowSource:
                 source_event_id_fallback=f"uw-rest-fallback-{index}",
             )
             if rp is None:
+                # Unmappable row (missing/unparseable required field). Record
+                # its KEYS (not values) so a schema mismatch is diagnosable.
+                self.rows_dropped += 1
+                if len(self.dropped_key_samples) < _MAX_DROPPED_SAMPLES:
+                    self.dropped_key_samples.append(tuple(sorted(row.keys())))
                 continue
+            self.rows_mapped += 1
             if cutoff is not None and (rp.timestamp < cutoff or rp.timestamp > before):
                 continue
             yield rp
