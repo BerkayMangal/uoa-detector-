@@ -56,16 +56,23 @@ from uoa_detector.calibration import load_default_profile
 from uoa_detector.calibration.loader import load_profile
 from uoa_detector.observability import (
     CollectingWriter,
+    FlowStats,
     NDJSONWriter,
     ParquetWriter,
     PrettyWriter,
+    format_enrichment_line,
+    format_flow_line,
     redact_secrets,
     render_markdown,
     render_stdout,
     screen_records,
+    screen_top_n,
 )
 from uoa_detector.pipeline.orchestrator import Pipeline
-from uoa_detector.pipeline.stages import default_stage_pipeline
+from uoa_detector.pipeline.stages import (
+    build_live_stage_pipeline,
+    default_stage_pipeline,
+)
 from uoa_detector.sources.multi_source_scenario import multi_source_scenario
 from uoa_detector.sources.parquet_replay import ParquetReplaySource
 from uoa_detector.sources.scenarios import (
@@ -422,6 +429,24 @@ def screener(
             "window filter — take whatever the endpoint returns as recent."
         ),
     ),
+    top_n: int = typer.Option(
+        15,
+        "--top-n",
+        help=(
+            "Display policy: show the top N signals ranked by confluence "
+            "score, regardless of label (each row still shows its LABEL and "
+            "MAX_R). Keeps the page non-empty when flow exists. Changes no "
+            "scoring and no threshold. Ignored when --strict is set."
+        ),
+    ),
+    strict: bool = typer.Option(
+        False,
+        "--strict",
+        help=(
+            "Restore the actionable-only filter (max_r>0 + non-noise labels) "
+            "instead of the top-N view. Same ranking; fewer rows."
+        ),
+    ),
     data_dir: Path | None = typer.Option(
         None,
         "--data-dir",
@@ -479,6 +504,7 @@ def screener(
     profile = _resolve_profile(profile_path)
     store = _build_store(store_url)
     collector = CollectingWriter()
+    flow_stats: FlowStats | None = None
 
     try:
         if source == "historical":
@@ -521,7 +547,7 @@ def screener(
             ticker_list = [
                 t.strip().upper() for t in live_tickers.split(",") if t.strip()
             ]
-            asyncio.run(
+            flow_stats = asyncio.run(
                 _run_rest(
                     profile=profile,
                     writer=collector,
@@ -536,7 +562,14 @@ def screener(
         store.close()
 
     run_ts = datetime.now(tz=UTC)
-    rows = screen_records(collector.records)
+    # Display policy (Phase 3.8): default top-N view is never empty when flow
+    # exists; --strict restores the actionable-only funnel. Neither changes
+    # any score or profile threshold (D4/D8).
+    rows = (
+        screen_records(collector.records)
+        if strict
+        else screen_top_n(collector.records, top_n=top_n)
+    )
     typer.echo(
         render_stdout(rows, profile_id=profile.profile_id, run_timestamp=run_ts),
         nl=False,
@@ -553,6 +586,24 @@ def screener(
         encoding="utf-8",
     )
     typer.echo(f"Digest written to {resolved_report}", err=True)
+
+    # Self-diagnostic (Phase 3.8): one run reveals end-to-end data health.
+    if flow_stats is not None:
+        typer.echo(
+            format_flow_line(
+                fetched=flow_stats.fetched,
+                mapped=flow_stats.mapped,
+                dropped=flow_stats.dropped,
+                dropped_sample=flow_stats.dropped_sample,
+            ),
+            err=True,
+        )
+    else:
+        typer.echo(
+            format_flow_line(fetched=None, mapped=None, dropped=None),
+            err=True,
+        )
+    typer.echo(format_enrichment_line(collector.records), err=True)
 
 
 def _build_store(store_url: str) -> BacktestStoreProtocol:
@@ -738,20 +789,41 @@ async def _run_live(
     except FeedConfigurationError as exc:
         raise typer.BadParameter(str(exc), param_hint="--feeds") from exc
 
-    pipeline = Pipeline(
-        bundle.sources,
-        list(default_stage_pipeline()),
-        profile=profile,
-        store=store,
-        decision_record_writer=writer,
-        force_multi_source=len(bundle.sources) > 1,
+    # Phase 3.8: enrichment (M21-M27) is UW-REST-only, independent of the
+    # live flow feed. Build a dedicated UW client for the enrichment
+    # providers so the live screener uses the multi-source engine instead
+    # of NoOp defaults. The flow WS source owns its own connection; this
+    # client is only for the REST enrichment calls and is closed here.
+    enrich_api_key = creds.unusual_whales_api_key
+    if enrich_api_key is None:
+        msg = (
+            "screener enrichment (M21-M27) requires the "
+            "UNUSUAL_WHALES_API_KEY environment variable (or an entry in "
+            ".env at the repo root); it is not set."
+        )
+        raise typer.BadParameter(msg, param_hint="--source")
+    enrich_client = UnusualWhalesClient(
+        api_key=enrich_api_key,
+        settings=profile.data_sources.unusual_whales,
     )
-    observer = LiveObserver(
-        pipeline=pipeline,
-        sources=bundle.sources,
-        install_signal_handlers=True,
-    )
-    await observer.run()
+
+    try:
+        pipeline = Pipeline(
+            bundle.sources,
+            build_live_stage_pipeline(enrich_client, profile),
+            profile=profile,
+            store=store,
+            decision_record_writer=writer,
+            force_multi_source=len(bundle.sources) > 1,
+        )
+        observer = LiveObserver(
+            pipeline=pipeline,
+            sources=bundle.sources,
+            install_signal_handlers=True,
+        )
+        await observer.run()
+    finally:
+        await enrich_client.aclose()
 
 
 async def _run_rest(
@@ -761,7 +833,7 @@ async def _run_rest(
     store: BacktestStoreProtocol,
     tickers: list[str],
     since_minutes: int | None,
-) -> None:
+) -> FlowStats:
     """Drive the pipeline against a one-shot Unusual Whales REST fetch.
 
     Phase 3.7: builds a ``UnusualWhalesRestFlowSource`` over the shared UW
@@ -796,9 +868,12 @@ async def _run_rest(
             tickers=tickers,
             lookback=lookback,
         )
+        # Phase 3.8: share ONE client across the flow source and every
+        # enrichment provider so the daily screener actually uses the
+        # multi-source engine (M21-M27) instead of NoOp defaults.
         pipeline = Pipeline(
             [src],
-            list(default_stage_pipeline()),
+            build_live_stage_pipeline(client, profile),
             profile=profile,
             store=store,
             decision_record_writer=writer,
@@ -806,6 +881,13 @@ async def _run_rest(
         await pipeline.run()
     finally:
         await client.aclose()
+
+    return FlowStats(
+        fetched=src.rows_fetched,
+        mapped=src.rows_mapped,
+        dropped=src.rows_dropped,
+        dropped_sample=tuple(src.dropped_key_samples),
+    )
 
 
 # ---------------------------------------------------------------------------

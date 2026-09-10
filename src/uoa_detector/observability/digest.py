@@ -143,24 +143,50 @@ def _top_reasons(record: SignalDecisionRecord, *, limit: int = 2) -> tuple[str, 
     return tuple(f"{name} {value:+.2f}" for name, value in components[:limit])
 
 
+def _row_from(record: SignalDecisionRecord, *, rank: int) -> DigestRow:
+    """Build one ``DigestRow`` from a decision record at ``rank``."""
+    return DigestRow(
+        rank=rank,
+        ticker=record.event.print_.ticker,
+        side=LONG_SIDE,
+        label=record.decision.label.value,
+        score=_combined_score(record),
+        contract=_fmt_contract(record),
+        max_r=record.size.max_r,
+        reasons=_top_reasons(record),
+        label_reason=record.decision.reason,
+    )
+
+
 def screen_records(records: Iterable[SignalDecisionRecord]) -> list[DigestRow]:
-    """Filter to actionable candidates and rank them deterministically."""
+    """Filter to actionable candidates and rank them deterministically.
+
+    This is the ``--strict`` view: only positioned, non-noise candidates.
+    """
     actionable = [r for r in records if is_actionable(r)]
     actionable.sort(key=_sort_key)
-    return [
-        DigestRow(
-            rank=i + 1,
-            ticker=r.event.print_.ticker,
-            side=LONG_SIDE,
-            label=r.decision.label.value,
-            score=_combined_score(r),
-            contract=_fmt_contract(r),
-            max_r=r.size.max_r,
-            reasons=_top_reasons(r),
-            label_reason=r.decision.reason,
-        )
-        for i, r in enumerate(actionable)
-    ]
+    return [_row_from(r, rank=i + 1) for i, r in enumerate(actionable)]
+
+
+def screen_top_n(
+    records: Iterable[SignalDecisionRecord],
+    *,
+    top_n: int,
+) -> list[DigestRow]:
+    """Rank ALL processed records by score desc and return the top ``top_n``.
+
+    Phase 3.8 default display policy: unlike ``screen_records`` this applies
+    **no** actionable filter, so the page is never empty when flow exists.
+    Every row still carries its LABEL and MAX_R, so a noise/rejected
+    candidate is shown *and* visibly marked — the operator applies judgment.
+
+    This is a display policy over already-scored rows; it changes no profile
+    threshold and no scoring (D4/D8 untouched). ``top_n <= 0`` returns an
+    empty list (show nothing), never "all".
+    """
+    ranked = sorted(records, key=_sort_key)
+    limited = ranked[:top_n] if top_n > 0 else []
+    return [_row_from(r, rank=i + 1) for i, r in enumerate(limited)]
 
 
 _HEADERS = ("#", "TICKER", "SIDE", "LABEL", "SCORE", "CONTRACT", "MAX_R", "TOP REASONS")

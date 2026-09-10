@@ -9,6 +9,7 @@ system depends on a correct time-of-day weight (see task spec).
 
 from uoa_detector.pipeline.stage import EnrichmentStage
 from uoa_detector.pipeline.stages.cluster_decay_stage import ClusterDecayStage
+from uoa_detector.pipeline.stages.live_stages import build_live_stage_pipeline
 from uoa_detector.pipeline.stages.m21_dealer_gamma import DealerGammaStage
 from uoa_detector.pipeline.stages.m22_event_calendar import EventCalendarStage
 from uoa_detector.pipeline.stages.m23_price_confirmation import PriceConfirmationStage
@@ -36,6 +37,7 @@ __all__ = [
     "SweepBlockStage",
     "TemporalClusterStage",
     "TimeOfDayStage",
+    "build_live_stage_pipeline",
 ]
 
 
