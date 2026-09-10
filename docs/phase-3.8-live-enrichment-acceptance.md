@@ -171,3 +171,79 @@ Add `--strict` to see only actionable candidates. Add `--since-minutes N` to
 window the recent-flow fetch. The digest prints to stdout and a markdown twin
 lands under `reports/screener_<date>.md`; the diagnostic line prints to
 stderr.
+
+---
+
+## 8. Closeout (paket-mode)
+
+Status: **KAPALI**. Contract met; every commit green.
+
+### Commits
+
+- `Phase 3.8.1` — freeze this acceptance contract.
+- `Phase 3.8.2` — `build_live_stage_pipeline` wires the real UW providers
+  (`pipeline/stages/live_stages.py`), exported from `stages/__init__.py`.
+- `Phase 3.8.3` — `screener --source rest|live` use the live pipeline; one
+  shared UW client per path; `run`/backtest/synthetic/historical untouched.
+- `Phase 3.8.4` — `--top-n` (default) / `--strict` display policy + stderr
+  self-diagnostic (flow ingestion + per-module OK/no-data/error tally).
+
+### Verified clean (at HEAD)
+
+- `uv run pytest -q` → 1531 passed, 20 skipped.
+- `uv run mypy --strict src/` → Success, 116 source files.
+- `uv run ruff check .` → All checks passed.
+
+### New tests (+27 over the 1504 baseline)
+
+- `tests/unit/test_live_stage_pipeline.py` (4): same stage order as default;
+  each M-stage carries its real UW provider (not NoOp); default pipeline
+  still NoOp; all providers share the one injected client.
+- `tests/unit/test_digest.py` (+4): `screen_top_n` ranks all labels, never
+  empty when flow exists, caps at N, empty on N<=0.
+- `tests/unit/test_diagnostics.py` (8): branch classification, per-module
+  tally, flow-line + enrichment-line rendering.
+- `tests/unit/test_uw_rest_flow.py` (+3): fetched/mapped/dropped counters,
+  zero-before-stream, windowed rows still count as mapped.
+- `tests/integration/test_cli_screener_rest.py` (+2) and
+  `test_cli_screener.py` (+1): diagnostic lines on stderr; top-N vs strict.
+
+### Judgment calls
+
+1. **New module `live_stages.py`** rather than growing `stages/__init__.py`.
+   Keeps the offline `default_stage_pipeline` and the online builder visibly
+   separate; the guard test pins that the default stays NoOp.
+2. **`--source live` builds a second, dedicated UW client** for enrichment.
+   The live flow feed is a WebSocket; enrichment is REST. One client for
+   both would tangle two lifecycles; the enrichment client is closed in a
+   `finally`. `--source rest` does share its single client (flow + all
+   providers) as the contract requires.
+3. **`screen_top_n` is a new function**, not a changed `screen_records`.
+   `screen_records` stays the strict view (its Phase 3.6 tests are the
+   cumulative spec, D10). One existing CLI test asserted the old default
+   (actionable-only); it was updated to the new default and given a
+   `--strict` counterpart — a documented D10 flag, not a silent weakening.
+4. **Data-health classifier is branch-first.** `branch` is present on every
+   stage; `provider_returned` is not uniform (M24 uses `iv_provider_returned`,
+   M25 has none). Timeout/error branches → error; an explicit no-data branch
+   set → no_data; everything else → ok; `preset_skip`/missing → not counted.
+5. **`_MAX_DROPPED_SAMPLES` and `--top-n` default (15) are display/rendering
+   values, not scoring thresholds** — they live in code, not the profile,
+   because D8 governs numeric truth for *scoring*, and these touch neither a
+   score nor the falsification framework.
+6. **M28 stays out of the live pipeline.** It is the T+1 overnight batch
+   validator (`M28Validator`), not a `PipelineStage`; wiring it here would be
+   wrong. Unchanged.
+
+### Honest framing
+
+This makes the screener *use* the multi-source data — it does **not** prove
+edge. Phase 3.5 (the real backtest) owns the edge verdict; nothing here
+claims profitability. The digest keeps its decision-support header.
+
+### Sıradaki
+
+Berkay runs the §7 command with a live UW key to confirm real providers
+return data end-to-end (the diagnostic line is the one-look health check).
+Any dead module shows as `err=` or `nodata=` for every row and is a named,
+one-line fix — not a silent hollow list.
