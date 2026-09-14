@@ -16,6 +16,11 @@ Design rationale:
     rows. A pending flush is also forced on ``start_run()`` so the
     previous run's data is durable before the next run starts.
 
+  * **Replay-safe live ingestion.** ``replay_safe=True`` (Phase 4.43)
+    skips signals whose ``(run_id, event_id)`` is already stored and
+    discards a batch whose commit failed, so a source that re-emits
+    recent events after a restart cannot wedge the write path.
+
   * **Idempotent open.** Re-opening an existing database calls Alembic
     to upgrade to head. If the database is already at head, that is a
     no-op. If it is at an older revision, the upgrade runs and the
@@ -34,6 +39,7 @@ Design rationale:
 
 from __future__ import annotations
 
+import logging
 import uuid
 from datetime import UTC, datetime
 from decimal import Decimal
@@ -60,12 +66,15 @@ if TYPE_CHECKING:
     from collections.abc import Iterator
 
     from sqlalchemy.engine import Engine
+    from sqlalchemy.orm import Session
 
     from uoa_detector.calibration import CalibrationProfile
     from uoa_detector.domain.events import EnrichedEvent
     from uoa_detector.domain.labels import LabelDecision
     from uoa_detector.domain.risk import PositionSize
 
+
+_logger = logging.getLogger(__name__)
 
 _MIGRATIONS_DIR = Path(__file__).parent / "migrations"
 
@@ -96,6 +105,7 @@ class SqliteBacktestStore:
         *,
         strict_run_lifecycle: bool = False,
         flush_threshold: int | None = None,
+        replay_safe: bool = False,
     ) -> None:
         """Open or create a SQLite database at ``database_url``.
 
@@ -107,11 +117,21 @@ class SqliteBacktestStore:
         On open the database is migrated to Alembic head. The journal
         mode is set to WAL for file-backed databases (no-op for memory
         databases — WAL is unavailable there).
+
+        ``replay_safe`` is for live ingestion from a source that re-emits
+        recent events after a restart (the UW flow poller backfills its last
+        10 minutes). When True, a signal whose ``(run_id, event_id)`` is
+        already stored, or repeated within the buffer, is skipped instead of
+        failing the commit; and a failed flush discards the buffer instead of
+        re-sending the same rows with every later write. The replaying source
+        re-emits whatever was dropped. Backtests keep the default: a
+        duplicate there is a data bug and must raise.
         """
         self._database_url = database_url
         self._engine: Engine = create_engine(database_url, future=True)
         self._strict = strict_run_lifecycle
         self._flush_threshold = flush_threshold or self._DEFAULT_FLUSH_THRESHOLD
+        self._replay_safe = replay_safe
 
         # Set WAL mode at connection open. This applies to every
         # connection from the pool, not just the first. SQLite-only:
@@ -435,15 +455,35 @@ class SqliteBacktestStore:
         if not self._signal_buffer and not self._error_buffer:
             return
 
-        signals_by_run: dict[str, int] = {}
-        errors_by_run: dict[str, int] = {}
-        for sig in self._signal_buffer:
-            signals_by_run[sig.run_id] = signals_by_run.get(sig.run_id, 0) + 1
-        for err in self._error_buffer:
-            errors_by_run[err.run_id] = errors_by_run.get(err.run_id, 0) + 1
+        try:
+            self._commit_buffers()
+        except Exception:
+            # Replay-safe stores never retry a failed batch: re-sending the
+            # same rows with every later write would wedge ingestion for the
+            # rest of the run. The replaying source re-emits what was dropped.
+            if self._replay_safe:
+                self._signal_buffer = []
+                self._error_buffer = []
+            raise
 
+        self._signal_buffer = []
+        self._error_buffer = []
+
+    def _commit_buffers(self) -> None:
+        """Write the buffers and per-run counters in one transaction."""
         with self._session_factory() as session:
-            session.add_all(self._signal_buffer)
+            signals = self._signal_buffer
+            if self._replay_safe:
+                signals = self._without_stored_duplicates(session, signals)
+
+            signals_by_run: dict[str, int] = {}
+            errors_by_run: dict[str, int] = {}
+            for sig in signals:
+                signals_by_run[sig.run_id] = signals_by_run.get(sig.run_id, 0) + 1
+            for err in self._error_buffer:
+                errors_by_run[err.run_id] = errors_by_run.get(err.run_id, 0) + 1
+
+            session.add_all(signals)
             session.add_all(self._error_buffer)
             for rid, count in signals_by_run.items():
                 run = session.get(BacktestRunRow, rid)
@@ -455,8 +495,35 @@ class SqliteBacktestStore:
                     run.total_errors += count
             session.commit()
 
-        self._signal_buffer = []
-        self._error_buffer = []
+    @staticmethod
+    def _without_stored_duplicates(
+        session: Session, signals: list[SignalRow],
+    ) -> list[SignalRow]:
+        """Drop signals whose ``(run_id, event_id)`` is stored or already kept."""
+        event_ids_by_run: dict[str, set[str]] = {}
+        for sig in signals:
+            event_ids_by_run.setdefault(sig.run_id, set()).add(sig.event_id)
+
+        taken: set[tuple[str, str]] = set()
+        for rid, event_ids in event_ids_by_run.items():
+            stored = session.scalars(
+                select(SignalRow.event_id).where(
+                    SignalRow.run_id == rid,
+                    SignalRow.event_id.in_(sorted(event_ids)),
+                ),
+            )
+            taken.update((rid, eid) for eid in stored)
+
+        kept: list[SignalRow] = []
+        for sig in signals:
+            key = (sig.run_id, sig.event_id)
+            if key not in taken:
+                taken.add(key)
+                kept.append(sig)
+        skipped = len(signals) - len(kept)
+        if skipped:
+            _logger.info("skipped %d replayed signal(s) already stored", skipped)
+        return kept
 
     # ---- Reads ---------------------------------------------------------
 

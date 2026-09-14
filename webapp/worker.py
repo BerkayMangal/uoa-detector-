@@ -49,9 +49,18 @@ def _normalize_pg(url: str) -> str:
 
 
 def _open_live_store(database_url: str) -> SqliteBacktestStore:
-    """Open the webapp's store for live ingestion: one commit per signal."""
+    """Open the webapp's store for live ingestion: one commit per signal.
+
+    Replay-safe (Phase 4.43): the flow source re-emits its last 10 minutes of
+    alerts every time it is rebuilt (in-process restart, Railway redeploy), with
+    the same event ids as rows already stored. A plain store fails that commit
+    and re-sends the rejected row on every later write, freezing the dashboard
+    for the rest of the day.
+    """
     return SqliteBacktestStore(
-        _normalize_pg(database_url), flush_threshold=_LIVE_FLUSH_THRESHOLD,
+        _normalize_pg(database_url),
+        flush_threshold=_LIVE_FLUSH_THRESHOLD,
+        replay_safe=True,
     )
 
 
