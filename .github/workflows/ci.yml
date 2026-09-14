@@ -1,0 +1,40 @@
+# Phase 5.0.2: the per-commit gate (CLAUDE.md D2) on every PR and every push to
+# main. CI has no API keys, so key-gated integration tests skip, matching the
+# local `env -u UNUSUAL_WHALES_API_KEY -u THETADATA_API_KEY -u THETADATA_USERNAME`
+# gate. Railway deploys main, so a red main is a red production.
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gate:
+    name: gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: astral-sh/setup-uv@v10.1.0
+        with:
+          version: "0.11.12"
+          python-version: "3.12"
+          enable-cache: true
+      - name: Lockfile matches pyproject
+        run: uv lock --check
+      - name: Install (locked)
+        run: uv sync --locked
+      - name: Tests (hermetic, no API keys)
+        run: uv run pytest -q
+      - name: Type check
+        run: uv run mypy --strict src/
+      - name: Lint
+        run: uv run ruff check .
