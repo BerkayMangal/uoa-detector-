@@ -424,9 +424,10 @@ def screener(
         None,
         "--since-minutes",
         help=(
-            "REST mode only: keep only flow from the last N minutes "
-            "(client-side window over /api/option-flow/recent). Default: no "
-            "window filter — take whatever the endpoint returns as recent."
+            "REST mode only: fetch flow alerts from the last N minutes "
+            "(epoch newer_than window on /api/option-trades/flow-alerts, all "
+            "pages). Default: the latest session with alerts, from 00:00 ET "
+            "of the newest alert's date."
         ),
     ),
     top_n: int = typer.Option(

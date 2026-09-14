@@ -16,6 +16,10 @@ Public surface:
   - ``UnusualWhalesClient`` (Phase 3.3.3.2): authenticated HTTP client
   - ``UnusualWhalesAuthError`` / ``UnusualWhalesRateLimitError`` /
     ``UnusualWhalesTransientError``
+  - ``UnusualWhalesNotFoundError`` (HTTP 404/422, subclass of
+    ``UnusualWhalesAuthError``) and ``UnusualWhalesDailyLimitError``
+    (daily-quota HTTP 429, subclass of ``UnusualWhalesRateLimitError``),
+    both Phase 3.9.3
   - ``UnusualWhalesError`` (base)
   - ``DEFAULT_BASE_URL``
 
@@ -27,7 +31,9 @@ from uoa_detector.sources.unusual_whales.client import (
     DEFAULT_BASE_URL,
     UnusualWhalesAuthError,
     UnusualWhalesClient,
+    UnusualWhalesDailyLimitError,
     UnusualWhalesError,
+    UnusualWhalesNotFoundError,
     UnusualWhalesRateLimitError,
     UnusualWhalesTransientError,
 )
@@ -36,7 +42,9 @@ __all__ = [
     "DEFAULT_BASE_URL",
     "UnusualWhalesAuthError",
     "UnusualWhalesClient",
+    "UnusualWhalesDailyLimitError",
     "UnusualWhalesError",
+    "UnusualWhalesNotFoundError",
     "UnusualWhalesRateLimitError",
     "UnusualWhalesTransientError",
 ]

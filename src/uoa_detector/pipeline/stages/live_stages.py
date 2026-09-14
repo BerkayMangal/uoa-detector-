@@ -85,6 +85,7 @@ def build_live_stage_pipeline(
     Same order and same non-provider stages as ``default_stage_pipeline``.
     The M-stages that take a provider get their real ``UnusualWhales*``
     provider, all sharing ``client`` and ``profile.data_sources.unusual_whales``.
+    M22 and M24 share one catalyst-calendar provider instance (Phase 3.9.8).
 
     Args:
         client: One shared UW REST client. Its lifecycle (``aclose``) is
@@ -99,6 +100,12 @@ def build_live_stage_pipeline(
         A fresh list of stage instances, safe to hand to ``Pipeline``.
     """
     uw = profile.data_sources.unusual_whales
+    # M22 and M24 read the same catalyst calendar. One instance shares its
+    # per-ticker cache, so earnings / FDA / FOMC are fetched once per ticker
+    # per TTL window instead of once per stage (Phase 3.9 §3.5).
+    catalyst_provider = UnusualWhalesCatalystCalendarProvider(
+        client=client, settings=uw,
+    )
 
     return [
         TimeOfDayStage(),  # M39 — no external provider
@@ -110,10 +117,8 @@ def build_live_stage_pipeline(
                 client=client, settings=uw,
             ),
         ),
-        EventCalendarStage(  # M22
-            provider=UnusualWhalesCatalystCalendarProvider(
-                client=client, settings=uw,
-            ),
+        EventCalendarStage(  # M22 — shares catalyst_provider with M24
+            provider=catalyst_provider,
         ),
         PriceConfirmationStage(  # M23 — UW price-action (Phase 3.3.8)
             provider=UnusualWhalesPriceActionProvider(
@@ -124,9 +129,7 @@ def build_live_stage_pipeline(
             iv_provider=UnusualWhalesIVHistoryProvider(
                 client=client, settings=uw,
             ),
-            catalyst_provider=UnusualWhalesCatalystCalendarProvider(
-                client=client, settings=uw,
-            ),
+            catalyst_provider=catalyst_provider,
         ),
         SectorPeerStage(  # M25 — two providers
             sector_provider=UnusualWhalesSectorMapProvider(

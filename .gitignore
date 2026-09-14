@@ -12,3 +12,6 @@ build/
 
 # Claude Code agent worktrees (ephemeral, session-local)
 .claude/worktrees/
+.env.save
+.env.*
+!.env.example

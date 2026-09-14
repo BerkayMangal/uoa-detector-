@@ -158,17 +158,17 @@ _UW_SIDE_TO_FILL_SIDE: dict[str, FillSide] = {
 }
 
 
-# Required fields on a UW flow object. Absence/unparse of any of these
-# makes the event unmappable; the shared mapper logs the row's actual keys
-# and returns None (Phase 3.7.2). WS field names; the REST recent-flow
-# endpoint is expected to carry the same names (see phase-3.7 acceptance §5).
+# Required fields on a UW flow object, as alias groups: the WS name first,
+# then the REST flow-alerts name (Phase 3.9.4, contract §3.1). When every
+# alias of a group is absent or unparseable the event is unmappable; the
+# shared mapper logs the row's actual keys and returns None (Phase 3.7.2).
 _REQUIRED_FLOW_FIELDS: tuple[str, ...] = (
     "ticker",
-    "executed_at",
-    "option_type",
+    "executed_at|created_at",
+    "option_type|type",
     "strike",
     "expiry",
-    "premium",
+    "premium|total_premium",
     "price",
     "bid",
     "ask",
@@ -187,18 +187,43 @@ def map_uw_flow_event(
     ``UnusualWhalesRestFlowSource`` (REST) so the two feeds normalise flow
     identically. Pure function: no I/O, no mutation of ``event``.
 
-    Field-name robustness (Phase 3.7):
-      - Fill side is read from ``side`` (WS) **or** ``side_classification``
-        (the recent-flow REST endpoint). An unrecognised value maps to
-        ``fill_side="unknown"`` — we never fabricate a fill side. Note that
-        on the recent-flow endpoint ``side_classification`` is directional
-        (bullish/bearish/neutral), which is not a fill label and therefore
-        degrades to "unknown"; direction is derived downstream from
-        ``option_type``, so this is safe (see acceptance §4).
-      - If any **required** field (``_REQUIRED_FLOW_FIELDS``) is absent or
+    Field aliases (Phase 3.9.4, contract §3.1). The WS name keeps priority
+    and the REST ``/api/option-trades/flow-alerts`` name is the fallback,
+    so WS events map exactly as before:
+
+      RawPrint field       WS name              flow-alert name
+      timestamp            executed_at          created_at
+      option_type          option_type          type (call/put only)
+      premium_paid         premium              total_premium
+      spot_price           spot_price           underlying_price
+      implied_volatility   implied_volatility   iv_end
+      is_iso               is_iso               has_sweep
+      source_tags          alert_type           alert_rule
+
+      - ``timestamp`` falls back to ``created_at`` (alert publication time,
+        no look-ahead) also when ``executed_at`` is present but unparseable.
+      - IV and OI accept a number or a numeric string; a negative or
+        non-finite value is treated as absent (None).
+      - ``has_multileg`` true adds the ``uw:multileg`` tag; the alert is kept.
+      - A spot from either name suppresses the ``uw:no-spot`` tag.
+
+    Fill side (never fabricated):
+      - A ``side`` (WS) or ``side_classification`` key is looked up in the
+        fixed table; an unrecognised value maps to ``"unknown"``.
+        ``side_classification`` is directional (bullish/bearish/neutral),
+        not a fill label, so it degrades to "unknown" (Phase 3.7 §4).
+      - Otherwise, when both ``total_ask_side_prem`` and
+        ``total_bid_side_prem`` parse: ask > bid is ``at_ask``, bid > ask is
+        ``at_bid``, equal is ``unknown``. The split is UW's per-trade
+        aggressor classification summed by premium, so it is fill data; it
+        cannot tell ``above_ask`` from ``at_ask``.
+
+    Required fields:
+      - If a required field group (``_REQUIRED_FLOW_FIELDS``) is absent or
         unparseable, log an ERROR that names ``sorted(event.keys())`` and
-        return None. A shape mismatch is then a named one-line fix, never a
-        silent drop and never a guessed value.
+        the alias groups, and return None. ``bid``/``ask`` have no alias. A
+        shape mismatch is then a named one-line fix, never a silent drop and
+        never a guessed value.
 
     :param source_id: value written to ``RawPrint.source_id``.
     :param source_event_id_fallback: ``source_event_id`` to use when the
@@ -209,13 +234,12 @@ def map_uw_flow_event(
     """
     try:
         ticker = str(event["ticker"]).upper()
-        executed_at_raw = str(event["executed_at"])
-        timestamp = _parse_iso_utc(executed_at_raw)
-        option_type_raw = str(event["option_type"]).lower()
+        timestamp = _flow_timestamp(event)
+        option_type_raw = str(_first_present(event, "option_type", "type")).lower()
         option_type = _coerce_option_type(option_type_raw)
         strike = Decimal(str(event["strike"]))
         expiry = _parse_expiry(event["expiry"])
-        premium = Decimal(str(event["premium"]))
+        premium = Decimal(str(_first_present(event, "premium", "total_premium")))
         price = Decimal(str(event["price"]))
         bid = Decimal(str(event["bid"]))
         ask = Decimal(str(event["ask"]))
@@ -231,21 +255,27 @@ def map_uw_flow_event(
         return None
 
     # Optional fields
-    oi_raw = event.get("open_interest")
-    open_interest = int(oi_raw) if isinstance(oi_raw, (int, float)) else None
-    iv_raw = event.get("implied_volatility")
-    implied_volatility = (
-        float(iv_raw) if isinstance(iv_raw, (int, float)) else None
-    )
-    is_iso = bool(event.get("is_iso", False))
+    open_interest = _optional_non_negative_int(event.get("open_interest"))
+    implied_volatility = _optional_non_negative_float(event.get("implied_volatility"))
+    if implied_volatility is None:
+        implied_volatility = _optional_non_negative_float(event.get("iv_end"))
+    is_iso_raw = event.get("is_iso")
+    is_iso = bool(event.get("has_sweep", False) if is_iso_raw is None else is_iso_raw)
     exchange = str(event.get("exchange", "UNKNOWN"))
 
-    # Side mapping — WS 'side' or REST 'side_classification' (accept both
-    # names; unrecognised value → "unknown", never fabricated).
-    side_raw = str(
-        event.get("side") or event.get("side_classification") or "",
-    ).upper()
-    fill_side: FillSide = _UW_SIDE_TO_FILL_SIDE.get(side_raw, "unknown")
+    # Fill side — a side label when the event carries one (WS 'side' or
+    # 'side_classification'; unrecognised → "unknown"), else the flow-alert
+    # ask/bid premium split. Never fabricated.
+    fill_side: FillSide
+    if "side" in event or "side_classification" in event:
+        side_raw = str(
+            event.get("side") or event.get("side_classification") or "",
+        ).upper()
+        fill_side = _UW_SIDE_TO_FILL_SIDE.get(side_raw, "unknown")
+    else:
+        fill_side = _fill_side_from_side_premium(
+            event.get("total_ask_side_prem"), event.get("total_bid_side_prem"),
+        )
 
     # DTE — drop if already expired at execution time.
     dte = (expiry - timestamp.date()).days
@@ -262,18 +292,19 @@ def map_uw_flow_event(
 
     # Source tags — preserve UW's classification labels.
     tags: list[str] = []
-    alert_type = event.get("alert_type")
-    if isinstance(alert_type, str) and alert_type:
-        tags.append(f"uw:{alert_type.lower()}")
-    # Spot price not provided by the UW flow feed in general.
-    spot_raw = event.get("spot_price")
-    if isinstance(spot_raw, (int, float, str)):
-        try:
-            spot_price = Decimal(str(spot_raw))
-        except ArithmeticError:
-            spot_price = Decimal("0")
-            tags.append("uw:no-spot")
-    else:
+    label = event.get("alert_type")
+    if not (isinstance(label, str) and label):
+        label = event.get("alert_rule")
+    if isinstance(label, str) and label:
+        tags.append(f"uw:{label.lower()}")
+    if event.get("has_multileg") is True:
+        tags.append("uw:multileg")
+    # Spot: WS 'spot_price', else flow-alert 'underlying_price'. The WS feed
+    # generally carries neither → 0 + 'uw:no-spot'.
+    spot_price = _optional_decimal(event.get("spot_price"))
+    if spot_price is None:
+        spot_price = _optional_decimal(event.get("underlying_price"))
+    if spot_price is None:
         spot_price = Decimal("0")
         tags.append("uw:no-spot")
 
@@ -536,3 +567,80 @@ def _parse_expiry(raw: object) -> date:
     if "T" in raw:
         return _parse_iso_utc(raw if raw.endswith("Z") else raw + "Z").date()
     return date_cls.fromisoformat(raw)
+
+
+def _first_present(event: dict[str, object], *names: str) -> object:
+    """Value of the first alias that is present and not None.
+
+    :raises KeyError: naming the alias group (``"a|b"``) when every alias is
+        absent or None.
+    """
+    for name in names:
+        value = event.get(name)
+        if value is not None:
+            return value
+    raise KeyError("|".join(names))
+
+
+def _flow_timestamp(event: dict[str, object]) -> datetime:
+    """Event time: ``executed_at`` (WS), else ``created_at`` (flow-alerts).
+
+    ``created_at`` is also used when ``executed_at`` is present but does not
+    parse. When neither parses the error propagates (event unmappable).
+    """
+    executed_at = event.get("executed_at")
+    created_at = event.get("created_at")
+    if executed_at is not None:
+        try:
+            return _parse_iso_utc(str(executed_at))
+        except ValueError:
+            if created_at is None:
+                raise
+    if created_at is None:
+        raise KeyError("executed_at|created_at")
+    return _parse_iso_utc(str(created_at))
+
+
+def _optional_decimal(raw: object) -> Decimal | None:
+    """A finite Decimal from a number or numeric string, else None."""
+    if isinstance(raw, bool) or not isinstance(raw, (int, float, str)):
+        return None
+    try:
+        value = Decimal(str(raw).strip())
+    except ArithmeticError:
+        return None
+    return value if value.is_finite() else None
+
+
+def _optional_non_negative_float(raw: object) -> float | None:
+    """A finite float >= 0 from a number or numeric string, else None."""
+    value = _optional_decimal(raw)
+    if value is None or value < 0:
+        return None
+    return float(value)
+
+
+def _optional_non_negative_int(raw: object) -> int | None:
+    """An int >= 0 from a number or numeric string, else None."""
+    value = _optional_decimal(raw)
+    if value is None or value < 0:
+        return None
+    return int(value)
+
+
+def _fill_side_from_side_premium(ask_prem: object, bid_prem: object) -> FillSide:
+    """Aggressor fill side from a flow alert's ask/bid premium split.
+
+    ask > bid → ``at_ask``; bid > ask → ``at_bid``; equal, or either side
+    absent/unparseable → ``unknown``. ``above_ask``/``below_bid`` are never
+    produced: a premium split cannot distinguish them (contract §3.1).
+    """
+    ask = _optional_decimal(ask_prem)
+    bid = _optional_decimal(bid_prem)
+    if ask is None or bid is None:
+        return "unknown"
+    if ask > bid:
+        return "at_ask"
+    if bid > ask:
+        return "at_bid"
+    return "unknown"

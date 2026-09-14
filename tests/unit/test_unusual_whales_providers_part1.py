@@ -100,52 +100,56 @@ def test_dealer_gamma_implements_protocol() -> None:
     assert isinstance(provider, DealerPositioningProvider)
 
 
+# Phase 3.9.5 (D10): these fixtures pinned a guessed
+# ``/greek-exposure-strike`` path and a ``{strike, as_of, net_gamma,
+# flow_direction}`` row shape; that path returned HTTP 404 live. They now
+# use trimmed live rows of ``GET /api/stock/AAPL/greek-exposure/strike``
+# (2026-09-11). UW publishes no flow direction, so the provider reports
+# ``neutral``. Protocol, strike-match, caching and TTL=0 behaviour is kept.
+
+_GEX_STRIKE_PATH = "/api/stock/AAPL/greek-exposure/strike"
+_GEX_AT = datetime(2026, 9, 11, 15, 30, tzinfo=UTC)
+_GEX_ROW_325: dict[str, Any] = {
+    "date": "2026-09-11", "strike": "325", "call_gex": "329818.0540",
+    "put_gex": "-132708.8386", "call_delta": "6182174.4550",
+    "put_delta": "-1425130.6740", "call_charm": "7572612.1562",
+    "put_charm": "3063665.8330", "call_vanna": "-1055985.2181",
+    "put_vanna": "-541253.4954",
+}
+_GEX_ROW_330: dict[str, Any] = {
+    "date": "2026-09-11", "strike": "330", "call_gex": "544970.2623",
+    "put_gex": "-62284.1385", "call_delta": "8692332.9087",
+    "put_delta": "-1620975.0500", "call_charm": "-14879958.8217",
+    "put_charm": "-1232646.7571", "call_vanna": "752334.4483",
+    "put_vanna": "-311991.4646",
+}
+
+
 @pytest.mark.asyncio
 async def test_dealer_gamma_returns_positioning_for_known_strike() -> None:
     client = _FakeClient()
-    client.stub(
-        "/api/stock/AAPL/greek-exposure-strike",
-        {
-            "data": [
-                {
-                    "strike": "150.00",
-                    "as_of": "2024-01-15T15:30:00Z",
-                    "net_gamma": "-12345678.0",
-                    "flow_direction": "accumulating",
-                },
-                {
-                    "strike": "155.00",
-                    "as_of": "2024-01-15T15:30:00Z",
-                    "net_gamma": "5000000.0",
-                    "flow_direction": "neutral",
-                },
-            ],
-        },
-    )
+    client.stub(_GEX_STRIKE_PATH, {"data": [_GEX_ROW_325, _GEX_ROW_330]})
     provider = UnusualWhalesDealerGammaProvider(
         client=client,  # type: ignore[arg-type]
         settings=_settings(),
     )
     pos = await provider.net_gamma_at(
         ticker="AAPL",
-        strike=Decimal("150.00"),
-        at=datetime(2024, 1, 15, 15, 30, tzinfo=UTC),
+        strike=Decimal("325.00"),
+        at=_GEX_AT,
     )
     assert pos is not None
     assert pos.ticker == "AAPL"
-    assert pos.strike == Decimal("150.00")
-    assert pos.net_gamma_dollars == Decimal("-12345678.0")
-    assert pos.flow_direction == "accumulating"
+    assert pos.strike == Decimal("325.00")
+    # call_gex + put_gex (share gamma; see the provider module docstring)
+    assert pos.net_gamma_dollars == Decimal("197109.2154")
+    assert pos.flow_direction == "neutral"
 
 
 @pytest.mark.asyncio
 async def test_dealer_gamma_returns_none_for_unknown_strike() -> None:
     client = _FakeClient()
-    client.stub(
-        "/api/stock/AAPL/greek-exposure-strike",
-        {"data": [{"strike": "150.00", "as_of": "2024-01-15T15:30:00Z",
-                    "net_gamma": "1.0", "flow_direction": "neutral"}]},
-    )
+    client.stub(_GEX_STRIKE_PATH, {"data": [_GEX_ROW_325]})
     provider = UnusualWhalesDealerGammaProvider(
         client=client,  # type: ignore[arg-type]
         settings=_settings(),
@@ -153,7 +157,7 @@ async def test_dealer_gamma_returns_none_for_unknown_strike() -> None:
     pos = await provider.net_gamma_at(
         ticker="AAPL",
         strike=Decimal("999.99"),
-        at=datetime(2024, 1, 15, 15, 30, tzinfo=UTC),
+        at=_GEX_AT,
     )
     assert pos is None
 
@@ -162,21 +166,17 @@ async def test_dealer_gamma_returns_none_for_unknown_strike() -> None:
 async def test_dealer_gamma_caches_response() -> None:
     """Two calls for same ticker → one HTTP request."""
     client = _FakeClient()
-    client.stub(
-        "/api/stock/AAPL/greek-exposure-strike",
-        {"data": [{"strike": "150.00", "as_of": "2024-01-15T15:30:00Z",
-                    "net_gamma": "1.0", "flow_direction": "neutral"}]},
-    )
+    client.stub(_GEX_STRIKE_PATH, {"data": [_GEX_ROW_325]})
     provider = UnusualWhalesDealerGammaProvider(
         client=client,  # type: ignore[arg-type]
         settings=_settings(dealer_gamma_seconds=300),
     )
-    at = datetime(2024, 1, 15, 15, 30, tzinfo=UTC)
+    at = _GEX_AT
     await provider.net_gamma_at(
-        ticker="AAPL", strike=Decimal("150.00"), at=at,
+        ticker="AAPL", strike=Decimal("325.00"), at=at,
     )
     await provider.net_gamma_at(
-        ticker="AAPL", strike=Decimal("150.00"), at=at,
+        ticker="AAPL", strike=Decimal("325.00"), at=at,
     )
     assert len(client.calls) == 1
 
@@ -184,19 +184,15 @@ async def test_dealer_gamma_caches_response() -> None:
 @pytest.mark.asyncio
 async def test_dealer_gamma_cache_disabled_when_ttl_zero() -> None:
     client = _FakeClient()
-    client.stub(
-        "/api/stock/AAPL/greek-exposure-strike",
-        {"data": [{"strike": "150.00", "as_of": "2024-01-15T15:30:00Z",
-                    "net_gamma": "1.0", "flow_direction": "neutral"}]},
-    )
+    client.stub(_GEX_STRIKE_PATH, {"data": [_GEX_ROW_325]})
     provider = UnusualWhalesDealerGammaProvider(
         client=client,  # type: ignore[arg-type]
         settings=_settings(dealer_gamma_seconds=0),
     )
-    at = datetime(2024, 1, 15, 15, 30, tzinfo=UTC)
+    at = _GEX_AT
     for _ in range(3):
         await provider.net_gamma_at(
-            ticker="AAPL", strike=Decimal("150.00"), at=at,
+            ticker="AAPL", strike=Decimal("325.00"), at=at,
         )
     assert len(client.calls) == 3
 
@@ -205,13 +201,8 @@ async def test_dealer_gamma_cache_disabled_when_ttl_zero() -> None:
 async def test_dealer_gamma_unknown_flow_direction_falls_back_to_neutral() -> None:
     client = _FakeClient()
     client.stub(
-        "/api/stock/AAPL/greek-exposure-strike",
-        {"data": [{
-            "strike": "150.00",
-            "as_of": "2024-01-15T15:30:00Z",
-            "net_gamma": "1.0",
-            "flow_direction": "wibble",  # garbage
-        }]},
+        _GEX_STRIKE_PATH,
+        {"data": [{**_GEX_ROW_325, "flow_direction": "wibble"}]},  # garbage
     )
     provider = UnusualWhalesDealerGammaProvider(
         client=client,  # type: ignore[arg-type]
@@ -219,8 +210,8 @@ async def test_dealer_gamma_unknown_flow_direction_falls_back_to_neutral() -> No
     )
     pos = await provider.net_gamma_at(
         ticker="AAPL",
-        strike=Decimal("150.00"),
-        at=datetime(2024, 1, 15, 15, 30, tzinfo=UTC),
+        strike=Decimal("325.00"),
+        at=_GEX_AT,
     )
     assert pos is not None
     assert pos.flow_direction == "neutral"
@@ -242,24 +233,26 @@ def test_iv_history_implements_protocol() -> None:
 
 @pytest.mark.asyncio
 async def test_iv_history_returns_nearest_snapshot() -> None:
+    """The row published just before ``at`` wins; the later row is unseen.
+
+    Phase 3.9.6 (D10): path and rows moved from the guessed per-contract
+    endpoint to live-shaped ``/api/stock/{ticker}/iv-rank`` rows.
+    """
     client = _FakeClient()
-    expected_path = "/api/option-contract/AAPL240216C00150000/iv-rank"
+    expected_path = "/api/stock/AAPL/iv-rank"
     client.stub(
         expected_path,
         {
             "data": [
-                {"as_of": "2024-01-15T15:00:00Z",
-                 "implied_volatility": 0.40,
-                 "iv_rank_252d": 60.0, "iv_percentile_252d": 65.0,
-                 "iv_change_intraday_pct": 5.0},
-                {"as_of": "2024-01-15T15:30:00Z",
-                 "implied_volatility": 0.42,
-                 "iv_rank_252d": 67.5, "iv_percentile_252d": 72.1,
-                 "iv_change_intraday_pct": 12.3},
-                {"as_of": "2024-01-15T16:00:00Z",
-                 "implied_volatility": 0.45,
-                 "iv_rank_252d": 70.0, "iv_percentile_252d": 75.0,
-                 "iv_change_intraday_pct": 18.0},
+                {"close": "315.34", "date": "2026-09-09",
+                 "updated_at": "2026-09-09T22:35:00.940875Z",
+                 "volatility": "0.259", "iv_rank_1y": "52.1585"},
+                {"close": "326.57", "date": "2026-09-10",
+                 "updated_at": "2026-09-10T22:35:01.459306Z",
+                 "volatility": "0.258", "iv_rank_1y": "51.5671"},
+                {"close": "332.27", "date": "2026-09-11",
+                 "updated_at": "2026-09-11T22:35:01.825674Z",
+                 "volatility": "0.239", "iv_rank_1y": "40.3312"},
             ],
         },
     )
@@ -272,11 +265,11 @@ async def test_iv_history_returns_nearest_snapshot() -> None:
         strike=Decimal("150.00"),
         expiry=date(2024, 2, 16),
         option_type="call",
-        at=datetime(2024, 1, 15, 15, 32, tzinfo=UTC),
+        at=datetime(2026, 9, 10, 23, 0, tzinfo=UTC),
     )
     assert snap is not None
-    assert snap.implied_volatility == 0.42  # nearest is 15:30
-    assert snap.iv_rank_252d == 67.5
+    assert snap.implied_volatility == 0.258  # nearest published is 09-10
+    assert snap.iv_rank_252d == 51.5671
 
 
 @pytest.mark.asyncio
@@ -297,12 +290,13 @@ async def test_iv_history_returns_none_on_empty() -> None:
 @pytest.mark.asyncio
 async def test_iv_history_caches_response() -> None:
     client = _FakeClient()
-    expected_path = "/api/option-contract/AAPL240216C00150000/iv-rank"
+    # Phase 3.9.6 (D10): live-shaped row on the ticker-level path.
+    expected_path = "/api/stock/AAPL/iv-rank"
     client.stub(
         expected_path,
-        {"data": [{"as_of": "2024-01-15T15:30:00Z",
-                    "implied_volatility": 0.42,
-                    "iv_rank_252d": 67.5}]},
+        {"data": [{"close": "332.27", "date": "2026-09-11",
+                    "updated_at": "2026-09-11T22:35:01.825674Z",
+                    "volatility": "0.239", "iv_rank_1y": "40.3312"}]},
     )
     provider = UnusualWhalesIVHistoryProvider(
         client=client,  # type: ignore[arg-type]
@@ -311,7 +305,7 @@ async def test_iv_history_caches_response() -> None:
     args: dict[str, Any] = {
         "ticker": "AAPL", "strike": Decimal("150.00"),
         "expiry": date(2024, 2, 16), "option_type": "call",
-        "at": datetime(2024, 1, 15, 15, 30, tzinfo=UTC),
+        "at": datetime(2026, 9, 11, 23, 0, tzinfo=UTC),
     }
     await provider.iv_rank_at(**args)
     await provider.iv_rank_at(**args)
@@ -319,8 +313,12 @@ async def test_iv_history_caches_response() -> None:
 
 
 @pytest.mark.asyncio
-async def test_iv_history_put_uses_p_in_occ_symbol() -> None:
-    """option_type='put' encodes as 'P' in the OCC symbol."""
+async def test_iv_history_put_uses_ticker_level_path() -> None:
+    """option_type='put' reads the same ticker-level series as a call.
+
+    Phase 3.9.6 (D10): replaces test_iv_history_put_uses_p_in_occ_symbol.
+    UW publishes IV rank per underlying, so no OCC symbol is built.
+    """
     client = _FakeClient()
     provider = UnusualWhalesIVHistoryProvider(
         client=client,  # type: ignore[arg-type]
@@ -329,11 +327,11 @@ async def test_iv_history_put_uses_p_in_occ_symbol() -> None:
     await provider.iv_rank_at(
         ticker="AAPL", strike=Decimal("150.00"),
         expiry=date(2024, 2, 16), option_type="put",
-        at=datetime(2024, 1, 15, 15, 30, tzinfo=UTC),
+        at=datetime(2026, 9, 11, 18, 0, tzinfo=UTC),
     )
     assert len(client.calls) == 1
     path = client.calls[0][0]
-    assert "AAPL240216P00150000" in path
+    assert path == "/api/stock/AAPL/iv-rank"
 
 
 # ===========================================================================
@@ -350,23 +348,42 @@ def test_dark_pool_implements_protocol() -> None:
     assert isinstance(provider, DarkPoolPrintProvider)
 
 
+def _dp_row(executed_at: str, **overrides: Any) -> dict[str, Any]:
+    """Live-shaped ``/api/darkpool/{ticker}`` row (Phase 3.9.7).
+
+    UW rows carry NBBO + condition codes, not a precomputed side_estimate.
+    """
+    row: dict[str, Any] = {
+        "executed_at": executed_at,
+        "trf_executed_at": executed_at,
+        "ticker": "AAPL",
+        "price": "150.42",
+        "size": 50000,
+        "premium": "7521000.00",
+        "nbbo_bid": "150.40",
+        "nbbo_ask": "150.45",
+        "canceled": False,
+        "sale_cond_codes": None,
+        "trade_code": None,
+        "ext_hour_sold_codes": None,
+        "market_center": "L",
+        "trade_settlement": "regular",
+    }
+    row.update(overrides)
+    return row
+
+
 @pytest.mark.asyncio
 async def test_dark_pool_returns_prints_in_window() -> None:
     client = _FakeClient()
     client.stub(
-        "/api/darkpool/AAPL/prints",
+        "/api/darkpool/AAPL",
         {
             "data": [
-                {"executed_at": "2024-01-15T14:25:30Z",
-                 "price": "150.42", "size": 50000,
-                 "side_estimate": "midpoint"},
-                {"executed_at": "2024-01-15T14:55:00Z",
-                 "price": "150.55", "size": 30000,
-                 "side_estimate": "above_ask"},
+                _dp_row("2024-01-15T14:25:30Z"),
+                _dp_row("2024-01-15T14:55:00Z", price="150.55", size=30000),
                 # Outside window:
-                {"executed_at": "2024-01-15T13:00:00Z",
-                 "price": "150.10", "size": 10000,
-                 "side_estimate": "midpoint"},
+                _dp_row("2024-01-15T13:00:00Z", price="150.10", size=10000),
             ],
         },
     )
@@ -387,11 +404,11 @@ async def test_dark_pool_returns_prints_in_window() -> None:
 @pytest.mark.asyncio
 async def test_dark_pool_unknown_side_falls_back() -> None:
     client = _FakeClient()
+    # No usable NBBO on the row -> side cannot be classified.
     client.stub(
-        "/api/darkpool/AAPL/prints",
-        {"data": [{"executed_at": "2024-01-15T14:30:00Z",
-                    "price": "150.0", "size": 100,
-                    "side_estimate": "weird_value"}]},
+        "/api/darkpool/AAPL",
+        {"data": [_dp_row("2024-01-15T14:30:00Z", price="150.0", size=100,
+                          nbbo_bid=None, nbbo_ask=None)]},
     )
     provider = UnusualWhalesDarkPoolProvider(
         client=client,  # type: ignore[arg-type]
@@ -410,28 +427,32 @@ async def test_dark_pool_unknown_side_falls_back() -> None:
 async def test_dark_pool_caches_per_ticker() -> None:
     client = _FakeClient()
     client.stub(
-        "/api/darkpool/AAPL/prints",
+        "/api/darkpool/AAPL",
         {"data": []},
     )
     provider = UnusualWhalesDarkPoolProvider(
         client=client,  # type: ignore[arg-type]
         settings=_settings(),
     )
-    before = datetime(2024, 1, 15, 15, 0, tzinfo=UTC)
     await provider.recent_prints(
-        ticker="AAPL", before=before, window=timedelta(minutes=10),
+        ticker="AAPL",
+        before=datetime(2024, 1, 15, 15, 0, tzinfo=UTC),
+        window=timedelta(minutes=10),
     )
     await provider.recent_prints(
-        ticker="AAPL", before=before, window=timedelta(minutes=20),
+        ticker="AAPL",
+        before=datetime(2024, 1, 15, 15, 20, tzinfo=UTC),
+        window=timedelta(minutes=10),
     )
-    # Same ticker → one fetch (window filtering happens in-memory).
+    # Same ticker, hour bucket and window → one fetch (window filtering
+    # happens in-memory). Contract §3.4 keys the cache on all three.
     assert len(client.calls) == 1
 
 
 @pytest.mark.asyncio
 async def test_dark_pool_handles_empty_response() -> None:
     client = _FakeClient()
-    client.stub("/api/darkpool/AAPL/prints", {"data": []})
+    client.stub("/api/darkpool/AAPL", {"data": []})
     provider = UnusualWhalesDarkPoolProvider(
         client=client,  # type: ignore[arg-type]
         settings=_settings(),
@@ -449,13 +470,11 @@ async def test_dark_pool_malformed_row_skipped() -> None:
     """Bad row dropped, good row emitted."""
     client = _FakeClient()
     client.stub(
-        "/api/darkpool/AAPL/prints",
+        "/api/darkpool/AAPL",
         {
             "data": [
-                {"executed_at": "garbage_timestamp", "price": "1.0", "size": 1,
-                 "side_estimate": "midpoint"},
-                {"executed_at": "2024-01-15T14:30:00Z", "price": "150.0",
-                 "size": 100, "side_estimate": "midpoint"},
+                _dp_row("garbage_timestamp", price="1.0", size=1),
+                _dp_row("2024-01-15T14:30:00Z", price="150.0", size=100),
             ],
         },
     )

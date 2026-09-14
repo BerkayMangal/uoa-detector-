@@ -84,11 +84,20 @@ unlocks both REST endpoints and WebSocket flow alerts.
    curl -H "Authorization: Bearer YOUR_KEY" \
         https://api.unusualwhales.com/api/stock/AAPL/info
    ```
-   (Should return a JSON object with sector, peers, etc.)
+   (Should return `{"data": {...}}` with `sector`, `next_earnings_date`,
+   `marketcap`, …)
 
 UW connects directly over HTTPS / WSS — no local proxy. The detector
 sends the bearer token in the `Authorization` header on every
 request and on the WebSocket handshake.
+
+Every UW REST endpoint the detector calls, with its live-verified
+response shape, is listed in
+`docs/phase-3.9-uw-endpoint-correction-acceptance.md` §3. The vendored
+OpenAPI spec (`docs/vendor/unusualwhales-openapi.json`, YAML content
+served by `/api/openapi`) is advisory only: it is wrong against live
+responses in several places (§2 of that contract). Live response headers
+on 2026-09-14 reported `x-uw-token-req-limit: 30000` requests per day.
 
 ---
 
@@ -267,6 +276,14 @@ CLI message (per-contract subscription enumeration is deferred).
 
 ### 4.1 UW-only live observer
 
+> **Phase 3.9 warning:** the WebSocket URL below
+> (`wss://api.unusualwhales.com/v1/ws`) has never been validated against
+> the live API. The vendored spec documents
+> `wss://api.unusualwhales.com/socket?token=…` with a `join` message
+> instead. For the daily candidate list use
+> `uv run python -m uoa_detector screener --source rest --live-tickers …`,
+> which runs on live-verified REST endpoints only.
+
 ```bash
 export UNUSUAL_WHALES_API_KEY="..."  # or in .env
 uv run python -m uoa_detector run \
@@ -371,6 +388,10 @@ Fix:
   is down, or a rotated UW key, or a network partition.
 - For long-running live observer runs that flap, raise the
   reconnect_max_attempts in the profile if the cause is transient.
+- UW accounting (Phase 3.9.3): HTTP 404/422 (unknown ticker, contract or
+  route; invalid input) do NOT count toward the breaker and are mapped to
+  no-data by the providers. HTTP 429 counts and is retried with backoff.
+  A daily-limit 429 (`daily_request_limit_hit`) fails fast without retry.
 
 ### 6.5 Live observer: "reconnect exhausted after 5 attempts"
 

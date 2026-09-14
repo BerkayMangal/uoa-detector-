@@ -3,6 +3,12 @@
 No live network: a fake client returns a canned ``{"data": [...]}`` payload.
 Pins the one-shot fetch, the shared-mapper wiring, RawFlowSource Protocol
 conformance, the optional lookback window, and resilience to a bad row.
+
+Phase 3.9.4 (D10): the source now calls ``/api/option-trades/flow-alerts``
+(contract ``docs/phase-3.9-uw-endpoint-correction-acceptance.md`` §3.1). The
+row fixture is a trimmed live flow-alert row, and the request assertions pin
+the live params. Pagination, aliases and fill-side derivation are covered in
+``test_uw_p39_flow.py``.
 """
 
 from __future__ import annotations
@@ -16,7 +22,7 @@ import pytest
 from uoa_detector.domain.raw_print import RawPrint
 from uoa_detector.sources.base import RawFlowSource
 from uoa_detector.sources.unusual_whales.rest_flow import (
-    RECENT_FLOW_PATH,
+    FLOW_ALERTS_PATH,
     UnusualWhalesRestFlowSource,
 )
 
@@ -44,19 +50,29 @@ class _FakeClient:
 
 
 def _rest_row(**overrides: Any) -> dict[str, Any]:
+    """A flow-alert row trimmed from live /api/option-trades/flow-alerts
+    (TSLA, 2026-09-11 session)."""
     base: dict[str, Any] = {
         "id": "rest_1",
         "ticker": "AAPL",
-        "executed_at": "2024-01-15T15:30:00Z",
-        "option_type": "call",
-        "strike": "150.00",
-        "expiry": "2024-02-16",
-        "premium": "12345.00",
-        "price": "1.50",
-        "bid": "1.45",
-        "ask": "1.55",
-        "side_classification": "bullish",
-        "exchange": "CBOE",
+        "type": "call",
+        "strike": "400",
+        "expiry": "2026-12-18",
+        "created_at": "2026-09-11T19:59:50.817119Z",
+        "price": "21.5",
+        "bid": "21.35",
+        "ask": "21.5",
+        "underlying_price": "365.31",
+        "total_premium": "118249",
+        "total_ask_side_prem": "118249",
+        "total_bid_side_prem": "0",
+        "total_size": 55,
+        "open_interest": 12605,
+        "iv_end": "0.440580259552382",
+        "has_sweep": False,
+        "has_multileg": False,
+        "alert_rule": "RepeatedHitsAscendingFill",
+        "option_chain": "TSLA261218C00400000",
     }
     base.update(overrides)
     return base
@@ -88,19 +104,21 @@ async def test_one_shot_fetch_yields_mapped_prints() -> None:
     src = UnusualWhalesRestFlowSource(
         client=client,  # type: ignore[arg-type]
         tickers=["aapl", "msft"],
-        before=datetime(2024, 1, 15, 20, 0, tzinfo=UTC),
+        before=datetime(2026, 9, 11, 20, 30, tzinfo=UTC),
     )
     prints = await _drain(src)
     assert len(prints) == 2
     assert {p.source_event_id for p in prints} == {"uw-rest_1", "uw-rest_2"}
     assert {p.ticker for p in prints} == {"AAPL", "MSFT"}
-    # Exactly one HTTP call — one-shot, not a loop.
+    # Exactly one HTTP call — one-shot, not a loop (a short page ends the walk).
     assert len(client.calls) == 1
     path, params = client.calls[0]
-    assert path == RECENT_FLOW_PATH
+    assert path == FLOW_ALERTS_PATH
     assert params is not None
-    assert params["tickers"] == "AAPL,MSFT"  # upper-cased, comma-joined
-    assert params["before"] == "2024-01-15T20:00:00+00:00"
+    assert params["ticker_symbol"] == "AAPL,MSFT"  # upper-cased, comma-joined
+    assert params["limit"] == 200
+    assert params["older_than"] == 1789158600  # 2026-09-11T20:30:00Z, epoch s
+    assert "newer_than" not in params  # no lookback → latest session
 
 
 @pytest.mark.asyncio
@@ -144,11 +162,11 @@ async def test_missing_data_key_yields_nothing() -> None:
 
 @pytest.mark.asyncio
 async def test_lookback_filters_old_rows() -> None:
-    before = datetime(2024, 1, 15, 20, 0, tzinfo=UTC)
+    before = datetime(2026, 9, 11, 20, 0, tzinfo=UTC)
     payload = {
         "data": [
-            _rest_row(id="fresh", executed_at="2024-01-15T19:30:00Z"),
-            _rest_row(id="stale", executed_at="2024-01-15T10:00:00Z"),
+            _rest_row(id="fresh", created_at="2026-09-11T19:30:00Z"),
+            _rest_row(id="stale", created_at="2026-09-11T10:00:00Z"),
         ],
     }
     client = _FakeClient(payload)
@@ -164,17 +182,20 @@ async def test_lookback_filters_old_rows() -> None:
 
 @pytest.mark.asyncio
 async def test_no_lookback_keeps_all_returned_rows() -> None:
+    # Phase 3.9.4: without a lookback the window is the latest ET session, so
+    # both rows sit inside the 2026-09-11 session (prior-session exclusion is
+    # pinned in test_uw_p39_flow.py).
     payload = {
         "data": [
-            _rest_row(id="a", executed_at="2024-01-15T19:30:00Z"),
-            _rest_row(id="b", executed_at="2024-01-01T10:00:00Z"),
+            _rest_row(id="a", created_at="2026-09-11T19:30:00Z"),
+            _rest_row(id="b", created_at="2026-09-11T13:35:00Z"),
         ],
     }
     client = _FakeClient(payload)
     src = UnusualWhalesRestFlowSource(
         client=client,  # type: ignore[arg-type]
         tickers=["AAPL"],
-        before=datetime(2024, 1, 15, 20, 0, tzinfo=UTC),
+        before=datetime(2026, 9, 11, 20, 0, tzinfo=UTC),
     )
     prints = await _drain(src)
     assert len(prints) == 2
@@ -251,12 +272,18 @@ async def test_counters_start_zero_before_stream() -> None:
 
 @pytest.mark.asyncio
 async def test_lookback_filtered_rows_still_count_as_mapped() -> None:
-    """Windowed-out rows mapped fine; they are not a data-health drop."""
-    before = datetime(2024, 1, 15, 20, 0, tzinfo=UTC)
+    """Windowed-out rows are not a data-health drop.
+
+    Phase 3.9.4 (D10): the window is now applied at fetch time (server
+    ``newer_than`` plus the paginator's clamp), so the stale row is neither
+    fetched nor mapped. The preserved assertion is that windowing never
+    counts as a drop.
+    """
+    before = datetime(2026, 9, 11, 20, 0, tzinfo=UTC)
     payload = {
         "data": [
-            _rest_row(id="fresh", executed_at="2024-01-15T19:30:00Z"),
-            _rest_row(id="stale", executed_at="2024-01-15T10:00:00Z"),
+            _rest_row(id="fresh", created_at="2026-09-11T19:30:00Z"),
+            _rest_row(id="stale", created_at="2026-09-11T10:00:00Z"),
         ],
     }
     client = _FakeClient(payload)
@@ -268,8 +295,8 @@ async def test_lookback_filtered_rows_still_count_as_mapped() -> None:
     )
     prints = await _drain(src)
     assert len(prints) == 1  # stale windowed out
-    assert src.rows_fetched == 2
-    assert src.rows_mapped == 2  # both mapped; one just fell outside the window
+    assert src.rows_fetched == 1  # windowed out at fetch, not after mapping
+    assert src.rows_mapped == 1
     assert src.rows_dropped == 0
 
 
@@ -283,4 +310,4 @@ async def test_custom_source_id() -> None:
     )
     prints = await _drain(src)
     assert prints[0].source_id == "unusual_whales-rest"
-    assert prints[0].strike == Decimal("150.00")
+    assert prints[0].strike == Decimal("400")

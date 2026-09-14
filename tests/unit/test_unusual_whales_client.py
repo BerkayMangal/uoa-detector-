@@ -14,6 +14,8 @@ infrastructure, same semantics; only differences captured below):
   - SecretStr key never leaks to error messages or repr
   - Circuit breaker open raises CircuitBreakerOpenError pre-flight
   - 5xx retries; 4xx raises immediately (and counts to breaker)
+    (Phase 3.9.3 exceptions: 429 is retried, and 404/422 stay outside
+    the breaker. Pinned in test_uw_p39_client.py.)
   - Lazy initialisation: importing the module does NOT open
     network/auth (cross-cutting acceptance)
 """
@@ -161,10 +163,32 @@ async def test_request_json_returns_parsed_dict() -> None:
 
 
 @pytest.mark.asyncio
-async def test_non_dict_response_raises_transient() -> None:
-    """A bare-list response is treated as a serialisation bug."""
+async def test_top_level_array_response_auto_wrapped() -> None:
+    """Phase 3.9.3 (D10 replacement of test_non_dict_response_raises_transient):
+    live /api/stock/{t}/flow-recent returns a top-level JSON array, so
+    the client wraps it as ``{"data": [...]}`` instead of rejecting it.
+    """
     def handler(_r: httpx.Request) -> httpx.Response:
-        return httpx.Response(200, json=[1, 2, 3])
+        return httpx.Response(200, json=[{"a": 1}, {"a": 2}])
+
+    client = UnusualWhalesClient(
+        api_key=SecretStr("uw_test"),
+        settings=_settings(),
+        retry=RetryPolicy(max_attempts=1),
+        transport=httpx.MockTransport(handler),
+    )
+    try:
+        result = await client.request_json("/api/x")
+    finally:
+        await client.aclose()
+    assert result == {"data": [{"a": 1}, {"a": 2}]}
+
+
+@pytest.mark.asyncio
+async def test_non_dict_non_list_response_raises_transient() -> None:
+    """A scalar/string top-level response is still a serialisation bug."""
+    def handler(_r: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json="garbage_string")
 
     client = UnusualWhalesClient(
         api_key=SecretStr("uw_test"),

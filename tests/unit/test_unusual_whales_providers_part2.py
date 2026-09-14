@@ -9,7 +9,7 @@ Pins:
   - Happy-path canned response → typed DTO
   - Cache hit on second identical call
   - Empty / malformed → None or empty seq
-  - OI: next_day computes trade_date+1 and uses EOD endpoint
+  - OI: next_day returns the first row after trade_date from /historic
   - SectorMap: peers_of excludes the source ticker itself
   - PeerFlow: cache key is sorted-tickers-tuple (caller-order-stable)
 """
@@ -92,17 +92,19 @@ def test_catalyst_calendar_implements_protocol() -> None:
 
 @pytest.mark.asyncio
 async def test_catalyst_calendar_returns_next_event() -> None:
+    # Phase 3.9.8: live /api/earnings/{t} row shape (the retired
+    # /api/stock/{t}/upcoming-events path returned 404).
     client = _FakeClient()
     client.stub(
-        "/api/stock/AAPL/upcoming-events",
+        "/api/earnings/AAPL",
         {
             "data": [
-                {"kind": "guidance", "when": "2024-01-20T12:00:00Z",
-                 "title": "AAPL guidance"},
-                {"kind": "earnings", "when": "2024-01-25T21:00:00Z",
-                 "title": "AAPL Q1 FY2024"},
-                {"kind": "investor_day", "when": "2024-03-15T13:00:00Z",
-                 "title": "AAPL Investor Day"},
+                {"source": "company", "report_date": "2024-05-02",
+                 "report_time": "postmarket"},
+                {"source": "company", "report_date": "2024-02-01",
+                 "report_time": "postmarket"},
+                {"source": "company", "report_date": "2023-11-02",
+                 "report_time": "postmarket"},
             ],
         },
     )
@@ -112,19 +114,19 @@ async def test_catalyst_calendar_returns_next_event() -> None:
     )
     after = datetime(2024, 1, 22, 0, 0, tzinfo=UTC)
     event = await provider.next_catalyst("AAPL", after)
-    # Should pick earnings (next event >= after); guidance (Jan 20) is before.
+    # Should pick the Feb 1 report (next event >= after); Nov 2 is before.
     assert event is not None
     assert event.kind == "earnings"
-    assert event.title == "AAPL Q1 FY2024"
+    assert event.title == "AAPL earnings 2024-02-01 (postmarket, company)"
 
 
 @pytest.mark.asyncio
 async def test_catalyst_calendar_returns_none_when_no_future_event() -> None:
     client = _FakeClient()
     client.stub(
-        "/api/stock/AAPL/upcoming-events",
-        {"data": [{"kind": "earnings", "when": "2023-12-01T12:00:00Z",
-                    "title": "old"}]},
+        "/api/earnings/AAPL",
+        {"data": [{"source": "company", "report_date": "2023-11-02",
+                    "report_time": "postmarket"}]},
     )
     provider = UnusualWhalesCatalystCalendarProvider(
         client=client,  # type: ignore[arg-type]
@@ -136,12 +138,16 @@ async def test_catalyst_calendar_returns_none_when_no_future_event() -> None:
 
 
 @pytest.mark.asyncio
-async def test_catalyst_calendar_unknown_kind_falls_back_to_other() -> None:
+async def test_catalyst_calendar_non_fomc_econ_row_is_not_a_catalyst() -> None:
+    # Phase 3.9.8: the vendor "kind" field existed only on the retired
+    # upcoming-events payload. Sources are now typed by endpoint; the
+    # remaining vendor category filter is the economic calendar's
+    # ``type``: only "fomc" rows are catalysts (contract §3.5).
     client = _FakeClient()
     client.stub(
-        "/api/stock/AAPL/upcoming-events",
-        {"data": [{"kind": "weird", "when": "2024-02-01T00:00:00Z",
-                    "title": "x"}]},
+        "/api/market/economic-calendar",
+        {"data": [{"type": "report", "time": "2024-02-01T13:30:00Z",
+                    "event": "Philadelphia Fed Business Outlook Survey"}]},
     )
     provider = UnusualWhalesCatalystCalendarProvider(
         client=client,  # type: ignore[arg-type]
@@ -149,17 +155,16 @@ async def test_catalyst_calendar_unknown_kind_falls_back_to_other() -> None:
     )
     after = datetime(2024, 1, 1, tzinfo=UTC)
     event = await provider.next_catalyst("AAPL", after)
-    assert event is not None
-    assert event.kind == "other"
+    assert event is None
 
 
 @pytest.mark.asyncio
 async def test_catalyst_calendar_caches() -> None:
     client = _FakeClient()
     client.stub(
-        "/api/stock/AAPL/upcoming-events",
-        {"data": [{"kind": "earnings", "when": "2024-02-01T00:00:00Z",
-                    "title": "x"}]},
+        "/api/earnings/AAPL",
+        {"data": [{"source": "company", "report_date": "2024-02-01",
+                    "report_time": "postmarket"}]},
     )
     provider = UnusualWhalesCatalystCalendarProvider(
         client=client,  # type: ignore[arg-type]
@@ -168,7 +173,14 @@ async def test_catalyst_calendar_caches() -> None:
     after = datetime(2024, 1, 1, tzinfo=UTC)
     await provider.next_catalyst("AAPL", after)
     await provider.next_catalyst("AAPL", after)
-    assert len(client.calls) == 1
+    # Phase 3.9.8: three endpoints replace the single retired one; each is
+    # fetched once across both calls (no refetch within the TTL).
+    paths = sorted(path for path, _ in client.calls)
+    assert paths == [
+        "/api/earnings/AAPL",
+        "/api/market/economic-calendar",
+        "/api/market/fda-calendar",
+    ]
 
 
 # ===========================================================================
@@ -188,11 +200,13 @@ def test_open_interest_implements_protocol() -> None:
 @pytest.mark.asyncio
 async def test_open_interest_at_returns_snapshot() -> None:
     client = _FakeClient()
-    expected_path = "/api/option-contract/AAPL240216C00150000/open-interest"
+    expected_path = "/api/option-contract/AAPL240216C00150000/historic"
     client.stub(
         expected_path,
-        {"data": {"as_of": "2024-01-15T15:30:00Z",
-                   "open_interest": 12345}},
+        {"chains": [{"date": "2024-01-15", "open_interest": 12345,
+                     "volume": 800,
+                     "last_tape_time": "2024-01-15T21:30:00Z"}],
+         "etf_holdings": []},
     )
     provider = UnusualWhalesOpenInterestProvider(
         client=client,  # type: ignore[arg-type]
@@ -210,13 +224,12 @@ async def test_open_interest_at_returns_snapshot() -> None:
 
 @pytest.mark.asyncio
 async def test_open_interest_at_handles_list_data_shape() -> None:
-    """Some UW endpoints return data as a list with one element."""
+    """Rows under ``data`` (the client's wrap of a top-level array) are read."""
     client = _FakeClient()
-    expected_path = "/api/option-contract/AAPL240216C00150000/open-interest"
+    expected_path = "/api/option-contract/AAPL240216C00150000/historic"
     client.stub(
         expected_path,
-        {"data": [{"as_of": "2024-01-15T15:30:00Z",
-                    "open_interest": 999}]},
+        {"data": [{"date": "2024-01-15", "open_interest": 999}]},
     )
     provider = UnusualWhalesOpenInterestProvider(
         client=client,  # type: ignore[arg-type]
@@ -234,11 +247,12 @@ async def test_open_interest_at_handles_list_data_shape() -> None:
 @pytest.mark.asyncio
 async def test_open_interest_next_day_uses_trade_date_plus_one() -> None:
     client = _FakeClient()
-    expected_path = "/api/option-contract/AAPL240216C00150000/open-interest/eod"
+    expected_path = "/api/option-contract/AAPL240216C00150000/historic"
     client.stub(
         expected_path,
-        {"data": {"as_of": "2024-01-16T21:00:00Z",
-                   "open_interest": 22000}},
+        {"chains": [{"date": "2024-01-17", "open_interest": 23000},
+                    {"date": "2024-01-16", "open_interest": 22000},
+                    {"date": "2024-01-15", "open_interest": 21000}]},
     )
     provider = UnusualWhalesOpenInterestProvider(
         client=client,  # type: ignore[arg-type]
@@ -251,11 +265,12 @@ async def test_open_interest_next_day_uses_trade_date_plus_one() -> None:
     )
     assert snap is not None
     assert snap.open_interest == 22000
-    # Verify the request used date=2024-01-16 (trade_date+1)
+    # The 2024-01-16 row (first after trade_date) comes from one fetch;
+    # the historic endpoint ignores ``date``, so no params are sent.
     assert len(client.calls) == 1
-    _path, params = client.calls[0]
-    assert params is not None
-    assert params["date"] == "2024-01-16"
+    path, params = client.calls[0]
+    assert path == expected_path
+    assert params is None
 
 
 @pytest.mark.asyncio
@@ -274,16 +289,13 @@ async def test_open_interest_returns_none_on_empty() -> None:
 
 
 @pytest.mark.asyncio
-async def test_open_interest_at_and_next_day_use_separate_caches() -> None:
-    """Same symbol: at() and next_day() cache independently."""
+async def test_open_interest_at_and_next_day_share_one_cache() -> None:
+    """Same symbol: one cached historic fetch serves at() and next_day()."""
     client = _FakeClient()
     client.stub(
-        "/api/option-contract/AAPL240216C00150000/open-interest",
-        {"data": {"as_of": "2024-01-15T15:30:00Z", "open_interest": 100}},
-    )
-    client.stub(
-        "/api/option-contract/AAPL240216C00150000/open-interest/eod",
-        {"data": {"as_of": "2024-01-16T21:00:00Z", "open_interest": 200}},
+        "/api/option-contract/AAPL240216C00150000/historic",
+        {"chains": [{"date": "2024-01-16", "open_interest": 200},
+                    {"date": "2024-01-15", "open_interest": 100}]},
     )
     provider = UnusualWhalesOpenInterestProvider(
         client=client,  # type: ignore[arg-type]
@@ -293,20 +305,24 @@ async def test_open_interest_at_and_next_day_use_separate_caches() -> None:
         "ticker": "AAPL", "strike": Decimal("150.00"),
         "expiry": date(2024, 2, 16), "option_type": "call",
     }
-    await provider.at(
+    at_snap = await provider.at(
         **args,
         when=datetime(2024, 1, 15, 15, 30, tzinfo=UTC),
     )
-    await provider.next_day(**args, trade_date=date(2024, 1, 15))
-    # Two distinct fetches (different endpoints)
-    assert len(client.calls) == 2
+    next_snap = await provider.next_day(**args, trade_date=date(2024, 1, 15))
+    assert at_snap is not None
+    assert at_snap.open_interest == 100
+    assert next_snap is not None
+    assert next_snap.open_interest == 200
+    # One fetch: the endpoint returns every day of the contract
+    assert len(client.calls) == 1
     # Repeat both — neither hits the network
     await provider.at(
         **args,
         when=datetime(2024, 1, 15, 15, 30, tzinfo=UTC),
     )
     await provider.next_day(**args, trade_date=date(2024, 1, 15))
-    assert len(client.calls) == 2
+    assert len(client.calls) == 1
 
 
 # ===========================================================================
@@ -342,10 +358,13 @@ async def test_sector_map_returns_sector() -> None:
 @pytest.mark.asyncio
 async def test_sector_map_peers_excludes_self() -> None:
     client = _FakeClient()
+    # Phase 3.9.10 (D10): peers come from /api/screener/stocks (live), not
+    # a guessed ``peers`` list on /info. Assertions unchanged.
+    client.stub("/api/stock/AAPL/info", {"data": {"sector": "Technology"}})
     client.stub(
-        "/api/stock/AAPL/info",
-        {"data": {"sector": "Technology",
-                   "peers": ["MSFT", "GOOGL", "AAPL", "aapl"]}},
+        "/api/screener/stocks",
+        {"data": [{"ticker": "MSFT"}, {"ticker": "GOOGL"},
+                  {"ticker": "AAPL"}, {"ticker": "aapl"}]},
     )
     provider = UnusualWhalesSectorMapProvider(
         client=client,  # type: ignore[arg-type]
@@ -404,21 +423,29 @@ def test_peer_flow_implements_protocol() -> None:
 @pytest.mark.asyncio
 async def test_peer_flow_returns_events_in_window() -> None:
     client = _FakeClient()
+    # Phase 3.9.10 (D10): /api/option-flow/recent never existed (HTTP 404).
+    # Rows are now in the live /api/option-trades/flow-alerts shape
+    # (created_at, type, side premiums, alert_rule). Assertions unchanged.
     client.stub(
-        "/api/option-flow/recent",
+        "/api/option-trades/flow-alerts",
         {
             "data": [
-                {"ticker": "MSFT",
-                 "executed_at": "2024-01-15T14:30:00Z",
-                 "side_classification": "bullish",
-                 "label": "CONVEXITY_CLUSTER"},
-                {"ticker": "GOOGL",
-                 "executed_at": "2024-01-15T14:45:00Z",
-                 "side_classification": "bearish"},
+                {"id": "a1", "ticker": "GOOGL", "type": "call",
+                 "created_at": "2024-01-15T14:45:00Z",
+                 "total_ask_side_prem": "0",
+                 "total_bid_side_prem": "150000",
+                 "has_multileg": False, "alert_rule": "RepeatedHits"},
+                {"id": "a2", "ticker": "MSFT", "type": "call",
+                 "created_at": "2024-01-15T14:30:00Z",
+                 "total_ask_side_prem": "250000",
+                 "total_bid_side_prem": "0",
+                 "has_multileg": False, "alert_rule": "RepeatedHits"},
                 # Outside window:
-                {"ticker": "MSFT",
-                 "executed_at": "2024-01-15T13:00:00Z",
-                 "side_classification": "bullish"},
+                {"id": "a3", "ticker": "MSFT", "type": "call",
+                 "created_at": "2024-01-15T13:00:00Z",
+                 "total_ask_side_prem": "250000",
+                 "total_bid_side_prem": "0",
+                 "has_multileg": False, "alert_rule": "RepeatedHits"},
             ],
         },
     )
@@ -439,8 +466,10 @@ async def test_peer_flow_returns_events_in_window() -> None:
 async def test_peer_flow_cache_key_caller_order_stable() -> None:
     """Same ticker set in different order → same cache entry."""
     client = _FakeClient()
+    # Phase 3.9.10 (D10): stub path moved off the non-existent
+    # /api/option-flow/recent. Assertion unchanged.
     client.stub(
-        "/api/option-flow/recent",
+        "/api/option-trades/flow-alerts",
         {"data": []},
     )
     provider = UnusualWhalesPeerFlowProvider(
@@ -480,11 +509,17 @@ async def test_peer_flow_empty_tickers_returns_empty() -> None:
 @pytest.mark.asyncio
 async def test_peer_flow_unknown_direction_falls_back_to_neutral() -> None:
     client = _FakeClient()
+    # Phase 3.9.10 (D10): live flow-alerts row shape; the unrecognised value
+    # moved from the guessed ``side_classification`` to the option ``type``.
+    # Assertions unchanged.
     client.stub(
-        "/api/option-flow/recent",
-        {"data": [{"ticker": "MSFT",
-                    "executed_at": "2024-01-15T14:30:00Z",
-                    "side_classification": "wibble"}]},
+        "/api/option-trades/flow-alerts",
+        {"data": [{"id": "a1", "ticker": "MSFT", "type": "wibble",
+                    "created_at": "2024-01-15T14:30:00Z",
+                    "total_ask_side_prem": "250000",
+                    "total_bid_side_prem": "0",
+                    "has_multileg": False,
+                    "alert_rule": "RepeatedHits"}]},
     )
     provider = UnusualWhalesPeerFlowProvider(
         client=client,  # type: ignore[arg-type]
