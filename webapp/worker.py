@@ -33,6 +33,12 @@ _logger = logging.getLogger(__name__)
 
 _DEFAULT_PROFILE = Path("profiles/v5_default.yaml")
 _RESTART_BACKOFF_S = 30.0
+# Phase 4.42: the live worker commits every signal immediately. The store's
+# default batch of 100 is right for backtests, but live flow is a few signals
+# per minute: with batching, today's run stays invisible (page reads STALE) until
+# the 100th signal, and every restart/redeploy silently drops up to 99 buffered
+# signals. A persistence setting, not a scoring threshold (D8).
+_LIVE_FLUSH_THRESHOLD = 1
 
 
 def _normalize_pg(url: str) -> str:
@@ -40,6 +46,13 @@ def _normalize_pg(url: str) -> str:
         if url.startswith(prefix):
             return "postgresql+psycopg://" + url[len(prefix):]
     return url
+
+
+def _open_live_store(database_url: str) -> SqliteBacktestStore:
+    """Open the webapp's store for live ingestion: one commit per signal."""
+    return SqliteBacktestStore(
+        _normalize_pg(database_url), flush_threshold=_LIVE_FLUSH_THRESHOLD,
+    )
 
 
 def live_config_from_env() -> dict[str, object] | None:
@@ -85,7 +98,7 @@ async def run_live_worker(
     (process shutdown) closes the source and store cleanly.
     """
     profile = load_profile(profile_path)
-    store = SqliteBacktestStore(_normalize_pg(database_url))
+    store = _open_live_store(database_url)
     _logger.info("live worker started: tickers=%s", tickers)
 
     def _ensure_run() -> str:
