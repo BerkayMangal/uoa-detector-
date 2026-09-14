@@ -30,6 +30,7 @@ from uoa_detector.sources.unusual_whales.providers.catalyst_calendar import (
     UnusualWhalesCatalystCalendarProvider,
 )
 from webapp.gamma import GammaRepo
+from webapp.ohlc import regular_session_closes
 
 _logger = logging.getLogger(__name__)
 _DEFAULT_PROFILE = Path("profiles/v5_default.yaml")
@@ -119,20 +120,18 @@ def _next_earnings_date(resp: object, *, today: str) -> str | None:
 
 def _realized_vol(resp: object, *, window: int = 21) -> float | None:
     """Annualised close-to-close realised vol from a UW /api/stock/{t}/ohlc/1d
-    payload (last ~window closes). None if too little data. Pure."""
+    payload: the last ``window`` regular-session closes in date order. The
+    payload is newest first and mixes pre/regular/post rows, so rows are
+    filtered to ``market_time == "r"`` and ordered by ``date`` explicitly
+    (``webapp.ohlc``). During RTH the newest "r" close can be intraday.
+    None if too little data. Pure."""
     data = resp.get("data") if isinstance(resp, dict) else None
     if not isinstance(data, list):
         return None
-    closes: list[float] = []
-    for d in data:
-        if not isinstance(d, dict):
-            continue
-        try:
-            c = float(d["close"])
-        except (KeyError, TypeError, ValueError):
-            continue
-        if c > 0:
-            closes.append(c)
+    closes = [
+        bar.close for bar in regular_session_closes(data)
+        if bar.close is not None and bar.close > 0
+    ]
     closes = closes[-window:]
     if len(closes) < 5:
         return None

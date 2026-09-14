@@ -32,7 +32,8 @@ def test_next_earnings_none_on_garbage() -> None:
 
 def test_realized_vol_flat_series_is_zero() -> None:
     from webapp.gamma_live import _realized_vol
-    flat = {"data": [{"close": 100.0} for _ in range(12)]}
+    flat = {"data": [{"date": f"2026-06-{i + 1:02d}", "market_time": "r", "close": 100.0}
+                     for i in range(12)]}
     assert _realized_vol(flat) == 0.0
 
 
@@ -40,7 +41,8 @@ def test_realized_vol_varying_series_positive_finite() -> None:
     import math
 
     from webapp.gamma_live import _realized_vol
-    alt = {"data": [{"close": 100.0 if i % 2 == 0 else 105.0} for i in range(22)]}
+    alt = {"data": [{"date": f"2026-06-{i + 1:02d}", "market_time": "r",
+                     "close": 100.0 if i % 2 == 0 else 105.0} for i in range(22)]}
     rv = _realized_vol(alt)
     assert rv is not None and rv > 0.0 and math.isfinite(rv)
 
