@@ -358,10 +358,13 @@ async def test_sector_map_returns_sector() -> None:
 @pytest.mark.asyncio
 async def test_sector_map_peers_excludes_self() -> None:
     client = _FakeClient()
+    # Phase 3.9.10 (D10): peers come from /api/screener/stocks (live), not
+    # a guessed ``peers`` list on /info. Assertions unchanged.
+    client.stub("/api/stock/AAPL/info", {"data": {"sector": "Technology"}})
     client.stub(
-        "/api/stock/AAPL/info",
-        {"data": {"sector": "Technology",
-                   "peers": ["MSFT", "GOOGL", "AAPL", "aapl"]}},
+        "/api/screener/stocks",
+        {"data": [{"ticker": "MSFT"}, {"ticker": "GOOGL"},
+                  {"ticker": "AAPL"}, {"ticker": "aapl"}]},
     )
     provider = UnusualWhalesSectorMapProvider(
         client=client,  # type: ignore[arg-type]
@@ -420,21 +423,29 @@ def test_peer_flow_implements_protocol() -> None:
 @pytest.mark.asyncio
 async def test_peer_flow_returns_events_in_window() -> None:
     client = _FakeClient()
+    # Phase 3.9.10 (D10): /api/option-flow/recent never existed (HTTP 404).
+    # Rows are now in the live /api/option-trades/flow-alerts shape
+    # (created_at, type, side premiums, alert_rule). Assertions unchanged.
     client.stub(
-        "/api/option-flow/recent",
+        "/api/option-trades/flow-alerts",
         {
             "data": [
-                {"ticker": "MSFT",
-                 "executed_at": "2024-01-15T14:30:00Z",
-                 "side_classification": "bullish",
-                 "label": "CONVEXITY_CLUSTER"},
-                {"ticker": "GOOGL",
-                 "executed_at": "2024-01-15T14:45:00Z",
-                 "side_classification": "bearish"},
+                {"id": "a1", "ticker": "GOOGL", "type": "call",
+                 "created_at": "2024-01-15T14:45:00Z",
+                 "total_ask_side_prem": "0",
+                 "total_bid_side_prem": "150000",
+                 "has_multileg": False, "alert_rule": "RepeatedHits"},
+                {"id": "a2", "ticker": "MSFT", "type": "call",
+                 "created_at": "2024-01-15T14:30:00Z",
+                 "total_ask_side_prem": "250000",
+                 "total_bid_side_prem": "0",
+                 "has_multileg": False, "alert_rule": "RepeatedHits"},
                 # Outside window:
-                {"ticker": "MSFT",
-                 "executed_at": "2024-01-15T13:00:00Z",
-                 "side_classification": "bullish"},
+                {"id": "a3", "ticker": "MSFT", "type": "call",
+                 "created_at": "2024-01-15T13:00:00Z",
+                 "total_ask_side_prem": "250000",
+                 "total_bid_side_prem": "0",
+                 "has_multileg": False, "alert_rule": "RepeatedHits"},
             ],
         },
     )
@@ -455,8 +466,10 @@ async def test_peer_flow_returns_events_in_window() -> None:
 async def test_peer_flow_cache_key_caller_order_stable() -> None:
     """Same ticker set in different order → same cache entry."""
     client = _FakeClient()
+    # Phase 3.9.10 (D10): stub path moved off the non-existent
+    # /api/option-flow/recent. Assertion unchanged.
     client.stub(
-        "/api/option-flow/recent",
+        "/api/option-trades/flow-alerts",
         {"data": []},
     )
     provider = UnusualWhalesPeerFlowProvider(
@@ -496,11 +509,17 @@ async def test_peer_flow_empty_tickers_returns_empty() -> None:
 @pytest.mark.asyncio
 async def test_peer_flow_unknown_direction_falls_back_to_neutral() -> None:
     client = _FakeClient()
+    # Phase 3.9.10 (D10): live flow-alerts row shape; the unrecognised value
+    # moved from the guessed ``side_classification`` to the option ``type``.
+    # Assertions unchanged.
     client.stub(
-        "/api/option-flow/recent",
-        {"data": [{"ticker": "MSFT",
-                    "executed_at": "2024-01-15T14:30:00Z",
-                    "side_classification": "wibble"}]},
+        "/api/option-trades/flow-alerts",
+        {"data": [{"id": "a1", "ticker": "MSFT", "type": "wibble",
+                    "created_at": "2024-01-15T14:30:00Z",
+                    "total_ask_side_prem": "250000",
+                    "total_bid_side_prem": "0",
+                    "has_multileg": False,
+                    "alert_rule": "RepeatedHits"}]},
     )
     provider = UnusualWhalesPeerFlowProvider(
         client=client,  # type: ignore[arg-type]
