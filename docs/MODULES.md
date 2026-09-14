@@ -52,14 +52,25 @@ score via `ScoringWeights.gamma` (default 0.10, Track B 0.25).
 
 ### Provider mapping
 
-`UnusualWhalesDealerGammaProvider` → UW endpoint
-`/api/option/{ticker}/gex/strikes`. Returns total dealer gamma in
-USD-per-1%-spot-move and per-strike net gamma. The provider derives:
+`UnusualWhalesDealerGammaProvider` (Phase 3.9.5, live-verified 2026-09-14):
 
-  - `total_dealer_gamma`: scalar in USD/1%
-  - `gamma_flip_strike`: spot price at which net dealer gamma flips
-    sign (zero crossing of the per-strike curve)
-  - `nearest_strike_gamma`: dealer gamma at the strike of the event
+  - `aggregate_for_ticker` → `GET /api/stock/{ticker}/spot-exposures?date=<ET date>`.
+    `net_gamma_dollars` is `gamma_per_one_percent_move_oi` from the latest
+    per-minute row with `time <= event_ts`. It is USD per 1% spot move, the
+    unit of `short_gamma_threshold`.
+  - `flip_strike` → `GET /api/stock/{ticker}/greek-exposure/strike?date=<ET date>`.
+    It is the cumulative zero crossing of `call_gex + put_gex` (share gamma;
+    a zero crossing does not depend on the unit).
+  - `net_gamma_at` (per strike, no pipeline consumer) → `call_gex + put_gex`,
+    in share gamma.
+
+Live note (flagged in the Phase 3.9 closeout): on full UW chains the
+unchanged first-crossing `_find_flip_strike` lands on deep-OTM strikes
+(AAPL 2026-09-11 → 10 with spot ≈ 332; SPY 2026-09-10 → None), so M21
+mostly takes `extreme_distance_cutoff` or loses its proximity leg.
+
+Before Phase 3.9 this section named `/api/option/{ticker}/gex/strikes`,
+which never existed. See `docs/phase-3.9-uw-endpoint-correction-acceptance.md` §3.2.
 
 ### Default thresholds + tuning rationale
 
@@ -119,11 +130,19 @@ Track B is catalyst-independent by thesis).
 
 ### Provider mapping
 
-`UnusualWhalesEventCalendarProvider` → UW endpoints
-`/api/earnings/upcoming`, `/api/fda-calendar/upcoming`,
-`/api/economic-calendar/upcoming`, `/api/dividends/upcoming`. Returns
-a list of `CalendarEvent` records with `event_type`,
-`scheduled_for_date`, and optional `confirmation_status`.
+`UnusualWhalesCatalystCalendarProvider` (Phase 3.9.8, live-verified):
+
+  - earnings → `GET /api/earnings/{ticker}`, which includes the upcoming
+    report as `source=estimation`. `report_time` premarket → 09:30 ET;
+    postmarket or unknown → 16:00 ET on `report_date`.
+  - FDA → `GET /api/market/fda-calendar?ticker=<ticker>`. Only precise dates
+    are used (`target_date` as `YYYY-MM-DD`, or `start_date == end_date`).
+  - FOMC → `GET /api/market/economic-calendar`. Only `type == "fomc"` rows,
+    applied market-wide; the feed covers the current and next week only.
+    Live note: on 2026-09-14 the feed typed the 2026-09-16 rate decision as
+    `type=report`, so this rule currently yields no FOMC catalysts (flagged).
+
+M22 and M24 share one instance (`live_stages.py`).
 
 ### Default thresholds + tuning rationale
 
@@ -198,6 +217,12 @@ the close of the latest in-window bar.
 ThetaData STOCK.VALUE subscription; rest of the system stays
 identical because both providers implement the same
 `PriceActionProvider` Protocol with the same `PriceMovement` DTO.
+
+**Phase 3.9.11:** `spot_at` is the close of the latest *completed* bar
+(`end_time <= event_ts`), and `spot_lookback_ago` is the open of the
+earliest completed bar starting at or after the window start. Before
+3.9.11 `spot_at` was the close of a bar that started at or before the
+event but printed after it (look-ahead). The cache key is (ticker, ET date).
 
 ### Default thresholds + tuning rationale
 
@@ -276,10 +301,14 @@ on the COMBINED score across all weights.
 
 ### Provider mapping
 
-`UnusualWhalesIVHistoryProvider` → UW endpoint
-`/api/option/{ticker}/iv-rank`. Returns 30-day IV percentile for
-the underlying. Provider derives the percentile rank for the
-event's IV against this 30-day window.
+`UnusualWhalesIVHistoryProvider` (Phase 3.9.6) → `GET /api/stock/{ticker}/iv-rank?date=<ET date>`.
+
+  - Ticker-level. `iv_rank_252d = iv_rank_1y`: the live scale is 0–100, so
+    there is no rescaling.
+  - `implied_volatility = volatility`.
+  - Row selection is as-of. A row dated before the event's ET date always
+    qualifies. A same-day row qualifies only when `updated_at <= event_ts`,
+    because UW publishes the day's row after the close.
 
 ### Default thresholds + tuning rationale
 
@@ -340,15 +369,20 @@ are typically ticker-specific).
 
 ### Provider mapping
 
-`UnusualWhalesSectorFlowProvider` → UW endpoint
-`/api/sector-flow/{sector}`. Returns aggregated UOA counts for
-the sector over recent windows (1h, 4h, 1d). Plus
-`UnusualWhalesSectorMembershipProvider` →
-`/api/ticker/{ticker}/sector` for the ticker → sector mapping.
+`UnusualWhalesSectorMapProvider` + `UnusualWhalesPeerFlowProvider` (Phase 3.9.10):
 
-This is the **two-provider pattern** introduced in Phase 3.4.5:
-one provider supplies the lookup (sector membership), the other
-supplies the data (sector flow). M25 wires both via constructor.
+  - sector → `GET /api/stock/{ticker}/info` (`data.sector`). ETFs and indices
+    have an empty sector and take `no_sector`.
+  - peers → `GET /api/screener/stocks?sectors[]=<sector>&order=marketcap&order_direction=desc&issue_types[]=Common Stock`,
+    i.e. top peers by market cap. `/api/stock/{sector}/tickers` is
+    alphabetical, so it is not used.
+  - peer flow → `GET /api/option-trades/flow-alerts?ticker_symbol=<peers>`
+    over an hour bucket with epoch-second cursors, filtered to
+    `[event_ts - window, event_ts]`. Direction comes from the option type
+    plus the ask- vs bid-side premium; multi-leg alerts are neutral.
+
+Membership is current as of the fetch, not point-in-time. Do not use it
+for historical replay without a date-aware source.
 
 ### Default thresholds + tuning rationale
 
@@ -409,10 +443,19 @@ combined score.
 
 ### Provider mapping
 
-`UnusualWhalesDarkPoolProvider` → UW endpoint
-`/api/darkpool/{ticker}`. Returns recent off-exchange prints with
-volume, timestamp, and price. M26 filters by volume threshold and
-window.
+`UnusualWhalesDarkPoolProvider` (Phase 3.9.7) → `GET /api/darkpool/{ticker}?date=&newer_than=&older_than=&limit=500&order_by=premium&order=desc`,
+fetched per hour bucket.
+
+  - Prints are filtered to `[event_ts - window, event_ts]` with
+    `trf_executed_at <= event_ts`; canceled prints are skipped.
+  - `side_estimate` from the NBBO: `price >= ask` → above_ask, `price <= bid`
+    → at_or_below_bid, otherwise midpoint.
+  - An invalid NBBO → unknown. Prints not priced against the NBBO also →
+    unknown: contingent, QCT, average-price, derivatively priced,
+    extended-hours.
+
+Live note: on SPY 8 of the 9 prints ≥ $5M in a sampled hour were
+contingent/QCT, so M26 on SPY mostly lands in `direction_unclear`.
 
 ### Default thresholds + tuning rationale
 
@@ -473,11 +516,15 @@ signals with `opening_closing_score >= min_m27_score_to_validate`
 
 ### Provider mapping
 
-`UnusualWhalesOpenInterestProvider` → UW endpoint
-`/api/option-contract/{ticker}/{strike}/{expiry}/{type}/oi`. Returns
-`OpenInterestSnapshot(as_of, open_interest)`. M27 makes two calls:
-one for prior session close, one for the current event timestamp.
-Computes `oi_delta_pct = (current - prior) / prior`.
+`UnusualWhalesOpenInterestProvider` (Phase 3.9.9) → `GET /api/option-contract/{OCC}/historic`.
+Rows sit under `chains`, one per trading day, fetched once per contract
+(the `date` query parameter is ignored live and not sent).
+
+  - `at(when)` returns the latest row with `date <= ET date(when)`.
+  - Live semantics are start-of-day. Row D is published pre-market and
+    equals the OI after D-1's trading.
+  - M27's prior/current pair therefore measures the OI built during D-1.
+    Intraday opening cannot be observed in daily OI.
 
 ### Default thresholds + tuning rationale
 
@@ -558,9 +605,8 @@ breaking change that gives validators a write-back rail.
 
 ### Provider mapping
 
-Same provider as M27: `UnusualWhalesOpenInterestProvider`. M28
-calls `provider.next_day(ticker, strike, expiry, option_type,
-trade_date)` — Phase 3.3.3 method that returns T+1 OI specifically.
+Same provider as M27. `next_day(trade_date)` returns the earliest `historic`
+row dated after `trade_date`, so a Friday trade resolves to Monday's row.
 
 ### Default thresholds + tuning rationale
 
