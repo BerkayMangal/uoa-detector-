@@ -14,7 +14,7 @@ import contextlib
 import logging
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, TypeVar, cast
 
 from fastapi import FastAPI, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -23,15 +23,18 @@ from fastapi.templating import Jinja2Templates
 from webapp import explanations, gamma, journal, pricing
 from webapp.gamma_live import gamma_refresh_loop
 from webapp.notability import notability_score
-from webapp.repo import SignalFilters, SignalRepo
-from webapp.vol_board import build_vol_board, vol_board_summary
+from webapp.repo import RunInfo, SignalFilters, SignalRepo
+from webapp.vol_board import VolBoardRow, build_vol_board, vol_board_summary
 from webapp.worker import live_config_from_env, run_live_worker
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncIterator
+    from collections.abc import AsyncIterator, Callable
+
+    from uoa_detector.backtest.store import StoredSignal
 
 _logger = logging.getLogger(__name__)
 _BASE = Path(__file__).parent
+_T = TypeVar("_T")
 
 
 async def _supervise(make_coro: object, name: str) -> None:
@@ -148,11 +151,11 @@ def _filters(
     )
 
 
-def _safe(fn: object, default: object) -> object:
+def _safe(fn: Callable[[], _T], default: _T) -> _T:
     """Call a repo accessor; on any DB error return a default so one failing
     widget can't blank the whole page. Logged for diagnosis."""
     try:
-        return fn()  # type: ignore[operator]
+        return fn()
     except Exception:
         _logger.exception("repo call failed; serving fallback")
         return default
@@ -198,52 +201,51 @@ def dashboard(
     min_score: float | None = None, sort: str = "score", run: str = "",
 ) -> HTMLResponse:
     repo = _repo()
-    runs = _safe(repo.runs, [])
+    runs: list[RunInfo] = _safe(repo.runs, [])
     # Default to the newest run (today's live flow if the worker is running,
     # else the sample backtest). An explicit ?run= overrides.
-    run_ids = {r.run_id for r in runs}  # type: ignore[attr-defined]
-    active = run if run in run_ids else (runs[0].run_id if runs else None)  # type: ignore[index]
-    current = next((r for r in runs if r.run_id == active), None)  # type: ignore[attr-defined]
+    run_ids = {r.run_id for r in runs}
+    active = run if run in run_ids else (runs[0].run_id if runs else None)
+    current = next((r for r in runs if r.run_id == active), None)
     # Freshness: show a pulsing LIVE only if the newest print is recent; a
     # frozen feed (e.g. UW down) must read STALE, not a misleading LIVE.
     fresh, age_min = False, None
-    if current is not None and current.latest_ts is not None:  # type: ignore[attr-defined]
-        ts = current.latest_ts  # type: ignore[attr-defined]
+    if current is not None and current.latest_ts is not None:
+        ts = current.latest_ts
         if ts.tzinfo is None:
             ts = ts.replace(tzinfo=UTC)  # Postgres stores naive UTC
         age_min = (datetime.now(UTC) - ts).total_seconds() / 60.0
         fresh = age_min < 15
     flt = _filters(ticker, label, min_score, sort, active)
-    matched_raw = _safe(lambda: repo.signals(flt), [])
+    matched_raw: list[StoredSignal] = _safe(lambda: repo.signals(flt), [])
     # Re-order the flow feed by descriptive notability (loudest/most unusual
     # first); the SQL sort still drives the page (truncation), this only
     # reorders the already-loaded page for the "Notable flow" section.
     matched = sorted(
         cast("list[object]", matched_raw), key=_signal_notability, reverse=True,
     )
-    options = _safe(lambda: repo.ticker_label_options(active), ([], []))
+    no_options: tuple[list[str], list[str]] = ([], [])
+    options = _safe(lambda: repo.ticker_label_options(active), no_options)
     # Build the gamma context ONCE and reuse it for both the vol board and the
     # existing "gamma" key (avoid a second latest() round-trip).
-    gamma_ctx = cast(
-        "dict[str, gamma.GammaContext]", _safe(lambda: _gamma().latest(), {}),
-    )
-    vol_rows = _safe(lambda: build_vol_board(
+    gamma_ctx: dict[str, gamma.GammaContext] = _safe(lambda: _gamma().latest(), {})
+    vol_rows: list[VolBoardRow] = _safe(lambda: build_vol_board(
         gamma_ctx,
         earnings={t: c.next_earnings for t, c in gamma_ctx.items()},
         now=datetime.now(UTC).date(),
     ), [])
     # `total` comes from the run's own count (already loaded in runs()) — no
     # extra round-trip. One DISTINCT query covers both filter dropdowns.
-    total = current.count if current is not None else 0  # type: ignore[attr-defined]
+    total = current.count if current is not None else 0
     return templates.TemplateResponse(
         request,
         "dashboard.html",
         {
             "signals": matched,
-            "tickers": options[0],  # type: ignore[index]
-            "labels": options[1],  # type: ignore[index]
+            "tickers": options[0],
+            "labels": options[1],
             "total": total,
-            "shown": len(matched),  # type: ignore[arg-type]
+            "shown": len(matched),
             "runs": runs, "current": current, "run": active or "",
             "fresh": fresh, "age_min": age_min,
             "ticker": ticker, "label": label, "min_score": min_score,
@@ -268,14 +270,14 @@ def dashboard(
 @app.get("/journal", response_class=HTMLResponse)
 def journal_page(request: Request) -> HTMLResponse:
     repo = _journal()
-    trades = _safe(repo.list, [])
+    trades: list[journal.TradeRow] = _safe(repo.list, [])
     return templates.TemplateResponse(
         request,
         "journal.html",
         {
-            "open_trades": [t for t in trades if t.status == "open"],  # type: ignore[attr-defined]
-            "closed_trades": [t for t in trades if t.status == "closed"],  # type: ignore[attr-defined]
-            "stats": journal.aggregate(trades),  # type: ignore[arg-type]
+            "open_trades": [t for t in trades if t.status == "open"],
+            "closed_trades": [t for t in trades if t.status == "closed"],
+            "stats": journal.aggregate(trades),
             "pnl": journal.option_pnl_usd,
             "excess": journal.directional_excess,
             **_EXPLAIN,
@@ -371,7 +373,8 @@ def journal_close(
 
 @app.get("/gamma", response_class=HTMLResponse)
 def gamma_page(request: Request) -> HTMLResponse:
-    rows = list(_safe(lambda: _gamma().latest(), {}).values())  # type: ignore[union-attr]
+    latest: dict[str, gamma.GammaContext] = _safe(lambda: _gamma().latest(), {})
+    rows = list(latest.values())
     # Sell-vol candidates first, then by IV percentile (richest first).
     order = {"sell": 0, "buy": 1, "neutral": 2}
     rows.sort(key=lambda g: (order.get(g.vol_signal, 9), -(g.iv_pct or 0)))

@@ -52,7 +52,10 @@ async def test_refresh_loop_builds_catalyst_provider(monkeypatch: pytest.MonkeyP
     monkeypatch.setattr(
         gamma_live,
         "Credentials",
-        lambda: SimpleNamespace(unusual_whales_api_key=SecretStr("test-key")),
+        lambda: SimpleNamespace(
+            unusual_whales_api_key=SecretStr("test-key"),
+            require_unusual_whales_api_key=lambda: SecretStr("test-key"),
+        ),
     )
     monkeypatch.setattr(gamma_live, "refresh_all", _fake_refresh_all)
     monkeypatch.setattr(gamma_live.asyncio, "sleep", _stop_sleep)

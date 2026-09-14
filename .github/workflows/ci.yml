@@ -35,6 +35,6 @@ jobs:
       - name: Tests (hermetic, no API keys)
         run: uv run pytest -q
       - name: Type check
-        run: uv run mypy --strict src/
+        run: uv run mypy --strict src/ webapp/
       - name: Lint
         run: uv run ruff check .

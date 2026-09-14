@@ -29,7 +29,7 @@ from uoa_detector.sources.unusual_whales.client import (
 from uoa_detector.sources.unusual_whales.providers.catalyst_calendar import (
     UnusualWhalesCatalystCalendarProvider,
 )
-from webapp.gamma import GammaRepo
+from webapp.gamma import GammaFields, GammaRepo
 from webapp.ohlc import regular_session_closes
 
 _logger = logging.getLogger(__name__)
@@ -65,7 +65,7 @@ def _flip(net_by_strike: list[tuple[float, float]], spot: float) -> float | None
 
 def context_from_uw(
     rows: list[dict[str, object]], iv: dict[str, object],
-) -> dict[str, float | None] | None:
+) -> GammaFields | None:
     """Build the gamma-map fields from greek-exposure rows + iv-rank payload."""
     spot = _f(iv.get("close"))
     if spot is None or spot <= 0:
@@ -147,7 +147,7 @@ async def fetch_one(
     client: UnusualWhalesClient,
     ticker: str,
     catalyst_provider: UnusualWhalesCatalystCalendarProvider | None = None,
-) -> tuple[str, dict[str, float | None]] | None:
+) -> tuple[str, GammaFields] | None:
     try:
         gex = await client.request_json(f"/api/stock/{ticker.upper()}/greek-exposure/strike")
         ivr = await client.request_json(f"/api/stock/{ticker.upper()}/iv-rank")
@@ -165,7 +165,7 @@ async def fetch_one(
     today = datetime.now(UTC).date().isoformat()
     try:
         e_resp = await client.request_json(f"/api/earnings/{ticker.upper()}")
-        ctx["next_earnings"] = _next_earnings_date(e_resp, today=today)  # type: ignore[assignment]
+        ctx["next_earnings"] = _next_earnings_date(e_resp, today=today)
     except UnusualWhalesError as exc:
         _logger.warning("earnings fetch failed for %s: %s", ticker, exc)
         ctx["next_earnings"] = None
@@ -232,7 +232,7 @@ async def gamma_refresh_loop(
                 await asyncio.sleep(_CLOSED_MARKET_SLEEP_S)
                 continue
             client = UnusualWhalesClient(
-                api_key=Credentials().unusual_whales_api_key,
+                api_key=Credentials().require_unusual_whales_api_key(),
                 settings=profile.data_sources.unusual_whales,
             )
             catalyst_provider = UnusualWhalesCatalystCalendarProvider(

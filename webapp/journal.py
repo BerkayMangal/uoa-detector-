@@ -103,10 +103,12 @@ def directional_excess(t: TradeRow) -> float | None:
     as 1 (simple market-neutral) — the same control the backtest used. Returns
     None unless all four prices are present.
     """
-    px = (t.entry_underlying_px, t.exit_underlying_px, t.entry_spy_px, t.exit_spy_px)
-    if any(p is None or p == 0 for p in px):
+    u_entry, u_exit = t.entry_underlying_px, t.exit_underlying_px
+    s_entry, s_exit = t.entry_spy_px, t.exit_spy_px
+    if u_entry is None or u_exit is None or s_entry is None or s_exit is None:
         return None
-    u_entry, u_exit, s_entry, s_exit = px  # type: ignore[misc]
+    if u_entry == 0 or u_exit == 0 or s_entry == 0 or s_exit == 0:
+        return None
     r_underlying = u_exit / u_entry - 1.0
     r_market = s_exit / s_entry - 1.0
     sign = 1.0 if t.direction == "bullish" else -1.0
@@ -215,7 +217,7 @@ class JournalRepo:
             id=trade_id,
             created_at=datetime.now(UTC),
             status="open",
-            **fields,  # type: ignore[arg-type]
+            **fields,
         )
         with self._session() as s:
             s.add(row)

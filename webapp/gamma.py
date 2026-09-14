@@ -23,10 +23,11 @@ import math
 import os
 from dataclasses import dataclass
 from datetime import date
+from typing import NotRequired, TypedDict, cast
 
 import numpy as np
 import pandas as pd
-from sqlalchemy import Float, String, create_engine, select
+from sqlalchemy import Float, String, Table, create_engine, select
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
 
 from webapp.repo import _normalize_url
@@ -54,6 +55,22 @@ class GammaRow(_Base):
     next_earnings: Mapped[str | None] = mapped_column(String, nullable=True)  # ISO date
     next_catalyst: Mapped[str | None] = mapped_column(String, nullable=True)  # ISO date, any kind
     catalyst_kind: Mapped[str | None] = mapped_column(String, nullable=True)  # earnings/fomc/fda/...
+
+
+class GammaFields(TypedDict):
+    """One ticker's gamma-map values as written by ``GammaRepo.upsert``."""
+
+    spot: float
+    net_gex: float
+    flip: float | None
+    call_wall: float | None
+    put_wall: float | None
+    atm_iv: NotRequired[float | None]
+    iv_pct: NotRequired[float | None]
+    realized_vol: NotRequired[float | None]
+    next_earnings: NotRequired[str | None]  # ISO date
+    next_catalyst: NotRequired[str | None]  # ISO date
+    catalyst_kind: NotRequired[str | None]
 
 
 @dataclass(frozen=True)
@@ -214,24 +231,24 @@ class GammaRepo:
     def reset(self) -> None:
         """Drop + recreate the table — the snapshot is a full daily rebuild, and
         this picks up schema changes (new columns) without a migration."""
-        GammaRow.__table__.drop(self._engine, checkfirst=True)
+        cast("Table", GammaRow.__table__).drop(self._engine, checkfirst=True)
         _Base.metadata.create_all(self._engine)
 
-    def upsert(self, ticker: str, as_of: str, m: dict[str, float | None]) -> None:
+    def upsert(self, ticker: str, as_of: str, m: GammaFields) -> None:
         with self._session() as s:
             row = s.get(GammaRow, ticker.upper()) or GammaRow(ticker=ticker.upper())
             row.as_of = as_of
-            row.spot = float(m["spot"])  # type: ignore[arg-type]
-            row.net_gex = float(m["net_gex"])  # type: ignore[arg-type]
+            row.spot = float(m["spot"])
+            row.net_gex = float(m["net_gex"])
             row.flip = m["flip"]
             row.call_wall = m["call_wall"]
             row.put_wall = m["put_wall"]
             row.atm_iv = m.get("atm_iv")
             row.iv_pct = m.get("iv_pct")
             row.realized_vol = m.get("realized_vol")
-            row.next_earnings = m.get("next_earnings")  # type: ignore[assignment]
-            row.next_catalyst = m.get("next_catalyst")  # type: ignore[assignment]
-            row.catalyst_kind = m.get("catalyst_kind")  # type: ignore[assignment]
+            row.next_earnings = m.get("next_earnings")
+            row.next_catalyst = m.get("next_catalyst")
+            row.catalyst_kind = m.get("catalyst_kind")
             s.add(row)
             s.commit()
 
