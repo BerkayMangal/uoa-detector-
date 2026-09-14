@@ -480,11 +480,10 @@ class SourceFusion:
           - ``premium_paid``, ``option_price``, ``spot_price``, ``bid``, ``ask``:
             median across reporting sources, Decimal-friendly via
             ``statistics.median``.
-          - ``implied_volatility``: median of non-None values; raises if no
-            source supplies (architectural pressure to pair sourceless-IV
-            adapters with a ``QuoteSnapshotSource``).
+          - ``implied_volatility``: median of non-None values; ``None`` when
+            no source supplies one (Phase 3.5.5.3).
           - ``open_interest``: max of non-None values (OI is monotonic per
-            session); raises if all None.
+            session); ``None`` when all are None (Phase 3.5.5.3).
           - ``fill_side``, ``is_iso``: modal value with deterministic
             tie-breaking by sort order (``False`` < ``True``).
           - ``exchange``: empty string for multi-print buckets — no single

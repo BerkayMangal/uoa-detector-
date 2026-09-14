@@ -63,7 +63,7 @@ def _fill_side_from_prems(ask_prem: object, bid_prem: object) -> FillSide:
 
 
 class UnusualWhalesFlowPollSource:
-    """Poll UW ``flow-recent`` per ticker and emit new prints as a stream."""
+    """Poll UW ``/api/stock/{ticker}/flow-alerts`` per ticker; emit new prints as a stream."""
 
     def __init__(
         self,
@@ -90,7 +90,7 @@ class UnusualWhalesFlowPollSource:
         self._seen: set[str] = set()
         self._closed = False
         # Budget guards (Phase 4.28): outside RTH there is no new flow, so
-        # polling only burns the UW 15k/day quota; and once UW returns the
+        # polling only burns the UW daily quota; and once UW returns the
         # daily-limit 429, hammering every interval eats the NEXT day's budget
         # too. Both back off hard instead.
         self._closed_market_sleep_s = closed_market_sleep_s

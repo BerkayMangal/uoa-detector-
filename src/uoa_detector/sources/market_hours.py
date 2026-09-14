@@ -2,7 +2,7 @@
 
 A pure, dependency-free check used by the live Unusual Whales poll loops to
 avoid spending the daily request budget outside market hours — there is no new
-options flow to fetch then, so polling overnight/weekends only burns the 15k/day
+options flow to fetch then, so polling overnight/weekends only burns the daily
 UW quota and triggers the daily-limit death spiral the screener hit.
 
 Window is expressed in UTC and deliberately covers BOTH US DST states so no

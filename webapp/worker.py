@@ -90,7 +90,7 @@ def live_config_from_env() -> dict[str, object] | None:
         "tickers": tickers,
         "database_url": database_url,
         # 60s FLOOR (Phase 4.28): with N live tickers + per-signal enrichment,
-        # a 20s interval over RTH alone can exceed the UW 15k/day cap. The floor
+        # a 20s interval over RTH alone can exceed the UW daily cap. The floor
         # keeps the budget safe even if LIVE_POLL_INTERVAL_S is set lower in the
         # deploy env; raise the env var to go slower, never faster than 60s.
         "poll_interval_s": max(60.0, float(os.environ.get("LIVE_POLL_INTERVAL_S", "60"))),

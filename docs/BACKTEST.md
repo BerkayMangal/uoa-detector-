@@ -659,6 +659,116 @@ exercised end-to-end. When Phase 3.3 lands the first real trade
 producer, the same `run-4cell` CLI command will produce real
 metrics with no further CLI changes.
 
+## Merged run-4cell engines (Phase 5.0)
+
+The text above predates the real trade producers. After the Phase 5.0 merge
+(`6d1e4ca`), `backtest run-4cell` has four `--trades` modes drawn from both
+lineages (`src/uoa_detector/cli.py::backtest_run_4cell`,
+`src/uoa_detector/backtest/cell_runner.py`). Every mode takes `--store`,
+`--report-path`, `--from`, `--to`, `--walk-forward-windows`, `--profile`,
+`--seed` and `--verdict-path`.
+
+| `--trades` | Origin | Producer | Mode flags | Universes | Exit quote |
+|---|---|---|---|---|---|
+| `noop` (default) | 3.2.4 | `noop_trade_producer` | none | none | none; zero trades per cell |
+| `historical` | `main` 3.5.0 (`b2caae9`) | `historical_trade_producer` | `--replay-data` (required, must exist), `--source-id` (default `historical`) | `data/universes/tier1_anchor.csv`, `tier2_starter.csv` | `backtest/simple_pnl.py` `ParquetExitQuoteProvider`: same UTC calendar day |
+| `synthetic` | `phase-3` 3.5.4 (`22178e3`) | `synthetic_trade_producer` | none | none; the default scripted scenario, identical in every cell | none; one NoOp open trade per stored signal (wiring smoke) |
+| `replay` | `phase-3` 3.5.5 (`2738091`) | `replay_trade_producer` | `--replay-data` (required), `--uw-enrichment`, `--chain-snapshots`, `--spot-series`, `--catalyst-calendar`, `--min-premium` | `data/universes/tier1_reduced.csv` (9), `tier2_top15.csv` (15) | `backtest/parquet_exit_quote.py` `ParquetExitQuoteProvider`: 3-month walk-back |
+
+### Stage sets
+
+**`historical`**
+- Every cell runs `default_stage_pipeline()`, so M21–M27 run on NoOp
+  providers.
+- Fusion cells set `force_multi_source`.
+
+**`replay`**
+- Single cells run the six core-flow stages: time-of-day, DTE decay,
+  sweep/block, relative premium, temporal cluster, cluster decay.
+- Fusion cells pick their stages in this order:
+  1. `--chain-snapshots` set: `fusion_stages_with_thetadata`. This takes
+     precedence.
+  2. `--uw-enrichment` set: `fusion_stages_with_uw`.
+  3. Neither: `default_stage_pipeline()`.
+- Every replay cell goes through windowed fusion (`force_multi_source=True`),
+  so sweep legs share a bucket.
+- M37 reads `data/medians_bulk.csv` when it exists.
+- `--min-premium` skips replayed prints below that premium.
+- `--uw-enrichment` cannot give a historical verdict: UW history is about
+  7 trading days (`docs/phase-3.5.5-status.md` B1).
+
+**Both engines**
+- Trades are priced with `backtest/simple_pnl.py::SimplePnLProvider`, which
+  includes the `b5fcd7a` look-ahead fix: a signal whose scheduled exit is at
+  or before entry stays open.
+- That closes `docs/phase-3.9-closeout.md` §7 flag 10(b) for both engines.
+
+### Exit-quote rules differ, so verdicts are not comparable
+
+| Class | Used by | Rule |
+|---|---|---|
+| `uoa_detector.backtest.simple_pnl.ParquetExitQuoteProvider` (also the package export `uoa_detector.backtest.ParquetExitQuoteProvider`) | `--trades historical` | Takes the latest bid at or before the exit instant, only if it falls on the same UTC calendar day. Otherwise it returns `None` and the trade stays open (pinned decision #2, `docs/phase-3.5.0-acceptance.md`). |
+| `uoa_detector.backtest.parquet_exit_quote.ParquetExitQuoteProvider` (import it by module path) | `--trades replay` | Takes the latest bid at or before the exit instant in the exit month. If there is none, it takes the last bid of up to 3 earlier months (`_MAX_WALKBACK_MONTHS = 3`), with no same-day limit. `None` leaves the trade open. |
+
+- **Consequence.** A replay run can realise a trade on a quote days or weeks
+  older than the exit, while a historical run leaves the same trade open.
+- **The 3.6 verdict.** The Phase 3.6 EDGE REJECTED verdict
+  (`docs/phase-3.6-results.md`) came from `replay`.
+- **Name the mode.** Every report or verdict must name its mode
+  (`docs/phase-5.0-merge-acceptance.md` §3.6).
+- **Registry.** Retiring an engine or changing the staleness rule is a Phase
+  5.10–5.19 registry item (`docs/INDEX.md` §7).
+
+### `--verdict-path`: falsification engine
+
+`backtest/falsification.py` (phase-3 3.5.6.1, `d58d4f6`):
+- `apply_falsification(results)` reads the four cells and returns
+  `edge_proven`, `edge_rejected` or `insufficient`.
+- `write_verdict_report(...)` writes a short markdown file headed
+  "Falsification verdict". The comparison report still goes to
+  `--report-path`.
+
+**Sample-size gate**
+- A cell with `metrics.total_trades` below 30 is INSUFFICIENT.
+- If all four cells are INSUFFICIENT, the verdict is `insufficient`, not
+  rejected.
+- Scenarios 1 and 4 run on the computable cells. Scenarios 2 and 3 need
+  both sides of their comparison computable; otherwise they are N/A.
+
+**Reject scenarios** (pinned in 3.2.4)
+1. Every computable cell has Sharpe < 0.
+2. Tier-1 cells are positive but Tier-2 cells negative.
+3. Single-source cells are positive but fusion cells negative.
+4. Best cell Sharpe < 0.5, or walk-forward consistency < 0.75.
+
+**Known debt**
+- **D8.** The gates are hardcoded at `falsification.py:79-81`:
+  `_MIN_CLOSED_TRADES = 30`, `_MIN_BEST_SHARPE = 0.5`,
+  `_MIN_BEST_WALK_FORWARD = 0.75`. Moving them into the profile is a Phase
+  5.10–5.19 registry item. The sample-size gate itself was ratified
+  retroactively in `docs/phase-5.0-merge-acceptance.md` §3.7.
+- **Phantom output path.** The module docstring and the `--verdict-path`
+  help name `docs/phase-3.5-results.md` as the conventional output. That
+  file does not exist (`docs/INDEX.md` §5).
+
+### `backtest/sanity_audit.py`
+
+Phase 3.5.7.1 (`b3c882c`). Pure functions over realized trades and bid/ask
+spreads, with no IO. It is not wired into the CLI; only
+`tests/unit/test_sanity_audit.py` imports it. Callers render its findings
+into `docs/phase-3.5.7-audit.md`.
+
+| Function | Check |
+|---|---|
+| `check_lookahead(trades)` | A closed trade with `exit_ts <= entry_ts`, or with no `exit_ts`, is a violation. |
+| `assess_trade_frequency(closed_trades)` | Compares the count with the 60-trade prep target: < 20 is too few, > 200 too many. |
+| `pnl_distribution(trades)` | Summary statistics over realized R. |
+| `spread_sanity(...)` | Bid/ask spread of the traded contracts as a fraction of mid, against the `slippage_pct` assumption. |
+
+The Phase 3.6 closeout credits this trade-level audit with catching the
+look-ahead leak: 84% of closed trades had `exit_ts <= entry_ts`
+(`docs/phase-3.6-closeout.md`).
+
 ## Why WAL mode
 
 `PRAGMA journal_mode=WAL` is set on every connection (a SQLAlchemy
