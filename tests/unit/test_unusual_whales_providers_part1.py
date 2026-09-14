@@ -100,52 +100,56 @@ def test_dealer_gamma_implements_protocol() -> None:
     assert isinstance(provider, DealerPositioningProvider)
 
 
+# Phase 3.9.5 (D10): these fixtures pinned a guessed
+# ``/greek-exposure-strike`` path and a ``{strike, as_of, net_gamma,
+# flow_direction}`` row shape; that path returned HTTP 404 live. They now
+# use trimmed live rows of ``GET /api/stock/AAPL/greek-exposure/strike``
+# (2026-09-11). UW publishes no flow direction, so the provider reports
+# ``neutral``. Protocol, strike-match, caching and TTL=0 behaviour is kept.
+
+_GEX_STRIKE_PATH = "/api/stock/AAPL/greek-exposure/strike"
+_GEX_AT = datetime(2026, 9, 11, 15, 30, tzinfo=UTC)
+_GEX_ROW_325: dict[str, Any] = {
+    "date": "2026-09-11", "strike": "325", "call_gex": "329818.0540",
+    "put_gex": "-132708.8386", "call_delta": "6182174.4550",
+    "put_delta": "-1425130.6740", "call_charm": "7572612.1562",
+    "put_charm": "3063665.8330", "call_vanna": "-1055985.2181",
+    "put_vanna": "-541253.4954",
+}
+_GEX_ROW_330: dict[str, Any] = {
+    "date": "2026-09-11", "strike": "330", "call_gex": "544970.2623",
+    "put_gex": "-62284.1385", "call_delta": "8692332.9087",
+    "put_delta": "-1620975.0500", "call_charm": "-14879958.8217",
+    "put_charm": "-1232646.7571", "call_vanna": "752334.4483",
+    "put_vanna": "-311991.4646",
+}
+
+
 @pytest.mark.asyncio
 async def test_dealer_gamma_returns_positioning_for_known_strike() -> None:
     client = _FakeClient()
-    client.stub(
-        "/api/stock/AAPL/greek-exposure-strike",
-        {
-            "data": [
-                {
-                    "strike": "150.00",
-                    "as_of": "2024-01-15T15:30:00Z",
-                    "net_gamma": "-12345678.0",
-                    "flow_direction": "accumulating",
-                },
-                {
-                    "strike": "155.00",
-                    "as_of": "2024-01-15T15:30:00Z",
-                    "net_gamma": "5000000.0",
-                    "flow_direction": "neutral",
-                },
-            ],
-        },
-    )
+    client.stub(_GEX_STRIKE_PATH, {"data": [_GEX_ROW_325, _GEX_ROW_330]})
     provider = UnusualWhalesDealerGammaProvider(
         client=client,  # type: ignore[arg-type]
         settings=_settings(),
     )
     pos = await provider.net_gamma_at(
         ticker="AAPL",
-        strike=Decimal("150.00"),
-        at=datetime(2024, 1, 15, 15, 30, tzinfo=UTC),
+        strike=Decimal("325.00"),
+        at=_GEX_AT,
     )
     assert pos is not None
     assert pos.ticker == "AAPL"
-    assert pos.strike == Decimal("150.00")
-    assert pos.net_gamma_dollars == Decimal("-12345678.0")
-    assert pos.flow_direction == "accumulating"
+    assert pos.strike == Decimal("325.00")
+    # call_gex + put_gex (share gamma; see the provider module docstring)
+    assert pos.net_gamma_dollars == Decimal("197109.2154")
+    assert pos.flow_direction == "neutral"
 
 
 @pytest.mark.asyncio
 async def test_dealer_gamma_returns_none_for_unknown_strike() -> None:
     client = _FakeClient()
-    client.stub(
-        "/api/stock/AAPL/greek-exposure-strike",
-        {"data": [{"strike": "150.00", "as_of": "2024-01-15T15:30:00Z",
-                    "net_gamma": "1.0", "flow_direction": "neutral"}]},
-    )
+    client.stub(_GEX_STRIKE_PATH, {"data": [_GEX_ROW_325]})
     provider = UnusualWhalesDealerGammaProvider(
         client=client,  # type: ignore[arg-type]
         settings=_settings(),
@@ -153,7 +157,7 @@ async def test_dealer_gamma_returns_none_for_unknown_strike() -> None:
     pos = await provider.net_gamma_at(
         ticker="AAPL",
         strike=Decimal("999.99"),
-        at=datetime(2024, 1, 15, 15, 30, tzinfo=UTC),
+        at=_GEX_AT,
     )
     assert pos is None
 
@@ -162,21 +166,17 @@ async def test_dealer_gamma_returns_none_for_unknown_strike() -> None:
 async def test_dealer_gamma_caches_response() -> None:
     """Two calls for same ticker → one HTTP request."""
     client = _FakeClient()
-    client.stub(
-        "/api/stock/AAPL/greek-exposure-strike",
-        {"data": [{"strike": "150.00", "as_of": "2024-01-15T15:30:00Z",
-                    "net_gamma": "1.0", "flow_direction": "neutral"}]},
-    )
+    client.stub(_GEX_STRIKE_PATH, {"data": [_GEX_ROW_325]})
     provider = UnusualWhalesDealerGammaProvider(
         client=client,  # type: ignore[arg-type]
         settings=_settings(dealer_gamma_seconds=300),
     )
-    at = datetime(2024, 1, 15, 15, 30, tzinfo=UTC)
+    at = _GEX_AT
     await provider.net_gamma_at(
-        ticker="AAPL", strike=Decimal("150.00"), at=at,
+        ticker="AAPL", strike=Decimal("325.00"), at=at,
     )
     await provider.net_gamma_at(
-        ticker="AAPL", strike=Decimal("150.00"), at=at,
+        ticker="AAPL", strike=Decimal("325.00"), at=at,
     )
     assert len(client.calls) == 1
 
@@ -184,19 +184,15 @@ async def test_dealer_gamma_caches_response() -> None:
 @pytest.mark.asyncio
 async def test_dealer_gamma_cache_disabled_when_ttl_zero() -> None:
     client = _FakeClient()
-    client.stub(
-        "/api/stock/AAPL/greek-exposure-strike",
-        {"data": [{"strike": "150.00", "as_of": "2024-01-15T15:30:00Z",
-                    "net_gamma": "1.0", "flow_direction": "neutral"}]},
-    )
+    client.stub(_GEX_STRIKE_PATH, {"data": [_GEX_ROW_325]})
     provider = UnusualWhalesDealerGammaProvider(
         client=client,  # type: ignore[arg-type]
         settings=_settings(dealer_gamma_seconds=0),
     )
-    at = datetime(2024, 1, 15, 15, 30, tzinfo=UTC)
+    at = _GEX_AT
     for _ in range(3):
         await provider.net_gamma_at(
-            ticker="AAPL", strike=Decimal("150.00"), at=at,
+            ticker="AAPL", strike=Decimal("325.00"), at=at,
         )
     assert len(client.calls) == 3
 
@@ -205,13 +201,8 @@ async def test_dealer_gamma_cache_disabled_when_ttl_zero() -> None:
 async def test_dealer_gamma_unknown_flow_direction_falls_back_to_neutral() -> None:
     client = _FakeClient()
     client.stub(
-        "/api/stock/AAPL/greek-exposure-strike",
-        {"data": [{
-            "strike": "150.00",
-            "as_of": "2024-01-15T15:30:00Z",
-            "net_gamma": "1.0",
-            "flow_direction": "wibble",  # garbage
-        }]},
+        _GEX_STRIKE_PATH,
+        {"data": [{**_GEX_ROW_325, "flow_direction": "wibble"}]},  # garbage
     )
     provider = UnusualWhalesDealerGammaProvider(
         client=client,  # type: ignore[arg-type]
@@ -219,8 +210,8 @@ async def test_dealer_gamma_unknown_flow_direction_falls_back_to_neutral() -> No
     )
     pos = await provider.net_gamma_at(
         ticker="AAPL",
-        strike=Decimal("150.00"),
-        at=datetime(2024, 1, 15, 15, 30, tzinfo=UTC),
+        strike=Decimal("325.00"),
+        at=_GEX_AT,
     )
     assert pos is not None
     assert pos.flow_direction == "neutral"

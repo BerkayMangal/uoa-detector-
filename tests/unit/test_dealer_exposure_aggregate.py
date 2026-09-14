@@ -5,19 +5,28 @@ Pins:
   - flip_strike: Decimal | None (None when curve doesn't cross zero)
   - DealerPositioningProvider.aggregate_for_ticker present on Protocol
   - NoOpDealerPositioningProvider returns None
-  - UW provider _aggregate happy path: sum + flip-strike identification
+  - UW provider _aggregate happy path: net gamma from the spot-exposure
+    row + flip-strike identification from the strike rows
   - UW provider _aggregate empty rows → None
   - UW provider _aggregate malformed rows skipped
   - UW provider _aggregate single row → flip_strike=None (curve monotone)
   - UW provider _aggregate monotone-positive → flip_strike=None
   - UW provider _aggregate flip detected on sign change ascending
   - UW provider _aggregate flip detected on exact zero crossing
+
+Phase 3.9.5 (D10): the ``_aggregate`` fixtures used a guessed per-strike
+``{strike, net_gamma, as_of}`` shape from an endpoint that never existed.
+They are rewritten to live-shaped rows: net gamma (USD per 1% move) from
+``/spot-exposures`` ``gamma_per_one_percent_move_oi``, the flip from
+``/greek-exposure/strike`` ``call_gex + put_gex``. The ``_find_flip_strike``
+tests are unchanged.
 """
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from decimal import Decimal
+from typing import Any
 
 import pytest
 
@@ -27,7 +36,9 @@ from uoa_detector.providers.dealer_positioning import (
     NoOpDealerPositioningProvider,
 )
 from uoa_detector.sources.unusual_whales.providers.dealer_gamma import (
-    UnusualWhalesDealerGammaProvider,
+    _aggregate,
+    _decode_spot_rows,
+    _decode_strike_rows,
     _find_flip_strike,
 )
 
@@ -157,83 +168,114 @@ def test_flip_strike_first_crossing_wins() -> None:
 
 
 # ---------------------------------------------------------------------------
-# UnusualWhalesDealerGammaProvider._aggregate
+# UW provider _aggregate (pure, over decoded live-shaped rows)
 # ---------------------------------------------------------------------------
 
+_ET_DATE = date(2026, 9, 11)
+_AT = datetime(2026, 9, 11, 20, 0, tzinfo=UTC)
 
-def _provider() -> UnusualWhalesDealerGammaProvider:
-    """Build a provider with no real client — _aggregate doesn't use it."""
-    from unittest.mock import MagicMock
-    return UnusualWhalesDealerGammaProvider(
-        client=MagicMock(),
-        settings=MagicMock(cache_ttl=MagicMock(dealer_gamma_seconds=300)),
+
+def _spot_row(time: str, gamma_usd: str) -> dict[str, Any]:
+    """Live-shaped /spot-exposures row (trimmed to the fields read)."""
+    return {
+        "time": time,
+        "ticker": "AAPL",
+        "start_time": time,
+        "price": "332.24",
+        "gamma_per_one_percent_move_oi": gamma_usd,
+    }
+
+
+def _strike_row(strike: str, call_gex: str, put_gex: str) -> dict[str, Any]:
+    """Live-shaped /greek-exposure/strike row (trimmed to the fields read)."""
+    return {
+        "date": "2026-09-11",
+        "strike": strike,
+        "call_gex": call_gex,
+        "put_gex": put_gex,
+    }
+
+
+def _agg(
+    spot_rows: list[dict[str, Any]],
+    strike_rows: list[dict[str, Any]],
+    *,
+    ticker: str = "AAPL",
+) -> DealerExposureAggregate | None:
+    return _aggregate(
+        ticker=ticker,
+        at=_AT,
+        spot=_decode_spot_rows(spot_rows),
+        strikes=_decode_strike_rows(strike_rows, et_date=_ET_DATE),
     )
 
 
 def test_uw_aggregate_empty_rows_returns_none() -> None:
-    p = _provider()
-    assert p._aggregate([], ticker="AAPL") is None
+    assert _agg([], []) is None
 
 
 def test_uw_aggregate_happy_path() -> None:
-    """3 rows → sum + flip-strike identified."""
-    p = _provider()
-    rows = [
-        {"strike": "140", "net_gamma": "100", "as_of": "2024-01-15T15:30:00Z"},
-        {"strike": "150", "net_gamma": "50", "as_of": "2024-01-15T15:30:00Z"},
-        {"strike": "160", "net_gamma": "-200", "as_of": "2024-01-15T15:30:00Z"},
+    """Net gamma from the spot-exposure row; flip from the strike rows."""
+    spot = [_spot_row("2026-09-11T19:59:59.000000Z", "-16707476323.88")]
+    strikes = [
+        _strike_row("140", "100", "0"),      # net 100, cumulative 100
+        _strike_row("150", "80", "-30"),     # net 50, cumulative 150
+        _strike_row("160", "20", "-220"),    # net -200, cumulative -50
     ]
-    agg = p._aggregate(rows, ticker="aapl")
+    agg = _agg(spot, strikes, ticker="aapl")
     assert agg is not None
     assert agg.ticker == "AAPL"  # uppercased
-    assert agg.net_gamma_dollars == Decimal("-50")  # 100 + 50 - 200
+    assert agg.net_gamma_dollars == Decimal("-16707476323.88")
     assert agg.flip_strike == Decimal("160")
 
 
 def test_uw_aggregate_skips_malformed_row() -> None:
-    """A row missing 'strike' is skipped; remaining rows still processed."""
-    p = _provider()
-    rows = [
-        {"strike": "150", "net_gamma": "100", "as_of": "2024-01-15T15:30:00Z"},
-        {"net_gamma": "50", "as_of": "2024-01-15T15:30:00Z"},  # bad
-        {"strike": "160", "net_gamma": "-200", "as_of": "2024-01-15T15:30:00Z"},
+    """A row missing 'strike' (or 'time') is skipped; the rest still count."""
+    spot = [
+        {"ticker": "AAPL", "gamma_per_one_percent_move_oi": "999"},  # bad
+        _spot_row("2026-09-11T19:59:59.000000Z", "3740943365.4"),
     ]
-    agg = p._aggregate(rows, ticker="AAPL")
+    strikes = [
+        _strike_row("150", "150", "-50"),                     # net 100
+        {"date": "2026-09-11", "call_gex": "50", "put_gex": "0"},  # bad
+        _strike_row("160", "0", "-200"),                      # net -200
+    ]
+    agg = _agg(spot, strikes)
     assert agg is not None
-    assert agg.net_gamma_dollars == Decimal("-100")  # 100 - 200
+    assert agg.net_gamma_dollars == Decimal("3740943365.4")
+    assert agg.flip_strike == Decimal("160")  # 100 → -100; bad row ignored
 
 
 def test_uw_aggregate_all_malformed_returns_none() -> None:
-    p = _provider()
-    rows = [
-        {"strike": "garbage", "net_gamma": "100", "as_of": "bad"},
+    spot = [
+        {"time": "bad", "gamma_per_one_percent_move_oi": "100"},
         {"weird": "field"},
     ]
-    agg = p._aggregate(rows, ticker="AAPL")
-    assert agg is None
+    strikes = [{"strike": "garbage", "call_gex": "1", "put_gex": "0"}]
+    assert _agg(spot, strikes) is None
 
 
 def test_uw_aggregate_uses_latest_as_of_across_rows() -> None:
-    p = _provider()
-    rows = [
-        {"strike": "140", "net_gamma": "100", "as_of": "2024-01-15T10:00:00Z"},
-        {"strike": "150", "net_gamma": "50", "as_of": "2024-01-15T15:30:00Z"},
-        {"strike": "160", "net_gamma": "-200", "as_of": "2024-01-15T13:00:00Z"},
+    spot = [
+        _spot_row("2026-09-11T14:00:58.000000Z", "100"),
+        _spot_row("2026-09-11T19:30:58.000000Z", "50"),
+        _spot_row("2026-09-11T17:00:58.000000Z", "-200"),
     ]
-    agg = p._aggregate(rows, ticker="AAPL")
+    agg = _agg(spot, [])
     assert agg is not None
-    # Latest is 15:30
-    assert agg.as_of == datetime(2024, 1, 15, 15, 30, tzinfo=UTC)
+    # Latest at or before _AT (20:00Z) is 19:30:58, whatever the row order
+    assert agg.as_of == datetime(2026, 9, 11, 19, 30, 58, tzinfo=UTC)
+    assert agg.net_gamma_dollars == Decimal("50")
 
 
 def test_uw_aggregate_monotone_curve_flip_strike_none() -> None:
     """All-positive cumulative ⇒ flip_strike=None."""
-    p = _provider()
-    rows = [
-        {"strike": "140", "net_gamma": "100", "as_of": "2024-01-15T15:30:00Z"},
-        {"strike": "150", "net_gamma": "200", "as_of": "2024-01-15T15:30:00Z"},
+    spot = [_spot_row("2026-09-11T19:59:59.000000Z", "300")]
+    strikes = [
+        _strike_row("140", "150", "-50"),
+        _strike_row("150", "250", "-50"),
     ]
-    agg = p._aggregate(rows, ticker="AAPL")
+    agg = _agg(spot, strikes)
     assert agg is not None
     assert agg.flip_strike is None
     assert agg.net_gamma_dollars == Decimal("300")
