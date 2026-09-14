@@ -12,6 +12,7 @@ from __future__ import annotations
 from typer.testing import CliRunner
 
 from uoa_detector.cli import app
+from uoa_detector.config.credentials import Credentials
 
 runner = CliRunner()
 
@@ -49,6 +50,9 @@ def test_live_source_unknown_feed_rejected() -> None:
 def test_live_source_missing_uw_key_rejected(monkeypatch) -> None:  # type: ignore[no-untyped-def]
     """When --feeds unusual_whales is requested but no key, fail-fast."""
     monkeypatch.delenv("UNUSUAL_WHALES_API_KEY", raising=False)
+    # Hermetic: the CLI builds Credentials() internally, which would read the
+    # developer's real ./.env. Disable the env file for this test only.
+    monkeypatch.setitem(Credentials.model_config, "env_file", None)
     result = runner.invoke(app, [
         "run", "--source", "live",
         "--feeds", "unusual_whales",

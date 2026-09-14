@@ -176,8 +176,10 @@ def test_build_both_feeds() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_missing_uw_key_fails_fast() -> None:
-    creds = Credentials()  # no UW key
+def test_missing_uw_key_fails_fast(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Hermetic: ignore the developer's real ./.env and exported key.
+    monkeypatch.delenv("UNUSUAL_WHALES_API_KEY", raising=False)
+    creds = Credentials(_env_file=None)  # no UW key
     with pytest.raises(
         FeedConfigurationError,
         match="UNUSUAL_WHALES_API_KEY is not set",
@@ -191,8 +193,10 @@ def test_missing_uw_key_fails_fast() -> None:
         )
 
 
-def test_missing_thetadata_key_fails_fast() -> None:
-    creds = Credentials()  # no TD key
+def test_missing_thetadata_key_fails_fast(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Hermetic: ignore the developer's real ./.env and exported key.
+    monkeypatch.delenv("THETADATA_API_KEY", raising=False)
+    creds = Credentials(_env_file=None)  # no TD key
     with pytest.raises(
         FeedConfigurationError,
         match="THETADATA_API_KEY is not set",
