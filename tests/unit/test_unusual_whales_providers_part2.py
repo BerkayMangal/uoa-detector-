@@ -92,17 +92,19 @@ def test_catalyst_calendar_implements_protocol() -> None:
 
 @pytest.mark.asyncio
 async def test_catalyst_calendar_returns_next_event() -> None:
+    # Phase 3.9.8: live /api/earnings/{t} row shape (the retired
+    # /api/stock/{t}/upcoming-events path returned 404).
     client = _FakeClient()
     client.stub(
-        "/api/stock/AAPL/upcoming-events",
+        "/api/earnings/AAPL",
         {
             "data": [
-                {"kind": "guidance", "when": "2024-01-20T12:00:00Z",
-                 "title": "AAPL guidance"},
-                {"kind": "earnings", "when": "2024-01-25T21:00:00Z",
-                 "title": "AAPL Q1 FY2024"},
-                {"kind": "investor_day", "when": "2024-03-15T13:00:00Z",
-                 "title": "AAPL Investor Day"},
+                {"source": "company", "report_date": "2024-05-02",
+                 "report_time": "postmarket"},
+                {"source": "company", "report_date": "2024-02-01",
+                 "report_time": "postmarket"},
+                {"source": "company", "report_date": "2023-11-02",
+                 "report_time": "postmarket"},
             ],
         },
     )
@@ -112,19 +114,19 @@ async def test_catalyst_calendar_returns_next_event() -> None:
     )
     after = datetime(2024, 1, 22, 0, 0, tzinfo=UTC)
     event = await provider.next_catalyst("AAPL", after)
-    # Should pick earnings (next event >= after); guidance (Jan 20) is before.
+    # Should pick the Feb 1 report (next event >= after); Nov 2 is before.
     assert event is not None
     assert event.kind == "earnings"
-    assert event.title == "AAPL Q1 FY2024"
+    assert event.title == "AAPL earnings 2024-02-01 (postmarket, company)"
 
 
 @pytest.mark.asyncio
 async def test_catalyst_calendar_returns_none_when_no_future_event() -> None:
     client = _FakeClient()
     client.stub(
-        "/api/stock/AAPL/upcoming-events",
-        {"data": [{"kind": "earnings", "when": "2023-12-01T12:00:00Z",
-                    "title": "old"}]},
+        "/api/earnings/AAPL",
+        {"data": [{"source": "company", "report_date": "2023-11-02",
+                    "report_time": "postmarket"}]},
     )
     provider = UnusualWhalesCatalystCalendarProvider(
         client=client,  # type: ignore[arg-type]
@@ -136,12 +138,16 @@ async def test_catalyst_calendar_returns_none_when_no_future_event() -> None:
 
 
 @pytest.mark.asyncio
-async def test_catalyst_calendar_unknown_kind_falls_back_to_other() -> None:
+async def test_catalyst_calendar_non_fomc_econ_row_is_not_a_catalyst() -> None:
+    # Phase 3.9.8: the vendor "kind" field existed only on the retired
+    # upcoming-events payload. Sources are now typed by endpoint; the
+    # remaining vendor category filter is the economic calendar's
+    # ``type``: only "fomc" rows are catalysts (contract §3.5).
     client = _FakeClient()
     client.stub(
-        "/api/stock/AAPL/upcoming-events",
-        {"data": [{"kind": "weird", "when": "2024-02-01T00:00:00Z",
-                    "title": "x"}]},
+        "/api/market/economic-calendar",
+        {"data": [{"type": "report", "time": "2024-02-01T13:30:00Z",
+                    "event": "Philadelphia Fed Business Outlook Survey"}]},
     )
     provider = UnusualWhalesCatalystCalendarProvider(
         client=client,  # type: ignore[arg-type]
@@ -149,17 +155,16 @@ async def test_catalyst_calendar_unknown_kind_falls_back_to_other() -> None:
     )
     after = datetime(2024, 1, 1, tzinfo=UTC)
     event = await provider.next_catalyst("AAPL", after)
-    assert event is not None
-    assert event.kind == "other"
+    assert event is None
 
 
 @pytest.mark.asyncio
 async def test_catalyst_calendar_caches() -> None:
     client = _FakeClient()
     client.stub(
-        "/api/stock/AAPL/upcoming-events",
-        {"data": [{"kind": "earnings", "when": "2024-02-01T00:00:00Z",
-                    "title": "x"}]},
+        "/api/earnings/AAPL",
+        {"data": [{"source": "company", "report_date": "2024-02-01",
+                    "report_time": "postmarket"}]},
     )
     provider = UnusualWhalesCatalystCalendarProvider(
         client=client,  # type: ignore[arg-type]
@@ -168,7 +173,14 @@ async def test_catalyst_calendar_caches() -> None:
     after = datetime(2024, 1, 1, tzinfo=UTC)
     await provider.next_catalyst("AAPL", after)
     await provider.next_catalyst("AAPL", after)
-    assert len(client.calls) == 1
+    # Phase 3.9.8: three endpoints replace the single retired one; each is
+    # fetched once across both calls (no refetch within the TTL).
+    paths = sorted(path for path, _ in client.calls)
+    assert paths == [
+        "/api/earnings/AAPL",
+        "/api/market/economic-calendar",
+        "/api/market/fda-calendar",
+    ]
 
 
 # ===========================================================================
