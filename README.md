@@ -1,21 +1,86 @@
 # UOA + Convexity Detector v5
 
-**What this is:** a discretionary options-flow **screener and context tool**. It
-surfaces unusual options activity and overlays structural context (dealer-gamma
-regime, IV rank, sector/peer flow, dark-pool corroboration) to inform a human's
-discretionary read. The one piece of *validated* information it carries is
-**conditioning**: selecting long-gamma + high-IV-rank names beats blind vol-
-selling by **+0.77 Sharpe** — useful context for the operator's judgment.
+**What this is:** decision support for options-flow screening.
+- It surfaces unusual options activity and scores it against structural
+  context: dealer-gamma regime, IV rank, sector/peer flow, dark-pool prints,
+  open interest and the event calendar.
+- A human reads the output and decides.
+- Nothing executes: there is no broker link and no auto-trading. Trade entry
+  is always a manual decision through the operator's own broker.
 
-**What this is NOT:** a mechanical, money-printing alpha engine. The vol-premium
-edge was put through a full cost / tail / multiple-testing / walk-forward gate
-and **rejected as untradeable** — out-of-sample Sharpe **−0.56**, Bonferroni ×30
-**p=1.00**, Deflated Sharpe **0.13**, and a single −20% gap ≈ **5× the credit**
-collected (full evidence: [`docs/edge_to_money.md`](docs/edge_to_money.md)). Raw
-UOA output is **never** auto-traded: the system does not execute, size, or
-recommend trades — entry is always a manual decision through the operator's own
-broker. This matches the live UI (`webapp/templates/base.html`) and the
-dealer-gamma map (`webapp/gamma.py`), which say the same thing.
+**What it has not found:** a tradeable edge. The project's canonical
+statement (`docs/INDEX.md` §0):
+
+> No tradeable edge found. Directional UOA confluence (UW-free, v6):
+> REJECTED (phase-3.6-closeout). Gamma-regime directional and pinning:
+> REJECTED (4.9, 4.11). Vol premium: untradeable after costs
+> (edge_to_money.md). Conditioning replication: WEAK (study_D_result.md).
+> UW-fed Track B (v5_gamma_squeeze with real UW enrichment) has never been
+> testable, because UW history is about 7 days (phase-3.5.5-status B1).
+
+**The +0.77 Sharpe figure is superseded.** Earlier versions of this README
+called the "long-gamma + high IV rank beats blind vol-selling by +0.77
+Sharpe" conditioning read validated. That figure was in-sample, on the burned
+2025-05 → 2026-04 panel.
+
+Its pre-registered out-of-sample test is Study D (`docs/preregister_D.md`,
+`docs/study_D_result.md`):
+- one run, no re-tuning;
+- fresh window 2024-05-01 → 2025-04-30, the same 24 tickers;
+- statistic: vol-points VRP Sharpe spread, with no option priced and no
+  costs.
+
+The result is **WEAK / BORDERLINE**:
+
+| Causal metric | In-sample (burned panel) | Fresh 2024 window |
+|---|---|---|
+| Conditioned − unconditioned Sharpe spread | +0.51 | +0.22 |
+| Welch t (conditioned − unconditioned) | +1.88 | +1.47 (not significant, < 2) |
+
+The conditioning's incremental value over blind vol-selling is not
+statistically significant and shrank out of sample.
+
+---
+
+## What is in the repo
+
+| Part | What it does | Entry point |
+|---|---|---|
+| Detection pipeline | `OptionsPrint` → enrichment stages (M21–M27, M34, M35, M37–M39) → M36 penalties → combined score → label → risk bucket. M28 runs as an overnight validator. | `src/uoa_detector/` |
+| CLI screener | A ranked digest of Unusual Whales flow for the listed tickers (latest session by default), enriched by the live-verified Phase 3.9 UW providers | `uoa-detector screener --source rest` |
+| Web app | FastAPI dashboard on Railway: stored and live signals, a gamma / vol board and a journal of manually logged trades. A live worker polls UW flow during market hours. | `webapp/` |
+| Backtest | Store, parquet replay, 4-cell runner with two engines (`--trades historical` / `replay`, verdicts not comparable), falsification verdict | `uoa-detector backtest run-4cell` |
+| Research | Pre-registered studies and their records | `scripts/`, `docs/` |
+
+Where to read next: `docs/INDEX.md` (current truth, doc map, burned data
+windows, Phase 5.x registry), `docs/DATA_INTEGRATION.md` (credentials,
+Railway runtime, environment variables), `docs/BACKTEST.md`,
+`docs/MODULES.md`.
+
+## Quick start
+
+```bash
+# Install dependencies (creates .venv)
+uv sync
+
+# Synthetic scenario through the full pipeline (no credentials)
+uv run python -m uoa_detector run --source synthetic --scenario default
+
+# CLI screener on live Unusual Whales REST flow (needs UNUSUAL_WHALES_API_KEY);
+# writes reports/screener_<YYYY-MM-DD>.md
+uv run python -m uoa_detector screener --source rest --live-tickers SPY,AAPL
+
+# Web app locally (needs WEB_AUTH_USER and WEB_AUTH_PASSWORD;
+# see docs/DATA_INTEGRATION.md §8-§9)
+uv run uvicorn webapp.main:app
+```
+
+**Gate** (run before every commit; CI runs it on every PR):
+
+```bash
+env -u UNUSUAL_WHALES_API_KEY -u THETADATA_API_KEY -u THETADATA_USERNAME uv run pytest -q \
+  && uv run mypy --strict src/ webapp/ && uv run ruff check . && uv lock --check
+```
 
 ---
 
@@ -23,8 +88,8 @@ dealer-gamma map (`webapp/gamma.py`), which say the same thing.
 > architecture reference (synthetic-data skeleton; the enrichment modules were
 > stubs at the time). The enrichment modules (M21–M28, M34–M39) and the live
 > Phase 4 screener have since been built — this document is kept as the
-> architecture map, not a current status report. For current state see `git log`
-> and `docs/`.
+> architecture map, not a current status report. For current state see
+> `docs/INDEX.md`.
 
 Foundational scaffold for a multi-module options-flow detection system, built to
 the v5 spec (`UOA_Convexity_Detector_v5.docx`). This is **Phase 1**: project

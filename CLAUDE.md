@@ -1,8 +1,9 @@
 # CLAUDE.md
 
 This file is read by Claude Code at the start of every session. It encodes
-the disciplines this project has built up over Phases 1-3.4 (32+ sub-commits,
-1412+ tests, mypy strict + ruff clean, ~110 source files). The discipline
+the disciplines this project has built up over Phases 1-5.0 (2150+ tests at
+the Phase 5.0 merge, mypy strict + ruff clean, 131 source files under
+`src/`). The discipline
 exists for a reason: this is a real-money options-flow detection system being
 built by Berkay, an ex-Deutsche Bank trader, and bugs that pass review will
 eventually lose actual capital. Treat the rules below as binding, not advisory.
@@ -78,22 +79,33 @@ more tuning".
 
 Before doing anything substantive, read these in order:
 
-1. `docs/MODULES.md` (720 lines) — per-module reference for M21-M28.
+1. `docs/INDEX.md` — current truth across both lineages (§0), the type
+   and status of every doc, label collisions, burned data windows, and the
+   Phase 5.x registry and numbering rules (§7). Start here.
+2. `docs/phase-3.9-uw-endpoint-correction-acceptance.md` and
+   `docs/phase-3.9-closeout.md` — the current, live-verified Unusual Whales
+   layer, and the open §7 flags.
+3. `docs/phase-3.6-closeout.md` — why the UW-free confluence verdict is
+   EDGE REJECTED, and the look-ahead leak the audit caught.
+4. `docs/edge_to_money.md` — why the vol premium is untradeable after costs.
+5. `docs/study_D_result.md` — the pre-registered conditioning replication
+   (WEAK / BORDERLINE).
+6. `docs/MODULES.md` — per-module reference for M21-M28.
    What each module scores, which providers it uses, which thresholds
    are configurable, which judgment calls were made during implementation.
-2. `docs/phase-3.4-acceptance.md` (746 lines) — Phase 3.4's frozen
+7. `docs/phase-3.4-acceptance.md` — Phase 3.4's frozen
    contract and closeout summary. The history of how M21-M28 came to be.
-3. `docs/phase-3.5-acceptance.md` (437 lines) — Phase 3.5's frozen
+8. `docs/phase-3.5-acceptance.md` — Phase 3.5's frozen
    contract. Eight sub-phases, the falsification framework, the things
    that explicitly *are not* allowed mid-phase.
-4. `docs/thetadata-v3-migration.md` (559 lines) — Phase 3.3.7's spec for
+9. `docs/thetadata-v3-migration.md` — Phase 3.3.7's spec for
    the v2→v3 migration. Read this before touching anything in
    `src/uoa_detector/sources/thetadata/`.
-5. `docs/phase-3.3.7-acceptance.md` — contract for the v3 migration.
-6. `profiles/v5_gamma_squeeze.yaml` — the strategy profile being tested.
-   The inline comments encode Berkay's hypothesis. Do not modify thresholds.
-7. `profiles/v5_default.yaml` — the broader profile. Same rule: do not
-   modify thresholds.
+10. `docs/phase-3.3.7-acceptance.md` — contract for the v3 migration.
+11. `profiles/v5_gamma_squeeze.yaml` — the strategy profile being tested.
+    The inline comments encode Berkay's hypothesis. Do not modify thresholds.
+12. `profiles/v5_default.yaml` — the broader profile. Same rule: do not
+    modify thresholds.
 
 Git history is the second source of truth. Every commit message describes
 the sub-phase, the decision, and the test impact. `git log --oneline` for
@@ -114,11 +126,13 @@ contract to match what you ended up doing.
 
 ### D2. Bisectable commits
 
-Every commit must be green on its own: `pytest -q`, `mypy --strict`, and
-`ruff check .` all pass. `git bisect` is a real debugging tool used in this
+Every commit must be green on its own: the gate under "Running tests"
+(hermetic `pytest -q`, `mypy --strict src/ webapp/`, `ruff check .` and
+`uv lock --check`) passes. `git bisect` is a real debugging tool used in this
 project; one broken middle commit destroys hours of future investigation.
 If a change is too big for one bisectable commit, split it into smaller
-ones that each leave the tree green.
+ones that each leave the tree green. The merged `phase-3` history is not
+D2-clean, so bisect `main` with `git bisect --first-parent`.
 
 ### D3. Sub-phase reports (paket-mode)
 
@@ -199,7 +213,10 @@ project went from 0 → 1412 tests this way; no shortcuts.
 
 If something needs to be done, it gets a sub-phase, an acceptance entry,
 and a commit. `# TODO` markers in code are how projects accumulate rot.
-This codebase has zero of them and that is intentional.
+Do not add any. The codebase is not at zero: two pre-existing markers
+remain, at `src/uoa_detector/calibration/resolver.py:48` and
+`src/uoa_detector/pipeline/stages/__init__.py:4`. Their removal is
+scheduled in the Phase 5.x registry (`docs/INDEX.md` §7, 5.10–5.19).
 
 ### D12. Type annotations are mandatory
 
@@ -216,12 +233,24 @@ adapter boundaries.
 
 ```bash
 uv sync                                    # if .venv stale
-uv run pytest -q                           # full suite, ~1412 tests, ~50s
 uv run pytest tests/unit/test_mXX_*.py -v  # one module
 uv run pytest -m integration               # gated integration smokes
-uv run mypy --strict src/                  # type check
-uv run ruff check .                        # lint
 ```
+
+The gate. Run it before every commit; CI (`.github/workflows/ci.yml`) runs
+the same gate on every PR and every push to `main`:
+
+```bash
+env -u UNUSUAL_WHALES_API_KEY -u THETADATA_API_KEY -u THETADATA_USERNAME uv run pytest -q && uv run mypy --strict src/ webapp/ && uv run ruff check . && uv lock --check
+```
+
+What each part does:
+- `env -u` strips the API keys from the pytest process. Missing-key tests
+  therefore stay hermetic even when your shell has the keys exported, and
+  key-gated integration tests skip, as they do in CI, which has no keys.
+- `uv lock --check` fails if `uv.lock` no longer matches `pyproject.toml`.
+- `scripts/` is ruff-only, a documented exception to mypy
+  (`docs/phase-5.0-merge-acceptance.md` §3.11).
 
 Integration smoke tests in `tests/integration/` are gated by environment
 variables (UNUSUAL_WHALES_API_KEY, THETADATA_API_KEY). They skip cleanly
@@ -237,23 +266,40 @@ verify a credential is present, check `$VARNAME` after the export.
 
 ### Committing
 
+Work reaches `main` only through a pull request from a feature branch:
+
 ```bash
+git switch -c <feature-branch> main
 git add <specific files, never -A>
-git commit -m "Phase 3.X.Y.Z: <one-line summary>"
-git push origin phase-3
+git commit -m "Phase 5.X.N: <one-line summary>"
+git push -u origin <feature-branch>
+gh pr create --base main
 ```
 
-Commit messages follow the `Phase 3.X.Y.Z: <thing>` format. The Z is a
-sub-sub-phase counter starting from 1. The summary is one line, no body
+- **Merge.** Berkay merges the PR once the gate is green locally and in CI.
+  Never auto-merge anything to `main`.
+- **Deploys.** Railway deploys `main` after the Phase 5.0 switch, so a red
+  `main` is a red production.
+- **`phase-3` is frozen.** Never push to it after its freeze: its tip is
+  tagged `phase-3-final` and the branch is locked
+  (`docs/phase-5.0-merge-acceptance.md` §3.14).
+
+Commit messages follow the `Phase 5.X.N: <thing>` format. N is a
+sub-phase commit counter starting from 1. Phase 3.x and 4.x labels are
+historical and never reused. A hotfix to a live component is a numbered
+sub-commit of the owning phase with "hotfix" in the summary. The full
+numbering rules are in `docs/INDEX.md` §7. The summary is one line, no body
 unless the change is non-obvious (breaking change, judgment call worth
 recording inline, etc).
 
 ### Acceptance docs
 
-When starting a new phase, write `docs/phase-X.Y-acceptance.md` BEFORE
+When starting a new phase, allocate its number in `docs/INDEX.md` §7 and
+write `docs/phase-5.X-<slug>-acceptance.md` BEFORE
 any code change. Get Berkay's approval (or read his explicit "yes" if
 he started the phase). Then implement against the doc. The doc is frozen
-from that point.
+from that point. The paket-mode report goes in a separate
+`docs/phase-5.X-closeout.md`.
 
 ### Theta Terminal v3
 
@@ -293,15 +339,24 @@ download command is in `docs/phase-3.5-acceptance.md`.
 - Phase progression (does 3.5.1 close, does 3.5.2 start).
 - Breaking changes to public APIs (e.g., BacktestStoreProtocol additions
   beyond what an acceptance doc already specifies).
-- Anything involving real money — running live, sending alerts, paper
-  trading, etc. Phase 4+ territory; we are nowhere near.
+- Anything involving real money. The rule as of 2026-09-14
+  (`docs/phase-5.0-merge-acceptance.md` §3.13):
+  - The webapp is live decision-support.
+  - Nothing executes, there is no broker link, and there is no
+    auto-trading.
+  - Alerts (notify-only) and a virtual portfolio (log-only paper records,
+    never executed) are approved product modules as of 2026-09-14. Each
+    sits behind its own acceptance doc (registry 5.5 and 5.6).
+  - Anything beyond that, such as order execution, a broker connection or
+    automated trading, is not approved.
 - Strategy hypothesis revisions — "what if we changed Track B to..." is
   always Berkay's call.
 
 ## What you must always do
 
-- Read `docs/MODULES.md` and the relevant acceptance doc before starting work.
-- Run `pytest -q && mypy --strict src/ && ruff check .` before every commit.
+- Read `docs/INDEX.md`, `docs/MODULES.md` and the relevant acceptance doc
+  before starting work.
+- Run the gate (see "Running tests") before every commit.
 - Produce a paket-mode report when a sub-phase closes.
 - Use `gh` CLI for GitHub operations (issues, PRs, releases) rather than
   asking Berkay to do it in the browser.
@@ -312,25 +367,48 @@ download command is in `docs/phase-3.5-acceptance.md`.
 - Modify `profiles/v5_*.yaml` thresholds during a validation phase.
 - Edit a frozen acceptance doc to match what you ended up doing.
 - Auto-merge anything to `main` without explicit Berkay approval.
-- Run live trading or paper trading code.
+- Run live trading or paper trading code. Nothing may send, route or place
+  an order, whether to a live account or a paper account. The log-only
+  virtual portfolio (registry 5.6), built under its own acceptance doc, only
+  records hypothetical positions for forward scoring. It is not order
+  execution.
 - Make optimistic claims about edge or strategy performance — let the
-  numbers speak via `docs/phase-3.5-results.md`.
+  numbers speak via `docs/INDEX.md` §0.
 
 ---
 
-## Current state (as of this CLAUDE.md being written)
+## Current state (Phase 5.0, 2026-09-14)
 
-- **Phase 3.4 complete**: M21-M28 + closeout + v5_gamma_squeeze.yaml +
-  E2E test + MODULES.md. Tag candidate: `phase-3.4-complete`.
-- **Phase 3.5 contract frozen**: `docs/phase-3.5-acceptance.md` written
-  and committed. 8 sub-phases, falsification framework pinned.
-- **Phase 3.3.7 in progress / just completed**: ThetaData v2→v3 migration.
-  Sub-phases 3.3.7.1-4 committed (mapping, client, historical, live).
-  Sub-phase 3.3.7.5 (smoke test updates + validation doc + closeout)
-  was the last task before this CLAUDE.md.
-- **Phase 3.5.1**: blocked on Phase 3.3.7.5 completion. Once 3.3.7 closes,
-  Berkay runs the 7-step smoke validation locally and commits
-  `docs/phase-3.5.1-validation.md`.
+- **Unified.** Both lineages are unified on `main` by the merge commit
+  `6d1e4ca` (Phase 5.0.3). Contract: `docs/phase-5.0-merge-acceptance.md`.
+  - `main` contributed Phase 3.5.0–3.9: the backtest engine, the CLI
+    screener and the live-verified UW layer.
+  - `phase-3` contributed Phase 3.3.9–3.6 and 4.1–4.43: the replay and
+    verdict engine, the self-derived research track, the webapp and live
+    worker on Railway, and the studies.
+  - `docs/INDEX.md` maps every doc of both lineages.
+- **Gate at the merge commit:** 2150 passed / 30 skipped (key-gated),
+  `mypy --strict src/` clean on 131 source files, ruff clean, `uv lock
+  --check` consistent. `docs/phase-5.0-closeout.md` records the final
+  Phase 5.0 counts.
+- **Edge**, canonical statement (`docs/INDEX.md` §0):
+
+  > No tradeable edge found. Directional UOA confluence (UW-free, v6):
+  > REJECTED (phase-3.6-closeout). Gamma-regime directional and pinning:
+  > REJECTED (4.9, 4.11). Vol premium: untradeable after costs
+  > (edge_to_money.md). Conditioning replication: WEAK (study_D_result.md).
+  > UW-fed Track B (v5_gamma_squeeze with real UW enrichment) has never been
+  > testable, because UW history is about 7 days (phase-3.5.5-status B1).
+
+- **UW layer:** Phase 3.9. Its closeout §7 flags are registry items.
+- **Live:** the FastAPI webapp on Railway, with the live worker in the same
+  process.
+  - Railway deploys `main` after the Phase 5.0 switch.
+  - `phase-3` is frozen; its tip is tagged `phase-3-final` before the switch
+    (contract §3.14).
+- **Next:** the Phase 5.0 closeout, then Phase 5.x in registry order
+  (`docs/INDEX.md` §7). Every 5.x phase needs its own approved acceptance
+  doc before code.
 
 Check `git log --oneline -20` for the precise commit-level state at the
 moment you read this. The acceptance docs are the spec; the git log is
@@ -356,5 +434,10 @@ emerge in real-time. The rules above were earned, not designed. If you
 think one of them is wrong, you might be right — but the chance you are
 right is lower than your prior would suggest, and breaking the rule
 silently is the failure mode that costs the most. Ask Berkay first.
+
+Phase 5.0.13 updated the header counts, reading list, gate, commit flow,
+acceptance-doc naming, real-money rule, D11, phantom results path and
+current state. Berkay approved those edits on 2026-09-14
+(`docs/phase-5.0-merge-acceptance.md` §3.13).
 
 Welcome to the project. Be useful.
