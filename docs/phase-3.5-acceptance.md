@@ -273,7 +273,28 @@ Scope:
      REJECTED
   4. Best cell Sharpe < 0.5 OR walk-forward consistency < 0.75 →
      REJECTED
-- If none of those four trigger:
+- **Sample-size gate (Phase 3.5.2.1 clarification)**: a cell's
+  metrics are only considered "computable" when
+  `closed_trades >= 30`. Cells below this threshold report
+  `INSUFFICIENT` rather than feeding the falsification matrix.
+  - If **all four cells** report INSUFFICIENT → the entire run
+    is INSUFFICIENT; the strategy is **not** rejected, but the
+    verdict is "edge unverified, sample too small". Treat as a
+    Phase 3.5.3 follow-up (extend the download window) rather
+    than as a Phase 3.5.6 verdict.
+  - If only some cells are INSUFFICIENT: the comparison
+    proceeds with the cells that ARE computable, but the
+    `(t1 vs t2)` and `(single vs fusion)` cross-comparisons
+    (scenarios 2 and 3) require BOTH sides of the comparison
+    to be computable. If one side is INSUFFICIENT, that
+    scenario is N/A for this run; verdict relies on whichever
+    scenarios remain.
+  - This rule exists because the Phase 3.2.4 prep target of 30
+    trade/year × 2 year = 60 was based on full Tier-2 × 24-month
+    download. The Phase 3.5.3 18-month + DTE-60 download
+    deliberately trades sample-count for wall-clock; the gate
+    keeps "Sharpe ≥ 0.5 on 4 trades" from masquerading as edge.
+- If none of those four trigger AND the gate doesn't fire:
   - Best cell is reported as "the edge"
   - Best cell metrics committed to `docs/phase-3.5-results.md`
   - Verdict: "edge proven"

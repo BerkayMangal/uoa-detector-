@@ -574,3 +574,64 @@ def test_decode_quote_response_decodes() -> None:
     assert len(rows) == 1
     assert rows[0].bid == Decimal("5.83")
     assert rows[0].ask == Decimal("5.85")
+
+
+def test_decode_quote_response_v3_nested_wrapper() -> None:
+    """Phase 3.3.11: real ThetaData v3 wraps rows inside per-contract
+    objects: ``{"response": [{"contract": {...}, "data": [rows]}]}``.
+    The decoder flattens this shape before per-row v3-dict parsing.
+    """
+    from uoa_detector.sources.thetadata.historical import _decode_quote_response
+    response: dict[str, Any] = {
+        "response": [
+            {
+                "contract": {
+                    "right": "CALL", "expiration": "2026-05-15",
+                    "symbol": "AAPL", "strike": 290.000,
+                },
+                "data": [
+                    {
+                        "ask": 4.95, "bid": 3.35,
+                        "ask_size": 2, "bid_size": 2,
+                        "ask_exchange": 73, "bid_exchange": 46,
+                        "ask_condition": 50, "bid_condition": 50,
+                        "timestamp": "2026-05-08T09:30:01.000",
+                    },
+                ],
+            },
+        ],
+    }
+    rows = _decode_quote_response(response)
+    assert len(rows) == 1
+    assert rows[0].bid == Decimal("3.35")
+    assert rows[0].ask == Decimal("4.95")
+
+
+def test_decode_trade_response_v3_nested_wrapper() -> None:
+    """Phase 3.3.11: same per-contract wrapper applies to /history/trade."""
+    from uoa_detector.sources.thetadata.historical import _decode_trade_response
+    response: dict[str, Any] = {
+        "response": [
+            {
+                "contract": {
+                    "right": "CALL", "expiration": "2026-05-15",
+                    "symbol": "AAPL", "strike": 290.000,
+                },
+                "data": [
+                    {
+                        "sequence": 959510345,
+                        "condition": 125,
+                        "size": 1, "price": 4.18,
+                        "ext_condition1": 255, "ext_condition2": 255,
+                        "ext_condition3": 255, "ext_condition4": 255,
+                        "exchange": 43,
+                        "timestamp": "2026-05-08T09:30:01.289",
+                    },
+                ],
+            },
+        ],
+    }
+    rows = _decode_trade_response(response)
+    assert len(rows) == 1
+    assert rows[0].price == Decimal("4.18")
+    assert rows[0].size == 1

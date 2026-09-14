@@ -52,17 +52,21 @@ class _FakeClient:
 
 @pytest.mark.asyncio
 async def test_list_contracts_calls_correct_endpoint() -> None:
+    """Phase 3.3.10: v3 path with symbol + date params."""
     client = _FakeClient()
     client.stub(
-        "/v2/list/contracts/option/quote",
+        "/v3/option/list/contracts/quote",
         {"data": []},
     )
     lister = ThetaDataContractLister(client=client)  # type: ignore[arg-type]
-    await lister.list_contracts("aapl")
+    await lister.list_contracts(
+        "aapl",
+        filters=ContractListFilter(as_of_date=date(2024, 1, 15)),
+    )
     assert len(client.calls) == 1
     path, params = client.calls[0]
-    assert path == "/v2/list/contracts/option/quote"
-    assert params == {"root": "AAPL"}  # uppercased
+    assert path == "/v3/option/list/contracts/quote"
+    assert params == {"symbol": "AAPL", "date": "20240115"}
 
 
 # ---------------------------------------------------------------------------
@@ -74,7 +78,7 @@ async def test_list_contracts_calls_correct_endpoint() -> None:
 async def test_list_contracts_parses_dict_rows() -> None:
     client = _FakeClient()
     client.stub(
-        "/v2/list/contracts/option/quote",
+        "/v3/option/list/contracts/quote",
         {"data": [
             {"expiration": 20240216, "strike": 1500000, "right": "C"},
             {"expiration": "20240216", "strike": "1550000", "right": "P"},
@@ -97,7 +101,7 @@ async def test_list_contracts_parses_array_rows() -> None:
     """Some ThetaData shapes return rows as [exp, strike, right, ...]."""
     client = _FakeClient()
     client.stub(
-        "/v2/list/contracts/option/quote",
+        "/v3/option/list/contracts/quote",
         {"data": [
             [20240216, 1500000, "C", "extra"],
             [20240216, 1550000, "P"],
@@ -112,9 +116,36 @@ async def test_list_contracts_parses_array_rows() -> None:
 
 
 @pytest.mark.asyncio
+async def test_list_contracts_parses_v3_response_schema() -> None:
+    """Phase 3.3.10: v3 ships {"response": [...]} with ISO date,
+    float dollar strike, CALL|PUT right.
+    """
+    client = _FakeClient()
+    client.stub(
+        "/v3/option/list/contracts/quote",
+        {"response": [
+            {"symbol": "AAPL", "expiration": "2026-07-17",
+             "strike": 210.0, "right": "CALL"},
+            {"symbol": "AAPL", "expiration": "2026-07-17",
+             "strike": 210.0, "right": "PUT"},
+        ]},
+    )
+    lister = ThetaDataContractLister(client=client)  # type: ignore[arg-type]
+    contracts = await lister.list_contracts(
+        "AAPL",
+        filters=ContractListFilter(as_of_date=date(2026, 5, 12)),
+    )
+    assert len(contracts) == 2
+    assert contracts[0].expiry == date(2026, 7, 17)
+    assert contracts[0].strike_dollars == Decimal("210.0")
+    assert contracts[0].right == "C"
+    assert contracts[1].right == "P"
+
+
+@pytest.mark.asyncio
 async def test_list_contracts_empty_data_returns_empty() -> None:
     client = _FakeClient()
-    client.stub("/v2/list/contracts/option/quote", {"data": []})
+    client.stub("/v3/option/list/contracts/quote", {"data": []})
     lister = ThetaDataContractLister(client=client)  # type: ignore[arg-type]
     assert await lister.list_contracts("AAPL") == []
 
@@ -123,7 +154,7 @@ async def test_list_contracts_empty_data_returns_empty() -> None:
 async def test_list_contracts_malformed_row_dropped() -> None:
     client = _FakeClient()
     client.stub(
-        "/v2/list/contracts/option/quote",
+        "/v3/option/list/contracts/quote",
         {"data": [
             {"expiration": "garbage"},  # bad
             {"expiration": 20240216, "strike": 150000, "right": "C"},
@@ -151,7 +182,7 @@ def _make_response(rows: list[dict[str, Any]]) -> dict[str, Any]:
 async def test_rights_filter_default_includes_both() -> None:
     client = _FakeClient()
     client.stub(
-        "/v2/list/contracts/option/quote",
+        "/v3/option/list/contracts/quote",
         _make_response([
             {"expiration": 20240216, "strike": 150000, "right": "C"},
             {"expiration": 20240216, "strike": 150000, "right": "P"},
@@ -168,7 +199,7 @@ async def test_rights_filter_default_includes_both() -> None:
 async def test_rights_filter_calls_only() -> None:
     client = _FakeClient()
     client.stub(
-        "/v2/list/contracts/option/quote",
+        "/v3/option/list/contracts/quote",
         _make_response([
             {"expiration": 20240216, "strike": 150000, "right": "C"},
             {"expiration": 20240216, "strike": 150000, "right": "P"},
@@ -190,7 +221,7 @@ async def test_dte_filter_min_dte() -> None:
     """min_dte=14 drops contracts expiring within 14 days of as_of."""
     client = _FakeClient()
     client.stub(
-        "/v2/list/contracts/option/quote",
+        "/v3/option/list/contracts/quote",
         _make_response([
             {"expiration": 20240105, "strike": 150000, "right": "C"},  # 4 dte
             {"expiration": 20240216, "strike": 150000, "right": "C"},  # 46 dte
@@ -212,7 +243,7 @@ async def test_dte_filter_max_dte() -> None:
     """max_dte=30 drops contracts expiring more than 30 days out."""
     client = _FakeClient()
     client.stub(
-        "/v2/list/contracts/option/quote",
+        "/v3/option/list/contracts/quote",
         _make_response([
             {"expiration": 20240115, "strike": 150000, "right": "C"},  # 14 dte
             {"expiration": 20240216, "strike": 150000, "right": "C"},  # 46 dte
@@ -234,7 +265,7 @@ async def test_max_contracts_cap_applied() -> None:
     """max_contracts=2 truncates after deterministic sort."""
     client = _FakeClient()
     client.stub(
-        "/v2/list/contracts/option/quote",
+        "/v3/option/list/contracts/quote",
         _make_response([
             {"expiration": 20240216, "strike": 160000, "right": "C"},
             {"expiration": 20240216, "strike": 150000, "right": "C"},

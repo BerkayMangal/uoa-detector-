@@ -528,7 +528,12 @@ async def test_canonical_exchange_is_empty_for_multi_source_bucket() -> None:
 # ---------------------------------------------------------------------------
 
 @pytest.mark.asyncio
-async def test_no_source_supplies_iv_raises() -> None:
+async def test_no_source_supplies_iv_yields_none() -> None:
+    """Phase 3.5.5.3: a bucket with no IV on any source no longer
+    raises — the canonical print carries ``implied_volatility=None``.
+    A pure ThetaData replay has no historical print-level IV; print
+    IV has no downstream scoring consumer, so None is the honest
+    value rather than a rejection or a fabricated default."""
     raw_no_iv = RawPrint(
         source_id="a",
         source_event_id="a-0",
@@ -552,12 +557,17 @@ async def test_no_source_supplies_iv_raises() -> None:
     src = SyntheticRawFlowSource("a", [raw_no_iv])
     fusion = SourceFusion([src], _params(), force_multi_source=True)
 
-    with pytest.raises(DataSourceError, match="implied_volatility"):
-        _ = [p async for p in fusion.stream()]
+    fused = [p async for p in fusion.stream()]
+    assert len(fused) == 1
+    assert fused[0].implied_volatility is None
 
 
 @pytest.mark.asyncio
-async def test_no_source_supplies_oi_raises() -> None:
+async def test_no_source_supplies_oi_yields_none() -> None:
+    """Phase 3.5.5.3: a bucket with no OI on any source no longer
+    raises — the canonical print carries ``open_interest=None``. The
+    thin-OI penalty skips on None (unknown is not 'thin'); M28's OI
+    delta re-fetches via its provider rather than the print."""
     raw_no_oi = RawPrint(
         source_id="a",
         source_event_id="a-0",
@@ -581,8 +591,9 @@ async def test_no_source_supplies_oi_raises() -> None:
     src = SyntheticRawFlowSource("a", [raw_no_oi])
     fusion = SourceFusion([src], _params(), force_multi_source=True)
 
-    with pytest.raises(DataSourceError, match="open_interest"):
-        _ = [p async for p in fusion.stream()]
+    fused = [p async for p in fusion.stream()]
+    assert len(fused) == 1
+    assert fused[0].open_interest is None
 
 
 # ---------------------------------------------------------------------------

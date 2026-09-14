@@ -94,7 +94,11 @@ class Pipeline:
             force_multi_source=force_multi_source,
         )
         self._stages = list(stages)
-        self._store = store or BacktestStore()
+        # Phase 3.5.4 bug fix: empty BacktestStore has __len__=0 which
+        # is falsy, so ``store or BacktestStore()`` discarded the
+        # caller's freshly-constructed store and made a private one.
+        # Use explicit None-check so the caller's store is honoured.
+        self._store = store if store is not None else BacktestStore()
         self._ctx = context or PipelineContext(profile=self._profile)
         # Engines built from the init-time profile. When resolver is provided,
         # process_one rebuilds these per event from the snapshot (engines

@@ -44,7 +44,7 @@ import argparse
 import asyncio
 import logging
 import sys
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 
 from uoa_detector.calibration import load_default_profile
@@ -68,6 +68,7 @@ from uoa_detector.historical.validation import (
     manifest_path,
     save_manifest,
 )
+from uoa_detector.sources._http_base import RetryPolicy
 from uoa_detector.sources.thetadata.client import ThetaDataClient
 from uoa_detector.sources.thetadata.historical import (
     ContextSnapshot,
@@ -200,6 +201,16 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Cap contracts per ticker (sandbox sanity check).",
     )
     p.add_argument(
+        "--max-dte", type=int, default=None,
+        help=(
+            "Skip contracts whose expiry is further than MAX_DTE days "
+            "from the download date. Track B's strategy profile "
+            "penalises 60+ DTE to zero (v5_gamma_squeeze leap_threshold=60); "
+            "passing --max-dte 60 cuts the download universe in half "
+            "without losing any contract Track B would actually trade."
+        ),
+    )
+    p.add_argument(
         "--dry-run", action="store_true",
         help="List tasks; do not call any HTTP endpoints.",
     )
@@ -314,14 +325,57 @@ async def _run(args: argparse.Namespace) -> int:
     client = ThetaDataClient(
         api_key=api_key,
         settings=profile.data_sources.thetadata,
+        # Phase 3.5.3.4: the circuit breaker is a live-trading safety
+        # device (Phase 3.3.2) — wrong tool for a multi-day batch
+        # download. A handful of transient HTTP 500s (Terminal
+        # hiccups under concurrency) would trip the breaker and
+        # cascade-fail every remaining ticker-month with
+        # CircuitBreakerOpenError. Transient errors are already
+        # handled per-request by RetryPolicy. Set the breaker
+        # threshold effectively infinite for the download path so
+        # one bad contract never kills the whole run.
+        circuit_breaker_threshold=10**9,
+        # Phase 3.5.3.5: 5 attempts (was default 3) — transient
+        # ThetaData HTTP 5xx under sustained concurrency clears on
+        # retry the overwhelming majority of the time.
+        retry=RetryPolicy(max_attempts=5),
     )
     lister = ThetaDataContractLister(client=client)
-    contract_filter = ContractListFilter(
-        max_contracts=args.max_contracts,
-    )
+    # Phase 3.5.3.1: per-(ticker, month) contract resolution. Each
+    # ticker-month task gets a freshly-anchored ContractListFilter
+    # so the lister returns only contracts actually listed in that
+    # month. Combined with the downloader's per-(contract, day) DTE
+    # guard, this kills the 472 storm seen pre-3.5.3.1 (contracts
+    # listed at end_date but not yet listed during the 18-month
+    # backfill window).
+    _contracts_cache: dict[tuple[str, int, int], list[ContractSpec]] = {}
 
-    async def _contracts_for_ticker(ticker: str) -> list[ContractSpec]:
-        return await lister.list_contracts(ticker, filters=contract_filter)
+    async def _contracts_for_ticker(
+        ticker: str, asof: date,
+    ) -> list[ContractSpec]:
+        key = (ticker.upper(), asof.year, asof.month)
+        cached = _contracts_cache.get(key)
+        if cached is not None:
+            return cached
+        # Phase 3.5.3.8: ThetaData's contract-list endpoint returns
+        # "no data" on non-trading days (weekends, market holidays).
+        # The orchestrator anchors at the 15th of the month, which is
+        # a weekend ~2/7 of the time — that yielded 0 contracts and
+        # stamped the whole ticker-month "done" with zero rows. Walk
+        # nearby days until one lands on a trading day with listings.
+        contracts: list[ContractSpec] = []
+        for delta in (0, 1, 2, 3, -1, -2, -3, 4, 5):
+            cand = asof + timedelta(days=delta)
+            f = ContractListFilter(
+                max_contracts=args.max_contracts,
+                max_dte=args.max_dte,
+                as_of_date=cand,
+            )
+            contracts = await lister.list_contracts(ticker, filters=f)
+            if contracts:
+                break
+        _contracts_cache[key] = contracts
+        return contracts
 
     async def _snapshot_for(c: ContractSpec, d: date) -> ContextSnapshot:
         return await _default_snapshot_for(client, c, d)
@@ -329,6 +383,7 @@ async def _run(args: argparse.Namespace) -> int:
     downloader = ThetaDataHistoricalDownloader(
         client=client,
         concurrency=args.concurrency,
+        max_dte=args.max_dte,
     )
     orch = HistoricalOrchestrator(
         downloader=downloader,

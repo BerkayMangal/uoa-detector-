@@ -71,8 +71,10 @@ class PenaltyEngine:
                     )
                 )
 
-        # 4) Thin OI
-        if pr.open_interest < t.thin_oi_threshold:
+        # 4) Thin OI — skipped when OI is unknown (None): a pure
+        # ThetaData replay has no open-interest, and "unknown" must
+        # not be scored as "thin".
+        if pr.open_interest is not None and pr.open_interest < t.thin_oi_threshold:
             penalties.append(
                 AppliedPenalty(
                     name="thin_oi",

@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block content %}
+
+<h2 class="text-xl font-bold text-white mb-1">Gamma &amp; vol board</h2>
+<p class="text-sm text-gray-400 mb-4 max-w-3xl">
+  Dealer-gamma structure per name, plus the one edge our research found: the
+  <strong class="text-amber-300">vol-risk premium</strong>. In long-gamma names with rich IV,
+  implied vol systematically overshoots what follows (sell-vol survived the full robustness
+  gauntlet, t=2.64 out-of-overlap). <strong>Not</strong> a directional signal — gamma direction
+  and pinning were both rejected. And vol-selling carries fat tail risk: only with
+  <strong>defined-risk</strong> structures and size that survives a vol spike.
+</p>
+
+<div class="overflow-x-auto rounded-lg border border-gray-800">
+<table class="w-full text-sm">
+  <thead class="text-xs text-gray-500 bg-gray-900/60 border-b border-gray-800">
+    <tr>
+      <th class="text-left px-3 py-2">Ticker</th>
+      <th class="text-left">Gamma regime</th>
+      <th class="text-right">Spot</th>
+      <th class="text-right">Flip</th>
+      <th class="text-right">Put wall</th>
+      <th class="text-right">Call wall</th>
+      <th class="text-right">IV</th>
+      <th class="text-right pr-3">IV rank</th>
+      <th class="text-left px-3">Vol read</th>
+    </tr>
+  </thead>
+  <tbody>
+  {% for g in rows %}
+    {% set vc = {'sell':'#f59e0b','buy':'#38bdf8','neutral':'#6b7280'}[g.vol_signal] %}
+    <tr class="border-b border-gray-900 hover:bg-gray-900/40">
+      <td class="px-3 py-2 font-bold text-white">{{ g.ticker }}</td>
+      <td>
+        <span class="px-2 py-0.5 rounded-full text-xs font-semibold {{ 'bg-amber-900/40 text-amber-300' if g.regime=='short' else 'bg-gray-800 text-gray-400' }}">
+          {{ '⚡ short — amplifies' if g.regime=='short' else 'long — suppresses' }}
+        </span>
+      </td>
+      <td class="text-right text-gray-200">${{ '%.2f'|format(g.spot) }}</td>
+      <td class="text-right text-gray-400">{{ '${:.0f}'.format(g.flip) if g.flip else '—' }}
+        {%- if g.flip %}<span class="text-gray-600 text-xs"> {{ '↑' if g.spot > g.flip else '↓' }}</span>{% endif %}</td>
+      <td class="text-right text-red-300">{{ '${:.0f}'.format(g.put_wall) if g.put_wall else '—' }}</td>
+      <td class="text-right text-emerald-300">{{ '${:.0f}'.format(g.call_wall) if g.call_wall else '—' }}</td>
+      <td class="text-right text-gray-300">{{ '%.0f%%'|format(g.atm_iv*100) if g.atm_iv else '—' }}</td>
+      <td class="text-right pr-3 font-semibold" style="color:{{ vc }}">{{ '%.0f%%'|format(g.iv_pct*100) if g.iv_pct is not none else '—' }}</td>
+      <td class="px-3">
+        {% if g.vol_signal != 'neutral' %}
+        <span class="px-2 py-0.5 rounded text-xs font-semibold" style="background:{{ vc }}22;color:{{ vc }};border:1px solid {{ vc }}55">{{ g.vol_label }}</span>
+        {% else %}<span class="text-gray-600 text-xs">{{ g.vol_label }}</span>{% endif %}
+      </td>
+    </tr>
+  {% endfor %}
+  {% if not rows %}<tr><td colspan="9" class="px-3 py-6 text-center text-gray-500">No gamma data yet. Run <code>scripts/gamma_snapshot.py</code> with the chain available.</td></tr>{% endif %}
+  </tbody>
+</table>
+</div>
+
+<p class="mt-3 text-xs text-gray-600">
+  Refreshed by the daily snapshot job from the ThetaData chain (UW's gamma endpoints aren't in our tier).
+  Flip ↑ = spot above flip (calmer / long-gamma zone); ↓ = below (jumpier).
+</p>
+
+{% endblock %}

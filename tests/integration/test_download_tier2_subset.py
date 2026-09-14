@@ -250,7 +250,7 @@ async def test_subset_run_full_orchestrator_state_and_manifest(
     state.initialize_tasks(tasks)
     save_state(state, sp)
 
-    async def _contracts(_t: str) -> list[ContractSpec]:
+    async def _contracts(_t: str, _asof: date) -> list[ContractSpec]:
         return [ContractSpec(
             ticker=_t, expiry=date(2024, 2, 16),
             strike_dollars=Decimal("150.00"), right="C",
@@ -396,7 +396,7 @@ async def test_resume_after_partial_failure(
     # Round 1: MSFT contracts lookup fails
     fail_msft = [True]
 
-    async def _contracts_round1(t: str) -> list[ContractSpec]:
+    async def _contracts_round1(t: str, _asof: date) -> list[ContractSpec]:
         if t.upper() == "MSFT" and fail_msft[0]:
             msg = "MSFT failed"
             raise RuntimeError(msg)

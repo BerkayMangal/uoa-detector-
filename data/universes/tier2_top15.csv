@@ -1,0 +1,16 @@
+ticker,sector,market_cap_usd_b_approx,options_volume_30d_avg_approx,notes
+PLTR,tech_software,~50,~250000,large but high gamma activity; flag for tier review
+COIN,fintech_crypto,~50,~180000,upper edge; high gamma flow
+MARA,crypto_mining,~5,~150000,high gamma activity
+RIOT,crypto_mining,~3,~110000,
+PLUG,energy_hydrogen,~3,~100000,high retail activity
+SNAP,tech_social,~17,~95000,
+RIVN,auto_ev,~12,~85000,
+SOFI,fintech,~10,~80000,
+DKNG,gaming_betting,~17,~80000,
+AI,tech_ai,~3,~75000,high gamma activity despite small cap
+HOOD,fintech_brokerage,~12,~70000,
+ABNB,tech_travel,~80,~70000,large; flag for tier review
+LCID,auto_ev,~10,~70000,
+CRWD,tech_security,~80,~70000,large; flag for review
+RBLX,tech_gaming,~25,~60000,upper edge of tier

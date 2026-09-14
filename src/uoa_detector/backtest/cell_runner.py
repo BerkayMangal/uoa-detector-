@@ -49,6 +49,7 @@ import csv
 import logging
 from dataclasses import dataclass
 from datetime import datetime
+from decimal import Decimal
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal
 
@@ -71,6 +72,7 @@ if TYPE_CHECKING:
     from uoa_detector.backtest.protocol import BacktestStoreProtocol
     from uoa_detector.backtest.store import StoredSignal
     from uoa_detector.calibration.profile import CalibrationProfile
+    from uoa_detector.pipeline.stage import EnrichmentStage
 
 
 _logger = logging.getLogger(__name__)
@@ -449,3 +451,454 @@ def historical_trade_producer(
 def noop_pnl_signal_to_trade(signal: StoredSignal) -> RealizedTrade:
     """Convert a StoredSignal to a NoOp open trade (helper for callers)."""
     return NoOpPnLProvider().provide(signal)
+
+
+# ---------------------------------------------------------------------------
+# Synthetic trade producer — Phase 3.5.4 4-cell pre-flight backtest
+# ---------------------------------------------------------------------------
+
+
+def synthetic_trade_producer(
+    cell: CellSpec,
+    windows: tuple[WalkForwardWindow, ...],
+    profile: CalibrationProfile,
+    data: BacktestDataHandle | None = None,
+) -> list[RealizedTrade]:
+    """Drive the default synthetic scenario through the full Phase 3.4
+    pipeline, then convert every StoredSignal into a NoOp open trade.
+
+    Phase 3.5.4: this is a **wiring smoke** producer, not a real PnL
+    engine. The four cells (tier1_single, tier1_fusion, tier2_single,
+    tier2_fusion) share the same synthetic prints; the trade count
+    is identical across cells. The 4-cell runner exercises:
+
+      - SyntheticRawFlowSource → SourceFusion → all 13 stages
+      - StoredSignal write-through per event
+      - RealizedTrade construction via NoOpPnLProvider
+        (``realized_r=None``, ``exit_reason="holding_window_open"``)
+      - Walk-forward windowing + metric aggregation surface
+
+    Real PnL is Phase 3.5.5's job (the historical replay run that
+    consumes the Phase 3.5.3 download). For 3.5.4 the only
+    invariant we test is "≥ 1 trade reaches metrics per cell so the
+    pipeline → store → producer → metrics chain works end-to-end".
+    """
+    # Imports are scoped here so this module's import graph stays
+    # narrow (cli.py already pulls cell_runner at startup; we don't
+    # want the synthetic-source machinery loaded for every CLI run).
+    import asyncio
+
+    from uoa_detector.backtest.store import BacktestStore
+    from uoa_detector.pipeline.orchestrator import Pipeline
+    from uoa_detector.pipeline.stages import default_stage_pipeline
+    from uoa_detector.sources.scenarios import default_scenario_prints
+    from uoa_detector.sources.synthetic import (
+        SyntheticRawFlowSource,
+        to_raw_print,
+    )
+
+    del cell, windows, data  # producer is cell-agnostic in 3.5.4
+
+    raw_prints = [
+        to_raw_print(p, source_id="synthetic")
+        for p in default_scenario_prints()
+    ]
+    source = SyntheticRawFlowSource("synthetic", raw_prints)
+    store = BacktestStore()
+    pipeline = Pipeline(
+        sources=[source],
+        stages=default_stage_pipeline(),
+        profile=profile,
+        store=store,
+    )
+    asyncio.run(pipeline.run())
+
+    pnl = NoOpPnLProvider()
+    return [pnl.provide(sig) for sig in store.all()]
+
+
+# ---------------------------------------------------------------------------
+# Replay trade producer — Phase 3.5.5 real-data 4-cell backtest
+# ---------------------------------------------------------------------------
+
+
+def fusion_stages_with_uw(
+    uw_client: object,
+    uw_settings: object,
+) -> list[EnrichmentStage]:
+    """Build the full 13-stage pipeline with M21-M27 wired to real UW.
+
+    Phase 3.5.5 B3: the enrichment stages are normally constructed with
+    NoOp providers (``default_stage_pipeline``). This builds them with
+    live Unusual Whales providers — the (B2) as-of providers — so the
+    fusion cells actually exercise the 8-axis confluence.
+
+    ``uw_client`` is a ``UnusualWhalesClient``; ``uw_settings`` an
+    ``UnusualWhalesSettings``. Typed as ``object`` here only to keep
+    this module's import graph narrow — the providers validate.
+    """
+    from uoa_detector.pipeline.stages import (
+        ClusterDecayStage,
+        DarkPoolStage,
+        DealerGammaStage,
+        DTEDecayStage,
+        EventCalendarStage,
+        IVExhaustionStage,
+        OpeningClosingStage,
+        PriceConfirmationStage,
+        RelativePremiumStage,
+        SectorPeerStage,
+        SweepBlockStage,
+        TemporalClusterStage,
+        TimeOfDayStage,
+    )
+    from uoa_detector.sources.unusual_whales.providers.catalyst_calendar import (
+        UnusualWhalesCatalystCalendarProvider,
+    )
+    from uoa_detector.sources.unusual_whales.providers.dark_pool import (
+        UnusualWhalesDarkPoolProvider,
+    )
+    from uoa_detector.sources.unusual_whales.providers.dealer_gamma import (
+        UnusualWhalesDealerGammaProvider,
+    )
+    from uoa_detector.sources.unusual_whales.providers.iv_history import (
+        UnusualWhalesIVHistoryProvider,
+    )
+    from uoa_detector.sources.unusual_whales.providers.open_interest import (
+        UnusualWhalesOpenInterestProvider,
+    )
+    from uoa_detector.sources.unusual_whales.providers.price_action import (
+        UnusualWhalesPriceActionProvider,
+    )
+    from uoa_detector.sources.unusual_whales.providers.sector_peer import (
+        UnusualWhalesPeerFlowProvider,
+        UnusualWhalesSectorMapProvider,
+    )
+
+    c = uw_client
+    s = uw_settings
+    catalyst = UnusualWhalesCatalystCalendarProvider(client=c, settings=s)  # type: ignore[arg-type]
+    return [
+        TimeOfDayStage(),
+        DTEDecayStage(),
+        SweepBlockStage(),
+        RelativePremiumStage(),
+        DealerGammaStage(
+            UnusualWhalesDealerGammaProvider(client=c, settings=s),  # type: ignore[arg-type]
+        ),
+        EventCalendarStage(catalyst),
+        PriceConfirmationStage(
+            UnusualWhalesPriceActionProvider(client=c, settings=s),  # type: ignore[arg-type]
+        ),
+        IVExhaustionStage(
+            UnusualWhalesIVHistoryProvider(client=c, settings=s),  # type: ignore[arg-type]
+            catalyst,
+        ),
+        SectorPeerStage(
+            UnusualWhalesSectorMapProvider(client=c, settings=s),  # type: ignore[arg-type]
+            UnusualWhalesPeerFlowProvider(client=c, settings=s),  # type: ignore[arg-type]
+        ),
+        DarkPoolStage(
+            UnusualWhalesDarkPoolProvider(client=c, settings=s),  # type: ignore[arg-type]
+        ),
+        OpeningClosingStage(
+            UnusualWhalesOpenInterestProvider(client=c, settings=s),  # type: ignore[arg-type]
+        ),
+        TemporalClusterStage(),
+        ClusterDecayStage(),
+    ]
+
+
+def fusion_stages_with_thetadata(
+    snapshots_dir: Path,
+    spot_series_dir: Path | None = None,
+    catalyst_csv: Path | None = None,
+) -> list[EnrichmentStage]:
+    """Build the fusion pipeline with the self-derived axes (Phase 3.6) —
+    no Unusual Whales.
+
+    Dealer gamma (M21), IV regime (M24) and OI delta (M27) come from the
+    ThetaData chain snapshots. ``spot_series_dir`` adds the
+    price-confirmation axis (M23, weighted) from the intraday spot series.
+    ``catalyst_csv`` adds the event-calendar axis (M22, weighted) from the
+    committed earnings calendar — and feeds M24's post-earnings penalty
+    gate. Remaining axes (sector, dark pool) stay NoOp. Stage scoring is
+    untouched — only the data source changes.
+    """
+    from uoa_detector.pipeline.stages import (
+        DealerGammaStage,
+        EventCalendarStage,
+        IVExhaustionStage,
+        OpeningClosingStage,
+        PriceConfirmationStage,
+        default_stage_pipeline,
+    )
+    from uoa_detector.sources.thetadata_derived.catalyst_calendar import (
+        CSVCatalystCalendarProvider,
+    )
+    from uoa_detector.sources.thetadata_derived.chain_history import (
+        ChainHistory,
+    )
+    from uoa_detector.sources.thetadata_derived.dealer_gamma import (
+        ThetaDataDealerPositioningProvider,
+    )
+    from uoa_detector.sources.thetadata_derived.iv_oi import (
+        ThetaDataIVHistoryProvider,
+        ThetaDataOpenInterestProvider,
+    )
+    from uoa_detector.sources.thetadata_derived.price_action import (
+        SpotSeries,
+        ThetaDataPriceActionProvider,
+    )
+    from uoa_detector.sources.thetadata_derived.snapshot_reader import (
+        DailyChainSnapshotSource,
+    )
+
+    gex = ThetaDataDealerPositioningProvider(
+        DailyChainSnapshotSource(snapshots_dir),
+    )
+    history = ChainHistory(snapshots_dir)
+    iv_provider = ThetaDataIVHistoryProvider(history)
+    oi_provider = ThetaDataOpenInterestProvider(history)
+    price_provider = (
+        ThetaDataPriceActionProvider(SpotSeries(spot_series_dir))
+        if spot_series_dir is not None else None
+    )
+    catalyst = (
+        CSVCatalystCalendarProvider(catalyst_csv)
+        if catalyst_csv is not None else None
+    )
+
+    stages: list[EnrichmentStage] = []
+    for st in default_stage_pipeline():
+        if isinstance(st, DealerGammaStage):
+            stages.append(DealerGammaStage(gex))
+        elif isinstance(st, IVExhaustionStage):
+            stages.append(
+                IVExhaustionStage(iv_provider, catalyst)
+                if catalyst is not None else IVExhaustionStage(iv_provider),
+            )
+        elif isinstance(st, OpeningClosingStage):
+            stages.append(OpeningClosingStage(oi_provider))
+        elif isinstance(st, PriceConfirmationStage) and price_provider is not None:
+            stages.append(PriceConfirmationStage(price_provider))
+        elif isinstance(st, EventCalendarStage) and catalyst is not None:
+            stages.append(EventCalendarStage(catalyst))
+        else:
+            stages.append(st)
+    return stages
+
+
+def _replay_stages(
+    fusion: CellFusion,
+    uw_client: object | None = None,
+    uw_settings: object | None = None,
+    chain_snapshots_dir: Path | None = None,
+    spot_series_dir: Path | None = None,
+    catalyst_csv: Path | None = None,
+) -> list[EnrichmentStage]:
+    """Return the stage list for a cell's fusion coordinate.
+
+    ``single`` runs only the core-flow stages — the ones that score
+    the raw UOA print without external-source corroboration
+    (time-of-day, DTE decay, sweep/block, relative premium, temporal
+    clustering + decay).
+
+    ``fusion`` runs the full Phase 3.4 pipeline. When ``uw_client`` is
+    supplied (Phase 3.5.5 B3) the M21-M27 enrichment stages use real
+    Unusual Whales providers; without it they fall back to the NoOp
+    providers in ``default_stage_pipeline`` (enrichment plumbing runs
+    but scores are neutral — a wiring smoke, not a verdict).
+    """
+    from uoa_detector.pipeline.stages import (
+        ClusterDecayStage,
+        DTEDecayStage,
+        RelativePremiumStage,
+        SweepBlockStage,
+        TemporalClusterStage,
+        TimeOfDayStage,
+        default_stage_pipeline,
+    )
+
+    if fusion == "fusion":
+        if chain_snapshots_dir is not None:
+            return fusion_stages_with_thetadata(
+                chain_snapshots_dir, spot_series_dir, catalyst_csv,
+            )
+        if uw_client is not None and uw_settings is not None:
+            return fusion_stages_with_uw(uw_client, uw_settings)
+        return list(default_stage_pipeline())
+    # Core-flow subset, in the same relative order as the full pipeline.
+    return [
+        TimeOfDayStage(),
+        DTEDecayStage(),
+        SweepBlockStage(),
+        RelativePremiumStage(),
+        TemporalClusterStage(),
+        ClusterDecayStage(),
+    ]
+
+
+def replay_trade_producer(
+    data_dir: Path,
+    *,
+    tier1_tickers: tuple[str, ...],
+    tier2_tickers: tuple[str, ...],
+    medians_csv: Path | None = None,
+    source_id: str = "thetadata",
+    use_uw_enrichment: bool = False,
+    chain_snapshots_dir: Path | None = None,
+    spot_series_dir: Path | None = None,
+    catalyst_csv: Path | None = None,
+    min_premium_usd: Decimal | None = None,
+) -> Callable[
+    [
+        CellSpec,
+        tuple[WalkForwardWindow, ...],
+        CalibrationProfile,
+        BacktestDataHandle | None,
+    ],
+    list[RealizedTrade],
+]:
+    """Build a TradeProducer that replays historical parquet data.
+
+    Phase 3.5.5: the real-data counterpart of ``synthetic_trade_producer``.
+    For each cell it streams the cell's universe through a
+    ``ParquetReplaySource``, drives the Phase 3.4 pipeline (stage set
+    chosen by ``cell.fusion`` — see ``_replay_stages``), then realizes
+    every stored signal into a ``RealizedTrade`` via ``SimplePnLProvider``
+    with exit bids from ``ParquetExitQuoteProvider``.
+
+    ``data_dir`` is the per-source replay root
+    (``data/historical/bulk``); ``tier1_tickers`` / ``tier2_tickers``
+    are the downloaded universes (the reduced 9 / 15-name lists, NOT
+    the cell runner's default tier1_anchor / tier2_starter — those are
+    not what was downloaded).
+
+    ``medians_csv`` feeds M37 (relative premium): without a per-ticker
+    median trade premium every print scores as non-unusual and the core
+    flow score collapses. When None, M37 falls back to its NoOp provider
+    (``relative_premium_score=None``). Generate the CSV with
+    ``scripts/compute_medians.py``.
+
+    ``use_uw_enrichment`` (Phase 3.5.5 B3): when True, the fusion cells'
+    M21-M27 stages use real Unusual Whales providers — the (B2) as-of
+    providers. Default False keeps fusion on NoOp enrichment (a wiring
+    smoke). Set True only once UW historical data access is granted;
+    before that the providers return only the last few days and a
+    fusion run would be both API-heavy and un-enriched for the
+    backtest period.
+
+    ``min_premium_usd`` (Phase 3.5.5 A5): candidate pre-filter — prints
+    with ``premium_paid`` below it are skipped during replay so a
+    full-universe run processes the unusual-size trades, not all ~245M
+    retail prints. Default None = no filter. The threshold value is a
+    modelling choice (it interacts with M38 cluster counts); pick it
+    deliberately, do not leave it to chance.
+    """
+
+    def _producer(
+        cell: CellSpec,
+        windows: tuple[WalkForwardWindow, ...],
+        profile: CalibrationProfile,
+        data: BacktestDataHandle | None = None,
+    ) -> list[RealizedTrade]:
+        # The replay root is bound at build time (``data_dir``); the
+        # run-level ``BacktestDataHandle`` is not used by this producer.
+        del data
+        import asyncio
+
+        from uoa_detector.backtest.parquet_exit_quote import (
+            ParquetExitQuoteProvider,
+        )
+        from uoa_detector.backtest.simple_pnl import SimplePnLProvider
+        from uoa_detector.backtest.store import BacktestStore
+        from uoa_detector.pipeline.orchestrator import Pipeline
+        from uoa_detector.pipeline.stage import PipelineContext
+        from uoa_detector.providers.median_trade_size import (
+            CSVMedianTradeSizeProvider,
+        )
+        from uoa_detector.sources.parquet_replay import ParquetReplaySource
+
+        tickers = (
+            tier1_tickers if cell.universe == "tier1" else tier2_tickers
+        )
+        period_start = windows[0].start
+        period_end = windows[-1].end
+
+        source = ParquetReplaySource(
+            source_id,
+            data_dir,
+            tickers=list(tickers),
+            from_month=f"{period_start:%Y-%m}",
+            to_month=f"{period_end:%Y-%m}",
+            min_premium_usd=min_premium_usd,
+        )
+        context = PipelineContext(profile=profile)
+        if medians_csv is not None:
+            context = PipelineContext(
+                profile=profile,
+                median_trade_size_provider=CSVMedianTradeSizeProvider(
+                    medians_csv,
+                ),
+            )
+
+        # B3: build a UW client for the fusion cells when enrichment is
+        # enabled. None for single cells / when disabled.
+        uw_client = None
+        if use_uw_enrichment and cell.fusion == "fusion":
+            from uoa_detector.config.credentials import Credentials
+            from uoa_detector.sources.unusual_whales.client import (
+                UnusualWhalesClient,
+            )
+
+            uw_client = UnusualWhalesClient(
+                api_key=Credentials().require_unusual_whales_api_key(),
+                settings=profile.data_sources.unusual_whales,
+            )
+
+        store = BacktestStore()
+        pipeline = Pipeline(
+            sources=[source],
+            stages=_replay_stages(
+                cell.fusion,
+                uw_client,
+                profile.data_sources.unusual_whales,
+                chain_snapshots_dir,
+                spot_series_dir,
+                catalyst_csv,
+            ),
+            profile=profile,
+            store=store,
+            context=context,
+            # Phase 3.5.5 A3: route the single ThetaData source through
+            # windowed fusion. Fusion buckets by contract key, so the
+            # several exchange-legs of one sweep land in one bucket —
+            # giving the canonical print exchanges_seen >= 2, which is
+            # what M34 needs to classify a multi-venue sweep. The
+            # single-source fast path emits one event per print
+            # (exchanges_seen == 1) and can never see a sweep.
+            force_multi_source=True,
+        )
+
+        async def _run_and_close() -> None:
+            try:
+                await pipeline.run()
+            finally:
+                if uw_client is not None:
+                    await uw_client.aclose()
+
+        asyncio.run(_run_and_close())
+
+        pnl = SimplePnLProvider(
+            profile.backtest,
+            ParquetExitQuoteProvider(data_dir),
+        )
+        trades = [pnl.provide(sig) for sig in store.all()]
+        _logger.info(
+            "replay producer: cell=%s tickers=%d signals=%d",
+            cell.name, len(tickers), len(trades),
+        )
+        return trades
+
+    return _producer

@@ -1,0 +1,241 @@
+{% extends "base.html" %}
+{% block content %}
+
+<!-- How to read a card — the colour/conviction key, always visible. -->
+<div class="rounded-lg border border-gray-800 bg-gray-900/40 px-4 py-3 mb-5 text-sm text-gray-300">
+  <span class="font-semibold text-gray-200">How to read a card:</span>
+  <span class="inline-flex items-center gap-1 ml-2"><span style="color:#10b981">▲</span> green = <strong class="text-emerald-300">bullish</strong> (calls)</span>
+  <span class="text-gray-600 mx-1">·</span>
+  <span class="inline-flex items-center gap-1"><span style="color:#ef4444">▼</span> red = <strong class="text-red-300">bearish</strong> (puts)</span>
+  <span class="text-gray-600 mx-1">·</span>
+  <span><strong class="text-sky-300">Conviction</strong> (blue) = how strong/corroborated, <em>not</em> odds of profit</span>
+  <span class="text-gray-600 mx-1">·</span>
+  <span><strong class="text-white">Premium</strong> = real money behind it</span>
+  <span class="text-gray-600 mx-1">·</span>
+  <span>hit <strong class="text-white">Log this trade</strong> to track it</span>
+</div>
+
+<!-- Honest live-scoring caveat: on a live run, three axes have no data feed in
+     our tier, so the combined score is partial. Never let the trader over-trust
+     the headline conviction number. -->
+{% if current and current.is_live %}
+<div class="rounded-lg border border-amber-800/40 bg-amber-900/15 px-4 py-2.5 mb-5 text-sm text-amber-200/90">
+  <strong class="text-amber-200">Live scoring note.</strong>
+  Most axes are live (flow, dealer-gamma, IV, price-confirmation, sector, event, time-of-day). Two aren't wired live yet
+  &mdash; <strong>Convexity</strong> and <strong>Relative-Premium</strong> read &lsquo;—&rsquo; &mdash; so treat the combined score as a
+  near-complete, not full, read. The one research-validated edge is the vol-premium read on the
+  <a href="/gamma" class="underline hover:text-amber-100">Gamma &amp; vol</a> tab.
+</div>
+{% endif %}
+
+<!-- Plain GET form -> "/". A normal browser submit (no JS needed), so the
+     filters and sort always work. Changing any control auto-submits; the
+     Apply button is the fallback. -->
+<form method="get" action="/" id="screen"
+      class="flex flex-wrap items-end gap-4 mb-5">
+
+  {% if runs %}
+  <label class="text-sm">
+    <span class="block text-gray-400 mb-1">Data</span>
+    <select name="run" onchange="this.form.submit()"
+            class="bg-gray-900 border border-gray-700 rounded px-2 py-1 text-gray-100">
+      {% for r in runs %}
+      <option value="{{ r.run_id }}" {% if r.run_id == run %}selected{% endif %}>{{ r.label }} ({{ r.count }})</option>
+      {% endfor %}
+    </select>
+  </label>
+  {% endif %}
+
+  <label class="text-sm">
+    <span class="block text-gray-400 mb-1">Ticker</span>
+    <select name="ticker" onchange="this.form.submit()"
+            class="bg-gray-900 border border-gray-700 rounded px-2 py-1 text-gray-100">
+      <option value="">All</option>
+      {% for t in tickers %}
+      <option value="{{ t }}" {% if t == ticker %}selected{% endif %}>{{ t }}</option>
+      {% endfor %}
+    </select>
+  </label>
+
+  <label class="text-sm">
+    <span class="block text-gray-400 mb-1">Label</span>
+    <select name="label" onchange="this.form.submit()"
+            class="bg-gray-900 border border-gray-700 rounded px-2 py-1 text-gray-100">
+      <option value="">All</option>
+      {% for l in labels %}
+      <option value="{{ l }}" {% if l == label %}selected{% endif %}>{{ l }}</option>
+      {% endfor %}
+    </select>
+  </label>
+
+  <label class="text-sm">
+    <span class="block text-gray-400 mb-1">Sort by</span>
+    <select name="sort" onchange="this.form.submit()"
+            class="bg-gray-900 border border-gray-700 rounded px-2 py-1 text-gray-100">
+      <option value="score"  {% if sort == 'score'  %}selected{% endif %}>Combined score (high&rarr;low)</option>
+      <option value="size"   {% if sort == 'size'   %}selected{% endif %}>Trade size R (high&rarr;low)</option>
+      <option value="newest" {% if sort == 'newest' %}selected{% endif %}>Newest first</option>
+      <option value="oldest" {% if sort == 'oldest' %}selected{% endif %}>Oldest first</option>
+    </select>
+  </label>
+
+  <label class="text-sm">
+    <span class="block text-gray-400 mb-1">Min combined score</span>
+    <input type="number" name="min_score" step="0.05" min="0" max="1"
+           value="{{ min_score if min_score is not none else '' }}"
+           onchange="this.form.submit()"
+           class="w-24 bg-gray-900 border border-gray-700 rounded px-2 py-1 text-gray-100">
+  </label>
+
+  <button type="submit"
+          class="rounded bg-emerald-600 hover:bg-emerald-500 px-4 py-1.5 text-sm font-semibold text-white">
+    Apply
+  </button>
+  <a href="/" class="text-sm text-gray-400 hover:text-gray-200 self-center">Reset</a>
+
+  <span class="text-xs text-gray-500 ml-auto self-center text-right">
+    {% if current and current.is_live %}
+      {% if fresh %}
+        <span class="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+        <span class="text-emerald-400 font-semibold">LIVE</span> &middot; auto-refresh 30s &middot;
+      {% else %}
+        <span class="inline-block w-2 h-2 rounded-full bg-amber-500"></span>
+        <span class="text-amber-400 font-semibold" title="No new prints recently — the feed may be paused (after hours) or down.">STALE</span> &middot;
+      {% endif %}
+      {% if current.latest_ts %}last print {{ current.latest_ts.strftime('%H:%M UTC') }}{% if age_min is not none %} ({{ age_min|int }}m ago){% endif %} &middot;{% endif %}
+    {% endif %}
+    Showing <strong class="text-gray-300">{{ shown }}</strong> of {{ total }}
+    {% if shown == 150 %}<span class="text-gray-600">(capped at 150 &mdash; narrow the filter)</span>{% endif %}
+  </span>
+</form>
+
+<!-- Vol-premium board (hero). Ranked by IV-rank — richness of vol in the name's
+     own 1y range. This is the one research-validated read; it is DESCRIPTIVE
+     context, never a directional call. Names with earnings inside the structure
+     window are demoted and flagged (high IV before earnings is a justified
+     charge, not free premium). Descriptive only — no prescriptive language. -->
+{% if vol_board %}
+<section class="mb-8">
+  <div class="flex items-center justify-between mb-1">
+    <h2 class="text-lg font-bold text-white">Vol-premium board <span class="text-sm font-normal text-gray-500">· ranked by IV-rank · context only</span></h2>
+  </div>
+  {% if vol_summary %}<p class="text-sm text-gray-400 mb-3">{{ vol_summary }}</p>{% endif %}
+  <div class="grid gap-4 xl:grid-cols-2">
+  {% set ns = namespace(crossed=false) %}
+  {% for row in vol_board %}
+    {% if row.below_threshold and not ns.crossed %}
+    <div class="xl:col-span-2 flex items-center gap-3 text-xs text-gray-600 my-1">
+      <span class="flex-1 h-px bg-gray-800"></span>
+      <span class="shrink-0">rich-vol threshold · IV-rank 75 — below here vol is less rich to sell</span>
+      <span class="flex-1 h-px bg-gray-800"></span>
+    </div>
+    {% set ns.crossed = true %}
+    {% endif %}
+    <article class="rounded-xl border border-gray-800 bg-gray-900/60 p-4 {{ 'opacity-50' if row.below_threshold else '' }}">
+      <!-- Top line: ticker · IV-rank bar · ATM IV · expected move -->
+      <div class="flex items-start justify-between gap-3">
+        <div class="min-w-0">
+          <div class="flex items-center gap-2 flex-wrap">
+            <span class="text-2xl font-bold text-white">{{ row.ticker }}</span>
+            {% if row.earnings_in_window %}
+            <span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-900/40 text-amber-300 border border-amber-800/50">⚠ earnings{% if row.earnings_date %} {{ row.earnings_date }}{% endif %}</span>
+            {% elif row.catalyst_in_window %}
+            <span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-900/40 text-amber-300 border border-amber-800/50">⚠ {{ row.catalyst_kind or 'catalyst' }} in window</span>
+            {% endif %}
+          </div>
+          <div class="text-sm text-gray-400 mt-1 flex flex-wrap items-center gap-x-4 gap-y-1">
+            <span>{{ row.regime_label }}</span>
+            {% if row.call_wall %}<span>call wall <span class="text-emerald-300 font-semibold">${{ '%.0f'|format(row.call_wall) }}</span></span>{% endif %}
+            {% if row.put_wall %}<span>put wall <span class="text-red-300 font-semibold">${{ '%.0f'|format(row.put_wall) }}</span></span>{% endif %}
+          </div>
+        </div>
+        <div class="text-right shrink-0">
+          <div class="text-[10px] text-gray-500 uppercase tracking-wide">IV-rank</div>
+          <div class="text-lg font-bold leading-tight text-sky-300">{{ row.iv_rank if row.iv_rank is not none else '—' }}</div>
+          <div class="mt-1 w-24 h-1.5 rounded-full bg-gray-800 overflow-hidden ml-auto">
+            <div class="h-full bg-sky-400 rounded-full" style="width:{{ row.iv_rank if row.iv_rank is not none else 0 }}%"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Key facts: ATM IV + expected move -->
+      <div class="mt-3 flex flex-wrap gap-x-6 gap-y-2">
+        {% if row.atm_iv %}
+        <div>
+          <div class="text-[10px] text-gray-500 uppercase tracking-wide">ATM IV</div>
+          <div class="text-base font-semibold text-white">{{ '%.0f'|format(row.atm_iv*100) }}%</div>
+        </div>
+        {% endif %}
+        {% if row.expected_move_pct is not none %}
+        <div>
+          <div class="text-[10px] text-gray-500 uppercase tracking-wide">Expected move</div>
+          <div class="text-base font-semibold text-gray-200">±{{ row.expected_move_pct }}% /30d</div>
+        </div>
+        {% endif %}
+        {% if row.realized_vol is not none %}
+        <div>
+          <div class="text-[10px] text-gray-500 uppercase tracking-wide">Realized vol</div>
+          <div class="text-base font-semibold text-gray-200">{{ '%.0f'|format(row.realized_vol*100) }}%</div>
+        </div>
+        {% endif %}
+        {% if row.vrp_pct is not none %}
+        <div>
+          <div class="text-[10px] text-gray-500 uppercase tracking-wide">Premium (IV−RV)</div>
+          <div class="text-base font-semibold {{ 'text-emerald-300' if row.vrp_pct > 0 else 'text-red-300' }}">{{ '%+.1f'|format(row.vrp_pct) }} pts</div>
+        </div>
+        {% endif %}
+      </div>
+
+      <!-- Defined-risk structure template (type, not strikes) -->
+      <div class="mt-3 rounded-lg border border-gray-800 bg-gray-950/50 px-3 py-2 text-sm text-gray-300">
+        {{ vol_structure(regime=row.regime) }}
+      </div>
+
+      <!-- Plain-English read: why this name is on the board -->
+      <p class="mt-2 text-[15px] leading-snug text-gray-100">
+        {{ vol_read(iv_rank=row.iv_rank, earnings_in_window=row.earnings_in_window) }}
+      </p>
+
+      <!-- Fixed honesty caveat on every row -->
+      <p class="mt-1.5 text-xs text-gray-500 leading-relaxed">{{ vol_caveat() }}</p>
+      <p class="mt-1 text-[10px] text-gray-600">gamma as of {{ row.as_of }}</p>
+
+      <!-- Action -->
+      <div class="mt-4">
+        <a href="/journal/new?ticker={{ row.ticker }}"
+           class="inline-flex items-center gap-1 rounded-lg bg-gray-800 hover:bg-gray-700 px-4 py-2 text-sm font-semibold text-gray-100">
+          Log to journal →
+        </a>
+      </div>
+    </article>
+  {% endfor %}
+  </div>
+</section>
+{% else %}
+<!-- Empty state: gamma_regime is only populated from live dealer-gamma during US
+     market hours, so the board is empty pre-open / overnight / weekends. Show the
+     header + an honest reason instead of hiding the section entirely. -->
+<section class="mb-8">
+  <h2 class="text-lg font-bold text-white mb-2">Vol-premium board <span class="text-sm font-normal text-gray-500">· ranked by IV-rank · context only</span></h2>
+  <div class="rounded-xl border border-gray-800 bg-gray-900/40 p-4 text-sm text-gray-400">
+    No live vol data right now — the board is built from live dealer-gamma and
+    populates during US market hours (13:30–21:00 UTC). Check back after the open.
+  </div>
+</section>
+{% endif %}
+
+<h2 class="text-lg font-bold text-white mb-3">Notable flow <span class="text-sm font-normal text-gray-500">· loudest / most unusual prints first</span></h2>
+
+<div id="signals">
+  {% include "_signals.html" %}
+</div>
+
+{% if current and current.is_live %}
+<script>
+  // Live run: refresh the page periodically to pull new prints. Preserves
+  // the current filters (they live in the querystring).
+  setTimeout(function () { window.location.reload(); }, 30000);
+</script>
+{% endif %}
+
+{% endblock %}

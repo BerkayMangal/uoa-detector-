@@ -24,6 +24,7 @@ from uoa_detector.sources.thetadata.mapping import (
     OPRA_DROP_CONDITIONS,
     QuoteRow,
     TradeRow,
+    classify_fill_side,
     et_ms_in_regular_hours,
     et_ms_to_utc_datetime,
     format_v3_right,
@@ -259,6 +260,20 @@ def test_traderow_validates_ms_of_day_range() -> None:
         )
 
 
+def test_traderow_accepts_negative_sequence() -> None:
+    """Phase 3.3.13: v3 Terminal emits 32-bit signed sequence values
+    (negatives observed in real downloads). TradeRow must accept
+    them; the field is an opaque tie-breaker, sign doesn't matter.
+    """
+    row = TradeRow(
+        ms_of_day=43860664,
+        sequence=-1630994273,  # negative — was rejected pre-3.3.13
+        condition=18, size=1, exchange=43,
+        price=Decimal("4.18"), date=20260508,
+    )
+    assert row.sequence == -1630994273
+
+
 def test_traderow_extra_fields_ignored() -> None:
     """Phase 3.3.7.2 (J2): extra='ignore' for v3 forward-compat.
 
@@ -406,7 +421,9 @@ def test_happy_path_call_trade() -> None:
     assert rp.option_price == Decimal("3.20")
     assert rp.bid == Decimal("3.18")
     assert rp.ask == Decimal("3.22")
-    assert rp.fill_side == "unknown"
+    # Phase 3.5.5 A1: fill_side is now inferred from the NBBO. Price
+    # 3.20 sits exactly at the 3.18/3.22 midpoint → "midpoint".
+    assert rp.fill_side == "midpoint"
     assert rp.exchange == "NYSE"
     assert rp.implied_volatility == 0.28
     assert rp.open_interest == 12000
@@ -757,3 +774,80 @@ def test_v3_trade_row_feeds_existing_map_function() -> None:
     assert rp.option_price == Decimal("1.85")
     assert rp.dte == 31  # Jan 16 → Feb 16
 
+
+
+# ---------------------------------------------------------------------------
+# Phase 3.5.5 A1 — fill_side classification from the NBBO
+# ---------------------------------------------------------------------------
+
+
+def test_classify_fill_side_at_or_above_ask() -> None:
+    assert classify_fill_side(Decimal("3.25"), Decimal("3.18"), Decimal("3.22")) == "above_ask"
+    assert classify_fill_side(Decimal("3.22"), Decimal("3.18"), Decimal("3.22")) == "above_ask"
+
+
+def test_classify_fill_side_at_or_below_bid() -> None:
+    assert classify_fill_side(Decimal("3.10"), Decimal("3.18"), Decimal("3.22")) == "below_bid"
+    assert classify_fill_side(Decimal("3.18"), Decimal("3.18"), Decimal("3.22")) == "below_bid"
+
+
+def test_classify_fill_side_within_spread() -> None:
+    # bid 3.18 / ask 3.22 → midpoint 3.20
+    assert classify_fill_side(Decimal("3.21"), Decimal("3.18"), Decimal("3.22")) == "at_ask"
+    assert classify_fill_side(Decimal("3.19"), Decimal("3.18"), Decimal("3.22")) == "at_bid"
+    assert classify_fill_side(Decimal("3.20"), Decimal("3.18"), Decimal("3.22")) == "midpoint"
+
+
+def test_classify_fill_side_unknown_on_bad_quote() -> None:
+    # Missing / non-positive / crossed quotes cannot be classified.
+    assert classify_fill_side(Decimal("3.20"), Decimal("0"), Decimal("3.22")) == "unknown"
+    assert classify_fill_side(Decimal("3.20"), Decimal("3.18"), Decimal("0")) == "unknown"
+    assert classify_fill_side(Decimal("3.20"), Decimal("3.30"), Decimal("3.22")) == "unknown"
+
+
+# ---------------------------------------------------------------------------
+# Phase 3.5.5 A2 — is_iso decoded from the trade condition code
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("iso_condition", [95, 126, 128])
+def test_map_trade_is_iso_true_for_iso_conditions(iso_condition: int) -> None:
+    """Condition codes 95 / 126 / 128 mark an Intermarket Sweep Order."""
+    row = TradeRow(
+        date_yyyymmdd=20240115,
+        ms_of_day=(14 * 3600) * 1000,
+        sequence=1,
+        condition=iso_condition,
+        size=3,
+        exchange=43,
+        price=Decimal("2.00"),
+    )
+    rp = map_thetadata_trade_to_rawprint(
+        trade_row=row, ticker="AAPL", expiry=date(2024, 2, 16),
+        strike_dollars=Decimal("170.00"), right="C",
+        spot_price=Decimal("180.00"),
+        bid=Decimal("1.95"), ask=Decimal("2.05"),
+    )
+    assert rp is not None
+    assert rp.is_iso is True
+
+
+@pytest.mark.parametrize("plain_condition", [0, 1, 18, 125])
+def test_map_trade_is_iso_false_for_non_iso_conditions(plain_condition: int) -> None:
+    row = TradeRow(
+        date_yyyymmdd=20240115,
+        ms_of_day=(14 * 3600) * 1000,
+        sequence=1,
+        condition=plain_condition,
+        size=3,
+        exchange=43,
+        price=Decimal("2.00"),
+    )
+    rp = map_thetadata_trade_to_rawprint(
+        trade_row=row, ticker="AAPL", expiry=date(2024, 2, 16),
+        strike_dollars=Decimal("170.00"), right="C",
+        spot_price=Decimal("180.00"),
+        bid=Decimal("1.95"), ask=Decimal("2.05"),
+    )
+    assert rp is not None
+    assert rp.is_iso is False
