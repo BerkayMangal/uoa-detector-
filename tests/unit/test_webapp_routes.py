@@ -13,6 +13,8 @@ from typing import TYPE_CHECKING
 import pytest
 from fastapi.testclient import TestClient
 
+from tests.unit._webapp_auth import authed_client
+
 if TYPE_CHECKING:
     from collections.abc import Iterator
     from pathlib import Path
@@ -36,7 +38,7 @@ def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[TestClie
         entry_ts=datetime.now(UTC), ticker="TSLA", direction="bullish",
         instrument="call", contracts=1.0, entry_price=3.0, thesis="smoke",
     )
-    yield TestClient(m.app)
+    yield authed_client(m.app, monkeypatch)
     m._REPO = m._JOURNAL = m._GAMMA = None
 
 

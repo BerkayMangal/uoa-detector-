@@ -5,13 +5,21 @@ Read-only dashboard over the detector's signals, a /gamma vol board, and a
 auto-refresh via a meta reload. Templates use Tailwind via CDN — no build
 step. Repo calls are wrapped in `_safe` and a global exception handler shows
 a clean error page, so a DB/feed blip degrades instead of 500-ing.
+
+Every route except ``GET /health`` is behind HTTP Basic auth (Phase 5.0.9):
+credentials come from ``WEB_AUTH_USER`` / ``WEB_AUTH_PASSWORD`` at request
+time, and the gate fails closed (503) when either is unset or empty.
 """
 
 from __future__ import annotations
 
 import asyncio
+import base64
+import binascii
 import contextlib
 import logging
+import os
+import secrets
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, TypeVar, cast
@@ -19,6 +27,8 @@ from typing import TYPE_CHECKING, TypeVar, cast
 from fastapi import FastAPI, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
+from starlette.datastructures import Headers
+from starlette.responses import PlainTextResponse
 
 from webapp import explanations, gamma, journal, pricing
 from webapp.gamma_live import gamma_refresh_loop
@@ -29,6 +39,8 @@ from webapp.worker import live_config_from_env, run_live_worker
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator, Callable
+
+    from starlette.types import ASGIApp, Receive, Scope, Send
 
     from uoa_detector.backtest.store import StoredSignal
 
@@ -83,6 +95,84 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 
 app = FastAPI(title="UOA Screener", lifespan=_lifespan)
+
+
+# ---------------------------------------------------------------------------
+# Access gate: HTTP Basic auth, fail closed (Phase 5.0.9, contract §3.10)
+# ---------------------------------------------------------------------------
+
+_AUTH_USER_ENV = "WEB_AUTH_USER"
+_AUTH_PASSWORD_ENV = "WEB_AUTH_PASSWORD"
+_OPEN_ROUTE = ("GET", "/health")
+_CHALLENGE = {"WWW-Authenticate": 'Basic realm="uoa"'}
+
+
+def _auth_failure(headers: Headers) -> int | None:
+    """None when the request carries the configured credentials, else the
+    status to answer with: 503 if the gate is not configured, 401 otherwise.
+
+    Credentials are read from the environment per request. Both the user and
+    the password comparison run (constant-time) before they are combined.
+    """
+    user = os.environ.get(_AUTH_USER_ENV, "")
+    password = os.environ.get(_AUTH_PASSWORD_ENV, "")
+    if not user or not password:
+        return 503
+    scheme, _, token = headers.get("authorization", "").partition(" ")
+    if scheme.lower() != "basic" or not token.strip():
+        return 401
+    try:
+        decoded = base64.b64decode(token.strip(), validate=True).decode("utf-8")
+    except (binascii.Error, UnicodeDecodeError):
+        return 401
+    got_user, sep, got_password = decoded.partition(":")
+    if not sep:
+        return 401
+    user_ok = secrets.compare_digest(got_user.encode("utf-8"), user.encode("utf-8"))
+    password_ok = secrets.compare_digest(
+        got_password.encode("utf-8"), password.encode("utf-8"),
+    )
+    return None if user_ok and password_ok else 401
+
+
+class _BasicAuthGate:
+    """ASGI middleware in front of every route, mount and 404. Only
+    ``GET /health`` (the Railway healthcheck) is open. Lifespan events pass
+    through untouched. Credentials are never logged."""
+
+    def __init__(self, app: ASGIApp) -> None:
+        self._app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] not in ("http", "websocket"):
+            await self._app(scope, receive, send)
+            return
+        if scope["type"] == "http" and (scope["method"], scope["path"]) == _OPEN_ROUTE:
+            await self._app(scope, receive, send)
+            return
+        failure = _auth_failure(Headers(scope=scope))
+        if failure is None:
+            await self._app(scope, receive, send)
+            return
+        if scope["type"] == "websocket":
+            await send({"type": "websocket.close", "code": 1008})
+            return
+        if failure == 503:
+            _logger.warning(
+                "%s / %s not configured; refusing %s",
+                _AUTH_USER_ENV, _AUTH_PASSWORD_ENV, scope["path"],
+            )
+            response = PlainTextResponse("auth not configured", status_code=503)
+        else:
+            response = PlainTextResponse(
+                "authentication required", status_code=401, headers=_CHALLENGE,
+            )
+        await response(scope, receive, send)
+
+
+app.add_middleware(_BasicAuthGate)
+
+
 templates = Jinja2Templates(directory=str(_BASE / "templates"))
 # Disable Jinja's template cache: its LRU cache key path errors on Python
 # 3.14. Templates are tiny, so re-parsing per request is negligible.

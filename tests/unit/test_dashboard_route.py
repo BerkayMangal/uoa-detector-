@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fastapi.testclient import TestClient
+from tests.unit._webapp_auth import authed_client
 
 
 def _ctx(ticker: str, iv_pct: float) -> object:
@@ -30,7 +30,7 @@ def _body(monkeypatch, gamma: dict[str, object]) -> str:
 
     monkeypatch.setattr(m, "_gamma", lambda: _G())
     monkeypatch.setattr(m, "_repo", lambda: _R())
-    return TestClient(m.app).get("/").text
+    return authed_client(m.app, monkeypatch).get("/").text
 
 
 def test_dashboard_renders_vol_board(monkeypatch) -> None:
@@ -70,7 +70,7 @@ def test_journal_new_prefills_from_vol_board_ticker(monkeypatch) -> None:
             return {"NVDA": _ctx("NVDA", 0.9)}  # net_gex>0 -> long regime
 
     monkeypatch.setattr(m, "_gamma", lambda: _G())
-    body = TestClient(m.app).get("/journal/new?ticker=nvda").text
+    body = authed_client(m.app, monkeypatch).get("/journal/new?ticker=nvda").text
     assert 'value="NVDA"' in body                       # ticker prefilled
     assert "Vol-premium board: NVDA" in body            # thesis prefilled
     assert "iron fly" in body                            # long-gamma structure
