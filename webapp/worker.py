@@ -5,9 +5,14 @@ Runs the same detection pipeline the backtest used, but driven by
 the store the webapp reads. Designed to run as a background task inside the
 FastAPI process (one Railway service), opt-in via ``LIVE_TICKERS``.
 
-Enrichment axes (gamma/IV/etc.) run with their NoOp defaults for now — they
-score neutral, so live cards show the core flow axes (flow, clustering,
-time-of-day, sweep/size). Wiring live UW enrichment providers is the next step.
+Enrichment is live Unusual Whales (Phase 5.0.5). The stages come from
+``build_live_stage_pipeline(client, profile, degrade_transient_errors=True)``:
+the screener's stage order, every provider on the one shared client, one
+catalyst provider for M22 and M24. A transient UW error (rate limit, daily
+quota, 5xx, open circuit breaker) scores that axis as no-data for the event
+instead of aborting the run and restarting the worker. An auth error or a
+programming error still propagates to the restart path below, so a bad key is
+logged loudly rather than scored as missing data.
 """
 
 from __future__ import annotations
@@ -20,12 +25,12 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
 
-from uoa_detector.backtest.cell_runner import fusion_stages_with_uw
 from uoa_detector.backtest.sqlite_store import SqliteBacktestStore
 from uoa_detector.calibration import load_profile
 from uoa_detector.config.credentials import Credentials
 from uoa_detector.pipeline.orchestrator import Pipeline
 from uoa_detector.pipeline.stage import PipelineContext
+from uoa_detector.pipeline.stages import build_live_stage_pipeline
 from uoa_detector.sources.unusual_whales.client import UnusualWhalesClient
 from uoa_detector.sources.unusual_whales.flow_poll import UnusualWhalesFlowPollSource
 
@@ -136,18 +141,21 @@ async def run_live_worker(
             try:
                 _ensure_run()
                 client = UnusualWhalesClient(
-                    api_key=Credentials().unusual_whales_api_key,
+                    api_key=Credentials().require_unusual_whales_api_key(),
                     settings=profile.data_sources.unusual_whales,
                 )
                 source = UnusualWhalesFlowPollSource(
                     client, tickers,
                     poll_interval_s=poll_interval_s, min_premium=min_premium,
                 )
-                # Full 8-axis enrichment wired to live UW. Providers are cached
-                # per-ticker and degrade to neutral on timeout/error (D7), so a
-                # slow or 401-gated axis never stalls the stream.
-                stages = fusion_stages_with_uw(
-                    client, profile.data_sources.unusual_whales,
+                # Live UW enrichment (Phase 5.0.5): the screener's stages and
+                # order on the shared client, with every provider except M23's
+                # wrapped so a transient UW error (rate limit, daily quota,
+                # 5xx, open breaker) scores that axis as no-data for the event
+                # instead of aborting the run. Timeouts stay per-stage (D7).
+                # Auth and programming errors still reach the restart path.
+                stages = build_live_stage_pipeline(
+                    client, profile, degrade_transient_errors=True,
                 )
                 pipeline = Pipeline(
                     [source], stages, profile=profile, store=store,
