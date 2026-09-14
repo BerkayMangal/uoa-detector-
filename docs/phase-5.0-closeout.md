@@ -24,7 +24,8 @@ Branch `phase-5.0-merge`. First-parent series on top of `origin/main` `27e2842`.
 | 5.0.11 | `f320f08` | v6 profile pin test |
 | 5.0.12 | `4b4f43c` | docs: INDEX, 3.5.1 validation record, living references, stale code text |
 | 5.0.13 | `06f7f37` | README positioning + CLAUDE.md rules |
-| 5.0.14 | this commit | closeout |
+| 5.0.14 | `0648e4b` | closeout |
+| 5.0.15 | this commit | CI job env: plain CLI output under GitHub Actions |
 
 ## 2. Gate
 
@@ -47,10 +48,14 @@ file.
 | 5.0.11 | `f320f08` | 2548 / 30 | `src/ webapp/`, 144 | clean | consistent |
 | 5.0.12 | `4b4f43c` | 2548 / 30 | `src/ webapp/`, 144 | clean | consistent |
 | 5.0.13 | `06f7f37` | 2548 / 30 | `src/ webapp/`, 144 | clean | consistent |
+| 5.0.14 | `0648e4b` | 2548 / 30 | `src/ webapp/`, 144 | clean | consistent |
 
 Gating:
 - 5.0.1–5.0.3 were gated before they were committed.
 - 5.0.4–5.0.13 were re-gated after being cherry-picked into this order.
+- 5.0.14 was gated before it was committed. 5.0.15 changes only the CI
+  workflow and this document; its gate result is in its commit message, and
+  CI on PR #8 runs against it.
 - Every skip is a key-gated integration test.
 - The two pytest warnings predate 5.0: a Starlette/httpx deprecation, and a
   numpy divide in a gamma test.
@@ -167,6 +172,16 @@ No scoring module changed, so there are no score-branch truth tables.
 10. **Parallel development.** 5.0.4–5.0.5, 5.0.6–5.0.11 and 5.0.12–5.0.13 were
     built on three branches cut from `6d1e4ca`, then cherry-picked in contract
     order. §2 gates the resulting series commit by commit.
+11. **CI environment (5.0.15).** The first CI run on PR #8 failed 12 CLI
+    tests that pass locally.
+    - Cause: Typer 0.25 forces a Rich terminal when `GITHUB_ACTIONS` is set,
+      so ANSI styling and 80-column panels split the option names the tests
+      assert on (`--live-tickers`, `--replay-data is required`, ...).
+    - Reproduced locally with `GITHUB_ACTIONS=true` (12 failed). Cleared with
+      `NO_COLOR=1 TERM=dumb COLUMNS=200` (82 passed in `tests/integration`).
+    - 5.0.15 sets those variables on the CI job. No test or code changed.
+      The per-commit gate in §2 is the local gate; CI runs only on the PR
+      head and on pushes to `main`.
 
 ## 6. Flags for Berkay
 

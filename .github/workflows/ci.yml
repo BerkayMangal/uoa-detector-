@@ -21,6 +21,14 @@ jobs:
     name: gate
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      # Phase 5.0.15: Typer forces a Rich terminal when GITHUB_ACTIONS is set
+      # (ANSI styling, 80-column panels), which splits the option names the CLI
+      # tests assert on. Plain output matches a local run; nothing under test
+      # changes.
+      NO_COLOR: "1"
+      TERM: dumb
+      COLUMNS: "200"
     steps:
       - uses: actions/checkout@v7.0.1
       - uses: astral-sh/setup-uv@v10.1.0
