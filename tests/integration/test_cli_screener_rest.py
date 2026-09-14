@@ -4,6 +4,10 @@ Drives the full screener command with the REST source, but injects a FAKE
 Unusual Whales client (no network, no credentials required beyond a dummy
 env var). Verifies the one-shot REST fetch flows through the SAME pipeline
 and digest as the other sources.
+
+Phase 3.9.4 (D10): the flow fetch moved to ``/api/option-trades/flow-alerts``
+with ``ticker_symbol`` params and live-shaped rows (contract
+``docs/phase-3.9-uw-endpoint-correction-acceptance.md`` §3.1).
 """
 
 from __future__ import annotations
@@ -16,7 +20,7 @@ from typer.testing import CliRunner
 
 from uoa_detector.cli import app
 from uoa_detector.observability.digest import DIGEST_INTENT
-from uoa_detector.sources.unusual_whales.rest_flow import RECENT_FLOW_PATH
+from uoa_detector.sources.unusual_whales.rest_flow import FLOW_ALERTS_PATH
 
 runner = CliRunner()
 
@@ -30,9 +34,14 @@ class _FakeClient:
     can assert the flow fetch specifically rather than "the last call", and
     returns ``{"data": []}`` for any non-flow path so every provider takes
     its graceful no-data branch (no network, no crash).
+
+    Phase 3.9.4: the flow rows are served only for the screener's own
+    flow-alerts request (``ticker_symbol`` == the screener tickers). Another
+    caller on the same path, such as peer flow, gets ``{"data": []}``.
     """
 
     flow_payload: ClassVar[dict[str, Any]] = {"data": []}
+    flow_tickers: ClassVar[str] = "AAPL,MSFT"
     calls: ClassVar[list[tuple[str, dict[str, Any] | None]]] = []
     aclose_calls: ClassVar[int] = 0
 
@@ -48,8 +57,12 @@ class _FakeClient:
         method: str = "GET",
     ) -> dict[str, Any]:
         type(self).calls.append((path, params))
-        if path == RECENT_FLOW_PATH:
-            # The one-shot flow fetch — serve the canned flow rows.
+        if (
+            path == FLOW_ALERTS_PATH
+            and params is not None
+            and params.get("ticker_symbol") == type(self).flow_tickers
+        ):
+            # The screener's flow fetch — serve the canned flow rows.
             return type(self).flow_payload
         # Any enrichment endpoint: empty → provider no-data branch.
         return {"data": []}
@@ -59,22 +72,28 @@ class _FakeClient:
 
 
 def _row(**overrides: Any) -> dict[str, Any]:
+    """A flow-alert row in the live /api/option-trades/flow-alerts shape."""
     base: dict[str, Any] = {
         "id": "rest_evt_1",
         "ticker": "AAPL",
-        "executed_at": "2024-01-15T15:30:00Z",
-        "option_type": "call",
+        "type": "call",
         "strike": "150.00",
-        "expiry": "2024-02-16",
-        "premium": "250000.00",
+        "expiry": "2026-12-18",
+        "created_at": "2026-09-11T19:59:50.817119Z",
         "price": "1.50",
         "bid": "1.45",
         "ask": "1.55",
-        "side_classification": "bullish",
+        "underlying_price": "148.20",
+        "total_premium": "250000.00",
+        "total_ask_side_prem": "250000.00",
+        "total_bid_side_prem": "0",
+        "total_size": 1667,
         "open_interest": 1000,
-        "implied_volatility": 0.25,
-        "exchange": "CBOE",
-        "alert_type": "sweep",
+        "iv_end": "0.25",
+        "has_sweep": True,
+        "has_multileg": False,
+        "alert_rule": "RepeatedHits",
+        "option_chain": "AAPL261218C00150000",
     }
     base.update(overrides)
     return base
@@ -85,9 +104,17 @@ def _fake_client(monkeypatch: pytest.MonkeyPatch) -> None:
     _FakeClient.flow_payload = {
         "data": [
             _row(id="e1", ticker="AAPL"),
-            _row(id="e2", ticker="MSFT", strike="400.00", option_type="put"),
+            _row(
+                id="e2",
+                ticker="MSFT",
+                strike="400.00",
+                type="put",
+                option_chain="MSFT261218P00400000",
+                created_at="2026-09-11T19:58:10.101010Z",
+            ),
         ],
     }
+    _FakeClient.flow_tickers = "AAPL,MSFT"
     _FakeClient.calls = []
     _FakeClient.aclose_calls = 0
     monkeypatch.setattr("uoa_detector.cli.UnusualWhalesClient", _FakeClient)
@@ -118,9 +145,9 @@ def test_screener_rest_renders_digest(tmp_path: Path) -> None:
     flow_calls = [
         params
         for path, params in _FakeClient.calls
-        if path == RECENT_FLOW_PATH and params is not None
+        if path == FLOW_ALERTS_PATH and params is not None
     ]
-    assert any(p.get("tickers") == "AAPL,MSFT" for p in flow_calls)
+    assert any(p.get("ticker_symbol") == "AAPL,MSFT" for p in flow_calls)
     assert _FakeClient.aclose_calls == 1
 
 
