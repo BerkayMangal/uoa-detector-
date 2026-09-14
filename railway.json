@@ -2,6 +2,8 @@
   "$schema": "https://railway.app/railway.schema.json",
   "deploy": {
     "startCommand": "uvicorn webapp.main:app --host 0.0.0.0 --port $PORT",
-    "restartPolicyType": "ON_FAILURE"
+    "restartPolicyType": "ON_FAILURE",
+    "healthcheckPath": "/health",
+    "healthcheckTimeout": 120
   }
 }
