@@ -9,7 +9,7 @@ Pins:
   - Happy-path canned response → typed DTO
   - Cache hit on second identical call
   - Empty / malformed → None or empty seq
-  - OI: next_day computes trade_date+1 and uses EOD endpoint
+  - OI: next_day returns the first row after trade_date from /historic
   - SectorMap: peers_of excludes the source ticker itself
   - PeerFlow: cache key is sorted-tickers-tuple (caller-order-stable)
 """
@@ -200,11 +200,13 @@ def test_open_interest_implements_protocol() -> None:
 @pytest.mark.asyncio
 async def test_open_interest_at_returns_snapshot() -> None:
     client = _FakeClient()
-    expected_path = "/api/option-contract/AAPL240216C00150000/open-interest"
+    expected_path = "/api/option-contract/AAPL240216C00150000/historic"
     client.stub(
         expected_path,
-        {"data": {"as_of": "2024-01-15T15:30:00Z",
-                   "open_interest": 12345}},
+        {"chains": [{"date": "2024-01-15", "open_interest": 12345,
+                     "volume": 800,
+                     "last_tape_time": "2024-01-15T21:30:00Z"}],
+         "etf_holdings": []},
     )
     provider = UnusualWhalesOpenInterestProvider(
         client=client,  # type: ignore[arg-type]
@@ -222,13 +224,12 @@ async def test_open_interest_at_returns_snapshot() -> None:
 
 @pytest.mark.asyncio
 async def test_open_interest_at_handles_list_data_shape() -> None:
-    """Some UW endpoints return data as a list with one element."""
+    """Rows under ``data`` (the client's wrap of a top-level array) are read."""
     client = _FakeClient()
-    expected_path = "/api/option-contract/AAPL240216C00150000/open-interest"
+    expected_path = "/api/option-contract/AAPL240216C00150000/historic"
     client.stub(
         expected_path,
-        {"data": [{"as_of": "2024-01-15T15:30:00Z",
-                    "open_interest": 999}]},
+        {"data": [{"date": "2024-01-15", "open_interest": 999}]},
     )
     provider = UnusualWhalesOpenInterestProvider(
         client=client,  # type: ignore[arg-type]
@@ -246,11 +247,12 @@ async def test_open_interest_at_handles_list_data_shape() -> None:
 @pytest.mark.asyncio
 async def test_open_interest_next_day_uses_trade_date_plus_one() -> None:
     client = _FakeClient()
-    expected_path = "/api/option-contract/AAPL240216C00150000/open-interest/eod"
+    expected_path = "/api/option-contract/AAPL240216C00150000/historic"
     client.stub(
         expected_path,
-        {"data": {"as_of": "2024-01-16T21:00:00Z",
-                   "open_interest": 22000}},
+        {"chains": [{"date": "2024-01-17", "open_interest": 23000},
+                    {"date": "2024-01-16", "open_interest": 22000},
+                    {"date": "2024-01-15", "open_interest": 21000}]},
     )
     provider = UnusualWhalesOpenInterestProvider(
         client=client,  # type: ignore[arg-type]
@@ -263,11 +265,12 @@ async def test_open_interest_next_day_uses_trade_date_plus_one() -> None:
     )
     assert snap is not None
     assert snap.open_interest == 22000
-    # Verify the request used date=2024-01-16 (trade_date+1)
+    # The 2024-01-16 row (first after trade_date) comes from one fetch;
+    # the historic endpoint ignores ``date``, so no params are sent.
     assert len(client.calls) == 1
-    _path, params = client.calls[0]
-    assert params is not None
-    assert params["date"] == "2024-01-16"
+    path, params = client.calls[0]
+    assert path == expected_path
+    assert params is None
 
 
 @pytest.mark.asyncio
@@ -286,16 +289,13 @@ async def test_open_interest_returns_none_on_empty() -> None:
 
 
 @pytest.mark.asyncio
-async def test_open_interest_at_and_next_day_use_separate_caches() -> None:
-    """Same symbol: at() and next_day() cache independently."""
+async def test_open_interest_at_and_next_day_share_one_cache() -> None:
+    """Same symbol: one cached historic fetch serves at() and next_day()."""
     client = _FakeClient()
     client.stub(
-        "/api/option-contract/AAPL240216C00150000/open-interest",
-        {"data": {"as_of": "2024-01-15T15:30:00Z", "open_interest": 100}},
-    )
-    client.stub(
-        "/api/option-contract/AAPL240216C00150000/open-interest/eod",
-        {"data": {"as_of": "2024-01-16T21:00:00Z", "open_interest": 200}},
+        "/api/option-contract/AAPL240216C00150000/historic",
+        {"chains": [{"date": "2024-01-16", "open_interest": 200},
+                    {"date": "2024-01-15", "open_interest": 100}]},
     )
     provider = UnusualWhalesOpenInterestProvider(
         client=client,  # type: ignore[arg-type]
@@ -305,20 +305,24 @@ async def test_open_interest_at_and_next_day_use_separate_caches() -> None:
         "ticker": "AAPL", "strike": Decimal("150.00"),
         "expiry": date(2024, 2, 16), "option_type": "call",
     }
-    await provider.at(
+    at_snap = await provider.at(
         **args,
         when=datetime(2024, 1, 15, 15, 30, tzinfo=UTC),
     )
-    await provider.next_day(**args, trade_date=date(2024, 1, 15))
-    # Two distinct fetches (different endpoints)
-    assert len(client.calls) == 2
+    next_snap = await provider.next_day(**args, trade_date=date(2024, 1, 15))
+    assert at_snap is not None
+    assert at_snap.open_interest == 100
+    assert next_snap is not None
+    assert next_snap.open_interest == 200
+    # One fetch: the endpoint returns every day of the contract
+    assert len(client.calls) == 1
     # Repeat both — neither hits the network
     await provider.at(
         **args,
         when=datetime(2024, 1, 15, 15, 30, tzinfo=UTC),
     )
     await provider.next_day(**args, trade_date=date(2024, 1, 15))
-    assert len(client.calls) == 2
+    assert len(client.calls) == 1
 
 
 # ===========================================================================
