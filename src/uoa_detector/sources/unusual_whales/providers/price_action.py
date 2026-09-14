@@ -12,55 +12,80 @@ The ThetaData implementation is retained in
 ``uoa_detector.sources.thetadata.providers.price_action`` for
 operators that DO have STOCK.VALUE.
 
-UW endpoint shape (verified Phase 3.3.8.2 against api.unusualwhales.com
-docs at ``/docs/operations/PublicApi.TickerController.ohlc``):
+UW endpoint shape (live-verified 2026-09-14, Phase 3.9.11, against
+``GET /api/stock/AAPL/ohlc/1m?date=2026-09-11``):
 
   GET /api/stock/{ticker}/ohlc/{candle_size}
     candle_size enum: 1m | 5m | 10m | 15m | 30m | 1h | 4h | 1d | 1w
-    optional params:
-      timeframe   — range string (YTD, 1D/2D, 1W/2W, 1M/2M, 1Y/2Y)
-      end_date    — trading date YYYY-MM-DD
-      date        — single trading date YYYY-MM-DD
-      limit       — 1..2500
+    params used: date — ET trading date YYYY-MM-DD
     → {
         "data": [
           {
-            "open": 192.50, "high": 193.20, "low": 192.30,
-            "close": 193.10, "volume": 1234, "total_volume": ...,
-            "start_time": "2024-01-02T09:30:00.000-05:00",
-            "end_time":   "2024-01-02T09:31:00.000-05:00",
+            "open": "332.5898", "high": "332.5898", "low": "332.56",
+            "close": "332.58", "volume": 2189, "total_volume": 50716811,
+            "start_time": "2026-09-11T23:59:00Z",
+            "end_time":   "2026-09-12T00:00:00Z",
             "market_time": "po"
           },
           ...
         ]
       }
 
+  Live facts the parser depends on:
+    - prices are strings (``Decimal(str(...))`` also accepts numbers);
+    - ``start_time`` / ``end_time`` are UTC ISO strings with a ``Z``
+      suffix, and ``end_time - start_time`` equals the candle size
+      (809/809 1m rows were exactly 60 s);
+    - rows are NEWEST FIRST;
+    - the day payload covers the whole extended session, 08:00-23:59 UTC
+      (809 1m bars on 2026-09-11: market_time ``pr`` 246, ``r`` 390,
+      ``po`` 173). No ``market_time`` filter is applied here.
+
 decision (use 1m bars, not 5m):
   M23's default confirmation window is 30 minutes; 1m bars give
   the stage 30 rows over the window, plenty of granularity for a
-  0.5% confirmation threshold. Per-call cost is one HTTP request
-  per (ticker, date) — TTL cache absorbs same-window duplicates.
+  0.5% confirmation threshold.
 
 decision (request the full session via ``date``, not just the
 window):
-  UW returns up to ``limit`` bars per call. Requesting the full
-  trading date and filtering window in-process is simpler than
-  computing per-request start_time / end_time. The session has
-  ≤ 390 1m bars (RTH), well below the 2500 cap. The TTL cache
-  keys on (ticker, date_iso, lookback_minutes); two M23 calls in
-  the same session for the same ticker share one HTTP request.
+  One request returns the whole ET trading day (~800 1m bars, below
+  the 2500 row cap). Requesting the full day and filtering the window
+  in-process is simpler than computing per-request bounds, and it lets
+  every M23 call for the same ticker and day share one HTTP request.
 
-decision (parse ISO timestamps, treat as UTC if tz-aware,
-otherwise as ET-naive):
-  UW timestamps in observed responses carry a UTC offset (e.g.
-  ``-05:00`` for EST). When the offset is present we parse and
-  normalize to UTC. If a future schema change drops the offset,
-  we treat it as ET-naive (UW publishes ET sessions) and convert
-  through ``zoneinfo``. The conversion code branches on
-  ``parsed.tzinfo is None``.
+decision (cache key = (ticker, ET date of ``at``, candle_size), Phase
+3.9.11):
+  The payload is the whole ET trading day, so the lookback is not part
+  of the key: two lookbacks on the same day share one fetch. The date
+  is the ET date — the same value sent as the ``date`` param — computed
+  once per call so key and request cannot drift apart. Before 3.9.11
+  the key used the UTC date and the lookback, so an event after 20:00
+  ET could be served the next UTC day's cached bars.
 
-decision (return None on empty data, malformed rows, or non-list
-shape):
+decision (no look-ahead: completed bars only, Phase 3.9.11):
+  A bar's ``close`` is knowable only when the bar ends. A bar is usable
+  for ``at`` only if it started at or after ``at - lookback`` and ended
+  at or before ``at``. ``spot_at`` is the close of the latest usable
+  bar; ``spot_lookback_ago`` is the open of the earliest usable bar.
+  Before 3.9.11 a bar that started at or before ``at`` was used even
+  though its close printed up to one candle after ``at``. The bar end
+  is the parsed ``end_time`` when it is present and later than
+  ``start_time``; otherwise ``start_time`` plus the candle duration.
+  In live mode the newest candle is still forming, so it is always
+  excluded; the TTL cache can make ``spot_at`` stale, never future.
+
+decision (candle_size restricted to intraday sizes):
+  The completed-bar rule needs a candle duration for the fallback bar
+  end. ``1d`` / ``1w`` have no fixed intraday duration, so the
+  constructor rejects them with ``ValueError``.
+
+decision (parse ISO timestamps, normalise to UTC; naive → ET):
+  Live timestamps carry ``Z``. If a future schema change drops the
+  offset, a naive timestamp is read as ET (UW publishes ET sessions)
+  and converted through ``zoneinfo``.
+
+decision (return None on empty data, malformed rows, non-list shape,
+or no usable bar):
   Same contract as the ThetaData implementation: M23 maps None to
   the neutral fallback per acceptance doc edge case. Subscription
   / auth failures surface as raised exceptions from the client
@@ -75,9 +100,9 @@ decision (no ``snapshot_at`` implementation):
 
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Final
 from zoneinfo import ZoneInfo
 
 from uoa_detector.providers.price_action import (
@@ -96,6 +121,19 @@ _ET = ZoneInfo("America/New_York")
 # Default candle size (string, matches UW path parameter)
 _CANDLE_SIZE_1M = "1m"
 
+# Duration of each intraday ``candle_size`` path value UW accepts. This
+# is the vendor enum's unit definition (used as the bar-end fallback when
+# ``end_time`` is absent), not a scoring threshold (D8).
+_INTRADAY_CANDLE_DURATIONS: Final[dict[str, timedelta]] = {
+    "1m": timedelta(minutes=1),
+    "5m": timedelta(minutes=5),
+    "10m": timedelta(minutes=10),
+    "15m": timedelta(minutes=15),
+    "30m": timedelta(minutes=30),
+    "1h": timedelta(hours=1),
+    "4h": timedelta(hours=4),
+}
+
 
 class UnusualWhalesPriceActionProvider:
     """``PriceActionProvider`` Protocol implementation backed by UW."""
@@ -107,8 +145,16 @@ class UnusualWhalesPriceActionProvider:
         settings: UnusualWhalesSettings,
         candle_size: str = _CANDLE_SIZE_1M,
     ) -> None:
+        duration = _INTRADAY_CANDLE_DURATIONS.get(candle_size)
+        if duration is None:
+            msg = (
+                "UnusualWhalesPriceActionProvider: candle_size must be one of "
+                f"{sorted(_INTRADAY_CANDLE_DURATIONS)} (got {candle_size!r})"
+            )
+            raise ValueError(msg)
         self._client = client
         self._candle_size = candle_size
+        self._candle_duration = duration
         self._cache: TTLCache[list[dict[str, Any]]] = TTLCache(
             ttl_seconds=settings.cache_ttl.intraday_price_seconds,
         )
@@ -128,34 +174,32 @@ class UnusualWhalesPriceActionProvider:
         at: datetime,
         lookback_minutes: int,
     ) -> PriceMovement | None:
-        """Return signed spot movement over [at - lookback, at]."""
+        """Return signed spot movement over completed bars in [at - lookback, at]."""
         if lookback_minutes <= 0:
             return None
-        window_start = at - timedelta(minutes=lookback_minutes)
-        cache_key = (
-            f"{ticker.upper()}|{at.date().isoformat()}|{lookback_minutes}"
-        )
+        symbol = ticker.upper()
+        et_date = at.astimezone(_ET).date()
+        cache_key = (symbol, et_date.isoformat(), self._candle_size)
         bars = await self._cache.get_or_fetch(
             cache_key,
-            loader=lambda: self._fetch(ticker, at),
+            loader=lambda: self._fetch(symbol, et_date),
         )
         return _build_movement(
             bars=bars,
-            ticker=ticker.upper(),
-            window_start=window_start,
+            ticker=symbol,
+            window_start=at - timedelta(minutes=lookback_minutes),
             window_end=at,
             lookback_minutes=lookback_minutes,
+            candle_duration=self._candle_duration,
         )
 
     async def _fetch(
         self,
-        ticker: str,
-        at: datetime,
+        symbol: str,
+        et_date: date,
     ) -> list[dict[str, Any]]:
-        """Fetch 1-minute OHLC bars for the trading date containing ``at``."""
-        # UW expects ET trading date in YYYY-MM-DD; convert ``at`` (UTC) to ET.
-        et_date = at.astimezone(_ET).date()
-        path = f"/api/stock/{ticker.upper()}/ohlc/{self._candle_size}"
+        """Fetch the OHLC bars for one ET trading date."""
+        path = f"/api/stock/{symbol}/ohlc/{self._candle_size}"
         params: dict[str, Any] = {"date": et_date.isoformat()}
         resp = await self._client.request_json(path, params=params)
         data = resp.get("data") if isinstance(resp, dict) else None
@@ -171,31 +215,34 @@ def _build_movement(
     window_start: datetime,
     window_end: datetime,
     lookback_minutes: int,
+    candle_duration: timedelta,
 ) -> PriceMovement | None:
-    """Pick first/last bars in window; compute movement.
+    """Pick the first/last COMPLETED bars in the window; compute movement.
 
-    Pure function — directly unit-testable.
+    A bar is usable only if ``start >= window_start`` and
+    ``end <= window_end``. Pure function — directly unit-testable.
     """
     if not bars:
         return None
 
-    in_window: list[tuple[datetime, Decimal, Decimal]] = []
+    usable: list[tuple[datetime, Decimal, Decimal]] = []
     for row in bars:
         try:
-            ts = _parse_bar_timestamp(row)
+            start = _parse_bar_timestamp(row, "start_time")
             open_px = Decimal(str(row["open"]))
             close_px = Decimal(str(row["close"]))
         except (KeyError, ValueError, ArithmeticError, TypeError):
             continue
-        if window_start <= ts <= window_end:
-            in_window.append((ts, open_px, close_px))
+        end = _bar_end(row, start=start, candle_duration=candle_duration)
+        if start >= window_start and end <= window_end:
+            usable.append((start, open_px, close_px))
 
-    if not in_window:
+    if not usable:
         return None
 
-    in_window.sort(key=lambda x: x[0])
-    spot_lookback_ago = in_window[0][1]  # earliest bar's open
-    spot_at = in_window[-1][2]            # latest bar's close
+    usable.sort(key=lambda x: x[0])
+    spot_lookback_ago = usable[0][1]  # earliest completed bar's open
+    spot_at = usable[-1][2]            # latest completed bar's close
     if spot_lookback_ago == Decimal("0"):
         return None  # avoid division by zero on a degenerate bar
     move_pct = float(
@@ -211,16 +258,42 @@ def _build_movement(
     )
 
 
-def _parse_bar_timestamp(row: dict[str, Any]) -> datetime:
-    """Parse a UW OHLC bar's ``start_time`` ISO string → UTC datetime.
+def _bar_end(
+    row: dict[str, Any],
+    *,
+    start: datetime,
+    candle_duration: timedelta,
+) -> datetime:
+    """Return the UTC instant a bar's ``close`` became knowable.
 
-    UW publishes timestamps with an explicit offset (e.g.
-    ``2024-01-02T09:30:00.000-05:00``). If a future schema change
-    drops the offset, we fall back to ET-naive interpretation.
+    Uses the parsed ``end_time`` when it is present and later than
+    ``start``. A missing, unparseable, or non-positive-length
+    ``end_time`` falls back to ``start + candle_duration``, so a
+    degenerate vendor value can never admit a bar that was still
+    forming at ``at``.
     """
-    raw = row["start_time"]
+    try:
+        end = _parse_bar_timestamp(row, "end_time")
+    except (KeyError, ValueError, TypeError):
+        return start + candle_duration
+    if end <= start:
+        return start + candle_duration
+    return end
+
+
+def _parse_bar_timestamp(row: dict[str, Any], field: str) -> datetime:
+    """Parse a UW OHLC bar's ISO timestamp ``field`` → UTC datetime.
+
+    Live UW timestamps carry an explicit ``Z`` (UTC). If a future
+    schema change drops the offset, we fall back to ET-naive
+    interpretation.
+    """
+    raw = row[field]
     if not isinstance(raw, str):
-        msg = f"_parse_bar_timestamp: 'start_time' must be a string (got {type(raw).__name__})"
+        msg = (
+            f"_parse_bar_timestamp: {field!r} must be a string "
+            f"(got {type(raw).__name__})"
+        )
         raise ValueError(msg)
     parsed = datetime.fromisoformat(raw)
     if parsed.tzinfo is None:
