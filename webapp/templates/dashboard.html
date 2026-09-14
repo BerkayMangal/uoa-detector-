@@ -23,8 +23,9 @@
   <strong class="text-amber-200">Live scoring note.</strong>
   Most axes are live (flow, dealer-gamma, IV, price-confirmation, sector, event, time-of-day). Two aren't wired live yet
   &mdash; <strong>Convexity</strong> and <strong>Relative-Premium</strong> read &lsquo;—&rsquo; &mdash; so treat the combined score as a
-  near-complete, not full, read. The one research-validated edge is the vol-premium read on the
-  <a href="/gamma" class="underline hover:text-amber-100">Gamma &amp; vol</a> tab.
+  near-complete, not full, read. Project research found no tradeable edge, including the vol-premium read on the
+  <a href="/gamma" class="underline hover:text-amber-100">Gamma &amp; vol</a> tab
+  (<code>docs/edge_to_money.md</code>); scores and boards are context only.
 </div>
 {% endif %}
 
@@ -110,8 +111,8 @@
 </form>
 
 <!-- Vol-premium board (hero). Ranked by IV-rank — richness of vol in the name's
-     own 1y range. This is the one research-validated read; it is DESCRIPTIVE
-     context, never a directional call. Names with earnings inside the structure
+     own 1y range. Project research found the vol premium untradeable after costs
+     (docs/edge_to_money.md); this board is DESCRIPTIVE context, never a call. Names with earnings inside the structure
      window are demoted and flagged (high IV before earnings is a justified
      charge, not free premium). Descriptive only — no prescriptive language. -->
 {% if vol_board %}
@@ -126,7 +127,7 @@
     {% if row.below_threshold and not ns.crossed %}
     <div class="xl:col-span-2 flex items-center gap-3 text-xs text-gray-600 my-1">
       <span class="flex-1 h-px bg-gray-800"></span>
-      <span class="shrink-0">rich-vol threshold · IV-rank 75 — below here vol is less rich to sell</span>
+      <span class="shrink-0">rich-vol threshold · IV-rank 75 — below here IV is less rich in its own 1y range</span>
       <span class="flex-1 h-px bg-gray-800"></span>
     </div>
     {% set ns.crossed = true %}

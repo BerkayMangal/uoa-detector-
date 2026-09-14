@@ -185,9 +185,9 @@ def _verdict(
         )
     if t >= 2.0 and mean > 0:
         return "edge", (
-            f"Possible edge. Your names move your way {mean:+.2%} beyond the "
-            f"market per trade (t={t:.2f}, significant). Promising — keep "
-            "validating and watch for regime change before sizing up."
+            f"Significant on this sample: your names moved your way {mean:+.2%} "
+            f"beyond the market per trade (t={t:.2f}). Not proof of a durable edge; "
+            "a small sample or a regime change can reverse it. Keep logging."
         )
     return "negative", (
         f"Warning: negative skill. Your picks underperform the market by "

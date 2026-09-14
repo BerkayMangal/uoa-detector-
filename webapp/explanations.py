@@ -21,14 +21,15 @@ AXES: list[tuple[str, str, str]] = [
      "lifting the offer (paying up). NOT a vs-history comparison; that is the "
      "separate Relative Premium axis."),
     ("convexity_score", "Convexity",
-     "Whether this looks like a cheap, asymmetric, high-payoff bet (small "
-     "risk, large potential). The detector's prize axis — but it is computed "
-     "from the option chain and is NOT in our live data tier, so it reads '—' "
-     "on live cards (populated only for the sample backtest)."),
+     "Whether the option's payoff looks asymmetric (small premium relative to "
+     "the move it would need). A description of the contract, not of expected "
+     "return. Computed from the option chain and NOT in our live data tier, so "
+     "it reads '—' on live cards (populated only for the sample backtest)."),
     ("gamma_score", "Dealer Gamma (GEX)",
-     "Whether market-makers are 'short gamma' near a flip — squeeze-prone, "
-     "computed from the dealer GEX across the chain. Live (from UW). The Gamma "
-     "& vol board shows the full per-name map (regime, flip, walls)."),
+     "Whether market-makers are 'short gamma' near a flip, computed from the "
+     "dealer GEX across the chain. Live (from UW). Project research found no "
+     "tradeable gamma-direction edge. The Gamma & vol board shows the full "
+     "per-name map (regime, flip, walls)."),
     ("price_confirmation_score", "Price Confirmation",
      "Did the underlying's spot move the SAME way as the bet around the print? "
      "Confirmation strengthens it. Live; defaults to neutral (0.5) when the "
@@ -56,8 +57,7 @@ GLOSSARY: dict[str, str] = {
            "chain. Negative (dealers short gamma) means hedging chases the "
            "move; the 'flip' is where it crosses zero.",
     "ISO": "Intermarket Sweep Order — an aggressive order that sweeps "
-           "multiple venues at once to fill fast. A marker of urgency / "
-           "informed execution.",
+           "multiple venues at once to fill fast. A marker of urgency.",
     "DTE": "Days To Expiry — how long until the option expires. Short-dated "
            "(low DTE) options are the most leveraged / convex.",
     "sweep": "A trade executed aggressively across venues (often ISO) — the "
@@ -78,10 +78,9 @@ GLOSSARY: dict[str, str] = {
 LABEL_MEANINGS: dict[str, str] = {
     "HIGH_CONVICTION_SEQUENCE": "Top of the stack — strong, corroborated, part "
                                 "of a building sequence.",
-    "CONVEXITY_CLUSTER": "A cluster of convex, asymmetric bets — the prize "
-                         "pattern.",
+    "CONVEXITY_CLUSTER": "A cluster of convex, asymmetric bets.",
     "CONVEXITY_BURST": "A sudden burst of convex positioning.",
-    "CONVEXITY_WATCH": "Convex-looking, but not yet corroborated — worth watching.",
+    "CONVEXITY_WATCH": "Convex-looking, but not yet corroborated.",
     "SWEEP_UOA": "Aggressive sweep with unusual size.",
     "STANDARD_UOA": "Unusual activity, but without strong corroboration.",
     "PRE_CATALYST_FLOW": "Flow positioned ahead of a scheduled catalyst.",
@@ -150,30 +149,28 @@ def conviction(score: float | None) -> tuple[str, int]:
 
 
 def vol_structure(*, regime: str) -> str:
-    """Defined-risk structure TEMPLATE (type, not strikes) for harvesting vol
-    premium, tailored to the gamma regime. Honesty: a template the user
-    sizes/strikes — never a recommendation."""
+    """Structure TEMPLATE text (type, not strikes) shown per gamma regime, with
+    the research outcome attached. Descriptive — never a recommendation."""
     if regime == "long":
-        # Dealers long gamma -> moves suppressed / range-bound: a symmetric body
-        # collects the most premium, wings cap the risk.
-        return ("~30 DTE ~30Δ iron fly — long-gamma suppresses moves, so a pinned "
-                "range favours the short body; the wings cap the risk. You size/strike it.")
-    # Dealers short gamma -> moves amplified / breakout risk: skip the symmetric
-    # fly, take one side, keep size small.
-    return ("~30 DTE ~30Δ credit spread (one side) — short-gamma amplifies moves, "
-            "so skip the symmetric fly; defined risk, keep size small. You size/strike it.")
+        return ("Template shown for long-gamma names: ~30 DTE ~30Δ iron fly (defined risk). "
+                "Project research found this structure untradeable after costs and tail "
+                "stress (docs/edge_to_money.md). Context, not a recommendation.")
+    return ("Template shown for short-gamma names: ~30 DTE ~30Δ one-sided credit spread "
+            "(defined risk). No project study validates it; the iron-fly version was "
+            "untradeable after costs (docs/edge_to_money.md). Context, not a recommendation.")
 
 
 def vol_read(*, iv_rank: int, earnings_in_window: bool) -> str:
     """Plain-English description of WHY this name is on the board. Descriptive."""
-    rich = f"IV-rank {iv_rank} — implied vol is high in its own 1y range, so the vol here is rich to sell."
-    earn = (" ⚠ Earnings inside the window — the high IV is a justified charge, not free premium."
+    rich = f"IV-rank {iv_rank}: implied vol is high in its own 1y range."
+    earn = (" ⚠ Earnings inside the window: the high IV prices a known event."
             if earnings_in_window else " No earnings in the window.")
     return rich + earn
 
 
 def vol_caveat() -> str:
     """Fixed honesty line shown on every vol-board row."""
-    return ("The base vol premium is the tested edge; the gamma regime is context, "
-            "not extra return. Size for a vol spike (fat left tail).")
+    return ("Context only: project research found the vol premium untradeable after "
+            "costs and tail stress (docs/edge_to_money.md); the gamma regime is context, "
+            "not extra return. Fat left tail: vol spikes.")
 

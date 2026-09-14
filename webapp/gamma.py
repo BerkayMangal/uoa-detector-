@@ -7,10 +7,13 @@ pinning (study_gamma_pinning — corr ~0, sign-flips across halves). The vol
 effect (H1, "extreme-gamma names move more") looks significant full-sample
 (t=2.60) but does NOT survive the same non-overlap gauntlet that killed the
 others (t=1.08) — so it is NOT robustly established either. The ONE thing that
-survived robustness is a separate, different claim: the vol-RISK-premium
-(sell vol in long-gamma + high-IV names, study_vol_premium, non-overlap t=2.64,
-small and tail-risky). So this map is purely SpotGamma-style structural context
-(regime, flip, walls, IV rank) to inform a discretionary read — NEVER a signal.
+survived that robustness check is a separate, different claim: the
+vol-RISK-premium (implied above later realized in long-gamma + high-IV names,
+study_vol_premium, non-overlap t=2.64). As a trade it did not survive costs,
+tail stress and walk-forward (docs/edge_to_money.md), and the conditioning is
+WEAK out of sample (docs/study_D_result.md). So this map is purely
+SpotGamma-style structural context (regime, flip, walls, IV rank) to inform a
+discretionary read — NEVER a signal.
 
 GEX is computed from per-strike dealer exposure: live from UW greek-exposure
 (webapp/gamma_live.py, full-tier key) refreshed in-process, OR offline from the
@@ -107,9 +110,12 @@ class GammaContext:
 
     @property
     def vol_signal(self) -> str:
-        """The study-backed vol read: sell vol in long-gamma + rich IV; buy in
-        short-gamma + cheap IV. Only the sell side survived robustness — buy is
-        shown as a weak/watch lead. Returns 'sell' | 'buy' | 'neutral'."""
+        """Regime + IV-rank bucket: 'sell' = long gamma and IV rank >= 0.75,
+        'buy' = short gamma and IV rank <= 0.25, else 'neutral'. The keys are
+        legacy identifiers for ordering and colour, not trade instructions:
+        project research found the vol premium untradeable after costs
+        (docs/edge_to_money.md) and this conditioning WEAK out of sample
+        (docs/study_D_result.md). Returns 'sell' | 'buy' | 'neutral'."""
         if self.iv_pct is None:
             return "neutral"
         if self.regime == "long" and self.iv_pct >= 0.75:
@@ -121,9 +127,9 @@ class GammaContext:
     @property
     def vol_label(self) -> str:
         return {
-            "sell": "Options rich — vol-selling candidate (defined-risk)",
-            "buy": "Options cheap — vol-buying lead (weak, watch)",
-            "neutral": "Vol fairly priced",
+            "sell": "IV rich vs its 1y range (long gamma)",
+            "buy": "IV cheap vs its 1y range (short gamma)",
+            "neutral": "IV rank not extreme for this regime",
         }[self.vol_signal]
 
 

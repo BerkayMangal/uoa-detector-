@@ -1,6 +1,6 @@
 """Pure assembly of the vol-premium board (Phase 4.34).
 
-Ranks the live gamma_regime names by IV-rank (richness of vol to sell) — NOT by
+Ranks the live gamma_regime names by IV-rank (IV richness in its own 1y range) — NOT by
 the long-gamma+high-IV "sell cell" (Study D showed that conditioning is weak
 OOS, docs/study_D_result.md). Names with earnings inside the structure window
 are demoted and flagged: high IV before earnings is a justified charge, not free

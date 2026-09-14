@@ -3,12 +3,12 @@
 
 <h2 class="text-xl font-bold text-white mb-1">Gamma &amp; vol board</h2>
 <p class="text-sm text-gray-400 mb-4 max-w-3xl">
-  Dealer-gamma structure per name, plus the one edge our research found: the
-  <strong class="text-amber-300">vol-risk premium</strong>. In long-gamma names with rich IV,
-  implied vol systematically overshoots what follows (sell-vol survived the full robustness
-  gauntlet, t=2.64 out-of-overlap). <strong>Not</strong> a directional signal — gamma direction
-  and pinning were both rejected. And vol-selling carries fat tail risk: only with
-  <strong>defined-risk</strong> structures and size that survives a vol spike.
+  Dealer-gamma structure per name, with IV rank as context. Descriptive only, not a signal:
+  project research found <strong>no tradeable edge</strong> here. Gamma direction and pinning
+  were rejected. Implied vol has run above later realized vol (the
+  <strong class="text-amber-300">vol-risk premium</strong>), but as a trade it did not survive
+  costs, tail stress and walk-forward (<code>docs/edge_to_money.md</code>), and the long-gamma +
+  high-IV conditioning is WEAK out of sample (<code>docs/study_D_result.md</code>).
 </p>
 
 <div class="overflow-x-auto rounded-lg border border-gray-800">

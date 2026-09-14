@@ -55,7 +55,7 @@ def test_empty_dashboard_shows_empty_state(client: TestClient) -> None:
 def test_gamma_board_shows_seeded_ticker(client: TestClient) -> None:
     body = client.get("/gamma").text
     assert "TSLA" in body
-    assert "vol-selling candidate" in body  # long-gamma + IV 90pct -> sell signal
+    assert "IV rich vs its 1y range" in body  # long-gamma + IV 90pct -> sell signal
 
 
 def test_journal_shows_seeded_trade(client: TestClient) -> None:

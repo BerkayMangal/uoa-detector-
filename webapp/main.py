@@ -465,7 +465,7 @@ def journal_close(
 def gamma_page(request: Request) -> HTMLResponse:
     latest: dict[str, gamma.GammaContext] = _safe(lambda: _gamma().latest(), {})
     rows = list(latest.values())
-    # Sell-vol candidates first, then by IV percentile (richest first).
+    # Rich-IV long-gamma rows first, then cheap-IV short-gamma, then by IV percentile.
     order = {"sell": 0, "buy": 1, "neutral": 2}
     rows.sort(key=lambda g: (order.get(g.vol_signal, 9), -(g.iv_pct or 0)))
     return templates.TemplateResponse(request, "gamma.html", {"rows": rows, **_EXPLAIN})
