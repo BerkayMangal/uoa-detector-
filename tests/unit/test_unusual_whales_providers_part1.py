@@ -348,23 +348,42 @@ def test_dark_pool_implements_protocol() -> None:
     assert isinstance(provider, DarkPoolPrintProvider)
 
 
+def _dp_row(executed_at: str, **overrides: Any) -> dict[str, Any]:
+    """Live-shaped ``/api/darkpool/{ticker}`` row (Phase 3.9.7).
+
+    UW rows carry NBBO + condition codes, not a precomputed side_estimate.
+    """
+    row: dict[str, Any] = {
+        "executed_at": executed_at,
+        "trf_executed_at": executed_at,
+        "ticker": "AAPL",
+        "price": "150.42",
+        "size": 50000,
+        "premium": "7521000.00",
+        "nbbo_bid": "150.40",
+        "nbbo_ask": "150.45",
+        "canceled": False,
+        "sale_cond_codes": None,
+        "trade_code": None,
+        "ext_hour_sold_codes": None,
+        "market_center": "L",
+        "trade_settlement": "regular",
+    }
+    row.update(overrides)
+    return row
+
+
 @pytest.mark.asyncio
 async def test_dark_pool_returns_prints_in_window() -> None:
     client = _FakeClient()
     client.stub(
-        "/api/darkpool/AAPL/prints",
+        "/api/darkpool/AAPL",
         {
             "data": [
-                {"executed_at": "2024-01-15T14:25:30Z",
-                 "price": "150.42", "size": 50000,
-                 "side_estimate": "midpoint"},
-                {"executed_at": "2024-01-15T14:55:00Z",
-                 "price": "150.55", "size": 30000,
-                 "side_estimate": "above_ask"},
+                _dp_row("2024-01-15T14:25:30Z"),
+                _dp_row("2024-01-15T14:55:00Z", price="150.55", size=30000),
                 # Outside window:
-                {"executed_at": "2024-01-15T13:00:00Z",
-                 "price": "150.10", "size": 10000,
-                 "side_estimate": "midpoint"},
+                _dp_row("2024-01-15T13:00:00Z", price="150.10", size=10000),
             ],
         },
     )
@@ -385,11 +404,11 @@ async def test_dark_pool_returns_prints_in_window() -> None:
 @pytest.mark.asyncio
 async def test_dark_pool_unknown_side_falls_back() -> None:
     client = _FakeClient()
+    # No usable NBBO on the row -> side cannot be classified.
     client.stub(
-        "/api/darkpool/AAPL/prints",
-        {"data": [{"executed_at": "2024-01-15T14:30:00Z",
-                    "price": "150.0", "size": 100,
-                    "side_estimate": "weird_value"}]},
+        "/api/darkpool/AAPL",
+        {"data": [_dp_row("2024-01-15T14:30:00Z", price="150.0", size=100,
+                          nbbo_bid=None, nbbo_ask=None)]},
     )
     provider = UnusualWhalesDarkPoolProvider(
         client=client,  # type: ignore[arg-type]
@@ -408,28 +427,32 @@ async def test_dark_pool_unknown_side_falls_back() -> None:
 async def test_dark_pool_caches_per_ticker() -> None:
     client = _FakeClient()
     client.stub(
-        "/api/darkpool/AAPL/prints",
+        "/api/darkpool/AAPL",
         {"data": []},
     )
     provider = UnusualWhalesDarkPoolProvider(
         client=client,  # type: ignore[arg-type]
         settings=_settings(),
     )
-    before = datetime(2024, 1, 15, 15, 0, tzinfo=UTC)
     await provider.recent_prints(
-        ticker="AAPL", before=before, window=timedelta(minutes=10),
+        ticker="AAPL",
+        before=datetime(2024, 1, 15, 15, 0, tzinfo=UTC),
+        window=timedelta(minutes=10),
     )
     await provider.recent_prints(
-        ticker="AAPL", before=before, window=timedelta(minutes=20),
+        ticker="AAPL",
+        before=datetime(2024, 1, 15, 15, 20, tzinfo=UTC),
+        window=timedelta(minutes=10),
     )
-    # Same ticker → one fetch (window filtering happens in-memory).
+    # Same ticker, hour bucket and window → one fetch (window filtering
+    # happens in-memory). Contract §3.4 keys the cache on all three.
     assert len(client.calls) == 1
 
 
 @pytest.mark.asyncio
 async def test_dark_pool_handles_empty_response() -> None:
     client = _FakeClient()
-    client.stub("/api/darkpool/AAPL/prints", {"data": []})
+    client.stub("/api/darkpool/AAPL", {"data": []})
     provider = UnusualWhalesDarkPoolProvider(
         client=client,  # type: ignore[arg-type]
         settings=_settings(),
@@ -447,13 +470,11 @@ async def test_dark_pool_malformed_row_skipped() -> None:
     """Bad row dropped, good row emitted."""
     client = _FakeClient()
     client.stub(
-        "/api/darkpool/AAPL/prints",
+        "/api/darkpool/AAPL",
         {
             "data": [
-                {"executed_at": "garbage_timestamp", "price": "1.0", "size": 1,
-                 "side_estimate": "midpoint"},
-                {"executed_at": "2024-01-15T14:30:00Z", "price": "150.0",
-                 "size": 100, "side_estimate": "midpoint"},
+                _dp_row("garbage_timestamp", price="1.0", size=1),
+                _dp_row("2024-01-15T14:30:00Z", price="150.0", size=100),
             ],
         },
     )
