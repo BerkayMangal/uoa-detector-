@@ -237,7 +237,7 @@ async def gamma_refresh_loop(
                 settings=profile.data_sources.unusual_whales,
             )
             catalyst_provider = UnusualWhalesCatalystCalendarProvider(
-                client, profile.data_sources.unusual_whales,
+                client=client, settings=profile.data_sources.unusual_whales,
             )
             try:
                 n = await refresh_all(client, tickers, repo, catalyst_provider)
