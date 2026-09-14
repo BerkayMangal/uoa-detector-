@@ -233,24 +233,26 @@ def test_iv_history_implements_protocol() -> None:
 
 @pytest.mark.asyncio
 async def test_iv_history_returns_nearest_snapshot() -> None:
+    """The row published just before ``at`` wins; the later row is unseen.
+
+    Phase 3.9.6 (D10): path and rows moved from the guessed per-contract
+    endpoint to live-shaped ``/api/stock/{ticker}/iv-rank`` rows.
+    """
     client = _FakeClient()
-    expected_path = "/api/option-contract/AAPL240216C00150000/iv-rank"
+    expected_path = "/api/stock/AAPL/iv-rank"
     client.stub(
         expected_path,
         {
             "data": [
-                {"as_of": "2024-01-15T15:00:00Z",
-                 "implied_volatility": 0.40,
-                 "iv_rank_252d": 60.0, "iv_percentile_252d": 65.0,
-                 "iv_change_intraday_pct": 5.0},
-                {"as_of": "2024-01-15T15:30:00Z",
-                 "implied_volatility": 0.42,
-                 "iv_rank_252d": 67.5, "iv_percentile_252d": 72.1,
-                 "iv_change_intraday_pct": 12.3},
-                {"as_of": "2024-01-15T16:00:00Z",
-                 "implied_volatility": 0.45,
-                 "iv_rank_252d": 70.0, "iv_percentile_252d": 75.0,
-                 "iv_change_intraday_pct": 18.0},
+                {"close": "315.34", "date": "2026-09-09",
+                 "updated_at": "2026-09-09T22:35:00.940875Z",
+                 "volatility": "0.259", "iv_rank_1y": "52.1585"},
+                {"close": "326.57", "date": "2026-09-10",
+                 "updated_at": "2026-09-10T22:35:01.459306Z",
+                 "volatility": "0.258", "iv_rank_1y": "51.5671"},
+                {"close": "332.27", "date": "2026-09-11",
+                 "updated_at": "2026-09-11T22:35:01.825674Z",
+                 "volatility": "0.239", "iv_rank_1y": "40.3312"},
             ],
         },
     )
@@ -263,11 +265,11 @@ async def test_iv_history_returns_nearest_snapshot() -> None:
         strike=Decimal("150.00"),
         expiry=date(2024, 2, 16),
         option_type="call",
-        at=datetime(2024, 1, 15, 15, 32, tzinfo=UTC),
+        at=datetime(2026, 9, 10, 23, 0, tzinfo=UTC),
     )
     assert snap is not None
-    assert snap.implied_volatility == 0.42  # nearest is 15:30
-    assert snap.iv_rank_252d == 67.5
+    assert snap.implied_volatility == 0.258  # nearest published is 09-10
+    assert snap.iv_rank_252d == 51.5671
 
 
 @pytest.mark.asyncio
@@ -288,12 +290,13 @@ async def test_iv_history_returns_none_on_empty() -> None:
 @pytest.mark.asyncio
 async def test_iv_history_caches_response() -> None:
     client = _FakeClient()
-    expected_path = "/api/option-contract/AAPL240216C00150000/iv-rank"
+    # Phase 3.9.6 (D10): live-shaped row on the ticker-level path.
+    expected_path = "/api/stock/AAPL/iv-rank"
     client.stub(
         expected_path,
-        {"data": [{"as_of": "2024-01-15T15:30:00Z",
-                    "implied_volatility": 0.42,
-                    "iv_rank_252d": 67.5}]},
+        {"data": [{"close": "332.27", "date": "2026-09-11",
+                    "updated_at": "2026-09-11T22:35:01.825674Z",
+                    "volatility": "0.239", "iv_rank_1y": "40.3312"}]},
     )
     provider = UnusualWhalesIVHistoryProvider(
         client=client,  # type: ignore[arg-type]
@@ -302,7 +305,7 @@ async def test_iv_history_caches_response() -> None:
     args: dict[str, Any] = {
         "ticker": "AAPL", "strike": Decimal("150.00"),
         "expiry": date(2024, 2, 16), "option_type": "call",
-        "at": datetime(2024, 1, 15, 15, 30, tzinfo=UTC),
+        "at": datetime(2026, 9, 11, 23, 0, tzinfo=UTC),
     }
     await provider.iv_rank_at(**args)
     await provider.iv_rank_at(**args)
@@ -310,8 +313,12 @@ async def test_iv_history_caches_response() -> None:
 
 
 @pytest.mark.asyncio
-async def test_iv_history_put_uses_p_in_occ_symbol() -> None:
-    """option_type='put' encodes as 'P' in the OCC symbol."""
+async def test_iv_history_put_uses_ticker_level_path() -> None:
+    """option_type='put' reads the same ticker-level series as a call.
+
+    Phase 3.9.6 (D10): replaces test_iv_history_put_uses_p_in_occ_symbol.
+    UW publishes IV rank per underlying, so no OCC symbol is built.
+    """
     client = _FakeClient()
     provider = UnusualWhalesIVHistoryProvider(
         client=client,  # type: ignore[arg-type]
@@ -320,11 +327,11 @@ async def test_iv_history_put_uses_p_in_occ_symbol() -> None:
     await provider.iv_rank_at(
         ticker="AAPL", strike=Decimal("150.00"),
         expiry=date(2024, 2, 16), option_type="put",
-        at=datetime(2024, 1, 15, 15, 30, tzinfo=UTC),
+        at=datetime(2026, 9, 11, 18, 0, tzinfo=UTC),
     )
     assert len(client.calls) == 1
     path = client.calls[0][0]
-    assert "AAPL240216P00150000" in path
+    assert path == "/api/stock/AAPL/iv-rank"
 
 
 # ===========================================================================
