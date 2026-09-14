@@ -25,6 +25,7 @@ from typing import TYPE_CHECKING
 from uoa_detector.domain.events import FillSide
 from uoa_detector.domain.raw_print import RawPrint
 from uoa_detector.sources.market_hours import is_market_open
+from uoa_detector.sources.unusual_whales.client import UnusualWhalesDailyLimitError
 from uoa_detector.sources.unusual_whales.live import (
     _coerce_option_type,
     _parse_expiry,
@@ -137,8 +138,13 @@ class UnusualWhalesFlowPollSource:
         except Exception as exc:
             # The UW daily request cap surfaces as a 429 carrying
             # "daily_request_limit_hit"; flag it so stream() backs off until
-            # the quota resets rather than re-polling every interval.
-            if "daily_request_limit" in str(exc):
+            # the quota resets rather than re-polling every interval. The
+            # client raises the typed UnusualWhalesDailyLimitError for it
+            # (Phase 3.9.3); the substring check stays as a fallback for any
+            # caller path that surfaces the vendor code untyped (Phase 5.0.4).
+            if isinstance(exc, UnusualWhalesDailyLimitError) or (
+                "daily_request_limit" in str(exc)
+            ):
                 self._daily_limit_hit = True
             _logger.warning("UW flow-alerts fetch failed for %s: %s", ticker, exc)
             return []

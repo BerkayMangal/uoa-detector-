@@ -10,6 +10,7 @@ from decimal import Decimal
 
 import pytest
 
+from uoa_detector.sources.unusual_whales.client import UnusualWhalesDailyLimitError
 from uoa_detector.sources.unusual_whales.flow_poll import UnusualWhalesFlowPollSource
 
 _NOW = datetime(2026, 6, 18, 19, 0, tzinfo=UTC)
@@ -188,6 +189,40 @@ async def test_daily_limit_triggers_long_backoff() -> None:
             )
 
     client = _LimitClient()
+    durations: list[float] = []
+    src = UnusualWhalesFlowPollSource(
+        client, ["TSLA"], now=lambda: _NOW,
+        poll_interval_s=60.0, daily_limit_backoff_s=1800.0,
+    )
+
+    async def _sleep(seconds: float) -> None:
+        durations.append(seconds)
+        src._closed = True
+
+    src._sleep = _sleep  # type: ignore[assignment]
+    prints = await _collect(src)
+    assert prints == []
+    assert client.calls == 1
+    assert durations == [1800.0]  # took the daily-limit backoff, not 60s
+
+
+async def test_typed_daily_limit_error_triggers_long_backoff() -> None:
+    # Phase 5.0.4: the client raises the typed UnusualWhalesDailyLimitError.
+    # Detection must not depend on the vendor code surviving in the message:
+    # a typed error whose text lacks the body marker still takes the long
+    # daily-limit backoff.
+    message = "UnusualWhales GET /api/stock/TSLA/flow-alerts quota exhausted (HTTP 429)"
+    assert "daily_request_limit" not in message
+
+    class _TypedLimitClient:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        async def request_json(self, path: str) -> dict[str, object]:
+            self.calls += 1
+            raise UnusualWhalesDailyLimitError(message)
+
+    client = _TypedLimitClient()
     durations: list[float] = []
     src = UnusualWhalesFlowPollSource(
         client, ["TSLA"], now=lambda: _NOW,
