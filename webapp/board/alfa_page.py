@@ -28,8 +28,18 @@ Contract: ``docs/phase-5.2-alfa-board-acceptance.md`` §4.1 ("Render"), §5 A1,
   profile that wrote the row. Applied penalties feed the counter-argument's
   last priority.
 - A7: the page counts clean candidates (R-EM1): İŞLENİR rows whose evidence is
-  within ``clean_candidate``. With none, the page shows ``Bugün temiz aday
-  yok``; a failed read never does.
+  within ``clean_candidate``. ``min_supporting`` counts only families that
+  point the row's way: a non-directional lehte family (dealer gamma, decision
+  P9) never makes a row clean on its own (review FA-03).
+- R-EM1 banner (review FA-04). With no clean candidate:
+  - ``Bugün temiz aday yok`` only when the run's newest print is on today's
+    ET date;
+  - ``{date} seansında temiz aday yok`` for an earlier session, and
+    ``Bu çalışmada temiz aday yok`` when the session date is unknown;
+  - never after a failed evidence or quote read: every row then reads
+    unknown, so the page says the clean-candidate state could not be read;
+  - never for a failed print read or when there is no run: nothing was
+    evaluated, and those states have their own copy.
 
 The template only shows strings from the frozen dictionaries here and in
 ``direction.py``, ``aggregate.py``, ``tradability.py``, ``evidence.py``,
@@ -43,10 +53,11 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from pathlib import Path
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Final, Literal
+from zoneinfo import ZoneInfo
 
 from uoa_detector.calibration import load_profile
 from webapp.board.aggregate import POSITION_READ_LABELS, BoardRow, build_board_rows
@@ -171,6 +182,13 @@ ALFA_COPY: Final[Mapping[str, str]] = MappingProxyType(
         "audit_pre": "Ceza öncesi birleşik skor: {score}",
         "audit_inputs": "Skorun girdileri",
         "audit_record_missing": "kayıt okunamadı",
+        # R-EM1 banner variants (review FA-04); "Bugün temiz aday yok" stays copy_tr.NO_CLEAN_CANDIDATE.
+        "no_clean_candidate_dated": "{date} seansında temiz aday yok",
+        "no_clean_candidate_undated": "Bu çalışmada temiz aday yok",
+        "clean_candidate_unread": (
+            "Temiz aday durumu okunamadı: kanıt veya kotasyon tabloları okunamadı. "
+            "Bu, temiz aday yok demek değil."
+        ),
     },
 )
 
@@ -206,6 +224,7 @@ FILL_SIDE_LABELS: Final[Mapping[str, str]] = MappingProxyType(
 )
 
 _MAIN_STATES: Final = frozenset({"tradable", "narrow"})
+_ET: Final = ZoneInfo("America/New_York")
 
 
 @dataclass(frozen=True)
@@ -267,11 +286,31 @@ class AlfaPage:
     quotes_failed: bool = False
     evidence_failed: bool = False
     clean_candidate_count: int = 0
+    session_date: date | None = None  # ET date of the run's newest print
+    today: date | None = None  # ET date of the page's clock
 
     @property
     def no_clean_candidate(self) -> bool:
-        """R-EM1: no row qualifies; never claimed for a failed read."""
-        return not self.load_failed and self.clean_candidate_count == 0
+        """R-EM1: no row qualifies; never claimed for a failed print, evidence or quote read."""
+        return not self._read_failed and self.clean_candidate_count == 0
+
+    @property
+    def clean_candidate_unread(self) -> bool:
+        """No clean candidate only because evidence or quotes could not be read: unknown, not "none"."""
+        return not self.load_failed and (self.evidence_failed or self.quotes_failed)
+
+    @property
+    def no_clean_candidate_text(self) -> str:
+        """``Bugün temiz aday yok`` for today's session; a dated or undated variant otherwise."""
+        if self.session_date is None:
+            return ALFA_COPY["no_clean_candidate_undated"]
+        if self.session_date == self.today:
+            return NO_CLEAN_CANDIDATE
+        return ALFA_COPY["no_clean_candidate_dated"].format(date=self.session_date.isoformat())
+
+    @property
+    def _read_failed(self) -> bool:
+        return self.load_failed or self.evidence_failed or self.quotes_failed
 
     @property
     def summary(self) -> str:
@@ -373,14 +412,29 @@ def build_audit(event_id: str | None, signal: StoredSignal | None) -> AuditView:
     )
 
 
-def is_clean_candidate(chip: TradabilityRead, counts: EvidenceCounts, settings: CleanCandidateSettings) -> bool:
-    """R-EM1: İŞLENİR (not DAR, not kotasyon yok) with the evidence inside ``clean_candidate``."""
+def is_clean_candidate(
+    chip: TradabilityRead,
+    counts: EvidenceCounts,
+    settings: CleanCandidateSettings,
+    *,
+    non_directional_supporting: int = 0,
+) -> bool:
+    """R-EM1: İŞLENİR (not DAR, not kotasyon yok) with the evidence inside ``clean_candidate``.
+
+    ``min_supporting`` counts only lehte families that point the row's way, so
+    ``non_directional_supporting`` (dealer gamma, decision P9) is taken out first.
+    """
     return (
         chip.state == "tradable"
-        and counts.supporting >= settings.min_supporting
+        and counts.supporting - non_directional_supporting >= settings.min_supporting
         and counts.against <= settings.max_against
         and counts.unknown <= settings.max_unknown
     )
+
+
+def _et_date(moment: datetime) -> date:
+    aware = moment.replace(tzinfo=UTC) if moment.tzinfo is None else moment
+    return aware.astimezone(_ET).date()
 
 
 def _view_order(view: AlfaRowView) -> tuple[int, int, int, Decimal, str, str]:
@@ -417,8 +471,12 @@ def build_alfa_page(
     legacy_scores: LegacyScores | None = None,
     profile_hash_source: ProfileHashSource | None = None,
     profile_resolver: ProfileResolver | None = None,
+    run_latest_ts: datetime | None = None,
 ) -> AlfaPage:
     """The page model; ``prints=None`` means the database read failed.
+
+    The session date for the R-EM1 banner is the ET date of the newest print,
+    or of ``run_latest_ts`` (the run's newest signal time) when no print parsed.
 
     Without a quote source every chip reads ``kotasyon yok``. A failed quote
     read sets ``quotes_failed`` and leaves every chip unknown, never clean.
@@ -428,9 +486,11 @@ def build_alfa_page(
     Without a profile hash source, or when it fails, the penalty ledger says
     the writing profile could not be read and shows no profile numbers.
     """
+    moment = now if now is not None else datetime.now(UTC)
     if prints is None:
         return AlfaPage(
             rows=(), views=(), sections=(), print_count=0, load_failed=True, gate_on=gate_on,
+            today=_et_date(moment),
         )
     rows = build_board_rows(prints, settings.aggregation)
     symbols = tuple(dominant_symbol(r) for r in rows)
@@ -460,7 +520,6 @@ def build_alfa_page(
         except Exception:
             _logger.exception("alfa board: profile hash read failed; ledgers show no profile numbers")
     signals = {p.event_id: p.signal for p in prints}
-    moment = now if now is not None else datetime.now(UTC)
     views: list[AlfaRowView] = []
     for row, symbol, request in zip(rows, symbols, requests, strict=True):
         chip = assess_tradability(
@@ -510,10 +569,14 @@ def build_alfa_page(
                     penalties=PenaltyCheck(applied=ledger.applied_names),
                 ),
                 ledger=ledger,
-                clean_candidate=is_clean_candidate(chip, evidence.counts, settings.clean_candidate),
+                clean_candidate=is_clean_candidate(
+                    chip, evidence.counts, settings.clean_candidate,
+                    non_directional_supporting=len(evidence.non_directional_supporting_labels()),
+                ),
             ),
         )
     ordered = tuple(sorted(views, key=_view_order))
+    newest = max((p.timestamp for row in rows for p in row.prints), default=run_latest_ts)
     return AlfaPage(
         rows=tuple(v.row for v in ordered),
         views=ordered,
@@ -524,6 +587,8 @@ def build_alfa_page(
         quotes_failed=quotes_failed,
         evidence_failed=evidence_failed,
         clean_candidate_count=sum(1 for v in ordered if v.clean_candidate),
+        session_date=_et_date(newest) if newest is not None else None,
+        today=_et_date(moment),
     )
 
 

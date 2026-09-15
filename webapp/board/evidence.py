@@ -248,6 +248,11 @@ _SWAPPED: Final[Mapping[FamilyState, FamilyState]] = MappingProxyType(
 )
 # Families whose stage result is relative to option type (swapped for sold options).
 _ORIENTED_FAMILIES: Final = frozenset({"dark_pool", "sector", "price_confirmation"})
+# Families whose lehte reading is non-directional (decision P9): M21 dealer gamma can
+# amplify a move but does not point one way. It still counts as lehte (§9), but the
+# reason sentence never says it shows the direction and the clean-candidate rule
+# does not rest on it (review FA-03).
+NON_DIRECTIONAL_FAMILIES: Final = frozenset({"dealer_gamma"})
 _UNCOUNTED_STATES: Final = frozenset({"neutral", "out_of_scope"})
 _DIMMED_STATES: Final = frozenset({"unknown", "out_of_scope"})
 
@@ -322,6 +327,20 @@ class RowEvidence:
 
     def labels_in(self, state: FamilyState) -> tuple[str, ...]:
         return tuple(f.label for f in self.families if f.state == state)
+
+    def directional_supporting_labels(self) -> tuple[str, ...]:
+        """Lehte families that point the row's way (non-directional families excluded)."""
+        return tuple(
+            f.label for f in self.families
+            if f.state == "supporting" and f.family not in NON_DIRECTIONAL_FAMILIES
+        )
+
+    def non_directional_supporting_labels(self) -> tuple[str, ...]:
+        """Lehte families that amplify a move without pointing one way (decision P9)."""
+        return tuple(
+            f.label for f in self.families
+            if f.state == "supporting" and f.family in NON_DIRECTIONAL_FAMILIES
+        )
 
 
 @dataclass(frozen=True)

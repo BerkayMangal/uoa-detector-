@@ -44,7 +44,10 @@
   {% else %}
   {% if page.no_clean_candidate %}
   <div class="rounded-lg border border-gray-600 bg-gray-900/70 px-4 py-3 mb-3 text-base font-semibold text-gray-100"
-       data-state="no-clean-candidate">{{ no_clean_candidate_label }}</div>
+       data-state="no-clean-candidate">{{ page.no_clean_candidate_text }}</div>
+  {% elif page.clean_candidate_unread %}
+  <div class="rounded-lg border border-dashed border-amber-700/60 bg-amber-900/10 px-4 py-3 mb-3 text-sm text-amber-200"
+       data-state="clean-candidate-unread">{{ copy.clean_candidate_unread }}</div>
   {% endif %}
   {% if not page.rows %}
   <div class="rounded-lg border border-gray-800 bg-gray-900/40 px-4 py-3 text-sm text-gray-400"

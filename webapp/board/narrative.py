@@ -9,6 +9,9 @@ R-WD1; §5 A5.
   tradability chip's frozen label and reason, and labels passed in by later
   items. There is no free text.
 - **Reason** (bull column): the ``lehte`` families and the position read.
+  A non-directional lehte family (dealer gamma, decision P9) is never listed
+  under "{direction} gösteriyor". It gets its own clause saying it does not
+  point a way and can amplify the move (review FA-03).
 - **Counter-argument** (bear column) starts with ``copy_tr.COUNTER_LEAD``
   (``AMA``). It names the single most material negative, in the contract's
   priority order (``COUNTER_PRIORITY``):
@@ -59,6 +62,14 @@ NARRATIVE_COPY: Final[Mapping[str, str]] = MappingProxyType(
 REASON_TEMPLATES: Final[Mapping[str, str]] = MappingProxyType(
     {
         "supporting": "Neden: {count} bağımsız kaynak {direction} gösteriyor ({families}); {position}.",
+        "supporting_amplified": (
+            "Neden: {count} bağımsız kaynak {direction} gösteriyor ({families}); "
+            "{amplifiers} yön göstermez, hareketi büyütebilir; {position}."
+        ),
+        "amplified_only": (
+            "Neden: yönü gösteren bağımsız kaynak yok; {amplifiers} yön göstermez, "
+            "hareketi büyütebilir; {position}."
+        ),
         "no_supporting": (
             "Neden: lehte bağımsız kaynak yok, satırı yalnızca akış baskıları oluşturuyor; {position}."
         ),
@@ -138,13 +149,18 @@ def _join(items: tuple[str, ...]) -> str:
 
 def reason_sentence(row: BoardRow, evidence: RowEvidence) -> str:
     position = POSITION_CLAUSES[row.position_read]
-    supporting = evidence.labels_in("supporting")
-    if not supporting:
+    directional = evidence.directional_supporting_labels()
+    amplifiers = evidence.non_directional_supporting_labels()
+    if not directional and not amplifiers:
         return REASON_TEMPLATES["no_supporting"].format(position=position)
-    return REASON_TEMPLATES["supporting"].format(
-        count=len(supporting),
+    if not directional:
+        return REASON_TEMPLATES["amplified_only"].format(amplifiers=_join(amplifiers), position=position)
+    key = "supporting_amplified" if amplifiers else "supporting"
+    return REASON_TEMPLATES[key].format(
+        count=len(directional),
         direction=DIRECTION_OBJECTS[row.direction],
-        families=_join(supporting),
+        families=_join(directional),
+        amplifiers=_join(amplifiers),
         position=position,
     )
 

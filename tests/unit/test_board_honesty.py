@@ -466,7 +466,14 @@ def test_r_em1_a_clean_candidate_suppresses_the_banner(seeded: TestClient) -> No
     assert len(re.findall(r'data-clean-candidate="true"', body)) == 1
 
 
-def test_r_em1_no_clean_candidate_is_a_first_class_state(board: Callable[..., TestClient]) -> None:
+def test_r_em1_no_clean_candidate_is_a_first_class_state(
+    board: Callable[..., TestClient], monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import webapp.main as m
+
+    # Phase 5.2.A-fix4 (D10, review FA-04): "Bugün" now requires the run's session to be
+    # today's ET date, so the page clock is pinned to the seeded session day.
+    monkeypatch.setattr(m, "_now", lambda: _TS + timedelta(hours=1))
     client = board([r for r in _ROWS if r.ticker != "AAA"])
     for path in _BOARD_PAGES:
         body = client.get(path).text

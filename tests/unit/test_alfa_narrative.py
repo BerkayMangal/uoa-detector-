@@ -240,8 +240,11 @@ def test_fallback_lists_only_the_checks_that_ran() -> None:
 def test_reason_names_the_lehte_families_direction_and_position() -> None:
     row, evidence = _measured_row_evidence()
     narrative = build_narrative(row, evidence, _chip(*_TRADABLE), settings=_NARRATIVE)
+    # Phase 5.2.A-fix4 (D10, review FA-03): dealer gamma is non-directional (decision P9),
+    # so it is no longer listed under "yukarıyı gösteriyor"; it gets its own clause.
     assert narrative.reason == (
-        "Neden: 4 bağımsız kaynak yukarıyı gösteriyor (Akış, Dealer gamma, Karanlık havuz, Sektör); "
+        "Neden: 3 bağımsız kaynak yukarıyı gösteriyor (Akış, Karanlık havuz, Sektör); "
+        "Dealer gamma yön göstermez, hareketi büyütebilir; "
         "prim tek strike'ta toplanmış (kasıtlı pozisyon)."
     )
 

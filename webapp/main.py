@@ -441,6 +441,11 @@ def _load_board_profiles() -> None:
     _BOARD_SETTINGS, _SPREAD_CUTOFF_PCT, _LEGACY_SCORES = settings, cutoff, legacy
 
 
+def _now() -> datetime:
+    """The board page's wall clock (quote and tape ages, the R-EM1 session date); a seam for tests."""
+    return datetime.now(UTC)
+
+
 @app.get("/", response_class=HTMLResponse)
 @app.get("/alfa", response_class=HTMLResponse)
 def alfa_board(request: Request, run: str = "", gate: str = "") -> HTMLResponse:
@@ -471,7 +476,7 @@ def alfa_board(request: Request, run: str = "", gate: str = "") -> HTMLResponse:
         settings,
         gate_on=gate != alfa_page.GATE_OFF_PARAM,
         spread_cutoff_pct=_spread_cutoff_pct(),
-        now=datetime.now(UTC),
+        now=_now(),
         quote_source=lambda symbols: alfa_page.db_quote_source(_board_reader().engine)(symbols),
         evidence_source=lambda run_id, requests: alfa_page.db_evidence_source(_board_reader().engine)(
             run_id, requests,
@@ -481,6 +486,7 @@ def alfa_board(request: Request, run: str = "", gate: str = "") -> HTMLResponse:
             run_id, event_ids,
         ),
         profile_resolver=alfa_page.resolve_writing_profile,
+        run_latest_ts=current.latest_ts if current is not None else None,
     )
     gamma_ctx: dict[str, gamma.GammaContext] = _safe(lambda: _gamma().latest(), {})
     vol_rows: list[VolBoardRow] = _safe(lambda: build_vol_board(
