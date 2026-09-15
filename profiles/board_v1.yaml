@@ -1,0 +1,104 @@
+# Alfa Board settings (Phase 5.2, docs/phase-5.2-alfa-board-acceptance.md §4.3).
+#
+# This file is deliberately SEPARATE from the calibration profiles. Adding a
+# section to CalibrationProfile would change the content hash of v5_default,
+# v5_gamma_squeeze and the burned v6 profile, which trace recorded verdicts.
+#
+# Every numeric cutoff the board uses lives here (D8). Percent keys use
+# percent units (15.0 = 15%), matching penalty_triggers.spread_pct_threshold.
+# The İŞLENMEZ spread cutoff is NOT duplicated here. The board reads
+# penalty_triggers.spread_pct_threshold from profiles/v5_default.yaml
+# (owner instruction A2).
+
+board_profile_id: board_v1
+
+evidence:
+  # K1 (owner): the six counted families. Remove one to stop counting it.
+  counted_families: [flow, dealer_gamma, dark_pool, sector, price_confirmation, open_interest]
+  strong_min_supporting: 4           # "Güçlü" needs at least this many lehte families
+  moderate_min_supporting: 2         # "Orta" needs at least this many lehte families
+  max_unknown_for_strong: 2          # 3+ unknown families: "Güçlü" is forbidden (owner rule)
+  flow_net_premium_deadband_usd: 250000   # |net aggressor premium| below this reads nötr
+
+tradability:
+  max_tradable_spread_pct: 5.0       # İŞLENİR ceiling; edge_to_money.md calls 5% a "generous" spread
+  min_exit_bid_size: 10              # bid size (contracts) below this reads DAR (thin exit)
+  max_quote_age_seconds: 900         # an older quote reads "kotasyon yok" (unknown)
+
+cost:
+  commission_per_contract_usd: 0.65  # per contract, per leg; the cost model of edge_to_money.md
+
+sizing:
+  capital_usd: 10000                 # DEFAULT: the owner's stated upper bound. Set the real value.
+  r_usd: 100                         # DEFAULT: 1% of capital. Set the real value.
+  values_confirmed_by_owner: false   # while false, size and cost cells show "(varsayılan değer)"
+
+aggregation:
+  intentional_min_top_strike_share_pct: 60.0   # top strike share >= this: "kasıtlı pozisyon"
+  scattered_max_top_strike_share_pct: 30.0     # top strike share <= this (with enough strikes): "dağınık envanter"
+  min_strikes_for_scattered: 4
+
+clean_candidate:                     # "Bugün temiz aday yok" when no row passes all of these
+  min_supporting: 1
+  max_against: 0
+  max_unknown: 2
+
+chase:
+  reasonable_max_pct: 10.0           # ask vs print price: at or below this reads "hâlâ makul"
+  late_min_pct: 15.0                 # at or above this reads "geç kaldın"; in between reads "dikkat"
+
+refresh:
+  cadence_seconds: 300               # board refresher cycle during regular trading hours
+  exit_depth_top_k: 10               # contracts that get a /flow depth call each cycle
+  atm_expiries: 3                    # nearest relevant expiries fetched for the ATM straddle
+  daily_request_soft_cap: 24000      # 80% of the 30k/day UW limit; non-critical fetches pause above it
+  closed_market_sleep_seconds: 300
+  daily_limit_backoff_seconds: 1800
+
+regime:
+  tide_deadband_usd: 25000000        # |call premium - put premium| below this reads flat
+  tide_persistence_buckets: 3        # complete 5m buckets a tide reversal must hold for the tripwire
+  gamma_deadband_usd: 1000000000     # |USD per 1% gamma| below this reads flat
+  iv_anchor_short_dte: 30
+  iv_anchor_long_dte: 90
+  iv_curve_deadband_vol_pts: 0.5
+  exclude_event_hump_max_dte: 3      # expiries with dte <= this are ignored for the curve
+  max_source_age_seconds: 900        # an older source reads "bilinmiyor"
+
+opening_closing:
+  confirm_open_min_ratio: 0.5        # delta OI >= ratio x flagged size: açılış
+  confirm_close_max_ratio: -0.5      # delta OI <= ratio x flagged size: kapanış
+  job_time_et: "07:15"               # UW publishes start-of-day OI around 06:30-06:45 ET
+
+catalyst:
+  macro_event_names:                 # matched case-insensitively as substrings of the event name
+    - "interest rate decision"
+    - "fomc"
+    - "economic projections"
+    - "consumer price index"
+    - "cpi"
+    - "nonfarm payrolls"
+    - "pce"
+    - "gdp"
+  macro_horizon_days: 10             # the UW economic calendar covers about 10 days; beyond that reads bilinmiyor
+
+delayed:
+  congress_late_days: 45             # STOCK Act filing deadline
+  congress_lookback_days: 365
+  insider_lookback_days: 90
+  job_time_et: "17:00"
+
+portfolio:
+  focused_etfs: [SMH, IGV, XBI, KRE, XLE, XOP, ITA, ARKK, KWEB, URA, TAN]
+  cluster_min_member_weight_pct: 3.0
+  max_focused_holdings: 60
+  share_class_aliases:
+    GOOG: GOOGL
+    BRK.A: BRK.B
+
+fills:
+  min_n_for_stats: 20                # below this sample size only counts are shown
+
+outcomes:
+  horizons_trading_days: [1, 5]
+  job_time_et: "17:30"
