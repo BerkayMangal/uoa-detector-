@@ -25,6 +25,11 @@ tape:
   # for a stale net-premium tape but pinned no age; this is that age.
   max_age_seconds: 900               # three refresher cycles at the 300 s cadence
 
+narrative:
+  # Phase 5.2.A5: added (the key was missing). Contract §5 A5 counter-argument
+  # priority 5 is "two or more unknown families" but pinned no key; this is that count.
+  counter_min_unknown_families: 2
+
 tradability:
   max_tradable_spread_pct: 5.0       # İŞLENİR ceiling; edge_to_money.md calls 5% a "generous" spread
   min_exit_bid_size: 10              # bid size (contracts) below this reads DAR (thin exit)

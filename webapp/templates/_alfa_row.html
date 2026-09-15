@@ -59,6 +59,19 @@
     {% endif %}
   </div>
 
+  {# R-CA2: the bull and bear columns share width (two equal grid columns) and classes. #}
+  <div class="grid gap-3 md:grid-cols-2 mt-2" data-cases>
+    <div class="{{ case_class }}" data-case="bull">
+      <p class="{{ case_title_class }}" data-case-title>{{ narrative_copy.bull_title }}</p>
+      <p data-reason>{{ view.narrative.reason }}</p>
+    </div>
+    <div class="{{ case_class }}" data-case="bear">
+      <p class="{{ case_title_class }}" data-case-title>{{ narrative_copy.bear_title }}</p>
+      <p data-counter>{{ view.narrative.counter }}</p>
+      {% if view.narrative.checked %}<p data-checked>{{ view.narrative.checked }}</p>{% endif %}
+    </div>
+  </div>
+
   <div class="grid gap-x-5 gap-y-1 md:grid-cols-4 mt-2 text-sm">
     <div><span class="text-gray-400">{{ copy.col_dominant }}</span>
       <span class="text-gray-100" data-dominant>{{ option_type_labels[row.dominant.key.option_type] }} {{ row.dominant.key.strike }} · {{ row.dominant.key.expiry }}</span>

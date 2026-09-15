@@ -165,12 +165,19 @@ class TapeSettings(_Strict):
     max_age_seconds: int = Field(gt=0)
 
 
+class NarrativeSettings(_Strict):
+    """Phase 5.2.A5: the reason sentence and the mandatory counter-argument."""
+
+    counter_min_unknown_families: int = Field(ge=1)
+
+
 class BoardSettings(_Strict):
     """Every Alfa Board cutoff, cadence and owner-set value."""
 
     board_profile_id: str = Field(min_length=1)
     evidence: EvidenceSettings
     tape: TapeSettings
+    narrative: NarrativeSettings
     tradability: TradabilitySettings
     cost: CostSettings
     sizing: SizingSettings

@@ -1,7 +1,7 @@
-"""The ``/alfa`` page view model and its frozen Turkish copy (Phase 5.2.A1, A2, A4).
+"""The ``/alfa`` page view model and its frozen Turkish copy (Phase 5.2.A1, A2, A4, A5).
 
 Contract: ``docs/phase-5.2-alfa-board-acceptance.md`` §4.1 ("Render"), §5 A1,
-§5 A2 ("Gate") and §5 A4; decisions P12, P15 and P16.
+§5 A2 ("Gate"), §5 A4 and §5 A5; decisions P12, P15 and P16.
 
 - A1: one row per (ticker, direction) over the whole run.
 - A2: each row carries the tradability chip of its dominant contract. The
@@ -20,12 +20,16 @@ Contract: ``docs/phase-5.2-alfa-board-acceptance.md`` §4.1 ("Render"), §5 A1,
     ``Birleşik skor (denetim, sınırsız ölçek): 0.xx``. It is not clamped.
   - A failed evidence read is flagged on the page, and every family reads
     ``bilinmiyor``: unknown, never clean.
+- A5: each row carries its reason sentence and its mandatory counter-argument
+  (``webapp/board/narrative.py``), rendered as two columns with the same
+  classes (R-CA2).
 
 The template only shows strings from the frozen dictionaries here and in
-``direction.py``, ``aggregate.py``, ``tradability.py`` and ``evidence.py``
-(rule R-WD1). Summary, chip and audit lines are formatted from frozen templates
-with row values; there is no free text. Quotes and evidence come from the
-database through injected sources; this module never calls Unusual Whales.
+``direction.py``, ``aggregate.py``, ``tradability.py``, ``evidence.py`` and
+``narrative.py`` (rule R-WD1). Summary, chip, audit and narrative lines are
+formatted from frozen templates with row values; there is no free text. Quotes
+and evidence come from the database through injected sources; this module never
+calls Unusual Whales.
 """
 
 from __future__ import annotations
@@ -53,6 +57,7 @@ from webapp.board.evidence import (
     request_for,
     strength_label,
 )
+from webapp.board.narrative import NARRATIVE_COPY, RowNarrative, build_narrative
 from webapp.board.quotes import dominant_symbol, read_board_quotes
 from webapp.board.tradability import (
     CHIP_COPY,
@@ -87,6 +92,10 @@ SectionKey = Literal["main", "no_quote", "untradable", "all"]
 # and its legacy evidence scores are read.
 LIVE_CALIBRATION_PROFILE: Final = Path("profiles/v5_default.yaml")
 GATE_OFF_PARAM: Final = "off"
+
+# R-CA2: the bull and bear columns share exactly these classes.
+CASE_CLASS: Final = "rounded-md border border-gray-800 bg-gray-950/40 px-3 py-2 text-sm leading-snug text-gray-200"
+CASE_TITLE_CLASS: Final = "text-xs font-semibold text-gray-500 mb-1"
 
 ALFA_COPY: Final[Mapping[str, str]] = MappingProxyType(
     {
@@ -211,6 +220,7 @@ class AlfaRowView:
     strength_key: StrengthKey  # through the R-UN2 guard
     strength_text: str  # through the R-UN2 guard
     audit: AuditView
+    narrative: RowNarrative
 
 
 @dataclass(frozen=True)
@@ -434,6 +444,7 @@ def build_alfa_page(
                 strength_key=strength,
                 strength_text=strength_label(strength, evidence.counts, settings.evidence),
                 audit=build_audit(request.event_id, signal),
+                narrative=build_narrative(row, evidence, chip, settings=settings.narrative),
             ),
         )
     ordered = tuple(sorted(views, key=_view_order))
@@ -495,4 +506,7 @@ def template_context() -> dict[str, object]:
         "section_heading": section_heading,
         "evidence_hover": EVIDENCE_HOVER,
         "unknown_not_clean": UNKNOWN_NOT_CLEAN,
+        "narrative_copy": NARRATIVE_COPY,
+        "case_class": CASE_CLASS,
+        "case_title_class": CASE_TITLE_CLASS,
     }
