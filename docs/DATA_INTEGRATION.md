@@ -490,8 +490,128 @@ table = pq.read_table("data/historical/thetadata/EXP240216_C_00150000/AAPL/2024-
 
 ---
 
-## 8. Where to look next
+## 8. Railway runtime (Phase 5.0)
 
+The live site is the FastAPI app in `webapp/`, run as one Railway service.
+Railway deploys `main` after the Phase 5.0 switch
+(`docs/phase-5.0-merge-acceptance.md` §3.14); before the switch it deploys
+`phase-3`.
+
+| File | Role |
+|---|---|
+| `railway.json` | `startCommand` `uvicorn webapp.main:app --host 0.0.0.0 --port $PORT`; `restartPolicyType` `ON_FAILURE`; `healthcheckPath` `/health`, `healthcheckTimeout` 120 |
+| `Procfile` | fallback for Procfile-based builders: `web: uvicorn webapp.main:app --host 0.0.0.0 --port ${PORT:-8000}` |
+| `runtime.txt` | Python `3.12` |
+| `pyproject.toml` | the web dependencies (`fastapi`, `uvicorn[standard]`, `jinja2`, `psycopg[binary]`, `python-multipart`) sit in the main dependency set, so a plain install is enough |
+
+- **Health.** `GET /health` returns `{"ok": true}`. It is the only route
+  without HTTP Basic auth, so the Railway healthcheck needs no credentials.
+- **Access gate.** Every other route needs `WEB_AUTH_USER` /
+  `WEB_AUTH_PASSWORD` (§9).
+  - Wrong or missing credentials return 401 with `WWW-Authenticate`.
+  - If either variable is unset or empty, those routes return 503 with no
+    data (fail closed).
+- **Background tasks.** The app lifespan starts two supervised tasks: the
+  live worker (`webapp/worker.py`) and the gamma refresh loop
+  (`webapp/gamma_live.py`).
+  - They start only when `LIVE_TICKERS`, `UNUSUAL_WHALES_API_KEY` and
+    `DATABASE_URL` are all set. Without them the app only serves stored
+    signals.
+  - A task that exits or raises is restarted after 30 s.
+  - Details: `docs/MODULES.md`, "Non-pipeline consumers".
+- **No schema change.** Phase 5.0 changes no schema: `StoredSignal` and the
+  tables are identical on both lineages. A rollback to the last `phase-3`
+  deployment is therefore data-safe (contract §3.11, §3.14).
+
+**Local run** (no live tasks):
+1. Set `WEB_AUTH_USER` and `WEB_AUTH_PASSWORD` in the shell.
+2. Run:
+
+   ```bash
+   uv run uvicorn webapp.main:app
+   ```
+
+Without `DATABASE_URL` the app reads `sqlite:///webapp/seed.db`. That file is
+not in git; `scripts/seed_screener.py` builds it from local replay data.
+
+---
+
+## 9. Environment variables
+
+Names only. Values live in `.env` locally and in Railway variables in
+production. `.env.example` lists the names with blank values.
+
+| Variable | Used by | Needed | Behaviour |
+|---|---|---|---|
+| `DATABASE_URL` | `webapp/repo.py`, `webapp/gamma.py`, `webapp/journal.py`, `webapp/worker.py`; default `--dest` of `scripts/migrate_to_postgres.py` | Railway | Postgres in production; the webapp default is `sqlite:///webapp/seed.db`. The worker rewrites `postgres://` / `postgresql://` to `postgresql+psycopg://`, and does not start without this variable. |
+| `LIVE_TICKERS` | `webapp/worker.py` | opt-in | Comma-separated, upper-cased. Unset or empty: no live worker and no gamma refresh. |
+| `UNUSUAL_WHALES_API_KEY` | `config/credentials.py` (`Credentials`), `webapp/worker.py`, `webapp/pricing.py`, CLI `screener --source rest`, `scripts/run_m28_overnight.py` | any UW call | Without it the worker does not start and journal prices stay empty. |
+| `WEB_AUTH_USER`, `WEB_AUTH_PASSWORD` | webapp access gate (Phase 5.0.9) | Railway | Fail closed: unset or empty returns 503 on every route except `/health`. Constant-time comparison. |
+| `LIVE_POLL_INTERVAL_S` | `webapp/worker.py` | optional | Default 60. The worker uses `max(60.0, value)`, so a value below 60 s has no effect. |
+| `LIVE_MIN_PREMIUM` | `webapp/worker.py` → `UnusualWhalesFlowPollSource` | optional | Default 25000 (USD). Polled alerts below it are skipped. |
+| `PORT` | `railway.json` / `Procfile` start command | set by Railway | `Procfile` falls back to 8000. |
+| `UOA_LOG_LEVEL` | `config/__init__.py` (`AppSettings.log_level`), CLI logging | optional | Default `INFO`. `WARNING` keeps full-universe replays fast. `AppSettings` also reads `UOA_PROFILES_DIR` and `UOA_DEFAULT_PROFILE_FILENAME`. |
+| `THETADATA_API_KEY`, `THETADATA_USERNAME` | `Credentials` | ThetaData adapter only | Not used by the webapp. |
+
+---
+
+## 10. Unusual Whales request budget
+
+- **Daily limit:** 30,000 requests per day, per the `x-uw-token-req-limit`
+  response header observed on 2026-09-14 (§1.2).
+- **Rate cap:** 1.5 requests per second (90/min), set in `profiles/v5_default.yaml`
+  (`data_sources.unusual_whales.rate_limit_requests_per_second`).
+  Accepted in `docs/phase-5.0-merge-acceptance.md` §3.4.
+- **Client behaviour** (`sources/unusual_whales/client.py`, Phase 3.9.3):
+  - a plain 429 is retried with backoff, then raises
+    `UnusualWhalesRateLimitError`;
+  - a 429 whose body carries `daily_request_limit` raises
+    `UnusualWhalesDailyLimitError` at once, with no retry.
+- **Reference load:** `x-uw-daily-req-count` was 4,613 at 18:32 UTC on
+  2026-09-14, with 10 live tickers (contract §3.14).
+
+Guards in the live tasks:
+
+| Guard | Where | Value |
+|---|---|---|
+| RTH-only polling | `sources/market_hours.py::is_market_open`, checked by `UnusualWhalesFlowPollSource.stream` and `gamma_refresh_loop` | Weekdays 13:30–21:00 UTC. This covers both EDT and EST; holidays are not modelled. Outside the window both tasks sleep 300 s between checks. |
+| Poll floor | `webapp/worker.py::live_config_from_env` | `max(60.0, LIVE_POLL_INTERVAL_S)` seconds between polling rounds |
+| Daily-limit backoff | `sources/unusual_whales/flow_poll.py` (`daily_limit_backoff_s`) | 1800 s (30 min) after a daily-limit error. Detected by type (`UnusualWhalesDailyLimitError`); the `daily_request_limit` message substring is the fallback. |
+| Gamma refresh cadence | `webapp/gamma_live.py::gamma_refresh_loop` (`interval_s`) | 240 s between refresh rounds |
+
+Per round, the flow poller spends one request per ticker. The gamma refresh
+spends four direct requests per ticker (`greek-exposure/strike`, `iv-rank`,
+`earnings`, `ohlc/1d`), plus the catalyst provider's calls.
+
+---
+
+## 11. ThetaData bulk and derived-data scripts
+
+These scripts built the local research data behind the Phase 3.5.5/3.6
+replay runs and the 4.x studies. `scripts/` is ruff-only and outside
+`mypy --strict` (`docs/phase-5.0-merge-acceptance.md` §3.11). The data
+windows they produced are burned (`docs/INDEX.md` §6).
+
+| Script | Phase | What it does (from its docstring) | Output |
+|---|---|---|---|
+| `scripts/download_bulk.py` | 3.5.3.9 | Bulk historical download. One ThetaData v3 `trade_quote` call with `expiration=*` per ticker-day returns the whole chain, each trade with its at-trade bid/ask. Replaced the per-contract `scripts/download_tier2.py` driver. | `data/historical/bulk/{TICKER}/{YYYY-MM}.parquet` |
+| `scripts/download_chain_snapshots.py` | 3.6.2 | Daily chain snapshots for the self-derived GEX, IV and OI providers. It joins full-chain daily OI with eod bid/ask, Black-Scholes-inverts IV from the eod mid, and takes parity spot from the bulk data. Requires Theta Terminal running locally. | `data/chain_snapshots/{TICKER}.parquet` |
+| `scripts/compute_spot_series.py` | 3.6.5 | Per-ticker minute-bar spot series (mean parity spot per minute) from the bulk parquet, for M23. | `data/spot_series/{TICKER}.parquet` |
+| `scripts/compute_medians.py` | 3.5.5.4 | Per-ticker median trade premium from the bulk parquet, for M37. | `data/medians_bulk.csv` |
+| `scripts/fetch_earnings_calendar.py` | 3.6.6 | Earnings dates for the download universe from Yahoo Finance, for M22. `yfinance` is a build-time tool, not a runtime dependency. | `data/earnings_calendar.csv` |
+
+- Gitignored: `data/chain_snapshots/`, `data/spot_series/` and the bulk
+  parquet.
+- Committed: `data/medians_bulk.csv` and `data/earnings_calendar.csv`. Both
+  are backtest-only; live scoring never reads them (contract §4).
+- Bulk download runbook: `docs/phase-3.5.3-config.md`.
+
+---
+
+## 12. Where to look next
+
+- **Current truth, burned data windows, Phase 5.x registry**: `docs/INDEX.md`
+- **Current UW endpoints**: `docs/phase-3.9-uw-endpoint-correction-acceptance.md` §3
 - **Adapter design + judgment calls**: `docs/phase-3.3-acceptance.md`
 - **Backtest harness**: `docs/BACKTEST.md`
 - **Per-module docstrings**: every adapter / provider / pipeline file

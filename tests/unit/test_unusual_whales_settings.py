@@ -123,7 +123,7 @@ def test_v5_default_carries_explicit_unusual_whales_block() -> None:
     """v5_default.yaml has the explicit unusual_whales block."""
     profile = load_default_profile()
     uw = profile.data_sources.unusual_whales
-    assert uw.rate_limit_requests_per_second == 2.0
+    assert uw.rate_limit_requests_per_second == 1.5  # 90/min, headroom under 120/min
     assert uw.historical_concurrency == 2
     assert uw.live_reconnect_max_attempts == 5
     assert uw.cache_ttl.catalyst_calendar_seconds == 3600

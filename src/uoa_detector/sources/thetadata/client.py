@@ -102,16 +102,6 @@ class ThetaDataAuthError(ThetaDataError):
     """Authentication or authorisation failure (4xx)."""
 
 
-class ThetaDataRateLimitError(ThetaDataError):
-    """The configured token bucket would be exceeded.
-
-    Raised when a request is attempted while the bucket is empty
-    AND the client is configured to fail-fast on rate-limit
-    rather than wait. Default behaviour is to wait; this exception
-    exists for tests and for callers who want hard limits.
-    """
-
-
 class ThetaDataTransientError(ThetaDataError):
     """Retryable failure: 5xx, network error, timeout."""
 
@@ -176,7 +166,18 @@ class ThetaDataClient:
         self._http = httpx.AsyncClient(
             base_url=self._base_url,
             transport=transport,
-            timeout=httpx.Timeout(connect=5.0, read=30.0, write=5.0, pool=5.0),
+            # Phase 3.5.3.7: read 30→60s (large historical responses),
+            # pool 5→30s (avoid a PoolTimeout storm when the Phase
+            # 3.5.3.6 parallel batches put dozens of requests in
+            # flight at once). Connection limits raised so the pool
+            # doesn't become the bottleneck under parallel download.
+            timeout=httpx.Timeout(
+                connect=10.0, read=60.0, write=10.0, pool=30.0,
+            ),
+            limits=httpx.Limits(
+                max_connections=200,
+                max_keepalive_connections=50,
+            ),
         )
 
     @property
@@ -252,6 +253,15 @@ class ThetaDataClient:
                     params=effective_params,
                     headers=self._auth_headers(),
                 )
+                # Phase 3.3.12: ThetaData v3 uses HTTP 472 as a
+                # custom "no data found for this query" code. It is
+                # NOT an auth or transient error — many legitimate
+                # downloads hit this on contracts with no trading
+                # activity for the requested day. Treat as an empty
+                # success.
+                if response.status_code == 472:
+                    self._breaker.record_success()
+                    return {"response": []}
                 if response.status_code >= 500:
                     msg = (
                         f"ThetaData {method} {path} returned "

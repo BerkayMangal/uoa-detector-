@@ -35,10 +35,15 @@ def test_thetadata_defaults_match_phase_3_prep() -> None:
 
 def test_v5_default_carries_explicit_data_sources_block() -> None:
     """profiles/v5_default.yaml has the explicit data_sources block —
-    operator-visible defaults rather than implicit ones."""
+    operator-visible defaults rather than implicit ones.
+
+    Phase 3.5.3.3/3.5.3.5: values raised from the conservative
+    10 req/s / 4 concurrent to the PRO-tier-observed 25 req/s /
+    8 concurrent (Terminal reports 'Max concurrent requests: 8').
+    """
     profile = load_default_profile()
-    assert profile.data_sources.thetadata.rate_limit_requests_per_second == 10.0
-    assert profile.data_sources.thetadata.historical_concurrency == 4
+    assert profile.data_sources.thetadata.rate_limit_requests_per_second == 25.0
+    assert profile.data_sources.thetadata.historical_concurrency == 8
 
 
 # ---------------------------------------------------------------------------

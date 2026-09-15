@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block content %}
+
+{% set tier_color = {'building':'#6b7280','none':'#f59e0b','edge':'#10b981','negative':'#ef4444'} %}
+{% set tc = tier_color.get(stats.verdict_tier, '#6b7280') %}
+
+<div class="flex items-center justify-between mb-4">
+  <h2 class="text-xl font-bold text-white">Trade journal</h2>
+  <a href="/journal/new" class="rounded bg-emerald-600 hover:bg-emerald-500 px-4 py-1.5 text-sm font-semibold text-white">+ Log a trade</a>
+</div>
+
+<!-- Edge verdict — the honest read on whether YOUR selection has edge. -->
+<div class="rounded-lg border p-4 mb-6" style="border-color:{{ tc }}55;background:{{ tc }}14">
+  <div class="text-xs uppercase tracking-wide mb-1" style="color:{{ tc }}">Edge verdict &middot; market-neutral</div>
+  <p class="text-sm text-gray-200">{{ stats.verdict }}</p>
+  <div class="mt-3 grid gap-3 sm:grid-cols-4 text-sm">
+    <div><div class="text-gray-500 text-xs">Closed trades</div><div class="text-gray-100 font-semibold">{{ stats.n_closed }}</div></div>
+    <div><div class="text-gray-500 text-xs">Mean excess / trade</div>
+      <div class="font-semibold" style="color:{{ tc }}">{{ '%+.2f%%'|format(stats.excess_mean*100) if stats.excess_mean is not none else '—' }}</div></div>
+    <div><div class="text-gray-500 text-xs">t-stat (|t|&gt;2 = signal)</div>
+      <div class="text-gray-100 font-semibold">{{ '%.2f'|format(stats.excess_t) if stats.excess_t is not none else '—' }}</div></div>
+    <div><div class="text-gray-500 text-xs">Trades w/ price data</div><div class="text-gray-100 font-semibold">{{ stats.excess_n }}</div></div>
+  </div>
+  <div class="mt-3 pt-3 border-t border-gray-800 grid gap-3 sm:grid-cols-3 text-sm">
+    <div><div class="text-gray-500 text-xs">Actual options P&amp;L</div>
+      <div class="font-semibold {{ 'text-emerald-400' if stats.pnl_total >= 0 else 'text-red-400' }}">${{ '{:,.0f}'.format(stats.pnl_total) }}</div></div>
+    <div><div class="text-gray-500 text-xs">Win rate</div>
+      <div class="text-gray-100 font-semibold">{{ '%.0f%%'|format(stats.pnl_win_rate*100) if stats.pnl_win_rate is not none else '—' }}</div></div>
+    <div><div class="text-gray-500 text-xs">Profit factor</div>
+      <div class="text-gray-100 font-semibold">{{ '%.2f'|format(stats.pnl_profit_factor) if stats.pnl_profit_factor is not none else '—' }}</div></div>
+  </div>
+  <p class="mt-3 text-xs text-gray-500">
+    The verdict reads your stock-selection skill: did the names you picked move your way <em>beyond the market</em>?
+    Option P&amp;L (the money) is shown separately because theta/IV can make a right thesis bleed or a wrong one pay.
+  </p>
+</div>
+
+<!-- Open positions -->
+<h3 class="text-sm font-semibold text-gray-300 mb-2">Open positions ({{ open_trades|length }})</h3>
+{% if not open_trades %}<p class="text-sm text-gray-500 mb-6">No open trades. Log one from a screener signal or with the button above.</p>{% endif %}
+<div class="grid gap-3 mb-8">
+{% for t in open_trades %}
+  <div class="rounded-lg border border-gray-800 bg-gray-900/50 p-3">
+    <div class="flex items-center justify-between flex-wrap gap-2">
+      <div class="text-sm">
+        <span class="font-bold text-white">{{ t.ticker }}</span>
+        <span class="px-1.5 py-0.5 rounded text-xs {{ 'bg-emerald-900/40 text-emerald-300' if t.direction == 'bullish' else 'bg-red-900/40 text-red-300' }}">{{ t.direction }}</span>
+        <span class="text-gray-400">{{ t.instrument }}{% if t.strike %} ${{ '%.1f'|format(t.strike) }}{% endif %}{% if t.expiry %} exp {{ t.expiry }}{% endif %}
+          &middot; {{ t.contracts }}x @ ${{ '%.2f'|format(t.entry_price) }}</span>
+        {% if t.signal_label %}<span class="text-xs text-gray-500">from {{ t.signal_label }}{% if t.signal_score is not none %} ({{ '%.2f'|format(t.signal_score) }}){% endif %}</span>{% endif %}
+      </div>
+      <form method="post" action="/journal/{{ t.id }}/close" class="flex items-end gap-2">
+        <label class="text-xs text-gray-400">Exit price
+          <input type="number" step="0.01" name="exit_price" required class="block w-24 bg-gray-950 border border-gray-700 rounded px-2 py-1 text-gray-100"></label>
+        <input name="exit_reason" placeholder="reason" class="w-28 bg-gray-950 border border-gray-700 rounded px-2 py-1 text-gray-100 text-xs">
+        <button class="rounded bg-gray-700 hover:bg-gray-600 px-3 py-1 text-xs font-semibold text-white">Close</button>
+      </form>
+    </div>
+    {% if t.thesis %}<p class="mt-1 text-xs text-gray-500">{{ t.thesis }}</p>{% endif %}
+  </div>
+{% endfor %}
+</div>
+
+<!-- Closed trades -->
+<h3 class="text-sm font-semibold text-gray-300 mb-2">Closed ({{ closed_trades|length }})</h3>
+<div class="overflow-x-auto">
+<table class="w-full text-sm">
+  <thead class="text-xs text-gray-500 border-b border-gray-800">
+    <tr><th class="text-left py-1">Ticker</th><th class="text-left">Dir</th><th class="text-left">Instrument</th>
+      <th class="text-right">Entry→Exit</th><th class="text-right">Option P&amp;L</th><th class="text-right">Mkt-neutral excess</th><th class="text-left pl-3">Thesis</th></tr>
+  </thead>
+  <tbody>
+  {% for t in closed_trades %}
+    {% set p = pnl(t) %}{% set e = excess(t) %}
+    <tr class="border-b border-gray-900">
+      <td class="py-1.5 font-semibold text-white">{{ t.ticker }}</td>
+      <td><span class="{{ 'text-emerald-300' if t.direction=='bullish' else 'text-red-300' }}">{{ t.direction }}</span></td>
+      <td class="text-gray-400">{{ t.instrument }}{% if t.strike %} ${{ '%.1f'|format(t.strike) }}{% endif %}</td>
+      <td class="text-right text-gray-400">${{ '%.2f'|format(t.entry_price) }} → ${{ '%.2f'|format(t.exit_price) }}</td>
+      <td class="text-right font-semibold {{ 'text-emerald-400' if p is not none and p>=0 else 'text-red-400' }}">{{ '${:,.0f}'.format(p) if p is not none else '—' }}</td>
+      <td class="text-right font-mono {{ 'text-emerald-400' if e is not none and e>=0 else 'text-red-400' }}">{{ '%+.2f%%'|format(e*100) if e is not none else '—' }}</td>
+      <td class="pl-3 text-gray-500 text-xs">{{ t.thesis }}</td>
+    </tr>
+  {% endfor %}
+  {% if not closed_trades %}<tr><td colspan="7" class="py-3 text-gray-500 text-center">No closed trades yet.</td></tr>{% endif %}
+  </tbody>
+</table>
+</div>
+
+{% endblock %}

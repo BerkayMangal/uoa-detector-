@@ -222,28 +222,38 @@ async def test_catalyst_calendar_provider_smoke() -> None:
 
 @pytest.mark.asyncio
 async def test_open_interest_provider_smoke() -> None:
+    """Phase 3.3.9.7 update: UW historic_data_access typically permits
+    the trailing ~7 trading days. The smoke uses a recent trade_date /
+    expiry pair so the OI fetch lands within the subscription window.
+    The contract identity is illustrative; the smoke validates wiring,
+    not data content (the provider returning None is acceptable).
+    """
     api_key = _key_or_skip()
     client = UnusualWhalesClient(api_key=api_key, settings=_settings())
     settings = _settings()
     provider = UnusualWhalesOpenInterestProvider(
         client=client, settings=settings,
     )
+    # Recent ATM-ish SPY call near the current monthly expiry.
+    today = datetime.now(UTC).date()
+    # Next monthly: third Friday of next month, approximated to
+    # 28 days out — always in-window for the historic endpoint.
+    expiry = today + timedelta(days=28)
+    trade_date = today - timedelta(days=2)  # within 7-day window
     try:
-        # at() — operator may need to swap to an in-window contract
         await provider.at(
             ticker="SPY",
-            strike=Decimal("470.00"),
-            expiry=date(2024, 12, 20),
+            strike=Decimal("500.00"),
+            expiry=expiry,
             option_type="call",
             when=datetime.now(UTC),
         )
-        # next_day() — yesterday's flow
         await provider.next_day(
             ticker="SPY",
-            strike=Decimal("470.00"),
-            expiry=date(2024, 12, 20),
+            strike=Decimal("500.00"),
+            expiry=expiry,
             option_type="call",
-            trade_date=date(2024, 11, 15),
+            trade_date=trade_date,
         )
     finally:
         await client.aclose()

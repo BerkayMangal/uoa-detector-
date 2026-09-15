@@ -33,6 +33,7 @@ import contextlib
 import logging
 import sys
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 from enum import StrEnum
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -87,9 +88,24 @@ from uoa_detector.sources.unusual_whales.rest_flow import (
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from uoa_detector.backtest import BacktestStoreProtocol
+    from uoa_detector.backtest.cell_runner import CellSpec
+    from uoa_detector.backtest.pnl_provider import RealizedTrade
+    from uoa_detector.backtest.walk_forward import WalkForwardWindow
     from uoa_detector.calibration import CalibrationProfile
     from uoa_detector.observability import DecisionRecordWriter
+
+    _TradeProducer = Callable[
+        [
+            CellSpec,
+            tuple[WalkForwardWindow, ...],
+            CalibrationProfile,
+            BacktestDataHandle | None,
+        ],
+        list[RealizedTrade],
+    ]
 
 
 class OutputFormat(StrEnum):
@@ -121,15 +137,27 @@ def _backtest_root() -> None:
 def _configure_logging(*, log_to_stderr: bool) -> None:
     """Wire up structlog. ``log_to_stderr=True`` keeps stdout clean for NDJSON.
 
+    The level comes from ``AppSettings.log_level`` (env ``UOA_LOG_LEVEL``,
+    default ``INFO``). ``make_filtering_bound_logger`` drops below-level
+    events *before* the processor chain runs, so a quiet level
+    (``UOA_LOG_LEVEL=WARNING``) makes a large backtest fast — the
+    per-signal INFO logs are never rendered. Pre-3.5 this level was
+    hardcoded to INFO and ``log_level`` was dead config.
+
     Phase 3.3.1.2: ``redact_secrets`` runs as the FIRST processor so
     no downstream processor (timestamper, renderer, etc.) sees the
     secret values. If a future processor decided to copy event_dict
     to disk for debugging, that copy is already redacted.
     """
+    from uoa_detector.config import default_settings
+
+    level = logging.getLevelName(default_settings().log_level.upper())
+    if not isinstance(level, int):
+        level = logging.INFO
     logging.basicConfig(
         format="%(message)s",
         stream=sys.stderr if log_to_stderr else sys.stdout,
-        level=logging.INFO,
+        level=level,
         force=True,  # override any prior basicConfig in tests
     )
     structlog.configure(
@@ -142,6 +170,7 @@ def _configure_logging(*, log_to_stderr: bool) -> None:
                 drop_missing=True,
             ),
         ],
+        wrapper_class=structlog.make_filtering_bound_logger(level),
         logger_factory=structlog.stdlib.LoggerFactory(),
     )
 
@@ -624,6 +653,14 @@ def _build_store(store_url: str) -> BacktestStoreProtocol:
     """
     if store_url == ":memory:":
         return BacktestStore()
+    if store_url.startswith(("postgres://", "postgresql://", "postgresql+")):
+        # Postgres (e.g. the Railway live sink). Normalise to the psycopg
+        # (v3) driver; the store creates the schema via ORM metadata.
+        for prefix in ("postgres://", "postgresql://"):
+            if store_url.startswith(prefix):
+                store_url = "postgresql+psycopg://" + store_url[len(prefix):]
+                break
+        return SqliteBacktestStore(store_url)
     if store_url.startswith("sqlite:"):
         # Already-canonical forms pass through.
         if store_url.startswith(("sqlite:///", "sqlite:////")):
@@ -637,7 +674,7 @@ def _build_store(store_url: str) -> BacktestStoreProtocol:
         return SqliteBacktestStore(url)
     msg = (
         f"Unrecognized --store value {store_url!r}. "
-        "Use ':memory:' or 'sqlite:path/to/db'."
+        "Use ':memory:', 'sqlite:path/to/db', or a 'postgresql://' URL."
     )
     raise typer.BadParameter(msg, param_hint="--store")
 
@@ -1101,21 +1138,80 @@ def backtest_run_4cell(
              "rendered) but every cell reports 0 trades. 'historical' "
              "(Phase 3.5.0) replays --replay-data through the pipeline, "
              "prices positioned signals with SimplePnL + the parquet "
-             "exit-quote source, and reports real trades per cell.",
+             "exit-quote source, and reports real trades per cell. "
+             "'synthetic' drives the default scripted scenario through the "
+             "full Phase 3.4 pipeline and emits one NoOp open trade per "
+             "stored signal (Phase 3.5.4 wiring smoke). 'replay' streams "
+             "the downloaded bulk parquet (--replay-data) through the "
+             "pipeline over the reduced universes and realizes trades via "
+             "SimplePnLProvider (Phase 3.5.5 real-data run).",
     ),
     replay_data: Path | None = typer.Option(
         None,
         "--replay-data",
-        help="Per-source parquet root for --trades historical, e.g. "
-             "data/historical/thetadata (layout "
-             "{root}/{ticker}/{YYYY-MM}.parquet). Required when "
-             "--trades historical; ignored for --trades noop.",
+        help="Per-source parquet root for --trades historical / replay, "
+             "e.g. data/historical/thetadata or data/historical/bulk "
+             "(layout {root}/{TICKER}/{YYYY-MM}.parquet). Required when "
+             "--trades historical or --trades replay; ignored otherwise.",
     ),
     source_id: str = typer.Option(
         "historical",
         "--source-id",
         help="--trades historical only: source_id tag for the replay "
              "harness. Defaults to 'historical'.",
+    ),
+    uw_enrichment: bool = typer.Option(
+        False,
+        "--uw-enrichment",
+        help="Wire real Unusual Whales providers into the fusion cells' "
+             "M21-M27 enrichment (Phase 3.5.5 B3). Default off — fusion "
+             "runs on NoOp enrichment (wiring smoke). Enable only once UW "
+             "historical data access is granted; before that the "
+             "providers return only the last few days.",
+    ),
+    chain_snapshots: Path | None = typer.Option(
+        None,
+        "--chain-snapshots",
+        help="Phase 3.6: directory of per-ticker daily chain snapshots "
+             "(scripts/download_chain_snapshots.py). When set, the fusion "
+             "cells' dealer-gamma axis (M21) is fed by the self-derived "
+             "GEX provider instead of Unusual Whales — a real confluence "
+             "verdict without UW. Takes precedence over --uw-enrichment.",
+    ),
+    spot_series: Path | None = typer.Option(
+        None,
+        "--spot-series",
+        help="Phase 3.6.5: directory of per-ticker minute-bar spot series "
+             "(scripts/compute_spot_series.py). When set alongside "
+             "--chain-snapshots, the price-confirmation axis (M23, a "
+             "weighted axis) is fed by the self-derived intraday spot.",
+    ),
+    catalyst_calendar: Path | None = typer.Option(
+        None,
+        "--catalyst-calendar",
+        help="Phase 3.6.6: earnings-calendar CSV "
+             "(scripts/fetch_earnings_calendar.py → "
+             "data/earnings_calendar.csv). When set, the event-calendar "
+             "axis (M22, a weighted axis) + M24's post-earnings gate are "
+             "fed by the self-derived catalyst dates.",
+    ),
+    min_premium: float | None = typer.Option(
+        None,
+        "--min-premium",
+        help="Candidate pre-filter (Phase 3.5.5 A5): skip replayed "
+             "prints whose premium (USD) is below this, so a full run "
+             "processes unusual-size trades rather than all ~245M "
+             "prints. Default: no filter. The value is a modelling "
+             "choice — it interacts with M38 cluster counts.",
+    ),
+    verdict_path: Path | None = typer.Option(
+        None,
+        "--verdict-path",
+        help="If set, apply the Phase 3.5.6 falsification framework to "
+             "the four cells and write the mechanical verdict (edge "
+             "proven / rejected / insufficient) here as markdown — by "
+             "convention docs/phase-3.5-results.md. Default: skip the "
+             "verdict step (the comparison report is still written).",
     ),
 ) -> None:
     """Run the Formülasyon A 4-cell combinatorial backtest end-to-end.
@@ -1129,13 +1225,26 @@ def backtest_run_4cell(
     report rendering with zero trades. ``--trades historical``
     (Phase 3.5.0) replays ``--replay-data`` through the full pipeline
     and prices positioned signals with SimplePnL + the parquet
-    exit-quote source, producing real per-cell trades.
+    exit-quote source, producing real per-cell trades. ``--trades
+    synthetic`` (Phase 3.5.4) is the scripted-scenario wiring smoke;
+    ``--trades replay`` (Phase 3.5.5) replays the bulk download over the
+    reduced universes, optionally with UW or self-derived enrichment and a
+    ``--verdict-path`` falsification verdict.
     """
-    if trades not in ("noop", "historical"):
+    # Configure logging up front (to stderr — stdout carries the console
+    # summary). Level honours UOA_LOG_LEVEL; a full-universe replay should
+    # run with UOA_LOG_LEVEL=WARNING or the per-signal INFO logs dominate.
+    _configure_logging(log_to_stderr=True)
+
+    if trades not in ("noop", "historical", "synthetic", "replay"):
         msg = (
-            f"--trades must be 'noop' or 'historical'; got {trades!r}."
+            f"--trades must be 'noop', 'historical', 'synthetic', or "
+            f"'replay'; got {trades!r}."
         )
         raise typer.BadParameter(msg, param_hint="--trades")
+    if trades == "replay" and replay_data is None:
+        msg = "--trades replay requires --replay-data PATH."
+        raise typer.BadParameter(msg, param_hint="--replay-data")
 
     data_handle: BacktestDataHandle | None = None
     if trades == "historical":
@@ -1165,10 +1274,48 @@ def backtest_run_4cell(
     profile = _resolve_profile(profile_path)
     store = _build_store(store_url)
 
-    producer = (
-        historical_trade_producer if trades == "historical"
-        else noop_trade_producer
-    )
+    producer: _TradeProducer
+    if trades == "historical":
+        producer = historical_trade_producer
+    elif trades == "synthetic":
+        from uoa_detector.backtest.cell_runner import synthetic_trade_producer
+        producer = synthetic_trade_producer
+    elif trades == "replay":
+        from uoa_detector.backtest.cell_runner import replay_trade_producer
+        from uoa_detector.historical.universe import (
+            read_universe,
+            tickers_only,
+        )
+
+        # The downloaded universes — the reduced 9 / 15-name lists,
+        # not the cell runner's default tier1_anchor / tier2_starter.
+        tier1_csv = Path("data/universes/tier1_reduced.csv")
+        tier2_csv = Path("data/universes/tier2_top15.csv")
+        for csv_path in (tier1_csv, tier2_csv):
+            if not csv_path.exists():
+                msg = f"universe CSV not found: {csv_path}"
+                raise typer.BadParameter(msg, param_hint="--trades")
+        assert replay_data is not None  # guarded above
+        # M37 relative-premium baseline. Optional: absent → M37 NoOp.
+        medians_csv: Path | None = Path("data/medians_bulk.csv")
+        if medians_csv is not None and not medians_csv.exists():
+            medians_csv = None
+        producer = replay_trade_producer(
+            replay_data,
+            tier1_tickers=tickers_only(read_universe(tier1_csv)),
+            tier2_tickers=tickers_only(read_universe(tier2_csv)),
+            medians_csv=medians_csv,
+            use_uw_enrichment=uw_enrichment,
+            chain_snapshots_dir=chain_snapshots,
+            spot_series_dir=spot_series,
+            catalyst_csv=catalyst_calendar,
+            min_premium_usd=(
+                Decimal(str(min_premium)) if min_premium is not None else None
+            ),
+        )
+    else:
+        producer = noop_trade_producer
+
     try:
         results = run_4cell_backtest(
             profile=profile,
@@ -1186,6 +1333,28 @@ def backtest_run_4cell(
     report = render_4cell_comparison_report(results)
     report_path.parent.mkdir(parents=True, exist_ok=True)
     report_path.write_text(report, encoding="utf-8")
+
+    # Phase 3.5.6 — mechanical falsification verdict, written only when
+    # the operator asks for it (--verdict-path). The four pinned reject
+    # scenarios + the sample-size gate; no judgment-call wiggle room.
+    if verdict_path is not None:
+        from uoa_detector.backtest.falsification import (
+            apply_falsification,
+            write_verdict_report,
+        )
+        falsification_verdict = apply_falsification(results)
+        write_verdict_report(
+            falsification_verdict,
+            results,
+            verdict_path,
+            period_label=f"{period_start} → {period_end}",
+        )
+        typer.echo(
+            f"=== Phase 3.5.6 verdict: "
+            f"{falsification_verdict.verdict.upper()} "
+            f"— wrote {verdict_path} ===",
+        )
+        typer.echo(f"  {falsification_verdict.rationale}")
 
     # Console summary so the operator sees the headline at the terminal.
     typer.echo(f"=== 4-cell backtest complete — wrote {report_path} ===")

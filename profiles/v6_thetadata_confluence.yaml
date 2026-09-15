@@ -1,0 +1,36 @@
+# UOA + Convexity Detector v6 — ThetaData self-derived confluence (Phase 3.6).
+#
+# Inherits v5_gamma_squeeze unchanged and overrides ONE leaf. The thesis is
+# identical to Track B (edge requires multi-source confluence); only the
+# data source behind the dealer-gamma axis changes — it is computed from the
+# ThetaData option chain (scripts/download_chain_snapshots.py →
+# DailyChainSnapshotSource → ThetaDataDealerPositioningProvider) instead of
+# Unusual Whales, so a real confluence verdict is possible without UW.
+#
+# The single override — M21 short_gamma_threshold = 0 — is the Phase 3.6 D4
+# discipline: the self-derived GEX uses a SIGN-based "net short" test
+# (scale-free, parameter-free, set a priori before the run), because we
+# cannot verify that our GEX magnitude is calibrated to the same scale as
+# UW's $50M/1% "institutional-significance" line. The materially-short
+# nuance is carried by the flip-proximity requirement (M21 awards 1.0 only
+# when dealers are short AND spot is near the flip). v5's flip_proximity_pct
+# / extreme_distance_pct are scale-free and inherited unchanged.
+#
+# NOTE (full-chain-OI discovery, 2026-06-15): the OI download is full-chain,
+# in the same $/1% units as UW, so the $50M threshold is plausibly viable.
+# Re-evaluating it (or a distributional a-priori percentile) is a Phase 3.6.x
+# variant to consider AFTER the MVP verdict — a new frozen choice, never a
+# tune-on-results. Do not change this value mid-run.
+#
+# Dark pool + sector peer flow run on their NoOp defaults (deferred — see
+# docs/phase-3.6-acceptance.md); IV / OI / catalyst self-derived axes are
+# later sub-phases (3.6.4-5).
+
+profile_id: v6_thetadata_confluence
+description: "Phase 3.6: Track B confluence with the dealer-gamma axis self-derived from the ThetaData chain (no UW). Inherits v5_gamma_squeeze; only M21 short_gamma_threshold differs (sign-based, scale-free)."
+inherits_from: v5_gamma_squeeze
+
+scoring:
+  modules:
+    m21:
+      short_gamma_threshold: 0   # self-derived GEX: net-short = net_gamma < 0 (sign)

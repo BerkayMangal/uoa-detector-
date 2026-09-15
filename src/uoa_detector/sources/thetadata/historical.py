@@ -287,9 +287,20 @@ class ThetaDataHistoricalDownloader:
         *,
         client: ThetaDataClient,
         concurrency: int = 4,
+        max_dte: int | None = None,
     ) -> None:
         self._client = client
         self._sem = asyncio.Semaphore(max(1, concurrency))
+        # Phase 3.5.3 fix: per-(contract, trade_day) DTE guard.
+        # The contract-list filter (ContractListFilter.max_dte) only
+        # filters by DTE at the contract-listing as_of_date, which
+        # doesn't reject (contract, day) pairs where the day-relative
+        # DTE blows past the cap. Example: a May-2026 expiry contract
+        # passes today's DTE=14 filter but gets fetched for every
+        # trade-day back to 2024-11 where its DTE is 18+ months.
+        # Setting ``max_dte`` here skips those (contract, day) pairs
+        # at request time — no HTTP call, no 472 churn.
+        self._max_dte = max_dte
 
     async def _fetch_trades_for_day(
         self, contract: ContractSpec, day: date,
@@ -415,6 +426,14 @@ class ThetaDataHistoricalDownloader:
             )
             month_prints: list[RawPrint] = []
             for day in days_in_month:
+                # Phase 3.5.3 fix: skip (contract, day) pairs whose
+                # day-relative DTE blows past max_dte. Prevents the
+                # 472 storm where a 14-DTE-today contract gets
+                # fetched for trade-days 18 months in the past.
+                if self._max_dte is not None:
+                    dte = (request.contract.expiry - day).days
+                    if dte < 0 or dte > self._max_dte:
+                        continue
                 snapshot = await _resolve_snapshot(
                     request.snapshot_for_date, day,
                 )
@@ -533,16 +552,49 @@ def _decode_quote_response(response: object) -> list[QuoteRow]:
 def _normalize_response_to_rows(response: object) -> list[object]:
     """Pick the row-list out of a v3 array OR a legacy v2 envelope.
 
-    v3: response is itself a list (rows are dicts).
-    v2 (legacy fallback): response is a dict with ``response`` key
-        containing a list of positional arrays.
-    Anything else returns ``[]`` so downstream consumers see no rows
-    rather than crashing on shape mismatch.
+    Phase 3.3.11 update: ThetaData v3's actual REST response shape
+    nests the row stream inside per-contract wrappers:
+
+      {"response": [
+        {"contract": {"symbol":..., "expiration":..., "strike":...,
+                      "right":...},
+         "data": [{<row>}, {<row>}, ...]}
+      ]}
+
+    The Phase 3.3.7 doc described the v3 wire as a top-level array
+    of row dicts; reality has a wrapper. We flatten the
+    ``response[*].data[*]`` shape here so downstream
+    ``_decode_*_response`` keeps using ``*_row_from_v3_dict`` on
+    one row at a time.
+
+    Tolerated shapes (in priority order):
+      1. dict with ``response: [{"contract":..., "data":[rows]},...]``
+         (Phase 3.3.11 verified v3 shape — flatten ``data`` arrays)
+      2. dict with ``response: [{row}, {row}, ...]``
+         (Phase 3.3.7 docstring assumption — rows directly under
+         ``response``; kept as fallback for older Terminal builds
+         and unit-test fixtures)
+      3. top-level list (early v3 prototype shape; kept as
+         compatibility net)
+      4. v2 ``{header, response}`` envelope (positional arrays)
+    Anything else returns ``[]``.
     """
     if isinstance(response, list):
-        return response
-    if isinstance(response, dict):
-        rows = response.get("response", [])
-        if isinstance(rows, list):
-            return rows
-    return []
+        return list(response)
+    if not isinstance(response, dict):
+        return []
+    rows = response.get("response")
+    if not isinstance(rows, list):
+        return []
+    # Heuristic: is each row a per-contract wrapper, or a row dict?
+    flattened: list[object] = []
+    saw_wrapper = False
+    for item in rows:
+        if isinstance(item, dict) and "data" in item and isinstance(
+            item["data"], list,
+        ):
+            saw_wrapper = True
+            flattened.extend(item["data"])
+        else:
+            flattened.append(item)
+    return flattened if saw_wrapper else list(rows)

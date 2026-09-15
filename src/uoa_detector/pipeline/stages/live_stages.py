@@ -26,6 +26,15 @@ profile.
 M28 is intentionally absent: it is not a ``PipelineStage``; it is the
 overnight T+1 batch validator (``M28Validator``) that runs against a stored
 run, not the live stream.
+
+Phase 5.0.5 (``degrade_transient_errors``): the Phase 3.9 providers propagate
+transient UW errors, and of the frozen 3.4 stages only M23 catches provider
+exceptions. The long-running live worker passes
+``degrade_transient_errors=True``, which wraps every provider except M23's in
+its ``Degrading*`` counterpart (``sources/unusual_whales/providers/degrading.py``).
+A wrapper maps rate-limit, daily-quota, transient and breaker-open errors to
+the Protocol method's no-data return. The default ``False`` builds exactly the
+Phase 3.9 wiring, so the screener and every other caller are unchanged.
 """
 
 from __future__ import annotations
@@ -56,6 +65,15 @@ from uoa_detector.sources.unusual_whales.providers.dark_pool import (
 from uoa_detector.sources.unusual_whales.providers.dealer_gamma import (
     UnusualWhalesDealerGammaProvider,
 )
+from uoa_detector.sources.unusual_whales.providers.degrading import (
+    DegradingCatalystCalendarProvider,
+    DegradingDarkPoolPrintProvider,
+    DegradingDealerPositioningProvider,
+    DegradingIVHistoryProvider,
+    DegradingOpenInterestProvider,
+    DegradingPeerFlowProvider,
+    DegradingSectorMapProvider,
+)
 from uoa_detector.sources.unusual_whales.providers.iv_history import (
     UnusualWhalesIVHistoryProvider,
 )
@@ -73,12 +91,25 @@ from uoa_detector.sources.unusual_whales.providers.sector_peer import (
 if TYPE_CHECKING:
     from uoa_detector.calibration import CalibrationProfile
     from uoa_detector.pipeline.stage import EnrichmentStage
+    from uoa_detector.providers.catalyst_calendar import CatalystCalendarProvider
+    from uoa_detector.providers.dark_pool import DarkPoolPrintProvider
+    from uoa_detector.providers.dealer_positioning import (
+        DealerPositioningProvider,
+    )
+    from uoa_detector.providers.iv_history import IVHistoryProvider
+    from uoa_detector.providers.open_interest import OpenInterestProvider
+    from uoa_detector.providers.sector_map import (
+        PeerFlowProvider,
+        SectorMapProvider,
+    )
     from uoa_detector.sources.unusual_whales.client import UnusualWhalesClient
 
 
 def build_live_stage_pipeline(
     client: UnusualWhalesClient,
     profile: CalibrationProfile,
+    *,
+    degrade_transient_errors: bool = False,
 ) -> list[EnrichmentStage]:
     """Return the canonical stage order with real UW providers wired.
 
@@ -95,6 +126,13 @@ def build_live_stage_pipeline(
             supplies each provider's settings (cache TTLs, rate limits);
             per-module timeouts/thresholds are read by the stages from
             ``scoring.modules.mXX`` at ``enrich()`` time (D7/D8).
+        degrade_transient_errors: Live worker only (Phase 5.0.5). When
+            True, the M21, M22, M24, M25 (both), M26 and M27 providers are
+            wrapped so UW rate-limit, daily-quota, transient and
+            breaker-open errors return that method's no-data value instead
+            of propagating. M22 and M24 still share one (wrapped) catalyst
+            provider. M23 is never wrapped; its stage already catches.
+            Default False: the Phase 3.9 wiring, unchanged.
 
     Returns:
         A fresh list of stage instances, safe to hand to ``Pipeline``.
@@ -103,20 +141,50 @@ def build_live_stage_pipeline(
     # M22 and M24 read the same catalyst calendar. One instance shares its
     # per-ticker cache, so earnings / FDA / FOMC are fetched once per ticker
     # per TTL window instead of once per stage (Phase 3.9 §3.5).
-    catalyst_provider = UnusualWhalesCatalystCalendarProvider(
+    catalyst_provider: CatalystCalendarProvider = (
+        UnusualWhalesCatalystCalendarProvider(client=client, settings=uw)
+    )
+    dealer_gamma_provider: DealerPositioningProvider = (
+        UnusualWhalesDealerGammaProvider(client=client, settings=uw)
+    )
+    iv_provider: IVHistoryProvider = UnusualWhalesIVHistoryProvider(
         client=client, settings=uw,
     )
+    sector_provider: SectorMapProvider = UnusualWhalesSectorMapProvider(
+        client=client, settings=uw,
+    )
+    peer_flow_provider: PeerFlowProvider = UnusualWhalesPeerFlowProvider(
+        client=client, settings=uw,
+    )
+    dark_pool_provider: DarkPoolPrintProvider = UnusualWhalesDarkPoolProvider(
+        client=client, settings=uw,
+    )
+    open_interest_provider: OpenInterestProvider = (
+        UnusualWhalesOpenInterestProvider(client=client, settings=uw)
+    )
+
+    if degrade_transient_errors:
+        # Phase 5.0 §3.8.3. The catalyst provider is wrapped once, before M22
+        # and M24 both take it, so they keep sharing one instance (one cache,
+        # one error counter).
+        catalyst_provider = DegradingCatalystCalendarProvider(catalyst_provider)
+        dealer_gamma_provider = DegradingDealerPositioningProvider(
+            dealer_gamma_provider,
+        )
+        iv_provider = DegradingIVHistoryProvider(iv_provider)
+        sector_provider = DegradingSectorMapProvider(sector_provider)
+        peer_flow_provider = DegradingPeerFlowProvider(peer_flow_provider)
+        dark_pool_provider = DegradingDarkPoolPrintProvider(dark_pool_provider)
+        open_interest_provider = DegradingOpenInterestProvider(
+            open_interest_provider,
+        )
 
     return [
         TimeOfDayStage(),  # M39 — no external provider
         DTEDecayStage(),  # M35 — no external provider
         SweepBlockStage(),  # M34 — no external provider
         RelativePremiumStage(),  # M37 — no external provider
-        DealerGammaStage(  # M21
-            provider=UnusualWhalesDealerGammaProvider(
-                client=client, settings=uw,
-            ),
-        ),
+        DealerGammaStage(provider=dealer_gamma_provider),  # M21
         EventCalendarStage(  # M22 — shares catalyst_provider with M24
             provider=catalyst_provider,
         ),
@@ -126,29 +194,15 @@ def build_live_stage_pipeline(
             ),
         ),
         IVExhaustionStage(  # M24 — two providers
-            iv_provider=UnusualWhalesIVHistoryProvider(
-                client=client, settings=uw,
-            ),
+            iv_provider=iv_provider,
             catalyst_provider=catalyst_provider,
         ),
         SectorPeerStage(  # M25 — two providers
-            sector_provider=UnusualWhalesSectorMapProvider(
-                client=client, settings=uw,
-            ),
-            peer_flow_provider=UnusualWhalesPeerFlowProvider(
-                client=client, settings=uw,
-            ),
+            sector_provider=sector_provider,
+            peer_flow_provider=peer_flow_provider,
         ),
-        DarkPoolStage(  # M26
-            provider=UnusualWhalesDarkPoolProvider(
-                client=client, settings=uw,
-            ),
-        ),
-        OpeningClosingStage(  # M27
-            provider=UnusualWhalesOpenInterestProvider(
-                client=client, settings=uw,
-            ),
-        ),
+        DarkPoolStage(provider=dark_pool_provider),  # M26
+        OpeningClosingStage(provider=open_interest_provider),  # M27
         TemporalClusterStage(),  # M38 — must precede ClusterDecayStage
         ClusterDecayStage(),  # event-time decay check
     ]

@@ -105,6 +105,8 @@ def test_run_4cell_rejects_unknown_trades_mode(tmp_path: Path) -> None:
     flat = " ".join(cleaned.split())
     assert "noop" in flat
     assert "historical" in flat
+    assert "synthetic" in flat
+    assert "replay" in flat
 
 
 def test_run_4cell_historical_requires_replay_data(tmp_path: Path) -> None:
@@ -171,6 +173,43 @@ def test_run_4cell_happy_path_writes_report_and_4_runs(tmp_path: Path) -> None:
             assert universe_id == expected
     finally:
         conn.close()
+
+
+def test_run_4cell_verdict_path_writes_phase356_verdict(tmp_path: Path) -> None:
+    """--verdict-path applies the Phase 3.5.6 framework and writes a verdict.
+
+    The noop producer yields zero trades, so every cell falls below the
+    sample-size gate → INSUFFICIENT (not REJECTED), per the pinned gate.
+    """
+    verdict = tmp_path / "phase-3.5-results.md"
+    result = runner.invoke(
+        app, [
+            "backtest", "run-4cell",
+            "--store", f"sqlite:{tmp_path}/r.db",
+            "--report-path", str(tmp_path / "r.md"),
+            "--from", "2024-01-01", "--to", "2026-01-01",
+            "--verdict-path", str(verdict),
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert verdict.exists()
+    content = verdict.read_text(encoding="utf-8")
+    assert "INSUFFICIENT" in content
+    assert "Phase 3.5.6 verdict: INSUFFICIENT" in result.output
+
+
+def test_run_4cell_without_verdict_path_writes_no_verdict(tmp_path: Path) -> None:
+    """Default (no --verdict-path) leaves the verdict step off."""
+    result = runner.invoke(
+        app, [
+            "backtest", "run-4cell",
+            "--store", f"sqlite:{tmp_path}/r.db",
+            "--report-path", str(tmp_path / "r.md"),
+            "--from", "2024-01-01", "--to", "2026-01-01",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert "Phase 3.5.6 verdict" not in result.output
 
 
 def test_run_4cell_console_summary_includes_all_cells(tmp_path: Path) -> None:

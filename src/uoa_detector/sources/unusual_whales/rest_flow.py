@@ -50,12 +50,15 @@ decision (event-time order):
   score each print against the prints already seen, so newest-first input
   would let a print see later flow (D9).
 
-decision (prints fusion cannot take are dropped loudly, never fabricated):
-  The mapper requires bid/ask. IV and OI are optional on ``RawPrint``, but
-  the single-source fusion path raises ``DataSourceError`` on a print with no
-  IV or no OI, which aborts the whole run. Such a print is dropped, counted
-  in ``rows_dropped``, key-sampled, and logged at ERROR with the row's keys.
-  A value is never invented.
+decision (IV-less / OI-less prints are dropped loudly, never fabricated):
+  The mapper requires bid/ask. IV and OI are optional on ``RawPrint``. Since
+  phase-3 ``012bde2`` (Phase 3.5.5.3, accepted in
+  ``docs/phase-5.0-merge-acceptance.md`` §3.5) fusion carries ``None`` for
+  them instead of raising. This source still drops a print with no IV or no
+  OI, by design: the Phase 3.9 contract (§3.1) keeps bid, ask and IV
+  required, and the OI check shipped with it in 3.9.4. Such a print is
+  dropped, counted in ``rows_dropped``, key-sampled, and logged at ERROR with
+  the row's keys. A value is never invented.
 
 decision (diagnostics):
   ``rows_fetched`` counts the rows the paginator returned inside the window,
@@ -182,8 +185,8 @@ class UnusualWhalesRestFlowSource:
             ]
             if missing:
                 _logger.error(
-                    "Dropping UW flow print without %s (source_id=%s): fusion "
-                    "requires it and values are never fabricated; row keys=%s",
+                    "Dropping UW flow print without %s (source_id=%s): the REST "
+                    "screener requires it and values are never fabricated; row keys=%s",
                     ", ".join(missing),
                     self.source_id,
                     sorted(row.keys()),

@@ -480,11 +480,10 @@ class SourceFusion:
           - ``premium_paid``, ``option_price``, ``spot_price``, ``bid``, ``ask``:
             median across reporting sources, Decimal-friendly via
             ``statistics.median``.
-          - ``implied_volatility``: median of non-None values; raises if no
-            source supplies (architectural pressure to pair sourceless-IV
-            adapters with a ``QuoteSnapshotSource``).
+          - ``implied_volatility``: median of non-None values; ``None`` when
+            no source supplies one (Phase 3.5.5.3).
           - ``open_interest``: max of non-None values (OI is monotonic per
-            session); raises if all None.
+            session); ``None`` when all are None (Phase 3.5.5.3).
           - ``fill_side``, ``is_iso``: modal value with deterministic
             tie-breaking by sort order (``False`` < ``True``).
           - ``exchange``: empty string for multi-print buckets — no single
@@ -498,25 +497,20 @@ class SourceFusion:
         """
         primary = prints[0]
 
+        # ``implied_volatility`` / ``open_interest`` are None when no
+        # source in the bucket supplies them. A pure ThetaData replay
+        # (Phase 3.5.5) has neither — ThetaData v3 exposes no historical
+        # print-level IV and its trade_quote feed carries no OI. Rather
+        # than reject the bucket, the canonical print carries None and
+        # downstream consumers degrade (print IV has no scoring use; the
+        # thin-OI penalty and M28's at-event OI baseline skip on None).
         iv_values = [
             p.implied_volatility for p in prints if p.implied_volatility is not None
         ]
-        if not iv_values:
-            msg = (
-                "fusion bucket has no implied_volatility on any source; pair "
-                "with a QuoteSnapshotSource or ensure the source populates IV"
-            )
-            raise DataSourceError(msg)
-        iv = float(median(iv_values))
+        iv = float(median(iv_values)) if iv_values else None
 
         oi_values = [p.open_interest for p in prints if p.open_interest is not None]
-        if not oi_values:
-            msg = (
-                "fusion bucket has no open_interest on any source; pair with "
-                "a QuoteSnapshotSource or ensure the source populates OI"
-            )
-            raise DataSourceError(msg)
-        oi = max(oi_values)
+        oi = max(oi_values) if oi_values else None
 
         fill_counter = Counter(p.fill_side for p in prints)
         modal_fill = sorted(fill_counter.items(), key=lambda kv: (-kv[1], kv[0]))[0][0]

@@ -38,6 +38,43 @@ all PipelineStages in retrospect.
 
 ---
 
+## UW provider lineage
+
+The Unusual Whales providers behind M21–M27 (and M28's OI fetch) went
+through three generations. `main` runs only the last one.
+
+| Generation | Lineage | Status |
+|---|---|---|
+| Phase 3.3.3 adapter paths (M23 moved to UW `ohlc/1m` in 3.3.8) | pre-fork, both lineages | guesses. The provider paths returned HTTP 404 live on 2026-09-14; only M23's path was correct (`docs/phase-3.9-closeout.md` §1–§2). |
+| Phase 3.3.9 path migration (`76e1a16`…`1cc04c1`, `docs/phase-3.3.9-acceptance.md`) | `phase-3` only | superseded, not ported. 3.9 did port two later phase-3 pieces: the 4.6 flow-alerts fill-side rule (`d55c148`) and the 4.18 429 retry (`45225f2`). |
+| Phase 3.9 endpoint correction (`dd287fa`…`6e44bcd`) | `main`; kept by the Phase 5.0 merge (`6d1e4ca`) | current, live-verified 2026-09-14 |
+
+3.3.9 was known wrong live in four places. The 3.9 contract §2 lists them;
+each was checked against the `f0d469f` provider code:
+- **M27/M28 open interest.** `open_interest.py` read `chains[0]` from
+  `/api/option-contract/{sym}/historic`. That row is always today's. 3.9
+  selects the as-of row (§3.6).
+- **M22 earnings.** `catalyst_calendar.py` mapped the `report_time` values
+  `pre-market` and `after-hours`, and `after-hours` never occurs live. 3.9
+  maps `premarket` to 09:30 ET, and `postmarket` or `unknown` to 16:00 ET
+  (§3.5).
+- **M25 peer flow.** `sector_peer.py` used per-ticker
+  `/api/stock/{t}/flow-recent`, which returns the last 50 trades, about
+  8 seconds of tape. 3.9 uses
+  `/api/option-trades/flow-alerts?ticker_symbol=<peers>` (§3.7).
+- **M21 dealer gamma.** `dealer_gamma.py` treated `greek-exposure/strike`
+  `call_gex + put_gex` as USD per 1% move. 3.9 reads USD per 1% from
+  `/api/stock/{t}/spot-exposures` (`gamma_per_one_percent_move_oi`). It uses
+  `greek-exposure/strike` only for the flip strike, where the unit does not
+  matter (§3.2).
+
+The 16 phase-3 provider tests that left the spec are listed in the `6d1e4ca`
+commit body, each with its replacement. For the current endpoints see
+`docs/phase-3.9-uw-endpoint-correction-acceptance.md` §2–§3 and the
+"Provider mapping" section of each module below.
+
+---
+
 ## M21 — Dealer Gamma Exposure (Phase 3.4.1)
 
 ### What it computes
@@ -723,6 +760,124 @@ Direct mutation of cross-module sub-scores remains forbidden.
 
 ---
 
+## Self-derived ThetaData providers (Phase 3.6.x, backtest-only, closed track)
+
+Package `src/uoa_detector/sources/thetadata_derived/`, from the phase-3
+lineage; it arrived with the Phase 5.0 merge. These providers compute
+enrichment axes from locally downloaded ThetaData data instead of Unusual
+Whales.
+- They satisfy the same provider Protocols, so stage scoring is unchanged.
+- Only `backtest/cell_runner.py::fusion_stages_with_thetadata` wires them
+  (`backtest run-4cell --trades replay --chain-snapshots …`), with profile
+  `profiles/v6_thetadata_confluence.yaml`.
+- Nothing live uses them.
+- The track is closed: EDGE REJECTED (`docs/phase-3.6-closeout.md`,
+  `docs/phase-3.6-results.md`). Its data window is burned
+  (`docs/INDEX.md` §6).
+
+| Module | Classes | Serves | Data |
+|---|---|---|---|
+| `dealer_gamma.py` (3.6.1) | `ThetaDataDealerPositioningProvider` | `DealerPositioningProvider` → M21 | chain snapshots via `DailyChainSnapshotSource` |
+| `chain.py` (3.6) | `ChainSnapshotSource` Protocol, `ChainContract`, `ChainAsOf` | point-in-time chain interface for the GEX provider; the as-of selection is the look-ahead guard | none |
+| `snapshot_reader.py` (3.6.2) | `DailyChainSnapshotSource` | implements `ChainSnapshotSource` | `data/chain_snapshots/{TICKER}.parquet` from `scripts/download_chain_snapshots.py` |
+| `chain_history.py` (3.6.4) | `ChainHistory` | per-contract OI/IV series and per-ticker ATM IV series for the IV and OI providers | same snapshots |
+| `iv_oi.py` (3.6.4) | `ThetaDataIVHistoryProvider`, `ThetaDataOpenInterestProvider` | `IVHistoryProvider` → M24; `OpenInterestProvider` → M27 | `ChainHistory` |
+| `price_action.py` (3.6.5) | `SpotSeries`, `ThetaDataPriceActionProvider` | `PriceActionProvider` → M23 | `data/spot_series/{TICKER}.parquet` from `scripts/compute_spot_series.py` |
+| `catalyst_calendar.py` (3.6.6) | `CSVCatalystCalendarProvider` | `CatalystCalendarProvider` → M22, and M24's post-earnings gate | `data/earnings_calendar.csv` from `scripts/fetch_earnings_calendar.py` |
+| `black_scholes.py` (3.6) | `gamma`, `price`, `implied_vol` | Black-Scholes math (r = 0) for the GEX provider and for IV inversion from the eod mid | none |
+
+**Wiring** (`fusion_stages_with_thetadata`)
+- **Always self-derived.** M21, M24 and M27 whenever `--chain-snapshots` is
+  set.
+- **Optional axes.** M23 needs `--spot-series`. M22, and M24's catalyst
+  gate, need `--catalyst-calendar`. Without those flags the stages keep
+  their NoOp providers.
+- **Always NoOp.** M25 (sector) and M26 (dark pool).
+- **M37.** The replay producer feeds `data/medians_bulk.csv`
+  (`scripts/compute_medians.py`) through `CSVMedianTradeSizeProvider`,
+  outside this package.
+
+**Profile and verdict**
+- `v6_thetadata_confluence` inherits `v5_gamma_squeeze` and overrides one
+  leaf: M21 `short_gamma_threshold = 0` (sign-based).
+- The 3.6 closeout records that M24 is only a conditional penalty and M27
+  feeds M28, not the combined score. Wiring them did not move the verdict.
+
+**Stale docstring.** `snapshot_reader.py` names
+`scripts/compute_chain_snapshots.py`; the script in the repo is
+`scripts/download_chain_snapshots.py`.
+
+---
+
+## Non-pipeline consumers (webapp)
+
+Two background tasks in the FastAPI app (`webapp/main.py` lifespan) call
+Unusual Whales outside the CLI and backtest paths.
+- Both start only when `LIVE_TICKERS`, `UNUSUAL_WHALES_API_KEY` and
+  `DATABASE_URL` are set (`webapp/worker.py::live_config_from_env`).
+- Each runs under a supervisor that restarts it 30 s after it exits or
+  raises.
+- Runtime and variables: `docs/DATA_INTEGRATION.md` §8–§10.
+
+### `webapp/worker.py`: live signal worker
+
+- **Source.** `UnusualWhalesFlowPollSource`
+  (`sources/unusual_whales/flow_poll.py`) polls per-ticker
+  `GET /api/stock/{t}/flow-alerts`. This keeps parity with the phase-3
+  production path (`docs/phase-5.0-merge-acceptance.md` §3.8). The port to
+  `/api/option-trades/flow-alerts` is a registry item: it changes the
+  event-id scheme and starts firing the wide_spread penalty on live cards.
+- **Stages.** `build_live_stage_pipeline(client, profile,
+  degrade_transient_errors=True)` gives the same stages and order as
+  `fusion_stages_with_uw`, with one shared catalyst provider.
+  - Degrading wrappers for M21, M22, M24, M25, M26 and M27 map three error
+    families to each protocol's documented no-data return, log a WARNING
+    and increment a counter: UW rate-limit errors (daily limit included),
+    transient errors and an open circuit breaker.
+  - `UnusualWhalesAuthError` and programming errors (`TypeError`,
+    `ValueError`) still raise.
+  - The builder's default (`False`) leaves the screener and backtests
+    unchanged. `fusion_stages_with_uw` stays for the replay path.
+  - Until the stage-level `provider_error` branch lands (registry), a
+    degraded axis shows the stage's no-data branch in decision records.
+- **Store.** `SqliteBacktestStore(url, flush_threshold=1, replay_safe=True)`
+  (Phase 4.42, 4.43). The poll source re-emits its last 10 minutes of alerts
+  on every rebuild. The replay-safe store skips a signal whose
+  `(run_id, event_id)` is already stored, and discards a batch whose commit
+  failed.
+- **Run id.** `live-YYYY-MM-DD` (UTC date), adopted again on a same-day
+  restart.
+- **Profile.** `profiles/v5_default.yaml`.
+- **Budget guards.** RTH-only polling, a 60 s poll floor and an 1800 s
+  daily-limit backoff (`docs/DATA_INTEGRATION.md` §10).
+
+### `webapp/gamma_live.py`: gamma / vol board
+
+- **Refresh.** Every 240 s during RTH, per ticker, it calls
+  `GET /api/stock/{t}/greek-exposure/strike`, `/api/stock/{t}/iv-rank`,
+  `/api/earnings/{t}` and `/api/stock/{t}/ohlc/1d`, plus
+  `UnusualWhalesCatalystCalendarProvider.next_catalyst`. Outside RTH it
+  sleeps 300 s between checks.
+- **Storage.** Results are upserted into the `gamma_regime` table read by
+  the webapp's `/gamma` page. On startup the loop drops and recreates that
+  table.
+- **`net_gex` is share gamma.** It is the sum of `call_gex + put_gex` over
+  the whole book, not USD per 1% move (see the 3.9 contract §3.2).
+  - The board uses only its sign, the flip and the call/put walls, all
+    unit-invariant.
+  - The flip is the cumulative zero crossing nearest spot, over strikes
+    within 0.6–1.4 × spot.
+  - `net_gex` is not comparable to M21's `net_gamma_dollars` or to any
+    profile threshold. Changing its units is a registry item.
+- **Realized vol.** The IV-vs-realized read uses the last 21 regular-session
+  daily closes from `ohlc/1d`, ordered by date.
+  `webapp/pricing.latest_close` (journal prices) uses the newest regular
+  close (contract §3.9).
+- **Client use.** It calls the UW client directly (no provider, no stage)
+  and builds a new client every round; client reuse is a registry item.
+
+---
+
 ## Deferrals to Phase 3.5+
 
 Items flagged during Phase 3.4 but explicitly NOT addressed:
@@ -778,6 +933,9 @@ the unit-only suite in ~60 seconds.
 
 ## Where to go next
 
+  - Current truth across both lineages, doc types, Phase 5.x registry:
+    `docs/INDEX.md`
+  - Current UW endpoints: `docs/phase-3.9-uw-endpoint-correction-acceptance.md`
   - Phase 3.4 acceptance contract: `docs/phase-3.4-acceptance.md`
   - Phase 3.3 acceptance contract: `docs/phase-3.3-acceptance.md`
     (data feeds and providers consumed by Phase 3.4)
