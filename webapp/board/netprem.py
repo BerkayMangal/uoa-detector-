@@ -319,6 +319,7 @@ class TapeSummary:
         return self.bullish_net_premium if direction == "up" else -self.bullish_net_premium
 
 
+# Any (D12 ORM boundary): SQLAlchemy column expressions of mixed types for one select().
 def _summary_columns() -> tuple[Any, ...]:
     return (
         AlfaNetPrem.ticker,
@@ -332,6 +333,7 @@ def _summary_columns() -> tuple[Any, ...]:
     )
 
 
+# Any (D12 ORM boundary): one untyped SQLAlchemy Row of _summary_columns(), unpacked by position.
 def _summary(row: Any) -> TapeSummary | None:
     ticker, trade_date, call_sum, put_sum, count, first, last, fetched = row
     if not count or first is None or last is None or fetched is None:

@@ -152,6 +152,16 @@ EVIDENCE_COPY: Final[Mapping[str, str]] = MappingProxyType(
     },
 )
 
+# Row-face tooltip of a legacy family. It names the persisted record, never its value:
+# score values appear only in the Denetim block's inputs (R-EV2; review FA-05).
+LEGACY_HOVER: Final[Mapping[str, str]] = MappingProxyType(
+    {
+        "price_confirmation": "eski satır: M23 kaydı (değer Denetim bloğunda)",
+        "sector": "eski satır: M25 kaydı (değer Denetim bloğunda)",
+        "dark_pool": "eski satır: M26 kaydı",
+    },
+)
+
 STRENGTH_LABELS: Final[Mapping[StrengthKey, str]] = MappingProxyType(
     {"strong": STRONG_LABEL, "moderate": "Orta", "weak": "Zayıf"},
 )
@@ -277,8 +287,9 @@ class FamilyRead:
     family: str
     state: FamilyState
     note: str | None = None
-    source: str | None = None  # stage and branch (or the persisted field) for the audit tooltip
+    source: str | None = None  # stage and branch, or the persisted field and value (audit metadata)
     flipped: bool = False
+    legacy_record: bool = False  # read from a persisted score on a legacy print
 
     @property
     def label(self) -> str:
@@ -287,6 +298,13 @@ class FamilyRead:
     @property
     def state_label(self) -> str:
         return STATE_LABELS[self.state]
+
+    @property
+    def hover(self) -> str | None:
+        """Row-face tooltip: the stage and branch, or for a legacy family its record name (no value)."""
+        if self.legacy_record:
+            return LEGACY_HOVER.get(self.family)
+        return self.source
 
     @property
     def dimmed(self) -> bool:
@@ -390,18 +408,30 @@ def _read(
     *,
     source: str | None = None,
     flipped: bool = False,
+    legacy_record: bool = False,
     **values: object,
 ) -> FamilyRead:
     note = NOTE_TEMPLATES[note_key].format(**values) if note_key is not None else None
-    return FamilyRead(family=family, state=state, note=note, source=source, flipped=flipped)
+    return FamilyRead(
+        family=family, state=state, note=note, source=source, flipped=flipped, legacy_record=legacy_record,
+    )
 
 
 def _oriented(
-    family: str, state: FamilyState, note_key: str | None, *, sold: bool, source: str | None,
+    family: str,
+    state: FamilyState,
+    note_key: str | None,
+    *,
+    sold: bool,
+    source: str | None,
+    legacy_record: bool = False,
 ) -> FamilyRead:
     if sold and family in _ORIENTED_FAMILIES and state in _SWAPPED:
-        return _read(family, _SWAPPED[state], note_key or "sold_flip", source=source, flipped=True)
-    return _read(family, state, note_key, source=source)
+        return _read(
+            family, _SWAPPED[state], note_key or "sold_flip", source=source, flipped=True,
+            legacy_record=legacy_record,
+        )
+    return _read(family, state, note_key, source=source, legacy_record=legacy_record)
 
 
 def stage_family(
@@ -457,8 +487,8 @@ def legacy_family(
             if signal.dark_pool_confirmation:
                 state = "supporting"
     if state is None:
-        return _read(family, "unknown", "legacy", source=source)
-    return _oriented(family, state, "legacy_value", sold=sold, source=source)
+        return _read(family, "unknown", "legacy", source=source, legacy_record=source is not None)
+    return _oriented(family, state, "legacy_value", sold=sold, source=source, legacy_record=True)
 
 
 def _as_utc(value: datetime) -> datetime:

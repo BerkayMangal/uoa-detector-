@@ -39,7 +39,7 @@
   <div class="mt-1 flex flex-wrap gap-1.5 text-xs" data-evidence-strip>
     {% for fam in view.evidence.families %}
     <span class="px-2 py-0.5 rounded border {{ evidence_style[fam.state] }}"
-          data-family="{{ fam.family }}" data-family-state="{{ fam.state }}"{% if fam.source %} title="{{ fam.source }}"{% endif %}>{{ fam.text }}{% if fam.dimmed %} · <span data-unknown-not-clean>{{ unknown_not_clean }}</span>{% endif %}</span>
+          data-family="{{ fam.family }}" data-family-state="{{ fam.state }}"{% if fam.hover %} title="{{ fam.hover }}"{% endif %}>{{ fam.text }}{% if fam.dimmed %} · <span data-unknown-not-clean>{{ unknown_not_clean }}</span>{% endif %}</span>
     {% endfor %}
   </div>
 

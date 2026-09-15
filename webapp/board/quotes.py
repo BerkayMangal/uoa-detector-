@@ -219,6 +219,7 @@ def _tape_time(raw: object, volume: int | None) -> datetime | None:
     return parsed
 
 
+# Any (D12 adapter boundary): rows of the untyped UW JSON payload; callers isinstance-check each row.
 def _data_rows(payload: object) -> list[Any]:
     rows = payload.get("data") if isinstance(payload, dict) else None
     if not isinstance(rows, list):
@@ -274,6 +275,7 @@ def parse_option_contract_rows(
     """
     wanted = _unique_symbols(requested)
     wanted_set = set(wanted)
+    # Any (D12 adapter boundary): raw UW JSON row values, parsed defensively below.
     found: dict[str, dict[str, Any]] = {}
     for row in _data_rows(payload):
         if not isinstance(row, dict):

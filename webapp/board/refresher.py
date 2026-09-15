@@ -255,11 +255,13 @@ def _warn_degraded_4xx(what: str, error: UnusualWhalesAuthError) -> None:
     _logger.warning("board refresher: %s rejected by UW (%s); marked degraded, continuing", what, error)
 
 
+# Any: arguments are forwarded unchanged to fn, as asyncio.to_thread's own signature does.
 async def _off_loop(fn: Callable[..., _T], *args: Any, **kwargs: Any) -> _T:
     """Run a synchronous database call in a worker thread so the shared event loop keeps serving."""
     return await asyncio.to_thread(fn, *args, **kwargs)
 
 
+# Any: a coroutine's send and yield types play no part here; only its result type is kept.
 async def _isolated(step: str, work: Coroutine[Any, Any, _T], cadence_seconds: int) -> _T | None:
     """Await one refresher step. Daily-limit and key failures propagate; any other error is logged."""
     try:

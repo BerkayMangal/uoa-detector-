@@ -25,7 +25,7 @@
     {% set ns.crossed = true %}
     {% endif %}
     <article class="rounded-xl border border-gray-800 bg-gray-900/60 p-4 {{ 'opacity-50' if row.below_threshold else '' }}">
-      <!-- Top line: ticker · IV-rank bar · ATM IV · expected move -->
+      <!-- Top line: ticker · IV-rank bar · ATM IV · IV-implied move -->
       <div class="flex items-start justify-between gap-3">
         <div class="min-w-0">
           <div class="flex items-center gap-2 flex-wrap">
@@ -51,7 +51,7 @@
         </div>
       </div>
 
-      <!-- Key facts: ATM IV + expected move -->
+      <!-- Key facts: ATM IV + IV-implied 1σ move (atm_iv · sqrt(30/365); a range, not an expectation) -->
       <div class="mt-3 flex flex-wrap gap-x-6 gap-y-2">
         {% if row.atm_iv %}
         <div>
@@ -61,7 +61,7 @@
         {% endif %}
         {% if row.expected_move_pct is not none %}
         <div>
-          <div class="text-[10px] text-gray-500 uppercase tracking-wide">Expected move</div>
+          <div class="text-[10px] text-gray-500 uppercase tracking-wide">IV-implied 1σ move</div>
           <div class="text-base font-semibold text-gray-200">±{{ row.expected_move_pct }}% /30d</div>
         </div>
         {% endif %}
