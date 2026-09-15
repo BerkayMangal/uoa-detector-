@@ -559,6 +559,10 @@ def alfa_board(request: Request, run: str = "", gate: str = "") -> HTMLResponse:
             run_id, requests,
         ),
         legacy_scores=_legacy_scores(),
+        profile_hash_source=lambda run_id, event_ids: alfa_page.db_profile_hash_source(_board_reader().engine)(
+            run_id, event_ids,
+        ),
+        profile_resolver=alfa_page.resolve_writing_profile,
     )
     return templates.TemplateResponse(
         request,

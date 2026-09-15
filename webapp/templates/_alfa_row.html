@@ -140,6 +140,13 @@
         {% endfor %}
       </ul>
       {% endif %}
+      <p class="text-gray-500 pt-1">{{ ledger_copy.title }}</p>
+      <p data-ledger-profile>{{ view.ledger.profile_text }}</p>
+      <ul class="space-y-0.5" data-ledger>
+        {% for entry in view.ledger.entries %}
+        <li data-penalty="{{ entry.key }}" data-penalty-status="{{ entry.status }}"><span class="text-gray-200">{{ entry.name }}</span>: {{ entry.status_label }}{% if entry.details %} · {{ entry.detail_text }}{% endif %}</li>
+        {% endfor %}
+      </ul>
     </div>
   </details>
 </article>

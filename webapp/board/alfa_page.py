@@ -1,7 +1,7 @@
-"""The ``/alfa`` page view model and its frozen Turkish copy (Phase 5.2.A1, A2, A4, A5).
+"""The ``/alfa`` page view model and its frozen Turkish copy (Phase 5.2.A1, A2, A4-A6).
 
 Contract: ``docs/phase-5.2-alfa-board-acceptance.md`` §4.1 ("Render"), §5 A1,
-§5 A2 ("Gate"), §5 A4 and §5 A5; decisions P12, P15 and P16.
+§5 A2 ("Gate"), §5 A4, §5 A5 and §5 A6; decisions P12, P15 and P16.
 
 - A1: one row per (ticker, direction) over the whole run.
 - A2: each row carries the tradability chip of its dominant contract. The
@@ -23,10 +23,14 @@ Contract: ``docs/phase-5.2-alfa-board-acceptance.md`` §4.1 ("Render"), §5 A1,
 - A5: each row carries its reason sentence and its mandatory counter-argument
   (``webapp/board/narrative.py``), rendered as two columns with the same
   classes (R-CA2).
+- A6: each row's audit block carries the penalty ledger of its source print
+  (``webapp/board/penalty_ledger.py``), with numbers from the calibration
+  profile that wrote the row. Applied penalties feed the counter-argument's
+  last priority.
 
 The template only shows strings from the frozen dictionaries here and in
-``direction.py``, ``aggregate.py``, ``tradability.py``, ``evidence.py`` and
-``narrative.py`` (rule R-WD1). Summary, chip, audit and narrative lines are
+``direction.py``, ``aggregate.py``, ``tradability.py``, ``evidence.py``,
+``narrative.py`` and ``penalty_ledger.py`` (rule R-WD1). Summary, chip, audit and narrative lines are
 formatted from frozen templates with row values; there is no free text. Quotes
 and evidence come from the database through injected sources; this module never
 calls Unusual Whales.
@@ -57,7 +61,15 @@ from webapp.board.evidence import (
     request_for,
     strength_label,
 )
-from webapp.board.narrative import NARRATIVE_COPY, RowNarrative, build_narrative
+from webapp.board.narrative import NARRATIVE_COPY, PenaltyCheck, RowNarrative, build_narrative
+from webapp.board.penalty_ledger import (
+    LEDGER_COPY,
+    M24_STAGE,
+    PenaltyLedger,
+    build_penalty_ledger,
+    read_profile_hashes,
+    resolve_profile,
+)
 from webapp.board.quotes import dominant_symbol, read_board_quotes
 from webapp.board.tradability import (
     CHIP_COPY,
@@ -74,6 +86,7 @@ if TYPE_CHECKING:
     from sqlalchemy.engine import Engine
 
     from uoa_detector.backtest.store import StoredSignal
+    from uoa_detector.calibration.profile import CalibrationProfile
     from webapp.board.evidence import EvidenceInputs, EvidenceRequest, StrengthKey
     from webapp.board.settings import BoardSettings
     from webapp.board.signals import BoardPrint
@@ -83,6 +96,8 @@ if TYPE_CHECKING:
         [Sequence[str]], tuple[Mapping[str, QuoteView], Mapping[str, DepthView]]
     ]
     EvidenceSource = Callable[[str, Sequence[EvidenceRequest]], EvidenceInputs]
+    ProfileHashSource = Callable[[str, Sequence[str]], Mapping[str, str]]
+    ProfileResolver = Callable[[str], CalibrationProfile | None]
 
 _logger = logging.getLogger(__name__)
 
@@ -221,6 +236,7 @@ class AlfaRowView:
     strength_text: str  # through the R-UN2 guard
     audit: AuditView
     narrative: RowNarrative
+    ledger: PenaltyLedger
 
 
 @dataclass(frozen=True)
@@ -373,6 +389,8 @@ def build_alfa_page(
     quote_source: QuoteSource | None = None,
     evidence_source: EvidenceSource | None = None,
     legacy_scores: LegacyScores | None = None,
+    profile_hash_source: ProfileHashSource | None = None,
+    profile_resolver: ProfileResolver | None = None,
 ) -> AlfaPage:
     """The page model; ``prints=None`` means the database read failed.
 
@@ -381,6 +399,8 @@ def build_alfa_page(
     Without an evidence source the telemetry families read as legacy (and
     ``bilinmiyor`` without legacy scores). A failed evidence read sets
     ``evidence_failed`` and every family reads ``bilinmiyor``.
+    Without a profile hash source, or when it fails, the penalty ledger says
+    the writing profile could not be read and shows no profile numbers.
     """
     if prints is None:
         return AlfaPage(
@@ -407,6 +427,12 @@ def build_alfa_page(
         except Exception:
             _logger.exception("alfa board: evidence read failed; every family reads bilinmiyor")
             evidence_failed = True
+    hashes: Mapping[str, str] = {}
+    if profile_hash_source is not None and requests:
+        try:
+            hashes = profile_hash_source(prints[0].run_id, [r.event_id for r in requests])
+        except Exception:
+            _logger.exception("alfa board: profile hash read failed; ledgers show no profile numbers")
     signals = {p.event_id: p.signal for p in prints}
     moment = now if now is not None else datetime.now(UTC)
     views: list[AlfaRowView] = []
@@ -434,6 +460,14 @@ def build_alfa_page(
             unread=evidence_failed,
         )
         strength = guard_strength(evidence.strength, evidence.counts, settings.evidence)
+        profile_hash = hashes.get(request.event_id)
+        stage_rows = inputs.telemetry.get(request.event_id)
+        ledger = build_penalty_ledger(
+            signal,
+            profile_hash=profile_hash,
+            profile=profile_resolver(profile_hash) if profile_resolver is not None and profile_hash else None,
+            m24_telemetry=stage_rows.get(M24_STAGE) if stage_rows is not None else None,
+        )
         views.append(
             AlfaRowView(
                 row=row,
@@ -444,7 +478,12 @@ def build_alfa_page(
                 strength_key=strength,
                 strength_text=strength_label(strength, evidence.counts, settings.evidence),
                 audit=build_audit(request.event_id, signal),
-                narrative=build_narrative(row, evidence, chip, settings=settings.narrative),
+                narrative=build_narrative(
+                    row, evidence, chip,
+                    settings=settings.narrative,
+                    penalties=PenaltyCheck(applied=ledger.applied_names),
+                ),
+                ledger=ledger,
             ),
         )
     ordered = tuple(sorted(views, key=_view_order))
@@ -478,6 +517,20 @@ def db_evidence_source(engine: Engine) -> EvidenceSource:
     return _source
 
 
+def db_profile_hash_source(engine: Engine) -> ProfileHashSource:
+    """A source of ``SignalRow.profile_content_hash`` per event (reads the database only)."""
+
+    def _source(run_id: str, event_ids: Sequence[str]) -> Mapping[str, str]:
+        return read_profile_hashes(engine, run_id, event_ids)
+
+    return _source
+
+
+def resolve_writing_profile(content_hash: str) -> CalibrationProfile | None:
+    """The calibration profile in ``profiles/`` whose content hash wrote the row, if any."""
+    return resolve_profile(content_hash)
+
+
 def load_spread_cutoff_pct(profile_path: Path = LIVE_CALIBRATION_PROFILE) -> float:
     """``penalty_triggers.spread_pct_threshold`` of the live calibration profile (read only)."""
     return load_profile(profile_path).penalty_triggers.spread_pct_threshold
@@ -509,4 +562,5 @@ def template_context() -> dict[str, object]:
         "narrative_copy": NARRATIVE_COPY,
         "case_class": CASE_CLASS,
         "case_title_class": CASE_TITLE_CLASS,
+        "ledger_copy": LEDGER_COPY,
     }
