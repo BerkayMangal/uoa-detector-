@@ -27,6 +27,13 @@ from pydantic import SecretStr
 from sqlalchemy.engine import Engine
 from webapp.board.daily_close import OHLC_DAILY_PATH, load_closes, run_daily_close_job
 from webapp.board.db import make_engine
+from webapp.board.delayed import (
+    CONGRESS_RECENT_TRADES_PATH,
+    build_delayed_evidence,
+    load_delayed_records,
+    refresh_congress,
+)
+from webapp.board.settings import DelayedSettings, load_board_settings
 
 from uoa_detector.calibration.profile import UnusualWhalesSettings
 from uoa_detector.sources.unusual_whales.client import UnusualWhalesClient
@@ -34,6 +41,11 @@ from uoa_detector.sources.unusual_whales.client import UnusualWhalesClient
 pytestmark = pytest.mark.integration
 
 _ET = ZoneInfo("America/New_York")
+_REPO = Path(__file__).resolve().parents[2]
+
+
+def _settings() -> DelayedSettings:
+    return load_board_settings(_REPO / "profiles" / "board_v1.yaml").delayed
 
 
 def _key_or_skip() -> SecretStr:
@@ -94,3 +106,40 @@ async def test_live_ohlc_daily_closes_job(live: _RecordingClient, engine: Engine
     assert [c.day for c in closes] == sorted(c.day for c in closes)
     # Holiday and weekend slack: the newest stored close is within a week.
     assert (now.astimezone(_ET).date() - closes[-1].day).days <= 7
+
+
+@pytest.mark.asyncio
+async def test_live_congress_recent_trades(live: _RecordingClient, engine: Engine) -> None:
+    now = datetime.now(UTC)
+    try:
+        result = await refresh_congress(live, engine, "NVDA", now=now, settings=_settings())  # type: ignore[arg-type]
+    finally:
+        await live._inner.aclose()
+
+    assert [(p, q) for p, q, _ in live.calls] == [
+        (CONGRESS_RECENT_TRADES_PATH, {"ticker": "NVDA", "limit": 200}),
+    ]
+    rows = [r for r in live.calls[0][2].get("data", []) if isinstance(r, dict)]
+    assert rows, "congress recent-trades returned no rows for NVDA"
+    assert {
+        "name", "politician_id", "ticker", "transaction_date", "filed_at_date", "txn_type",
+        "amounts", "member_type", "issuer",
+    } <= rows[0].keys()
+    assert "id" not in rows[0]  # probed: no id field, hence the composite dedupe key
+    assert all(isinstance(r["member_type"], str) for r in rows)  # probed: str, not the spec's bool
+    assert all(isinstance(r["amounts"], str) for r in rows)
+
+    assert result.status == "ok"
+    records = load_delayed_records(engine, "NVDA")
+    assert records, "no NVDA congress buy/sell filed inside the lookback window"
+    assert result.inserted == len(records)
+    for record in records:
+        assert record.family == "congress"
+        assert record.side in {"buy", "sell"}
+        assert record.delay_days is not None
+        assert record.delay_days >= 0
+        assert record.transaction_date is not None
+    today = now.astimezone(_ET).date()
+    evidence = build_delayed_evidence("NVDA", records, (), today=today, settings=_settings())
+    assert evidence.items
+    assert {i.date_label for i in evidence.items} == {"bildirim tarihi"}
