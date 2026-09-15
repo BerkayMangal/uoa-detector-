@@ -1,0 +1,72 @@
+{# One Alfa Board row: every print of one (ticker, side-aware direction) in the run.
+   Copy comes only from the frozen dictionaries passed by alfa_page.template_context(). #}
+{% set is_up = row.direction == 'up' %}
+{% set dir_color = '#10b981' if is_up else '#ef4444' %}
+<article class="rounded-lg border border-gray-800 bg-gray-900/40 px-4 py-3"
+         data-row data-ticker="{{ row.ticker }}" data-direction="{{ row.direction }}">
+  <div class="flex flex-wrap items-baseline gap-x-5 gap-y-1">
+    <span class="text-lg font-bold text-white">{{ row.ticker }}</span>
+    <span class="text-sm font-semibold px-2 py-0.5 rounded" style="background:{{ dir_color }}22;color:{{ dir_color }}"
+          data-direction-label>{{ direction_labels[row.direction] }}</span>
+    <span class="text-sm"><span class="text-gray-400">{{ copy.col_premium }}</span>
+      <span class="text-white font-semibold" data-total-premium>${{ '{:,.0f}'.format(row.total_premium|float) }}</span></span>
+    <span class="text-sm"><span class="text-gray-400">{{ copy.col_prints }}</span>
+      <span class="text-white" data-print-count>{{ row.print_count }}</span></span>
+    <span class="text-sm"><span class="text-gray-400">{{ copy.col_contracts }}</span>
+      <span class="text-white" data-distinct-contracts>{{ row.distinct_contracts }}</span></span>
+  </div>
+
+  <div class="grid gap-x-5 gap-y-1 md:grid-cols-4 mt-2 text-sm">
+    <div><span class="text-gray-400">{{ copy.col_dominant }}</span>
+      <span class="text-gray-100" data-dominant>{{ option_type_labels[row.dominant.key.option_type] }} {{ row.dominant.key.strike }} · {{ row.dominant.key.expiry }}</span>
+      {% if row.dominant.option_chain %}<span class="text-gray-500 text-xs" data-dominant-chain>{{ row.dominant.option_chain }}</span>{% endif %}
+    </div>
+    <div><span class="text-gray-400 tip" title="{{ copy.concentration_help }}">{{ copy.col_concentration }}</span>
+      <span class="text-gray-100" data-concentration>{% if row.concentration_pct is not none %}%{{ '%.0f'|format(row.concentration_pct) }}{% else %}{{ copy.unknown }}{% endif %}</span>
+    </div>
+    <div><span class="text-gray-400 tip" title="{{ copy.dominance_help }}">{{ copy.col_dominance }}</span>
+      <span class="text-gray-100" data-dominance>{% if row.dominance_pct is not none %}%{{ '%.0f'|format(row.dominance_pct) }}{% else %}{{ copy.unknown }}{% endif %}</span>
+    </div>
+    <div><span class="text-gray-400">{{ copy.col_position }}</span>
+      <span class="text-gray-100" data-position="{{ row.position_read }}">{{ position_labels[row.position_read] }}</span>
+    </div>
+  </div>
+
+  <div class="text-xs text-gray-400 mt-1 flex flex-wrap gap-2 items-center">
+    <span data-side-counts>{{ side_counts_text(row) }}</span>
+    {% if row.fallback_prints %}
+    <span class="border border-dashed border-gray-600 rounded px-1.5 py-0.5 text-gray-400"
+          data-fallback-marker>{{ fallback_marker }}</span>
+    {% endif %}
+  </div>
+
+  <details class="mt-2 text-sm">
+    <summary class="cursor-pointer text-gray-300">{{ detail_summary_text(row) }}</summary>
+    <div class="overflow-x-auto">
+      <table class="mt-2 w-full text-xs">
+        <thead class="text-gray-400">
+          <tr>
+            <th class="text-left pr-3 font-normal">{{ copy.th_time }}</th>
+            <th class="text-left pr-3 font-normal">{{ copy.th_contract }}</th>
+            <th class="text-right pr-3 font-normal">{{ copy.th_premium }}</th>
+            <th class="text-right pr-3 font-normal">{{ copy.th_price }}</th>
+            <th class="text-left pr-3 font-normal">{{ copy.th_side }}</th>
+            <th class="text-left font-normal">{{ copy.th_direction_source }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in row.prints %}
+          <tr class="border-t border-gray-800" data-print="{{ p.event_id }}">
+            <td class="pr-3">{{ p.timestamp.strftime('%H:%M:%S') }}</td>
+            <td class="pr-3">{{ option_type_labels[p.option_type] }} {{ p.strike }} · {{ p.expiry }}</td>
+            <td class="pr-3 text-right">${{ '{:,.0f}'.format(p.premium|float) }}</td>
+            <td class="pr-3 text-right">${{ p.option_price }}</td>
+            <td class="pr-3">{{ fill_side_label(p.fill_side) }}</td>
+            <td>{{ copy.source_side if p.side_aware else copy.source_type }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </details>
+</article>

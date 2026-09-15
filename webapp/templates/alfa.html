@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{# Alfa Board (Phase 5.2.A1, contract §5 A1). Every visible string comes from the
+   frozen dictionaries in webapp/board (alfa_page.py, direction.py, aggregate.py). #}
+{% block content %}
+<section id="alfa-board" lang="tr">
+  <div class="flex items-baseline gap-3 flex-wrap mb-3">
+    <h2 class="text-xl font-bold text-white">{{ copy.page_title }}</h2>
+    <span class="text-sm text-gray-400">{{ copy.intro }}</span>
+  </div>
+
+  {% if runs %}
+  <form method="get" action="/alfa" class="flex flex-wrap items-end gap-4 mb-4">
+    <label class="text-sm">
+      <span class="block text-gray-400 mb-1">{{ copy.run_label }}</span>
+      <select name="run" onchange="this.form.submit()"
+              class="bg-gray-900 border border-gray-700 rounded px-2 py-1 text-gray-100">
+        {% for r in runs %}
+        <option value="{{ r.run_id }}" {% if r.run_id == run %}selected{% endif %}>{{ r.run_id }} ({{ r.count }})</option>
+        {% endfor %}
+      </select>
+    </label>
+  </form>
+  {% endif %}
+
+  {% if page.load_failed %}
+  <div class="rounded-lg border border-dashed border-amber-700/60 bg-amber-900/10 px-4 py-3 text-sm text-amber-200"
+       data-state="load-failed">{{ copy.load_failed }}</div>
+  {% elif not runs %}
+  <div class="rounded-lg border border-gray-800 bg-gray-900/40 px-4 py-3 text-sm text-gray-400"
+       data-state="no-runs">{{ copy.no_runs }}</div>
+  {% elif not page.rows %}
+  <div class="rounded-lg border border-gray-800 bg-gray-900/40 px-4 py-3 text-sm text-gray-400"
+       data-state="empty-run">{{ copy.empty_run }}</div>
+  {% else %}
+  <p class="text-sm text-gray-400 mb-3" data-summary>{{ page.summary }}</p>
+  <div class="space-y-3" id="alfa-rows">
+    {% for row in page.rows %}
+    {% include "_alfa_row.html" %}
+    {% endfor %}
+  </div>
+  {% endif %}
+</section>
+{% endblock %}

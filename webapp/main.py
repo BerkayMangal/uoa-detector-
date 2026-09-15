@@ -31,6 +31,9 @@ from starlette.datastructures import Headers
 from starlette.responses import PlainTextResponse
 
 from webapp import explanations, gamma, journal, pricing
+from webapp.board import alfa_page
+from webapp.board.settings import BoardSettings, load_board_settings
+from webapp.board.signals import BoardSignalReader
 from webapp.gamma_live import gamma_refresh_loop
 from webapp.notability import notability_score
 from webapp.repo import RunInfo, SignalFilters, SignalRepo
@@ -43,6 +46,7 @@ if TYPE_CHECKING:
     from starlette.types import ASGIApp, Receive, Scope, Send
 
     from uoa_detector.backtest.store import StoredSignal
+    from webapp.board.signals import BoardPrint
 
 _logger = logging.getLogger(__name__)
 _BASE = Path(__file__).parent
@@ -469,6 +473,52 @@ def gamma_page(request: Request) -> HTMLResponse:
     order = {"sell": 0, "buy": 1, "neutral": 2}
     rows.sort(key=lambda g: (order.get(g.vol_signal, 9), -(g.iv_pct or 0)))
     return templates.TemplateResponse(request, "gamma.html", {"rows": rows, **_EXPLAIN})
+
+
+# ---------------------------------------------------------------------------
+# Alfa Board (Phase 5.2). Built on /alfa first; A7 moves it to / (decision P12)
+# ---------------------------------------------------------------------------
+
+_BOARD_READER: BoardSignalReader | None = None
+_BOARD_SETTINGS: BoardSettings | None = None
+
+
+def _board_reader() -> BoardSignalReader:
+    global _BOARD_READER
+    if _BOARD_READER is None:
+        _BOARD_READER = BoardSignalReader()
+    return _BOARD_READER
+
+
+def _board_settings() -> BoardSettings:
+    global _BOARD_SETTINGS
+    if _BOARD_SETTINGS is None:
+        _BOARD_SETTINGS = load_board_settings()
+    return _BOARD_SETTINGS
+
+
+@app.get("/alfa", response_class=HTMLResponse)
+def alfa_board(request: Request, run: str = "") -> HTMLResponse:
+    """One row per (ticker, side-aware direction) over the whole selected run.
+
+    Reads the database only; no Unusual Whales call (contract §4.1). A failed
+    read renders an explicit "could not read" state, never an empty board.
+    """
+    settings = _board_settings()
+    runs_read: list[RunInfo] | None = _safe(_repo().runs, None)
+    runs = runs_read or []
+    run_ids = {r.run_id for r in runs}
+    active = run if run in run_ids else (runs[0].run_id if runs else None)
+    prints: list[BoardPrint] | None = None if runs_read is None else []
+    if active is not None:
+        run_id = active
+        prints = _safe(lambda: _board_reader().load_run(run_id), None)
+    page = alfa_page.build_alfa_page(prints, settings)
+    return templates.TemplateResponse(
+        request,
+        "alfa.html",
+        {"page": page, "runs": runs, "run": active or "", **alfa_page.template_context()},
+    )
 
 
 @app.get("/health")
