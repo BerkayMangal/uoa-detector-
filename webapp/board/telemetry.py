@@ -243,6 +243,7 @@ class AlfaTelemetryWriter:
         self._engine: Engine | None = None
         self._sessions: sessionmaker[Session] | None = None
         self._closed = False
+        self._write_failures = 0
 
     @classmethod
     def for_stages(
@@ -270,6 +271,11 @@ class AlfaTelemetryWriter:
     def closed(self) -> bool:
         return self._closed
 
+    @property
+    def write_failures(self) -> int:
+        """Writes that raised since this writer was built (review RT-6); each one is also logged."""
+        return self._write_failures
+
     def write(self, record: SignalDecisionRecord) -> None:
         """Persist the board's slice of ``record``. Never raises."""
         event_id = "<unknown>"
@@ -288,9 +294,11 @@ class AlfaTelemetryWriter:
         try:
             self._persist(record, degraded)
         except Exception as exc:
+            self._write_failures += 1
             _logger.warning(
-                "alfa telemetry write failed for event %s; live ingestion unaffected (%s)",
-                event_id, _describe(exc),
+                "alfa telemetry write failed for event %s (%d write failures since this writer started); "
+                "live ingestion unaffected (%s)",
+                event_id, self._write_failures, _describe(exc),
             )
 
     def close(self) -> None:
