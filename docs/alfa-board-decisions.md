@@ -214,3 +214,137 @@ ambiguous, pick the most honest and most reversible option, record it here as
   daily-limit 429 that starves the live flow poller.
 - **Undo.** Remove the attribute read. Client behaviour is otherwise
   unchanged.
+
+## P18. Contract §3 vs §4.3: where board cutoffs live
+
+- **Finding** (reported by the FAZ A, B and D build agents). The frozen
+  contract contradicts itself.
+  - §3 says every new numeric cutoff goes into "a new `board:` profile section
+    with an explicit value in `profiles/v5_default.yaml`". That line was
+    written before decision P6.
+  - §4.3 and P6 put them in the separate `profiles/board_v1.yaml`.
+- **Decision.** §4.3 and P6 govern. All code follows them.
+- **Rationale.** P6 protects the calibration content hashes of the burned
+  profiles. §4.3 is the detailed architecture section, and §3's line predates
+  the decision.
+- **Change.** Per D1 the contract is not edited; this entry records the
+  resolution.
+- **Undo.** See P6.
+
+## P19. Additive deviations made during the FAZ A/B/D builds
+
+These change no rule or behaviour the owner specified. Each is reversible.
+
+- **`alfa_atm_expiry`** (not in §4.2). Stores the once-a-day expiry list so the
+  per-cycle ATM job survives a refresher restart without re-fetching.
+  Rebuildable.
+- **`alfa_catalyst_fetch`** (not in §4.2). Records fetch coverage per source
+  and ticker. A source that was never fetched, or failed, then reads
+  `bilinmiyor` instead of "no catalyst" (R-UN1). Rebuildable.
+- **`alfa_catalyst` key.** Uses a string `when_key` (ISO instant, ISO date, or
+  a vague label such as `2026-Q3`) instead of a timestamp, because FDA Q/H/MID
+  targets have no precise time. Precise `starts_at`/`ends_at` are stored
+  alongside.
+- **Degraded flag storage.** Per stage on `alfa_stage_telemetry`; there is no
+  column on `alfa_print_meta`. The print-level flag is the any() over its
+  stages, so no information is lost.
+- **Table creation.** Each module creates its own tables with
+  `Model.__table__.create(checkfirst=True)` in an `ensure_*_tables` function,
+  still on `AlfaBase`. This avoids a central registry file shared by parallel
+  builds.
+- **Live integration test files.** Split per domain instead of one
+  `test_alfa_live_endpoints.py`: `test_alfa_live_quotes.py`,
+  `test_alfa_live_tape.py`, `test_alfa_live_b.py`,
+  `test_alfa_live_delayed.py`.
+- **Daily greek-exposure staleness.** A once-a-day source cannot use the 900 s
+  intraday staleness rule, which would blank it all day. It goes stale after
+  one trading day.
+- **Lot % of capital.** Shown in percent units, per §4.3's unit rule.
+
+## P20. Judgment calls from the FAZ A build and review (folded in from commit bodies)
+
+### Board profile keys added
+
+Each key was genuinely missing and is commented in `profiles/board_v1.yaml`.
+
+| Key | Value | Why it was needed |
+|---|---|---|
+| `tape.max_age_seconds` | 900 | A3 reads a stale tape as `bilinmiyor` but pinned no age |
+| `narrative.counter_min_unknown_families` | 2 | AMA priority 5 |
+| `refresh.max_symbols_per_request` | 200 | the live-verified `option_symbol[]` bound |
+
+**Undo:** remove the key, and the code path that reads it.
+
+### Evidence
+
+- **Legacy prints.** A print with no telemetry rows is legacy.
+  - A print with telemetry but missing one stage reads that family
+    `bilinmiyor`.
+  - An unmapped branch reads `bilinmiyor`.
+  - Missing telemetry never reads `kapsam-dışı`.
+- **Orientation flip.** Only M23, M25 and M26 flip for sold options. M21 never
+  flips (P9). Akış and Açık pozisyon are read in the row's own direction.
+- **Aggressor side.** `above_ask` counts as bought and `below_bid` as sold,
+  the same as at_ask and at_bid.
+- **R-UN2 guard.** It never raises. It downgrades `Güçlü` to `Orta` or `Zayıf`
+  and logs ERROR, both when evidence is built and again before rendering.
+- **Akış after the close.** Once the tape is older than 900 s, Akış reads
+  `bilinmiyor` on evening views. Registry: a "complete session" rule with its
+  own key.
+
+### Cost and quotes
+
+- **Crossed or zero-ask quote** (ask < bid, or ask = 0). It reads
+  `kotasyon yok`, and no cost cells are rendered from it (fix1).
+- **Soft cap.** "Critical" means quotes for open journal legs only. A daily
+  count is honoured only on the UTC day it was observed.
+
+### Clean candidates and banners
+
+- **Clean candidate:** tradability `İŞLENİR`, L ≥ 1, A = 0, U ≤ 2. Dealer gamma
+  alone (non-directional) cannot make a row clean (fix4).
+- **The `Bugün temiz aday yok` banner** shows for any successfully read run
+  with zero clean candidates. Runs that are not today's carry their date. The
+  banner never shows for load-failed or no-runs states (fix4).
+
+### Runtime
+
+- **Startup.** The app refuses to start when the board profile is missing or
+  invalid (fix3). On Railway the healthcheck then keeps the previous
+  deployment serving.
+- **Refresher.**
+  - DB writes are set-based and run off the event loop.
+  - Each step is isolated, so one failing step does not skip the others.
+  - The run is chosen by newest print on today's ET date, not by
+    `live-<UTC today>` (fix2). This is needed because the worker does not roll
+    its run id over at UTC midnight.
+  - Key failures (401/403, or no status) log ERROR and wait one cadence
+    instead of looping.
+- **Telemetry write failures** are counted and logged; they never raise into
+  the live worker (fix7).
+- **Removed with the old dashboard (A7):** its 30 s reload and the page-level
+  LIVE/STALE badge. The board reloads every `refresh.cadence_seconds`.
+  Per-row quote ages remain. A board-level freshness line is restored in a
+  follow-up fix if it is missing.
+
+### Registry (deferred, each with a reason in the fix commit bodies)
+
+1. FA-07: `kotasyon yok` is not a counter-argument. The owner pinned the
+   priority list.
+2. FA-10: the journal pages still show the legacy `signal_score`. FAZ C
+   decision cards replace that entry flow.
+3. R-A-1: the vol board's `IV-rank 75` literal should render from
+   `rich_threshold`.
+4. RT-2: `webapp/worker.py` never rolls its live run id over at UTC midnight
+   without a restart. This predates FAZ A and sits on the ingestion path.
+5. RT-5: the refresher is gated on the 13:30–21:00 UTC union, not the real ET
+   session. The post-close window is an owner call. Spend is about 2,750–2,880
+   requests/day.
+6. RT-6: a live print with no telemetry is labelled "legacy" instead of
+   "telemetry write failed". Fixing that needs a marker column, i.e. a schema
+   decision.
+7. FA-09: the gamma snapshot has no fetch timestamp. The gamma loop is a
+   non-goal.
+8. `notability.py`, `SignalRepo.signals`, `SignalFilters` and
+   `ticker_label_options` no longer have a route caller. Their tests still
+   pass. Cleanup item.
