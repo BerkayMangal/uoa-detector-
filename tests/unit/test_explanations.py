@@ -6,7 +6,6 @@ from webapp.explanations import (
     AXES,
     LABEL_MEANINGS,
     OFFLINE_LIVE_AXES,
-    conviction,
     headline,
 )
 
@@ -24,19 +23,6 @@ def test_label_meanings_cover_every_real_label() -> None:
 def test_offline_axes_are_real_axis_keys() -> None:
     axis_keys = {key for key, _, _ in AXES}
     assert axis_keys >= OFFLINE_LIVE_AXES
-
-
-def test_conviction_tiers() -> None:
-    assert conviction(None) == ("—", 0)
-    assert conviction(0.45)[0] == "Strong"
-    assert conviction(0.32)[0] == "Moderate"
-    assert conviction(0.22)[0] == "Weak"
-    assert conviction(0.05)[0] == "Noise"
-
-
-def test_conviction_meter_pct_clamped() -> None:
-    assert conviction(0.25)[1] == 50  # 0.25/0.5 -> 50%
-    assert conviction(0.9)[1] == 100  # clamped
 
 
 def test_headline_bullish_call_sweep() -> None:

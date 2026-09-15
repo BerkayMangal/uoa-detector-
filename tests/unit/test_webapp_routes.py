@@ -49,7 +49,12 @@ def test_every_route_renders(client: TestClient, path: str) -> None:
 
 def test_empty_dashboard_shows_empty_state(client: TestClient) -> None:
     body = client.get("/").text
-    assert "No signals match" in body  # empty signal table -> friendly empty card
+    # Phase 5.2.A7 (D10): "/" is the Alfa Board. This fixture creates no signal
+    # table, so the board says it could not read the prints: never an empty,
+    # clean-looking board, and never "Bugün temiz aday yok".
+    assert 'data-state="load-failed"' in body
+    assert 'data-state="no-clean-candidate"' not in body
+    assert "No signals match" not in body
 
 
 def test_gamma_board_shows_seeded_ticker(client: TestClient) -> None:

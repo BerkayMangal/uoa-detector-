@@ -152,7 +152,7 @@ def test_alfa_renders_one_row_per_ticker_and_side_aware_direction(
     assert response.status_code == 200
     body = response.text
 
-    assert 'href="/alfa"' in body
+    assert 'href="/"' in body  # Phase 5.2.A7 (D10): the nav links the board at "/"; /alfa is an alias
     assert _ROW.findall(body) == [("SPY", "up"), ("NVDA", "down"), ("SPY", "down")]
     assert "3 satır · 5 baskı" in body
 

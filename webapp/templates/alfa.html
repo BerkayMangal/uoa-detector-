@@ -1,7 +1,7 @@
 {% extends "base.html" %}
-{# Alfa Board (Phase 5.2.A1-A2, contract §5 A1-A2). Every visible string comes from the
-   frozen dictionaries in webapp/board (alfa_page.py, direction.py, aggregate.py,
-   tradability.py, copy_tr.py). #}
+{# Alfa Board (Phase 5.2.A1-A7, contract §5), served at / and at the /alfa alias. Every visible
+   Turkish string comes from the frozen dictionaries in webapp/board (alfa_page.py, direction.py,
+   aggregate.py, tradability.py, evidence.py, narrative.py, penalty_ledger.py, copy_tr.py). #}
 {% block content %}
 <section id="alfa-board" lang="tr">
   <div class="flex items-baseline gap-3 flex-wrap mb-3">
@@ -11,7 +11,7 @@
 
   <div class="flex flex-wrap items-end gap-6 mb-4">
     {% if runs %}
-    <form method="get" action="/alfa" data-form="run">
+    <form method="get" action="{{ board_path }}" data-form="run">
       {% if not page.gate_on %}<input type="hidden" name="gate" value="{{ gate_off_param }}">{% endif %}
       <label class="text-sm">
         <span class="block text-gray-400 mb-1">{{ copy.run_label }}</span>
@@ -24,7 +24,7 @@
       </label>
     </form>
     {% endif %}
-    <form method="get" action="/alfa" data-form="gate">
+    <form method="get" action="{{ board_path }}" data-form="gate">
       {% if run %}<input type="hidden" name="run" value="{{ run }}">{% endif %}
       {% if page.gate_on %}<input type="hidden" name="gate" value="{{ gate_off_param }}">{% endif %}
       <label class="text-sm flex items-center gap-2 cursor-pointer" data-gate="{{ 'on' if page.gate_on else 'off' }}">
@@ -41,7 +41,12 @@
   {% elif not runs %}
   <div class="rounded-lg border border-gray-800 bg-gray-900/40 px-4 py-3 text-sm text-gray-400"
        data-state="no-runs">{{ copy.no_runs }}</div>
-  {% elif not page.rows %}
+  {% else %}
+  {% if page.no_clean_candidate %}
+  <div class="rounded-lg border border-gray-600 bg-gray-900/70 px-4 py-3 mb-3 text-base font-semibold text-gray-100"
+       data-state="no-clean-candidate">{{ no_clean_candidate_label }}</div>
+  {% endif %}
+  {% if not page.rows %}
   <div class="rounded-lg border border-gray-800 bg-gray-900/40 px-4 py-3 text-sm text-gray-400"
        data-state="empty-run">{{ copy.empty_run }}</div>
   {% else %}
@@ -69,5 +74,15 @@
   </section>
   {% endfor %}
   {% endif %}
+  {% endif %}
 </section>
+
+{% include "_vol_board.html" %}
+
+{% if live_reload_seconds %}
+<script>
+  // Live run: reload once per board refresh cadence; the query string keeps the run and the gate.
+  setTimeout(function () { window.location.reload(); }, {{ live_reload_seconds * 1000 }});
+</script>
+{% endif %}
 {% endblock %}

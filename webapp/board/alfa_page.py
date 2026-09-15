@@ -27,6 +27,9 @@ Contract: ``docs/phase-5.2-alfa-board-acceptance.md`` §4.1 ("Render"), §5 A1,
   (``webapp/board/penalty_ledger.py``), with numbers from the calibration
   profile that wrote the row. Applied penalties feed the counter-argument's
   last priority.
+- A7: the page counts clean candidates (R-EM1): İŞLENİR rows whose evidence is
+  within ``clean_candidate``. With none, the page shows ``Bugün temiz aday
+  yok``; a failed read never does.
 
 The template only shows strings from the frozen dictionaries here and in
 ``direction.py``, ``aggregate.py``, ``tradability.py``, ``evidence.py``,
@@ -47,7 +50,13 @@ from typing import TYPE_CHECKING, Final, Literal
 
 from uoa_detector.calibration import load_profile
 from webapp.board.aggregate import POSITION_READ_LABELS, BoardRow, build_board_rows
-from webapp.board.copy_tr import EVIDENCE_HOVER, GATE_LABEL, UNKNOWN_NOT_CLEAN
+from webapp.board.copy_tr import (
+    EVIDENCE_HOVER,
+    GATE_LABEL,
+    IV_NOT_SELL_VOL,
+    NO_CLEAN_CANDIDATE,
+    UNKNOWN_NOT_CLEAN,
+)
 from webapp.board.direction import DIRECTION_LABELS, FALLBACK_MARKER
 from webapp.board.evidence import (
     EMPTY_INPUTS,
@@ -87,8 +96,8 @@ if TYPE_CHECKING:
 
     from uoa_detector.backtest.store import StoredSignal
     from uoa_detector.calibration.profile import CalibrationProfile
-    from webapp.board.evidence import EvidenceInputs, EvidenceRequest, StrengthKey
-    from webapp.board.settings import BoardSettings
+    from webapp.board.evidence import EvidenceCounts, EvidenceInputs, EvidenceRequest, StrengthKey
+    from webapp.board.settings import BoardSettings, CleanCandidateSettings
     from webapp.board.signals import BoardPrint
     from webapp.board.tradability import DepthView, QuoteView
 
@@ -237,6 +246,7 @@ class AlfaRowView:
     audit: AuditView
     narrative: RowNarrative
     ledger: PenaltyLedger
+    clean_candidate: bool  # R-EM1
 
 
 @dataclass(frozen=True)
@@ -256,6 +266,12 @@ class AlfaPage:
     gate_on: bool = True
     quotes_failed: bool = False
     evidence_failed: bool = False
+    clean_candidate_count: int = 0
+
+    @property
+    def no_clean_candidate(self) -> bool:
+        """R-EM1: no row qualifies; never claimed for a failed read."""
+        return not self.load_failed and self.clean_candidate_count == 0
 
     @property
     def summary(self) -> str:
@@ -354,6 +370,16 @@ def build_audit(event_id: str | None, signal: StoredSignal | None) -> AuditView:
         inputs=tuple(
             (label, _score(getattr(signal, name))) for name, label in AUDIT_INPUT_LABELS.items()
         ),
+    )
+
+
+def is_clean_candidate(chip: TradabilityRead, counts: EvidenceCounts, settings: CleanCandidateSettings) -> bool:
+    """R-EM1: İŞLENİR (not DAR, not kotasyon yok) with the evidence inside ``clean_candidate``."""
+    return (
+        chip.state == "tradable"
+        and counts.supporting >= settings.min_supporting
+        and counts.against <= settings.max_against
+        and counts.unknown <= settings.max_unknown
     )
 
 
@@ -484,6 +510,7 @@ def build_alfa_page(
                     penalties=PenaltyCheck(applied=ledger.applied_names),
                 ),
                 ledger=ledger,
+                clean_candidate=is_clean_candidate(chip, evidence.counts, settings.clean_candidate),
             ),
         )
     ordered = tuple(sorted(views, key=_view_order))
@@ -496,6 +523,7 @@ def build_alfa_page(
         gate_on=gate_on,
         quotes_failed=quotes_failed,
         evidence_failed=evidence_failed,
+        clean_candidate_count=sum(1 for v in ordered if v.clean_candidate),
     )
 
 
@@ -563,4 +591,6 @@ def template_context() -> dict[str, object]:
         "case_class": CASE_CLASS,
         "case_title_class": CASE_TITLE_CLASS,
         "ledger_copy": LEDGER_COPY,
+        "no_clean_candidate_label": NO_CLEAN_CANDIDATE,
+        "iv_not_sell_vol": IV_NOT_SELL_VOL,
     }

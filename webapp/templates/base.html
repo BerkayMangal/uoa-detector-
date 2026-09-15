@@ -22,8 +22,7 @@
         <span class="text-gray-400">a screening tool, not a buy signal. It never auto-trades.</span></span>
     </div>
     <nav class="flex gap-1 mt-4 -mb-px text-sm font-medium">
-      <a href="/" class="px-4 py-2 rounded-t-lg border-b-2 {{ 'border-emerald-500 text-white bg-gray-900/60' if path == '/' else 'border-transparent text-gray-400 hover:text-gray-200' }}">Screener</a>
-      <a href="/alfa" class="px-4 py-2 rounded-t-lg border-b-2 {{ 'border-emerald-500 text-white bg-gray-900/60' if path.startswith('/alfa') else 'border-transparent text-gray-400 hover:text-gray-200' }}">Alfa Board</a>
+      <a href="/" class="px-4 py-2 rounded-t-lg border-b-2 {{ 'border-emerald-500 text-white bg-gray-900/60' if path == '/' or path.startswith('/alfa') else 'border-transparent text-gray-400 hover:text-gray-200' }}">Alfa Board</a>
       <a href="/gamma" class="px-4 py-2 rounded-t-lg border-b-2 {{ 'border-emerald-500 text-white bg-gray-900/60' if path.startswith('/gamma') else 'border-transparent text-gray-400 hover:text-gray-200' }}">Gamma &amp; vol</a>
       <a href="/journal" class="px-4 py-2 rounded-t-lg border-b-2 {{ 'border-emerald-500 text-white bg-gray-900/60' if path.startswith('/journal') else 'border-transparent text-gray-400 hover:text-gray-200' }}">Trade journal</a>
     </nav>
