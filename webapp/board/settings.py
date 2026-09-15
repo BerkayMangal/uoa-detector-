@@ -140,6 +140,8 @@ class DelayedSettings(_Strict):
     congress_late_days: int = Field(ge=1)
     congress_lookback_days: int = Field(ge=1)
     insider_lookback_days: int = Field(ge=1)
+    short_interest_lookback_days: int = Field(ge=1)  # Phase 5.2.D3a
+    ftd_lookback_days: int = Field(ge=1)  # Phase 5.2.D3a
     job_time_et: str = Field(pattern=_CLOCK)
 
 
