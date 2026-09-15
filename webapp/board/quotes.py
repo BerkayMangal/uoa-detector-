@@ -36,6 +36,12 @@ Error handling (UW response rules):
 - An unexpected payload shape is degraded as well, never mistaken for
   "not returned".
 
+Persistence (review RT-1). ``upsert_quotes`` and ``upsert_depths`` write a
+whole batch as one ``INSERT ... ON CONFLICT DO UPDATE`` statement (PostgreSQL
+and SQLite), never one ``SELECT`` plus one write per contract. The refresher
+shares the web server's event loop, and the production database is remote, so
+the statement count per cycle must not grow with the number of contracts.
+
 Nothing here runs at page render except ``read_quotes``, ``read_depths`` and
 ``read_board_quotes``, which only read the database.
 """
@@ -49,7 +55,8 @@ from datetime import UTC, date, datetime
 from decimal import Decimal, InvalidOperation
 from typing import TYPE_CHECKING, Any, Final, Protocol, cast
 
-from sqlalchemy import Boolean, DateTime, Float, Integer, String, Table, select
+from sqlalchemy import Boolean, DateTime, Float, Integer, String, Table, bindparam, select, update
+from sqlalchemy.dialects import postgresql, sqlite
 from sqlalchemy.orm import Mapped, Session, mapped_column
 
 from uoa_detector.sources.market_hours import is_market_open
@@ -79,6 +86,9 @@ SYMBOL_PARAM: Final = "option_symbol[]"
 _STRIKE_SCALE: Final = Decimal(1000)
 _STRIKE_UNITS_LIMIT: Final = Decimal(10) ** 8  # OCC strike field: 8 digits
 _DEGRADABLE = (UnusualWhalesRateLimitError, UnusualWhalesTransientError, CircuitBreakerOpenError)
+# Bound parameters per upsert statement. SQLite's default SQLITE_MAX_VARIABLE_NUMBER
+# (3.32+) is 32,766 and PostgreSQL allows 65,535, so a batch stays under both.
+_MAX_BIND_PARAMETERS: Final = 32766
 
 
 class AlfaQuote(AlfaBase):
@@ -380,46 +390,82 @@ async def fetch_contract_depth(client: _JsonClient, symbol: str) -> DepthFetch:
 # ---------------------------------------------------------------------------
 
 
+def _upsert_statement(dialect_name: str, table: Table, key: str, rows: Sequence[dict[str, object]]) -> Any:
+    """One ``INSERT ... ON CONFLICT (key) DO UPDATE`` for ``rows``, or None for another dialect.
+
+    Returns the dialect's executable insert construct (typed ``Any``: the
+    PostgreSQL and SQLite insert classes share no common typed base).
+    """
+    columns = list(rows[0])
+    if dialect_name == "postgresql":
+        pg_stmt = postgresql.insert(table).values(list(rows))
+        return pg_stmt.on_conflict_do_update(
+            index_elements=[table.c[key]],
+            set_={name: pg_stmt.excluded[name] for name in columns if name != key},
+        )
+    if dialect_name == "sqlite":
+        lite_stmt = sqlite.insert(table).values(list(rows))
+        return lite_stmt.on_conflict_do_update(
+            index_elements=[table.c[key]],
+            set_={name: lite_stmt.excluded[name] for name in columns if name != key},
+        )
+    return None
+
+
+def _upsert_rows(engine: Engine, table: Table, key: str, rows: Sequence[dict[str, object]]) -> int:
+    """Insert or update ``rows`` by primary key ``key``: one statement per batch, not per row."""
+    if not rows:
+        return 0
+    batch = max(1, _MAX_BIND_PARAMETERS // len(rows[0]))
+    with engine.begin() as conn:
+        for start in range(0, len(rows), batch):
+            chunk = rows[start : start + batch]
+            stmt = _upsert_statement(engine.dialect.name, table, key, chunk)
+            if stmt is not None:
+                conn.execute(stmt)
+                continue
+            # Another dialect: one SELECT for the batch's keys, then batched INSERT and UPDATE.
+            keys = [row[key] for row in chunk]
+            existing = set(conn.execute(select(table.c[key]).where(table.c[key].in_(keys))).scalars())
+            fresh = [row for row in chunk if row[key] not in existing]
+            if fresh:
+                conn.execute(table.insert(), fresh)
+            stale = [{**row, "_key": row[key]} for row in chunk if row[key] in existing]
+            if stale:
+                conn.execute(update(table).where(table.c[key] == bindparam("_key")), stale)
+    return len(rows)
+
+
 def upsert_quotes(engine: Engine, quotes: Iterable[QuoteSnapshot], *, fetched_at: datetime) -> int:
-    written = 0
-    with Session(engine) as session:
-        for q in quotes:
-            session.merge(
-                AlfaQuote(
-                    option_symbol=q.option_symbol,
-                    ticker=q.ticker,
-                    nbbo_bid=q.nbbo_bid,
-                    nbbo_ask=q.nbbo_ask,
-                    last_price=q.last_price,
-                    volume=q.volume,
-                    open_interest=q.open_interest,
-                    last_tape_time=q.last_tape_time,
-                    fetched_at=fetched_at,
-                    returned=q.returned,
-                ),
-            )
-            written += 1
-        session.commit()
-    return written
+    rows: dict[str, dict[str, object]] = {}
+    for q in quotes:
+        rows[q.option_symbol] = {
+            "option_symbol": q.option_symbol,
+            "ticker": q.ticker,
+            "nbbo_bid": q.nbbo_bid,
+            "nbbo_ask": q.nbbo_ask,
+            "last_price": q.last_price,
+            "volume": q.volume,
+            "open_interest": q.open_interest,
+            "last_tape_time": q.last_tape_time,
+            "fetched_at": fetched_at,
+            "returned": q.returned,
+        }
+    return _upsert_rows(engine, cast("Table", AlfaQuote.__table__), "option_symbol", list(rows.values()))
 
 
 def upsert_depths(engine: Engine, depths: Iterable[DepthSnapshot], *, fetched_at: datetime) -> int:
-    written = 0
-    with Session(engine) as session:
-        for d in depths:
-            session.merge(
-                AlfaContractDepth(
-                    option_symbol=d.option_symbol,
-                    nbbo_bid_size=d.nbbo_bid_size,
-                    nbbo_ask_size=d.nbbo_ask_size,
-                    nbbo_bid_time=d.nbbo_bid_time,
-                    nbbo_ask_time=d.nbbo_ask_time,
-                    fetched_at=fetched_at,
-                ),
-            )
-            written += 1
-        session.commit()
-    return written
+    rows: dict[str, dict[str, object]] = {}
+    for d in depths:
+        rows[d.option_symbol] = {
+            "option_symbol": d.option_symbol,
+            "nbbo_bid_size": d.nbbo_bid_size,
+            "nbbo_ask_size": d.nbbo_ask_size,
+            "nbbo_bid_time": d.nbbo_bid_time,
+            "nbbo_ask_time": d.nbbo_ask_time,
+            "fetched_at": fetched_at,
+        }
+    return _upsert_rows(engine, cast("Table", AlfaContractDepth.__table__), "option_symbol", list(rows.values()))
 
 
 def _utc(value: datetime | None) -> datetime | None:
