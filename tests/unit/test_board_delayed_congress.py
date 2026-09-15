@@ -9,6 +9,7 @@ UW and Postgres. No network, no env.
 from __future__ import annotations
 
 import json
+import string
 from dataclasses import fields
 from datetime import UTC, date, datetime
 from pathlib import Path
@@ -22,6 +23,7 @@ from webapp.board.daily_close import AlfaDailyClose, ClosePoint, ensure_daily_cl
 from webapp.board.db import TABLE_PREFIX, make_engine, session_factory
 from webapp.board.delayed import (
     CONGRESS_RECENT_TRADES_PATH,
+    INSIDER_TRANSACTIONS_PATH,
     AlfaDelayed,
     DelayedEvidence,
     DelayedItem,
@@ -111,6 +113,11 @@ def engine(tmp_path: Path) -> Engine:
 def _parse(rows: list[object], **kw: Any) -> dl.FamilyParse:
     return parse_congress_trades(rows, ticker=kw.get("ticker", "NVDA"), today=kw.get("today", _TODAY),
                                  settings=kw.get("settings", _SETTINGS))
+
+
+def _congress_results(job: dl.DelayedJobResult) -> list[dl.DelayedFamilyResult]:
+    """The job also runs the other delayed families; these tests pin the congress ones."""
+    return [r for r in job.results if r.family == "congress"]
 
 
 # ---------------------------------------------------------------------------
@@ -234,15 +241,18 @@ def test_rows_outside_the_window_or_unusable_are_skipped() -> None:
 async def test_job_calls_only_recent_trades_and_appends_idempotently(engine: Engine) -> None:
     client = _FakeClient({CONGRESS_RECENT_TRADES_PATH: {"data": list(_LIVE_ROWS)}})
     first = await run_delayed_job(client, engine, ["nvda", "NVDA"], now=_NOW, settings=_SETTINGS)  # type: ignore[arg-type]
-    assert client.calls == [(CONGRESS_RECENT_TRADES_PATH, {"ticker": "NVDA", "limit": 200})]
+    assert [c for c in client.calls if c[0] == CONGRESS_RECENT_TRADES_PATH] == [
+        (CONGRESS_RECENT_TRADES_PATH, {"ticker": "NVDA", "limit": 200}),
+    ]
+    assert {path for path, _ in client.calls} == {CONGRESS_RECENT_TRADES_PATH, INSIDER_TRANSACTIONS_PATH}
     assert all("unusual-trades" not in path for path, _ in client.calls)
-    [result] = first.results
+    [result] = _congress_results(first)
     assert (result.status, result.inserted, result.already_stored, result.truncated) == ("ok", 6, 0, False)
 
     edited = [dict(r, notes="vendor edit") for r in _LIVE_ROWS]
     second = await run_delayed_job(_FakeClient({CONGRESS_RECENT_TRADES_PATH: {"data": edited}}), engine,  # type: ignore[arg-type]
                                    ["NVDA"], now=_NOW, settings=_SETTINGS)
-    assert (second.results[0].inserted, second.results[0].already_stored) == (0, 6)
+    assert [(r.inserted, r.already_stored) for r in _congress_results(second)] == [(0, 6)]
     stored = load_delayed_records(engine, "NVDA")
     assert len(stored) == 6
     assert {json.loads(r.payload_json)["notes"] for r in stored} != {"vendor edit"}
@@ -263,7 +273,7 @@ async def test_a_full_page_is_reported_as_truncated(engine: Engine) -> None:
     rows = [_row(transaction_date=date.fromordinal(date(2026, 9, 11).toordinal() - i).isoformat())
             for i in range(200)]
     client = _FakeClient({CONGRESS_RECENT_TRADES_PATH: {"data": rows}})
-    [result] = (await run_delayed_job(client, engine, ["NVDA"], now=_NOW, settings=_SETTINGS)).results  # type: ignore[arg-type]
+    [result] = _congress_results(await run_delayed_job(client, engine, ["NVDA"], now=_NOW, settings=_SETTINGS))  # type: ignore[arg-type]
     assert result.truncated is True
     assert result.inserted == 200
 
@@ -275,7 +285,7 @@ async def test_error_policy(engine: Engine) -> None:
         f"{CONGRESS_RECENT_TRADES_PATH}?ticker=NVDA": {"data": list(_LIVE_ROWS)},
     })
     job = await run_delayed_job(client, engine, ["ZZZZ", "SMCI", "NVDA"], now=_NOW, settings=_SETTINGS)  # type: ignore[arg-type]
-    assert [(r.ticker, r.status) for r in job.results] == [
+    assert [(r.ticker, r.status) for r in _congress_results(job)] == [
         ("ZZZZ", "no_data"), ("SMCI", "no_data"), ("NVDA", "ok"),
     ]
 
@@ -376,7 +386,8 @@ def test_view_types_have_no_count_fields() -> None:
 
 def test_every_generated_string_is_clean() -> None:
     for template in dl._TEXT.values():
-        ensure_clean(template.format(days=45, pct="+3.0", base="2026-09-11", through="2026-09-14"))
+        names = {name for _, name, _, _ in string.Formatter().parse(template) if name}
+        ensure_clean(template.format(**dict.fromkeys(names, "45")))
     ev = _evidence(list(_LIVE_ROWS))
     generated = [ev.bucket_label, ev.exclusion_note]
     for item in ev.items:  # who and size_text are vendor data, not generated copy

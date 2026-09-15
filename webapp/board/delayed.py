@@ -26,6 +26,23 @@ Families:
     flagged separately.
   - Only buy and sell transactions are stored. The lookback window
     (``delayed.congress_lookback_days``) applies to the filing date.
+- ``insider`` (D2): ``GET /api/insider/transactions?ticker_symbol=
+  &form_types[]=4&form_types[]=4/A&start_date=<today - delayed.insider_lookback_days>``.
+  - ``/api/insider/{t}`` is only a roster, and ``/api/market/insider-buy-sells``
+    is market-wide and filing-dated. Neither is used per ticker.
+  - Only transaction codes P (open-market purchase) and S (sale) are stored.
+    A, F, G and J (grants, tax withholding, gifts, other) are not decisions to
+    trade. Form 144 (a notice of intent) is not requested and never stored.
+  - Side comes from the amount sign together with the code; when they disagree
+    the side is unknown. Size = |amount| shares x price, in USD.
+  - ``is_10b5_1`` (a pre-scheduled plan) is flagged; Form 4/A is flagged as an
+    amendment.
+  - delay = filing_date - transaction_date. The window applies to the
+    transaction date, like the request's ``start_date``.
+  - UW merges rows of the same person, day and code and lists their ``ids``.
+    The dedupe key is the sorted ids. A stored group whose ids are a strict
+    subset of another stored group's ids (a later regrouping) is not shown.
+  - ``has_more`` true is reported as truncated.
 
 UW error policy: NotFound -> no data; RateLimit, Transient, CircuitBreakerOpen ->
 that family is degraded and the job continues; DailyLimit and Auth propagate.
@@ -41,6 +58,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import math
 import re
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
@@ -69,7 +87,7 @@ from webapp.board.settings import DelayedSettings
 
 _logger = logging.getLogger(__name__)
 
-DelayedFamily = Literal["congress"]
+DelayedFamily = Literal["congress", "insider"]
 TradeSide = Literal["buy", "sell"]
 
 _FAMILY_ORDER: Final[tuple[DelayedFamily, ...]] = get_args(DelayedFamily)
@@ -79,6 +97,11 @@ CONGRESS_RECENT_TRADES_PATH: Final = "/api/congress/recent-trades"
 # The endpoint has no paging, so a full page is reported as truncated.
 _CONGRESS_LIMIT: Final = 200
 
+INSIDER_TRANSACTIONS_PATH: Final = "/api/insider/transactions"
+INSIDER_FORM_TYPES: Final[tuple[str, ...]] = ("4", "4/A")
+_INSIDER_CODE_SIDE: Final[Mapping[str, TradeSide]] = MappingProxyType({"P": "buy", "S": "sell"})
+_AMENDED_FORM: Final = "4/A"
+
 _ET: Final = ZoneInfo("America/New_York")
 
 # Frozen Turkish copy (R-WD1: every generated string passes ensure_clean).
@@ -86,12 +109,16 @@ _TEXT: Final[Mapping[str, str]] = MappingProxyType({
     "bucket": "ek kanıt (gecikmeli)",
     "exclusion": "gecikmeli veri: kanıt sayımına, güç etiketine ve karşı argümana girmez",
     "family.congress": "Kongre",
+    "family.insider": "İçeriden",
     "date.filed": "bildirim tarihi",
     "delay.filed": "işlemden {days} gün sonra bildirildi",
     "side.buy": "alış",
     "side.sell": "satış",
+    "size.shares": "{shares} hisse x ${price} ≈ ${usd}",
     "flag.late": "geç bildirim",
     "flag.executive": "yürütme beyanı (Kongre üyesi değil)",
+    "flag.10b5_1": "10b5-1 planlı işlem",
+    "flag.amended": "düzeltilmiş beyan (Form 4/A)",
     "outcome.filed": "bildirim tarihinden beri dayanak %{pct} ({base} → {through} kapanış)",
     "outcome.unknown": "bilinmiyor",
 })
@@ -184,6 +211,34 @@ def _to_date(value: object) -> date | None:
         return date.fromisoformat(text[:10])
     except ValueError:
         return None
+
+
+def _to_float(value: object) -> float | None:
+    """UW numbers arrive as strings or numbers; anything else, or non-finite, is None."""
+    if isinstance(value, bool) or not isinstance(value, int | float | str):
+        return None
+    try:
+        parsed = float(value)
+    except ValueError:
+        return None
+    return parsed if math.isfinite(parsed) else None
+
+
+def _to_bool(value: object) -> bool | None:
+    if isinstance(value, bool):
+        return value
+    lowered = (_text(value) or "").lower()
+    if lowered in {"true", "t", "yes"}:
+        return True
+    if lowered in {"false", "f", "no"}:
+        return False
+    return None
+
+
+def _ids(value: object) -> tuple[str, ...]:
+    if not isinstance(value, list):
+        return ()
+    return tuple(sorted({text for item in value if (text := _text(item)) is not None}))
 
 
 def _digest(parts: Sequence[str | None]) -> str:
@@ -294,6 +349,68 @@ def _congress_record(
     )
 
 
+def parse_insider_transactions(
+    data: object,
+    *,
+    ticker: str,
+    today: date,
+    settings: DelayedSettings,
+) -> FamilyParse:
+    """Rows of ``/api/insider/transactions`` -> Form 4/4A P and S records traded inside the lookback."""
+    symbol = ticker.strip().upper()
+    earliest = today - timedelta(days=settings.insider_lookback_days)
+    rows = data if isinstance(data, list) else []
+    return _ordered(rows, (_insider_record(r, symbol, earliest, today) for r in rows))
+
+
+def _insider_key(row: Mapping[str, object]) -> str | None:
+    ids = _ids(row.get("ids"))
+    if ids:
+        return _digest(["ids", *ids])
+    row_id = _text(row.get("id"))
+    return _digest(["id", row_id]) if row_id is not None else None
+
+
+def _insider_record(row: object, symbol: str, earliest: date, today: date) -> DelayedRecord | None:
+    if not isinstance(row, dict):
+        return None
+    row_ticker = _text(row.get("ticker"))
+    form = _text(row.get("formtype"))
+    code = (_text(row.get("transaction_code")) or "").upper()
+    if row_ticker is None or row_ticker.upper() != symbol:
+        return None
+    if form not in INSIDER_FORM_TYPES or code not in _INSIDER_CODE_SIDE:
+        return None
+    traded = _to_date(row.get("transaction_date"))
+    filed = _to_date(row.get("filing_date"))
+    if traded is None or filed is None or filed < traded or traded < earliest or filed > today:
+        return None
+    amount = _to_float(row.get("amount"))
+    key = _insider_key(row)
+    if amount is None or amount == 0 or key is None:
+        return None
+    sign_side: TradeSide = "buy" if amount > 0 else "sell"
+    price = _to_float(row.get("price"))
+    size = abs(amount) * price if price is not None and price > 0 else None
+    return DelayedRecord(
+        ticker=symbol,
+        family="insider",
+        dedupe_key=key,
+        filed_or_asof_date=filed,
+        transaction_date=traded,
+        delay_days=(filed - traded).days,
+        side=sign_side if sign_side == _INSIDER_CODE_SIDE[code] else None,
+        size_text=None,
+        size_low=size,
+        size_high=size,
+        flag_late=None,
+        flag_executive=None,
+        flag_10b5_1=_to_bool(row.get("is_10b5_1")),
+        form=form,
+        payload_json=_payload_text(row),
+    )
+
+
 # ---------------------------------------------------------------------------
 # Daily job
 # ---------------------------------------------------------------------------
@@ -307,7 +424,7 @@ class DelayedFamilyResult:
     inserted: int = 0
     already_stored: int = 0
     rows_skipped: int = 0
-    truncated: bool = False  # the source returned a full page; older rows may be missing
+    truncated: bool = False  # the source signalled more rows than it returned
 
 
 @dataclass(frozen=True)
@@ -343,8 +460,8 @@ async def run_delayed_job(
     """Fetch every delayed family for every ticker and append the rows not stored yet.
 
     ``now`` is the job's event time (D9): its ET date bounds the lookback windows
-    and it is stored as ``fetched_at``. DailyLimit and Auth errors propagate;
-    rows already committed stay.
+    and it is stored as ``fetched_at``. One request per (ticker, family).
+    DailyLimit and Auth errors propagate; rows already committed stay.
     """
     today, fetched_at = _clock(now)
     ensure_delayed_tables(engine)
@@ -367,9 +484,33 @@ async def refresh_congress(
     settings: DelayedSettings,
 ) -> DelayedFamilyResult:
     """The congress family alone for one ticker (one request)."""
+    return await _refresh_one(_congress, client, engine, ticker, now=now, settings=settings)
+
+
+async def refresh_insider(
+    client: UnusualWhalesClient,
+    engine: Engine,
+    ticker: str,
+    *,
+    now: datetime,
+    settings: DelayedSettings,
+) -> DelayedFamilyResult:
+    """The insider family alone for one ticker (one request)."""
+    return await _refresh_one(_insider, client, engine, ticker, now=now, settings=settings)
+
+
+async def _refresh_one(
+    job: _FamilyJob,
+    client: UnusualWhalesClient,
+    engine: Engine,
+    ticker: str,
+    *,
+    now: datetime,
+    settings: DelayedSettings,
+) -> DelayedFamilyResult:
     today, fetched_at = _clock(now)
     ensure_delayed_tables(engine)
-    return await _congress(
+    return await job(
         client, session_factory(engine), ticker.strip().upper(),
         today=today, fetched_at=fetched_at, settings=settings,
     )
@@ -409,6 +550,34 @@ async def _get(
         return "degraded", None
 
 
+def _rows(body: Mapping[str, object]) -> list[object]:
+    data = body.get("data")
+    return data if isinstance(data, list) else []
+
+
+def _finish(
+    factory: sessionmaker[Session],
+    ticker: str,
+    family: DelayedFamily,
+    parsed: FamilyParse,
+    fetched_at: datetime,
+    *,
+    truncated: bool,
+) -> DelayedFamilyResult:
+    if truncated:
+        _logger.warning("delayed %s source for %s signalled more rows than returned", family, ticker)
+    inserted, existing = _store(factory, ticker, family, parsed.records, fetched_at)
+    return DelayedFamilyResult(
+        ticker=ticker,
+        family=family,
+        status="ok",
+        inserted=inserted,
+        already_stored=existing,
+        rows_skipped=parsed.rows_skipped,
+        truncated=truncated,
+    )
+
+
 async def _congress(
     client: UnusualWhalesClient,
     factory: sessionmaker[Session],
@@ -424,28 +593,45 @@ async def _congress(
         {"ticker": ticker, "limit": _CONGRESS_LIMIT},
         what=f"congress {ticker}",
     )
-    if body is None:
-        return DelayedFamilyResult(ticker=ticker, family="congress", status=status)
-    data = body.get("data")
-    if not isinstance(data, list) or not data:
-        return DelayedFamilyResult(ticker=ticker, family="congress", status="no_data")
-    truncated = len(data) >= _CONGRESS_LIMIT
-    if truncated:
-        _logger.warning("congress recent-trades for %s returned a full page; older rows may be missing", ticker)
-    parsed = parse_congress_trades(data, ticker=ticker, today=today, settings=settings)
-    inserted, existing = _store(factory, ticker, "congress", parsed.records, fetched_at)
-    return DelayedFamilyResult(
-        ticker=ticker,
-        family="congress",
-        status="ok",
-        inserted=inserted,
-        already_stored=existing,
-        rows_skipped=parsed.rows_skipped,
-        truncated=truncated,
+    rows = _rows(body) if body is not None else []
+    if not rows:
+        return DelayedFamilyResult(
+            ticker=ticker, family="congress", status=status if body is None else "no_data",
+        )
+    parsed = parse_congress_trades(rows, ticker=ticker, today=today, settings=settings)
+    return _finish(factory, ticker, "congress", parsed, fetched_at, truncated=len(rows) >= _CONGRESS_LIMIT)
+
+
+async def _insider(
+    client: UnusualWhalesClient,
+    factory: sessionmaker[Session],
+    ticker: str,
+    *,
+    today: date,
+    fetched_at: datetime,
+    settings: DelayedSettings,
+) -> DelayedFamilyResult:
+    start = today - timedelta(days=settings.insider_lookback_days)
+    status, body = await _get(
+        client,
+        INSIDER_TRANSACTIONS_PATH,
+        {
+            "ticker_symbol": ticker,
+            "form_types[]": list(INSIDER_FORM_TYPES),
+            "start_date": start.isoformat(),
+        },
+        what=f"insider {ticker}",
     )
+    rows = _rows(body) if body is not None else []
+    if body is None or not rows:
+        return DelayedFamilyResult(
+            ticker=ticker, family="insider", status=status if body is None else "no_data",
+        )
+    parsed = parse_insider_transactions(rows, ticker=ticker, today=today, settings=settings)
+    return _finish(factory, ticker, "insider", parsed, fetched_at, truncated=body.get("has_more") is True)
 
 
-_FAMILY_JOBS: Final[tuple[_FamilyJob, ...]] = (_congress,)
+_FAMILY_JOBS: Final[tuple[_FamilyJob, ...]] = (_congress, _insider)
 
 
 def _store(
@@ -517,12 +703,13 @@ def load_delayed_records(engine: Engine, ticker: str) -> tuple[DelayedRecord, ..
 
 
 def _record(row: AlfaDelayed) -> DelayedRecord | None:
-    if row.family not in _FAMILY_ORDER:
+    family = next((f for f in _FAMILY_ORDER if f == row.family), None)
+    if family is None:
         return None
-    side = row.side if row.side in get_args(TradeSide) else None
+    side = next((s for s in get_args(TradeSide) if s == row.side), None)
     return DelayedRecord(
         ticker=row.ticker,
-        family=row.family,
+        family=family,
         dedupe_key=row.dedupe_key,
         filed_or_asof_date=row.filed_or_asof_date,
         transaction_date=row.transaction_date,
@@ -567,11 +754,11 @@ class DelayedItem:
     delay_text: str
     side: TradeSide | None
     side_text: str | None
-    size_text: str | None  # vendor data (e.g. the filed USD range), not generated copy
+    size_text: str | None  # congress: the filed USD range as-is; otherwise generated copy
     size_low_usd: float | None
     size_high_usd: float | None
     flags: tuple[str, ...]
-    who: str | None  # vendor data (filer name), not generated copy
+    who: str | None  # vendor data (filer name and title), not generated copy
     outcome: DelayedOutcome
 
 
@@ -595,10 +782,12 @@ def build_delayed_evidence(
 ) -> DelayedEvidence:
     """Delayed items of ``ticker`` inside their lookback windows as of ``today`` (D9)."""
     symbol = ticker.strip().upper()
+    mine = [record for record in records if record.ticker == symbol]
+    hidden = _superseded_insider_groups(mine)
     items = [
-        item
-        for record in records
-        if record.ticker == symbol and (item := _item(record, closes, today, settings)) is not None
+        _item(record, closes, today)
+        for record in mine
+        if record.dedupe_key not in hidden and _in_window(record, today, settings)
     ]
     items.sort(key=lambda i: (
         -i.filed_or_asof_date.toordinal(), _FAMILY_ORDER.index(i.family), i.key,
@@ -628,23 +817,38 @@ def load_delayed_evidence(
     )
 
 
-def _item(
-    record: DelayedRecord,
-    closes: Sequence[ClosePoint],
-    today: date,
-    settings: DelayedSettings,
-) -> DelayedItem | None:
+def _superseded_insider_groups(records: Sequence[DelayedRecord]) -> set[str]:
+    """Keys of insider groups whose ids are a strict subset of another stored group's ids."""
+    groups = [
+        (record.dedupe_key, frozenset(ids))
+        for record in records
+        if record.family == "insider" and (ids := _ids(_payload(record.payload_json).get("ids")))
+    ]
+    return {key for key, ids in groups if any(ids < other for _, other in groups)}
+
+
+def _in_window(record: DelayedRecord, today: date, settings: DelayedSettings) -> bool:
+    if record.filed_or_asof_date > today or record.transaction_date is None:
+        return False
+    if record.family == "insider":
+        return record.transaction_date >= today - timedelta(days=settings.insider_lookback_days)
+    return record.filed_or_asof_date >= today - timedelta(days=settings.congress_lookback_days)
+
+
+def _item(record: DelayedRecord, closes: Sequence[ClosePoint], today: date) -> DelayedItem:
     filed = record.filed_or_asof_date
-    earliest = today - timedelta(days=settings.congress_lookback_days)
-    if not earliest <= filed <= today or record.transaction_date is None:
-        return None
-    delay = (filed - record.transaction_date).days
+    traded = record.transaction_date or filed
+    delay = (filed - traded).days
     payload = _payload(record.payload_json)
     flags: list[str] = []
     if record.flag_late:
         flags.append(_say("flag.late"))
     if record.flag_executive:
         flags.append(_say("flag.executive"))
+    if record.flag_10b5_1:
+        flags.append(_say("flag.10b5_1"))
+    if record.form == _AMENDED_FORM:
+        flags.append(_say("flag.amended"))
     return DelayedItem(
         key=record.dedupe_key,
         family=record.family,
@@ -656,11 +860,11 @@ def _item(
         delay_text=_say("delay.filed", days=delay),
         side=record.side,
         side_text=_say(f"side.{record.side}") if record.side is not None else None,
-        size_text=record.size_text,
+        size_text=_size_text(record, payload),
         size_low_usd=record.size_low,
         size_high_usd=record.size_high,
         flags=tuple(flags),
-        who=_text(payload.get("name")) or _text(payload.get("reporter")),
+        who=_who(record, payload),
         outcome=_outcome(closes, filed, today),
     )
 
@@ -671,6 +875,29 @@ def _payload(payload_json: str) -> Mapping[str, object]:
     except ValueError:
         return {}
     return parsed if isinstance(parsed, dict) else {}
+
+
+def _who(record: DelayedRecord, payload: Mapping[str, object]) -> str | None:
+    if record.family == "insider":
+        name = _text(payload.get("owner_name"))
+        title = _text(payload.get("officer_title"))
+        return f"{name} ({title})" if name is not None and title is not None else name
+    return _text(payload.get("name")) or _text(payload.get("reporter"))
+
+
+def _size_text(record: DelayedRecord, payload: Mapping[str, object]) -> str | None:
+    if record.family == "congress":
+        return record.size_text
+    shares = _to_float(payload.get("amount"))
+    price = _to_float(payload.get("price"))
+    if shares is None or price is None or record.size_low is None:
+        return None
+    return _say(
+        "size.shares",
+        shares=f"{abs(shares):,.0f}",
+        price=f"{price:,.2f}",
+        usd=f"{record.size_low:,.0f}",
+    )
 
 
 def _outcome(closes: Sequence[ClosePoint], base: date, today: date) -> DelayedOutcome:

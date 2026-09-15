@@ -17,7 +17,7 @@ Request budget: 1 request per test.
 from __future__ import annotations
 
 import os
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
@@ -29,9 +29,11 @@ from webapp.board.daily_close import OHLC_DAILY_PATH, load_closes, run_daily_clo
 from webapp.board.db import make_engine
 from webapp.board.delayed import (
     CONGRESS_RECENT_TRADES_PATH,
+    INSIDER_TRANSACTIONS_PATH,
     build_delayed_evidence,
     load_delayed_records,
     refresh_congress,
+    refresh_insider,
 )
 from webapp.board.settings import DelayedSettings, load_board_settings
 
@@ -143,3 +145,42 @@ async def test_live_congress_recent_trades(live: _RecordingClient, engine: Engin
     evidence = build_delayed_evidence("NVDA", records, (), today=today, settings=_settings())
     assert evidence.items
     assert {i.date_label for i in evidence.items} == {"bildirim tarihi"}
+
+
+@pytest.mark.asyncio
+async def test_live_insider_transactions(live: _RecordingClient, engine: Engine) -> None:
+    now = datetime.now(UTC)
+    settings = _settings()
+    try:
+        result = await refresh_insider(live, engine, "NVDA", now=now, settings=settings)  # type: ignore[arg-type]
+    finally:
+        await live._inner.aclose()
+
+    today = now.astimezone(_ET).date()
+    start = today - timedelta(days=settings.insider_lookback_days)
+    [(path, params, body)] = live.calls
+    assert path == INSIDER_TRANSACTIONS_PATH
+    assert params == {"ticker_symbol": "NVDA", "form_types[]": ["4", "4/A"], "start_date": start.isoformat()}
+    assert isinstance(body.get("has_more"), bool)
+    rows = [r for r in body.get("data", []) if isinstance(r, dict)]
+    assert rows, "insider transactions returned no Form 4 rows for NVDA in the window"
+    assert {
+        "ticker", "transaction_date", "filing_date", "formtype", "transaction_code", "amount",
+        "price", "ids", "owner_name", "is_10b5_1",
+    } <= rows[0].keys()
+    assert {r["formtype"] for r in rows} <= {"4", "4/A"}  # form_types[] is honoured (probed)
+    assert all(date.fromisoformat(r["transaction_date"]) >= start for r in rows)  # start_date filters trades
+    assert all(isinstance(r["amount"], int) and isinstance(r["price"], str) for r in rows)
+
+    assert result.status == "ok"
+    records = load_delayed_records(engine, "NVDA")
+    trades = [r for r in rows if r["transaction_code"] in {"P", "S"}]
+    assert bool(records) == bool(trades)
+    assert len(records) <= len(trades)
+    for record in records:
+        assert record.family == "insider"
+        assert record.form in {"4", "4/A"}
+        assert record.delay_days is not None
+        assert record.delay_days >= 0
+        assert record.flag_10b5_1 in {True, False}
+        assert record.size_low is None or record.size_low > 0
