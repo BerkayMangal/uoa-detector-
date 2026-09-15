@@ -159,11 +159,18 @@ class OutcomesSettings(_Strict):
     job_time_et: str = Field(pattern=_CLOCK)
 
 
+class TapeSettings(_Strict):
+    """Phase 5.2.A3: the net-premium tape behind the Akış family."""
+
+    max_age_seconds: int = Field(gt=0)
+
+
 class BoardSettings(_Strict):
     """Every Alfa Board cutoff, cadence and owner-set value."""
 
     board_profile_id: str = Field(min_length=1)
     evidence: EvidenceSettings
+    tape: TapeSettings
     tradability: TradabilitySettings
     cost: CostSettings
     sizing: SizingSettings

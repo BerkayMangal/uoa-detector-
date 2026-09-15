@@ -1,7 +1,7 @@
-"""Alfa Board refresher: option quotes and top-K exit depth (Phase 5.2.A2).
+"""Alfa Board refresher: quotes, exit depth, net-premium tape, ticker info (Phase 5.2.A2, A3).
 
 Contract: ``docs/phase-5.2-alfa-board-acceptance.md`` §4.1 ("Board refresher"),
-§4.4 (request budget) and §5 A2; decisions P16 and P17.
+§4.4 (request budget), §5 A2 and §5 A3; decisions P16 and P17.
 
 One cycle runs every ``refresh.cadence_seconds`` during regular trading hours:
 
@@ -15,6 +15,15 @@ One cycle runs every ``refresh.cadence_seconds`` during regular trading hours:
    symbols per call.
 3. Exit depth comes from ``/api/option-contract/{symbol}/flow?limit=1``, for
    the dominant contracts of the top ``refresh.exit_depth_top_k`` rows.
+4. A3: the net-premium tape, one ``/api/stock/{ticker}/net-prem-ticks`` call per
+   board ticker (``webapp/board/netprem.py``).
+5. A3: ticker info, one ``/api/stock/{ticker}/info`` call per board ticker with
+   no row fetched on the current UTC day (``webapp/board/ticker_info.py``).
+   This is the daily job. It runs inside the RTH loop, so each ticker is
+   fetched on its first cycle of the day.
+
+The steps run in this order inside one ``try``. An error in any step ends that
+cycle; the loop logs it and waits one cadence.
 
 Guards (the ``flow_poll`` pattern; decision P17):
 
@@ -26,8 +35,8 @@ Guards (the ``flow_poll`` pattern; decision P17):
 - ``UnusualWhalesDailyLimitError``: sleep ``refresh.daily_limit_backoff_seconds``.
 - Soft cap: once the client's last seen ``x-uw-daily-req-count`` reaches
   ``refresh.daily_request_soft_cap`` on the same UTC day, non-critical fetches
-  (signal-contract quotes and every depth call) pause. Journal-leg quotes
-  continue.
+  pause: signal-contract quotes, every depth call, the tape and ticker info.
+  Journal-leg quotes continue.
 - An auth error is logged at ERROR and the loop waits a full cadence rather
   than restarting, so a bad key is loud without burning quota in a crash
   loop. Any other cycle error is logged the same way.
@@ -57,6 +66,7 @@ from uoa_detector.sources.unusual_whales.client import (
 )
 from webapp.board.aggregate import build_board_rows
 from webapp.board.db import make_engine
+from webapp.board.netprem import ensure_netprem_tables, fetch_net_prem_ticks, upsert_tape
 from webapp.board.quotes import (
     contract_symbol,
     dominant_symbol,
@@ -69,6 +79,12 @@ from webapp.board.quotes import (
 )
 from webapp.board.settings import DEFAULT_BOARD_PROFILE, load_board_settings
 from webapp.board.signals import BoardSignalReader
+from webapp.board.ticker_info import (
+    ensure_ticker_info_tables,
+    fetch_ticker_info,
+    tickers_needing_info,
+    upsert_ticker_infos,
+)
 from webapp.journal import JournalRepo
 
 if TYPE_CHECKING:
@@ -151,6 +167,17 @@ class CycleReport:
     depths_written: int
     degraded_fetches: int
     skipped_non_critical: bool
+    tickers: tuple[str, ...] = ()  # the board's tickers in row order (A3: tape and ticker info)
+
+
+@dataclass(frozen=True)
+class StepReport:
+    """One A3 step: the net-premium tape or the ticker-info job."""
+
+    requests: int
+    written: int
+    degraded_fetches: int
+    skipped_non_critical: bool
 
 
 @dataclass(frozen=True)
@@ -230,6 +257,13 @@ def _plan(
     return plan
 
 
+def _warn_soft_cap(soft_cap: SoftCap, cap: int | None, what: str) -> None:
+    _logger.warning(
+        "board refresher: daily request count %s reached the soft cap %s; %s paused",
+        soft_cap.count, cap, what,
+    )
+
+
 async def run_quotes_cycle(
     client: BoardClient,
     engine: Engine,
@@ -289,10 +323,7 @@ async def run_quotes_cycle(
             depths_written += upsert_depths(engine, [depth.depth], fetched_at=clock())
 
     if skipped:
-        _logger.warning(
-            "board refresher: daily request count %s reached the soft cap %s; non-critical fetches paused",
-            soft_cap.count, refresh.daily_request_soft_cap,
-        )
+        _warn_soft_cap(soft_cap, refresh.daily_request_soft_cap, "non-critical fetches")
     return CycleReport(
         run_id=run_id,
         requests=requests,
@@ -300,7 +331,62 @@ async def run_quotes_cycle(
         depths_written=depths_written,
         degraded_fetches=degraded,
         skipped_non_critical=skipped,
+        tickers=tuple(dict.fromkeys(row.ticker for row in rows)),
     )
+
+
+async def run_tape_cycle(
+    client: BoardClient,
+    engine: Engine,
+    *,
+    tickers: Sequence[str],
+    soft_cap: SoftCap,
+    clock: Callable[[], datetime],
+) -> StepReport:
+    """One ``net-prem-ticks`` call per ticker (non-critical). Daily-limit and auth errors propagate."""
+    requests = written = degraded = 0
+    skipped = False
+    for ticker in dict.fromkeys(t.strip().upper() for t in tickers if t.strip()):
+        if soft_cap.reached(clock()):
+            skipped = True
+            break
+        fetch = await fetch_net_prem_ticks(client, ticker)
+        requests += 1
+        soft_cap.observe(client.last_daily_request_count, clock())
+        if fetch.degraded:
+            degraded += 1
+            continue
+        written += upsert_tape(engine, fetch.ticker, fetch.minutes, fetched_at=clock())
+    if skipped:
+        _warn_soft_cap(soft_cap, None, "the net-premium tape")
+    return StepReport(requests=requests, written=written, degraded_fetches=degraded, skipped_non_critical=skipped)
+
+
+async def run_ticker_info_job(
+    client: BoardClient,
+    engine: Engine,
+    *,
+    tickers: Sequence[str],
+    soft_cap: SoftCap,
+    clock: Callable[[], datetime],
+) -> StepReport:
+    """``/info`` for tickers not fetched today (non-critical). Daily-limit and auth errors propagate."""
+    requests = written = degraded = 0
+    skipped = False
+    for ticker in tickers_needing_info(engine, tickers, today=clock().date()):
+        if soft_cap.reached(clock()):
+            skipped = True
+            break
+        fetch = await fetch_ticker_info(client, ticker)
+        requests += 1
+        soft_cap.observe(client.last_daily_request_count, clock())
+        if fetch.degraded or fetch.snapshot is None:
+            degraded += 1
+            continue
+        written += upsert_ticker_infos(engine, [fetch.snapshot], fetched_at=clock())
+    if skipped:
+        _warn_soft_cap(soft_cap, None, "ticker info")
+    return StepReport(requests=requests, written=written, degraded_fetches=degraded, skipped_non_critical=skipped)
 
 
 async def board_refresh_loop(
@@ -313,7 +399,7 @@ async def board_refresh_loop(
     clock: Callable[[], datetime] | None = None,
     sleep: Callable[[float], Awaitable[None]] | None = None,
 ) -> None:
-    """Refresh quotes and exit depth until cancelled. Runs under ``_supervise``."""
+    """Refresh quotes, exit depth, the tape and ticker info until cancelled. Runs under ``_supervise``."""
     profile = load_profile(profile_path)
     settings = load_board_settings(board_profile_path)
     refresh = settings.refresh
@@ -323,6 +409,8 @@ async def board_refresh_loop(
     client: BoardClient | None = None
     try:
         ensure_quotes_tables(engine)
+        ensure_netprem_tables(engine)
+        ensure_ticker_info_tables(engine)
         reader = BoardSignalReader(engine=engine)
         journal: OpenTrades = (
             journal_factory(database_url) if journal_factory is not None else JournalRepo(database_url)
@@ -350,6 +438,12 @@ async def board_refresh_loop(
                     client, engine, settings,
                     reader=reader, journal=journal, soft_cap=soft_cap, clock=now_fn,
                 )
+                tape = await run_tape_cycle(
+                    client, engine, tickers=report.tickers, soft_cap=soft_cap, clock=now_fn,
+                )
+                info = await run_ticker_info_job(
+                    client, engine, tickers=report.tickers, soft_cap=soft_cap, clock=now_fn,
+                )
             except UnusualWhalesDailyLimitError:
                 _logger.warning(
                     "board refresher: UW daily request limit reached; backing off %ss",
@@ -368,6 +462,12 @@ async def board_refresh_loop(
                     "board refresher %s: %d requests, %d quotes, %d depths, %d degraded, non-critical paused=%s",
                     report.run_id, report.requests, report.quotes_written, report.depths_written,
                     report.degraded_fetches, report.skipped_non_critical,
+                )
+                _logger.info(
+                    "board refresher %s: tape %d requests, %d minutes written, %d degraded; "
+                    "ticker info %d requests, %d written, %d degraded",
+                    report.run_id, tape.requests, tape.written, tape.degraded_fetches,
+                    info.requests, info.written, info.degraded_fetches,
                 )
             await pause(refresh.cadence_seconds)
     finally:

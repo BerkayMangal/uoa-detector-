@@ -104,6 +104,20 @@ _FLOW_ROWS: dict[str, dict[str, Any]] = {
     },
 }
 
+# Phase 5.2.A3: the loop also fetches the net-premium tape and ticker info.
+# Trimmed from the live NVDA net-prem-ticks and /info responses captured 2026-09-15.
+_TAPE_ROWS: list[dict[str, Any]] = [
+    {
+        "date": "2026-09-15", "tape_time": "2026-09-15T15:29:00.000000Z", "net_call_premium": "638346.00",
+        "net_put_premium": "-1206342.00", "net_call_volume": 3421, "net_put_volume": -6248,
+        "call_volume": 15430, "put_volume": 8079, "net_delta": "172878.594859157335195500",
+    },
+]
+_INFO_ROWS: dict[str, dict[str, Any]] = {
+    "SPY": {"symbol": "SPY", "sector": None, "issue_type": "ETF"},
+    "SMCI": {"symbol": "SMCI", "sector": "Technology", "issue_type": "Common Stock"},
+}
+
 # (event_id, ticker, type, strike, dte, premium, fill_side, recorded chain)
 _SPECS = [
     ("e1", "SPY", "call", "757", 0, "500000", "at_ask", "SPY260915C00757000"),
@@ -181,6 +195,10 @@ class _FakeClient:
         if path.endswith("/flow"):
             symbol = path.split("/")[3]
             return {"data": [_FLOW_ROWS[symbol]] if symbol in _FLOW_ROWS else [], "date": "2026-09-15"}
+        if path.endswith("/net-prem-ticks"):
+            return {"data": list(_TAPE_ROWS)}
+        if path.endswith("/info"):
+            return {"data": _INFO_ROWS[path.split("/")[3]]}
         raise AssertionError(path)
 
     async def aclose(self) -> None:
@@ -511,7 +529,9 @@ async def test_loop_keeps_one_client_across_cycles_and_closes_it(url: str) -> No
     slept, made = await _run_loop(url, client, max_sleeps=3)
     assert slept == [_SETTINGS.refresh.cadence_seconds] * 3
     assert len(made) == 1
-    assert len(client.calls) == 3 * 5  # per cycle: SPY and SMCI quotes, three depth calls
+    # Per cycle: SPY and SMCI quotes, three depth calls and (A3) two net-premium tapes;
+    # ticker info for SPY and SMCI on the first cycle of the day only.
+    assert len(client.calls) == 3 * 5 + 3 * 2 + 2
     assert client.closed is True
 
 
