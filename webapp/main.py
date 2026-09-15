@@ -75,6 +75,15 @@ async def _supervise(make_coro: object, name: str) -> None:
 
 @contextlib.asynccontextmanager
 async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
+    # Phase 5.2.A-fix3 (review RT-4): the board profile and the calibration values
+    # the board reads are loaded and validated before the app accepts traffic. A
+    # missing or invalid file fails startup, so a broken deploy fails its /health
+    # check instead of answering /health 200 while GET / returns 500.
+    try:
+        _load_board_profiles()
+    except Exception:
+        _logger.exception("board profiles could not be loaded; refusing to start")
+        raise
     # Opt-in live tasks: only start when LIVE_TICKERS (+ UW key + DB) is set.
     # Otherwise the app just serves stored signals (local dev, sample data).
     config = live_config_from_env()
@@ -417,6 +426,19 @@ def _legacy_scores() -> LegacyScores:
     if _LEGACY_SCORES is None:
         _LEGACY_SCORES = alfa_page.load_live_legacy_scores()
     return _LEGACY_SCORES
+
+
+def _load_board_profiles() -> None:
+    """Load and validate every profile value the board reads; raises on a missing or invalid file.
+
+    Runs at startup (``_lifespan``) and replaces the lazily cached values, so the
+    files are checked on every start rather than on the first page request.
+    """
+    global _BOARD_SETTINGS, _SPREAD_CUTOFF_PCT, _LEGACY_SCORES
+    settings = load_board_settings()
+    cutoff = alfa_page.load_spread_cutoff_pct()
+    legacy = alfa_page.load_live_legacy_scores()
+    _BOARD_SETTINGS, _SPREAD_CUTOFF_PCT, _LEGACY_SCORES = settings, cutoff, legacy
 
 
 @app.get("/", response_class=HTMLResponse)
