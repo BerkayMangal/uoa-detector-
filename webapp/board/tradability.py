@@ -28,6 +28,14 @@ States, evaluated in this order:
    depth below ``tradability.min_exit_bid_size``.
 4. ``İŞLENİR``: everything else. An unknown exit depth does not demote a row.
 
+Cost cells are computed only from an executable price pair (R-CO1):
+
+- a crossed quote (ask below bid) shows its raw bid and ask, but spread,
+  round trip and lot cost read unknown. A crossed NBBO is not an entry/exit
+  pair, and its arithmetic would render negative dollars;
+- a quote whose ask is not positive (a 0/0 NBBO) has no entry price, so the
+  round trip and lot cost read unknown while the state stays ``İŞLENMEZ``.
+
 Spread math runs in ``Decimal`` over each price's decimal text, like
 ``penalties.py``, so a quote sitting exactly on a cutoff classifies exactly.
 An exit-depth reading older than ``max_quote_age_seconds`` counts as unknown.
@@ -208,9 +216,15 @@ def assess_tradability(
     usable_depth = depth if depth is not None and _age_seconds(depth.fetched_at, now) <= max_age else None
     exit_depth = usable_depth.nbbo_bid_size if usable_depth is not None else None
 
-    def read(state: TradabilityState, reason: str | None, *, priced: bool) -> TradabilityRead:
+    def read(
+        state: TradabilityState, reason: str | None, *, priced: bool, costed: bool | None = None,
+    ) -> TradabilityRead:
+        """``priced`` shows the quote's bid and ask; ``costed`` (default: ``priced``) computes cost cells."""
         bid = quote.nbbo_bid if quote is not None and priced else None
         ask = quote.nbbo_ask if quote is not None and priced else None
+        with_cost = priced if costed is None else costed and priced
+        cost_bid = bid if with_cost else None
+        cost_ask = ask if with_cost else None
         last_trade: datetime | None = quote.last_tape_time if quote is not None else None
         if last_trade is None and usable_depth is not None:
             last_trade = usable_depth.quote_time
@@ -219,14 +233,18 @@ def assess_tradability(
             reason=reason,
             bid=bid,
             ask=ask,
-            spread_pct=spread_pct_of_mid(bid, ask) if bid is not None and ask is not None else None,
+            spread_pct=(
+                spread_pct_of_mid(cost_bid, cost_ask) if cost_bid is not None and cost_ask is not None else None
+            ),
             round_trip_usd=(
-                round_trip_usd(bid, ask, cost.commission_per_contract_usd)
-                if bid is not None and ask is not None
+                round_trip_usd(cost_bid, cost_ask, cost.commission_per_contract_usd)
+                if cost_bid is not None and cost_ask is not None
                 else None
             ),
-            lot_cost_usd=one_lot_cost_usd(ask) if ask is not None else None,
-            lot_pct_capital=one_lot_pct_of_capital(ask, sizing.capital_usd) if ask is not None else None,
+            lot_cost_usd=one_lot_cost_usd(cost_ask) if cost_ask is not None else None,
+            lot_pct_capital=(
+                one_lot_pct_of_capital(cost_ask, sizing.capital_usd) if cost_ask is not None else None
+            ),
             exit_depth=exit_depth,
             exit_depth_at_last_print=exit_depth is not None,
             quote_age_seconds=_age_seconds(quote.fetched_at, now) if quote is not None else None,
@@ -249,10 +267,10 @@ def assess_tradability(
     bid = _dec(quote.nbbo_bid)
     ask = _dec(quote.nbbo_ask)
     if ask < bid:
-        return read("no_quote", _reason("crossed", ticker=ticker), priced=True)
+        return read("no_quote", _reason("crossed", ticker=ticker), priced=True, costed=False)
     spread = _spread_decimal(bid, ask)
     if bid == 0 or spread is None:
-        return read("untradable", _reason("zero_bid", ticker=ticker), priced=True)
+        return read("untradable", _reason("zero_bid", ticker=ticker), priced=True, costed=ask > 0)
     if spread_cutoff_pct is None:
         msg = "spread_cutoff_pct (penalty_triggers.spread_pct_threshold) is required to classify a quote"
         raise ValueError(msg)
