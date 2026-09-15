@@ -1,7 +1,14 @@
-{# One Alfa Board row: every print of one (ticker, side-aware direction) in the run.
-   Copy comes only from the frozen dictionaries passed by alfa_page.template_context(). #}
+{# One Alfa Board row: every print of one (ticker, side-aware direction) in the run, plus the
+   tradability chip of its dominant contract (A2). Copy comes only from the frozen
+   dictionaries passed by alfa_page.template_context(). #}
 {% set is_up = row.direction == 'up' %}
 {% set dir_color = '#10b981' if is_up else '#ef4444' %}
+{% set chip_style = {
+  'tradable': 'border-emerald-600 text-emerald-300',
+  'narrow': 'border-amber-600 text-amber-300',
+  'untradable': 'border-red-700 text-red-300',
+  'no_quote': 'border-dashed border-gray-600 text-gray-400 opacity-80',
+} %}
 <article class="rounded-lg border border-gray-800 bg-gray-900/40 px-4 py-3"
          data-row data-ticker="{{ row.ticker }}" data-direction="{{ row.direction }}">
   <div class="flex flex-wrap items-baseline gap-x-5 gap-y-1">
@@ -14,6 +21,22 @@
       <span class="text-white" data-print-count>{{ row.print_count }}</span></span>
     <span class="text-sm"><span class="text-gray-400">{{ copy.col_contracts }}</span>
       <span class="text-white" data-distinct-contracts>{{ row.distinct_contracts }}</span></span>
+  </div>
+
+  <div class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm" data-chip="{{ view.chip.state }}">
+    <span class="px-2 py-0.5 rounded border font-semibold {{ chip_style[view.chip.state] }}"
+          data-chip-label>{{ view.chip_text.label }}</span>
+    {% if view.chip_text.reason %}<span class="text-gray-300" data-chip-reason>{{ view.chip_text.reason }}</span>{% endif %}
+    <span><span class="text-gray-400">{{ chip_copy.spread }}</span> <span data-spread>{{ view.chip_text.spread }}</span></span>
+    {% if view.chip_text.bid_ask %}<span class="text-gray-300" data-bid-ask>{{ view.chip_text.bid_ask }}</span>{% endif %}
+    <span><span class="text-gray-400">{{ chip_copy.round_trip }}</span> <span data-round-trip>{{ view.chip_text.round_trip }}</span>
+      {% if view.chip_text.default_marker %}<span class="text-xs text-amber-300/80" data-default-value>{{ view.chip_text.default_marker }}</span>{% endif %}</span>
+    <span><span class="text-gray-400">{{ chip_copy.lot }}</span> <span data-lot>{{ view.chip_text.lot }}</span>
+      {% if view.chip_text.default_marker %}<span class="text-xs text-amber-300/80" data-default-value>{{ view.chip_text.default_marker }}</span>{% endif %}</span>
+    <span><span class="text-gray-400">{{ chip_copy.exit_depth }}</span> <span data-exit-depth>{{ view.chip_text.exit_depth }}</span></span>
+    {% if view.chip_text.quote_age or view.chip_text.last_trade %}
+    <span class="text-xs text-gray-500" data-quote-age>{{ view.chip_text.quote_age or '' }}{% if view.chip_text.quote_age and view.chip_text.last_trade %} · {% endif %}{{ view.chip_text.last_trade or '' }}</span>
+    {% endif %}
   </div>
 
   <div class="grid gap-x-5 gap-y-1 md:grid-cols-4 mt-2 text-sm">

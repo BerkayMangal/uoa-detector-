@@ -32,6 +32,7 @@ from starlette.responses import PlainTextResponse
 
 from webapp import explanations, gamma, journal, pricing
 from webapp.board import alfa_page
+from webapp.board.refresher import board_refresh_loop
 from webapp.board.settings import BoardSettings, load_board_settings
 from webapp.board.signals import BoardSignalReader
 from webapp.gamma_live import gamma_refresh_loop
@@ -87,6 +88,14 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
                 database_url=config["database_url"],  # type: ignore[arg-type]
             ),
             "gamma-refresh",
+        )))
+        # Phase 5.2.A2: the Alfa Board refresher (quotes, exit depth) on its own
+        # long-lived UW client. GET /alfa only reads what it writes.
+        tasks.append(asyncio.create_task(_supervise(
+            lambda: board_refresh_loop(
+                database_url=config["database_url"],  # type: ignore[arg-type]
+            ),
+            "board-refresh",
         )))
     try:
         yield
@@ -497,12 +506,24 @@ def _board_settings() -> BoardSettings:
     return _BOARD_SETTINGS
 
 
+_SPREAD_CUTOFF_PCT: float | None = None
+
+
+def _spread_cutoff_pct() -> float:
+    """``penalty_triggers.spread_pct_threshold`` of the live calibration profile (read only)."""
+    global _SPREAD_CUTOFF_PCT
+    if _SPREAD_CUTOFF_PCT is None:
+        _SPREAD_CUTOFF_PCT = alfa_page.load_spread_cutoff_pct()
+    return _SPREAD_CUTOFF_PCT
+
+
 @app.get("/alfa", response_class=HTMLResponse)
-def alfa_board(request: Request, run: str = "") -> HTMLResponse:
+def alfa_board(request: Request, run: str = "", gate: str = "") -> HTMLResponse:
     """One row per (ticker, side-aware direction) over the whole selected run.
 
     Reads the database only; no Unusual Whales call (contract §4.1). A failed
-    read renders an explicit "could not read" state, never an empty board.
+    read renders an explicit "could not read" state, never an empty board. The
+    cost gate ``Alabileceklerimi göster`` is on unless ``gate=off`` (§5 A2).
     """
     settings = _board_settings()
     runs_read: list[RunInfo] | None = _safe(_repo().runs, None)
@@ -513,7 +534,14 @@ def alfa_board(request: Request, run: str = "") -> HTMLResponse:
     if active is not None:
         run_id = active
         prints = _safe(lambda: _board_reader().load_run(run_id), None)
-    page = alfa_page.build_alfa_page(prints, settings)
+    page = alfa_page.build_alfa_page(
+        prints,
+        settings,
+        gate_on=gate != alfa_page.GATE_OFF_PARAM,
+        spread_cutoff_pct=_spread_cutoff_pct(),
+        now=datetime.now(UTC),
+        quote_source=lambda symbols: alfa_page.db_quote_source(_board_reader().engine)(symbols),
+    )
     return templates.TemplateResponse(
         request,
         "alfa.html",

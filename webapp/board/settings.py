@@ -100,6 +100,7 @@ class ChaseSettings(_Strict):
 class RefreshSettings(_Strict):
     cadence_seconds: int = Field(ge=60)
     exit_depth_top_k: int = Field(ge=0)
+    max_symbols_per_request: int = Field(ge=1)
     atm_expiries: int = Field(ge=1, le=5)
     daily_request_soft_cap: int = Field(gt=0)
     closed_market_sleep_seconds: int = Field(ge=60)

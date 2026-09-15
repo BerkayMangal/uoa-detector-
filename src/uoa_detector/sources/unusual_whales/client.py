@@ -234,10 +234,35 @@ class UnusualWhalesClient:
             transport=transport,
             timeout=httpx.Timeout(connect=5.0, read=30.0, write=5.0, pool=5.0),
         )
+        self._last_daily_request_count: int | None = None
 
     @property
     def settings(self) -> UnusualWhalesSettings:
         return self._settings
+
+    @property
+    def last_daily_request_count(self) -> int | None:
+        """The last ``x-uw-daily-req-count`` header value seen, or ``None``.
+
+        Phase 5.2.A2 (decision P17): read-only budget visibility for the
+        Alfa Board refresher's soft cap. The value is captured from every
+        HTTP response that carries a parseable, non-negative header, error
+        responses included. The count is key-wide, so it also covers other
+        processes using the same key. Reading it never changes request
+        behaviour.
+        """
+        return self._last_daily_request_count
+
+    def _capture_daily_count(self, response: httpx.Response) -> None:
+        raw = response.headers.get("x-uw-daily-req-count")
+        if raw is None:
+            return
+        try:
+            value = int(raw.strip())
+        except ValueError:
+            return
+        if value >= 0:
+            self._last_daily_request_count = value
 
     @property
     def circuit_breaker(self) -> CircuitBreaker:
@@ -328,6 +353,7 @@ class UnusualWhalesClient:
                     params=params,
                     headers=self._auth_headers(),
                 )
+                self._capture_daily_count(response)
                 status = response.status_code
                 if status >= 500:
                     msg = f"UnusualWhales {method} {path} returned HTTP {status}"

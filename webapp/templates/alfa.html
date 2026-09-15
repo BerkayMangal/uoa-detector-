@@ -1,6 +1,7 @@
 {% extends "base.html" %}
-{# Alfa Board (Phase 5.2.A1, contract §5 A1). Every visible string comes from the
-   frozen dictionaries in webapp/board (alfa_page.py, direction.py, aggregate.py). #}
+{# Alfa Board (Phase 5.2.A1-A2, contract §5 A1-A2). Every visible string comes from the
+   frozen dictionaries in webapp/board (alfa_page.py, direction.py, aggregate.py,
+   tradability.py, copy_tr.py). #}
 {% block content %}
 <section id="alfa-board" lang="tr">
   <div class="flex items-baseline gap-3 flex-wrap mb-3">
@@ -8,19 +9,31 @@
     <span class="text-sm text-gray-400">{{ copy.intro }}</span>
   </div>
 
-  {% if runs %}
-  <form method="get" action="/alfa" class="flex flex-wrap items-end gap-4 mb-4">
-    <label class="text-sm">
-      <span class="block text-gray-400 mb-1">{{ copy.run_label }}</span>
-      <select name="run" onchange="this.form.submit()"
-              class="bg-gray-900 border border-gray-700 rounded px-2 py-1 text-gray-100">
-        {% for r in runs %}
-        <option value="{{ r.run_id }}" {% if r.run_id == run %}selected{% endif %}>{{ r.run_id }} ({{ r.count }})</option>
-        {% endfor %}
-      </select>
-    </label>
-  </form>
-  {% endif %}
+  <div class="flex flex-wrap items-end gap-6 mb-4">
+    {% if runs %}
+    <form method="get" action="/alfa" data-form="run">
+      {% if not page.gate_on %}<input type="hidden" name="gate" value="{{ gate_off_param }}">{% endif %}
+      <label class="text-sm">
+        <span class="block text-gray-400 mb-1">{{ copy.run_label }}</span>
+        <select name="run" onchange="this.form.submit()"
+                class="bg-gray-900 border border-gray-700 rounded px-2 py-1 text-gray-100">
+          {% for r in runs %}
+          <option value="{{ r.run_id }}" {% if r.run_id == run %}selected{% endif %}>{{ r.run_id }} ({{ r.count }})</option>
+          {% endfor %}
+        </select>
+      </label>
+    </form>
+    {% endif %}
+    <form method="get" action="/alfa" data-form="gate">
+      {% if run %}<input type="hidden" name="run" value="{{ run }}">{% endif %}
+      {% if page.gate_on %}<input type="hidden" name="gate" value="{{ gate_off_param }}">{% endif %}
+      <label class="text-sm flex items-center gap-2 cursor-pointer" data-gate="{{ 'on' if page.gate_on else 'off' }}">
+        <input type="checkbox" {% if page.gate_on %}checked{% endif %} onchange="this.form.submit()">
+        <span class="text-gray-100 font-semibold">{{ gate_label }}</span>
+        <span class="text-gray-400">({{ copy.gate_on if page.gate_on else copy.gate_off }})</span>
+      </label>
+    </form>
+  </div>
 
   {% if page.load_failed %}
   <div class="rounded-lg border border-dashed border-amber-700/60 bg-amber-900/10 px-4 py-3 text-sm text-amber-200"
@@ -33,11 +46,24 @@
        data-state="empty-run">{{ copy.empty_run }}</div>
   {% else %}
   <p class="text-sm text-gray-400 mb-3" data-summary>{{ page.summary }}</p>
-  <div class="space-y-3" id="alfa-rows">
-    {% for row in page.rows %}
-    {% include "_alfa_row.html" %}
-    {% endfor %}
-  </div>
+  {% if page.quotes_failed %}
+  <div class="rounded-lg border border-dashed border-amber-700/60 bg-amber-900/10 px-4 py-2 mb-3 text-sm text-amber-200"
+       data-state="quotes-failed">{{ copy.quotes_failed }}</div>
+  {% endif %}
+  {% for section in page.sections %}
+  <section class="mb-6" data-section="{{ section.key }}">
+    <h3 class="text-sm font-semibold text-gray-300 mb-2">{{ section_heading(section) }}</h3>
+    {% if not section.views %}
+    <div class="rounded-lg border border-gray-800 px-4 py-3 text-sm text-gray-500" data-section-empty>{{ copy.main_empty }}</div>
+    {% endif %}
+    <div class="space-y-3">
+      {% for view in section.views %}
+      {% set row = view.row %}
+      {% include "_alfa_row.html" %}
+      {% endfor %}
+    </div>
+  </section>
+  {% endfor %}
   {% endif %}
 </section>
 {% endblock %}
