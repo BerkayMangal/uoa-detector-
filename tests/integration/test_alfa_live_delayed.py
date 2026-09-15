@@ -16,6 +16,7 @@ Request budget: 1 request per test.
 
 from __future__ import annotations
 
+import json
 import os
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
@@ -29,11 +30,15 @@ from webapp.board.daily_close import OHLC_DAILY_PATH, load_closes, run_daily_clo
 from webapp.board.db import make_engine
 from webapp.board.delayed import (
     CONGRESS_RECENT_TRADES_PATH,
+    FTDS_PATH,
     INSIDER_TRANSACTIONS_PATH,
+    SHORT_INTEREST_PATH,
     build_delayed_evidence,
     load_delayed_records,
     refresh_congress,
+    refresh_ftds,
     refresh_insider,
+    refresh_short_interest,
 )
 from webapp.board.settings import DelayedSettings, load_board_settings
 
@@ -183,4 +188,66 @@ async def test_live_insider_transactions(live: _RecordingClient, engine: Engine)
         assert record.delay_days is not None
         assert record.delay_days >= 0
         assert record.flag_10b5_1 in {True, False}
+        assert record.size_low is None or record.size_low > 0
+
+
+@pytest.mark.asyncio
+async def test_live_short_interest_float_v2(live: _RecordingClient, engine: Engine) -> None:
+    now = datetime.now(UTC)
+    settings = _settings()
+    try:
+        result = await refresh_short_interest(live, engine, "TSLA", now=now, settings=settings)  # type: ignore[arg-type]
+    finally:
+        await live._inner.aclose()
+
+    [(path, params, body)] = live.calls
+    assert (path, params) == (SHORT_INTEREST_PATH.format(ticker="TSLA"), None)
+    rows = [r for r in body.get("data", []) if isinstance(r, dict)]
+    assert rows, "interest-float/v2 returned no rows for TSLA"
+    assert {"symbol", "market_date", "short_interest", "total_float", "si_float", "days_to_cover"} <= rows[0].keys()
+    dates = [r["market_date"] for r in rows]
+    assert dates == sorted(dates, reverse=True)  # probed: newest first
+    assert isinstance(rows[0]["si_float"], str)  # probed: a string
+    assert 0 <= float(rows[0]["si_float"]) < 1  # probed: a fraction, not a percent (TSLA ~2%)
+
+    assert result.status == "ok"
+    records = load_delayed_records(engine, "TSLA")
+    assert records, "no TSLA short-interest as-of date inside the window"
+    for record in records:
+        assert record.family == "short_interest"
+        assert record.delay_days is None
+        assert record.transaction_date is None
+        assert "short_shares_available" not in json.loads(record.payload_json)
+    today = now.astimezone(_ET).date()
+    [newest, *_] = build_delayed_evidence("TSLA", records, (), today=today, settings=settings).items
+    assert newest.date_label == "itibarıyla tarihi"
+    assert newest.delay_days == (today - newest.filed_or_asof_date).days
+
+
+@pytest.mark.asyncio
+async def test_live_ftds(live: _RecordingClient, engine: Engine) -> None:
+    now = datetime.now(UTC)
+    settings = _settings()
+    try:
+        result = await refresh_ftds(live, engine, "NVDA", now=now, settings=settings)  # type: ignore[arg-type]
+    finally:
+        await live._inner.aclose()
+
+    [(path, params, body)] = live.calls
+    assert (path, params) == (FTDS_PATH.format(ticker="NVDA"), None)
+    rows = [r for r in body.get("data", []) if isinstance(r, dict)]
+    assert rows, "ftds returned no rows for NVDA"
+    assert {"date", "quantity", "price"} <= rows[0].keys()
+    assert all(isinstance(r["quantity"], int) and isinstance(r["price"], str) for r in rows[:50])
+    dates = [r["date"] for r in rows]
+    assert dates == sorted(dates, reverse=True)  # probed: newest first
+
+    assert result.status == "ok"
+    today = now.astimezone(_ET).date()
+    start = today - timedelta(days=settings.ftd_lookback_days)
+    in_window = [r for r in rows if start <= date.fromisoformat(r["date"]) <= today and r["quantity"] > 0]
+    records = load_delayed_records(engine, "NVDA")
+    assert len(records) == len(in_window)
+    for record in records:
+        assert record.family == "ftd"
         assert record.size_low is None or record.size_low > 0

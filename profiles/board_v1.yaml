@@ -86,6 +86,9 @@ delayed:
   congress_late_days: 45             # STOCK Act filing deadline
   congress_lookback_days: 365
   insider_lookback_days: 90
+  # Phase 5.2.D3a (keys were missing): as-of windows for the shorts families, in calendar days.
+  short_interest_lookback_days: 90   # FINRA settlement as-of dates (twice a month, about 15 days behind)
+  ftd_lookback_days: 60              # trailing fails-to-deliver window (SEC publishes 2-6 weeks behind)
   job_time_et: "17:00"
 
 portfolio:

@@ -43,6 +43,21 @@ Families:
     The dedupe key is the sorted ids. A stored group whose ids are a strict
     subset of another stored group's ids (a later regrouping) is not shown.
   - ``has_more`` true is reported as truncated.
+- ``short_interest`` (D3): ``GET /api/shorts/{ticker}/interest-float/v2``.
+  - The v1 ``/interest-float`` data ends in 2021 with impossible values. It is
+    never called.
+  - ``si_float`` is a fraction, displayed as a percent. ``market_date`` (the
+    FINRA settlement date) is the as-of date and the dedupe key.
+  - ``short_shares_available`` (10,000,000 in every probed row) is ignored and
+    not stored.
+  - Window: ``delayed.short_interest_lookback_days`` on the as-of date.
+- ``ftd`` (D3): ``GET /api/shorts/{ticker}/ftds``.
+  - ``date`` is the fail date and the dedupe key; ``quantity`` is shares;
+    notional = quantity x price, in USD.
+  - Only days with fails are published: a missing day means no reported fails.
+  - Window: ``delayed.ftd_lookback_days`` on the fail date (a trailing window).
+- Neither shorts source has a filing date. Their delay is today - the as-of (or
+  fail) date, computed at render and labelled that way; ``delay_days`` is NULL.
 
 UW error policy: NotFound -> no data; RateLimit, Transient, CircuitBreakerOpen ->
 that family is degraded and the job continues; DailyLimit and Auth propagate.
@@ -87,7 +102,7 @@ from webapp.board.settings import DelayedSettings
 
 _logger = logging.getLogger(__name__)
 
-DelayedFamily = Literal["congress", "insider"]
+DelayedFamily = Literal["congress", "insider", "short_interest", "ftd"]
 TradeSide = Literal["buy", "sell"]
 
 _FAMILY_ORDER: Final[tuple[DelayedFamily, ...]] = get_args(DelayedFamily)
@@ -102,7 +117,16 @@ INSIDER_FORM_TYPES: Final[tuple[str, ...]] = ("4", "4/A")
 _INSIDER_CODE_SIDE: Final[Mapping[str, TradeSide]] = MappingProxyType({"P": "buy", "S": "sell"})
 _AMENDED_FORM: Final = "4/A"
 
+SHORT_INTEREST_PATH: Final = "/api/shorts/{ticker}/interest-float/v2"
+FTDS_PATH: Final = "/api/shorts/{ticker}/ftds"
+_IGNORED_SHORT_INTEREST_FIELDS: Final = frozenset({"short_shares_available"})
+
 _ET: Final = ZoneInfo("America/New_York")
+
+# How each family's date, delay and outcome are labelled.
+_DATE_KIND: Final[Mapping[str, str]] = MappingProxyType({
+    "congress": "filed", "insider": "filed", "short_interest": "asof", "ftd": "fail",
+})
 
 # Frozen Turkish copy (R-WD1: every generated string passes ensure_clean).
 _TEXT: Final[Mapping[str, str]] = MappingProxyType({
@@ -110,16 +134,26 @@ _TEXT: Final[Mapping[str, str]] = MappingProxyType({
     "exclusion": "gecikmeli veri: kanıt sayımına, güç etiketine ve karşı argümana girmez",
     "family.congress": "Kongre",
     "family.insider": "İçeriden",
+    "family.short_interest": "Short",
+    "family.ftd": "FTD",
     "date.filed": "bildirim tarihi",
+    "date.asof": "itibarıyla tarihi",
+    "date.fail": "FTD günü",
     "delay.filed": "işlemden {days} gün sonra bildirildi",
+    "delay.asof": "bugün - itibarıyla tarihi = {days} gün (kaynakta bildirim tarihi yok)",
+    "delay.fail": "bugün - FTD günü = {days} gün (kaynakta bildirim tarihi yok)",
     "side.buy": "alış",
     "side.sell": "satış",
     "size.shares": "{shares} hisse x ${price} ≈ ${usd}",
+    "size.short_interest": "açığa satış / serbest dolaşım %{pct}; short kapatma süresi {dtc} gün",
+    "size.short_interest_no_dtc": "açığa satış / serbest dolaşım %{pct}",
     "flag.late": "geç bildirim",
     "flag.executive": "yürütme beyanı (Kongre üyesi değil)",
     "flag.10b5_1": "10b5-1 planlı işlem",
     "flag.amended": "düzeltilmiş beyan (Form 4/A)",
     "outcome.filed": "bildirim tarihinden beri dayanak %{pct} ({base} → {through} kapanış)",
+    "outcome.asof": "itibarıyla tarihinden beri dayanak %{pct} ({base} → {through} kapanış)",
+    "outcome.fail": "FTD gününden beri dayanak %{pct} ({base} → {through} kapanış)",
     "outcome.unknown": "bilinmiyor",
 })
 
@@ -257,6 +291,33 @@ def _ordered(rows: Sequence[object], records: Iterable[DelayedRecord | None]) ->
             unique.setdefault(record.dedupe_key, record)
     ordered = sorted(unique.values(), key=lambda r: (-r.filed_or_asof_date.toordinal(), r.dedupe_key))
     return FamilyParse(records=tuple(ordered), rows_skipped=len(rows) - len(ordered))
+
+
+def _as_of_record(
+    symbol: str,
+    family: DelayedFamily,
+    as_of: date,
+    payload: Mapping[str, object],
+    *,
+    usd: float | None = None,
+) -> DelayedRecord:
+    return DelayedRecord(
+        ticker=symbol,
+        family=family,
+        dedupe_key=as_of.isoformat(),
+        filed_or_asof_date=as_of,
+        transaction_date=None,
+        delay_days=None,
+        side=None,
+        size_text=None,
+        size_low=usd,
+        size_high=usd,
+        flag_late=None,
+        flag_executive=None,
+        flag_10b5_1=None,
+        form=None,
+        payload_json=_payload_text(payload),
+    )
 
 
 def _usd_range(value: object) -> tuple[str | None, float | None, float | None]:
@@ -411,6 +472,60 @@ def _insider_record(row: object, symbol: str, earliest: date, today: date) -> De
     )
 
 
+def parse_short_interest(
+    data: object,
+    *,
+    ticker: str,
+    today: date,
+    settings: DelayedSettings,
+) -> FamilyParse:
+    """Rows of ``/api/shorts/{t}/interest-float/v2`` -> one record per as-of date inside the window."""
+    symbol = ticker.strip().upper()
+    earliest = today - timedelta(days=settings.short_interest_lookback_days)
+    rows = data if isinstance(data, list) else []
+    return _ordered(rows, (_short_interest_record(r, symbol, earliest, today) for r in rows))
+
+
+def _short_interest_record(row: object, symbol: str, earliest: date, today: date) -> DelayedRecord | None:
+    if not isinstance(row, dict):
+        return None
+    row_symbol = _text(row.get("symbol"))
+    as_of = _to_date(row.get("market_date"))
+    si_float = _to_float(row.get("si_float"))
+    if row_symbol is not None and row_symbol.upper() != symbol:
+        return None
+    if as_of is None or not earliest <= as_of <= today or si_float is None or si_float < 0:
+        return None
+    kept = {k: v for k, v in row.items() if k not in _IGNORED_SHORT_INTEREST_FIELDS}
+    return _as_of_record(symbol, "short_interest", as_of, kept)
+
+
+def parse_ftds(
+    data: object,
+    *,
+    ticker: str,
+    today: date,
+    settings: DelayedSettings,
+) -> FamilyParse:
+    """Rows of ``/api/shorts/{t}/ftds`` -> one record per fail date inside the trailing window."""
+    symbol = ticker.strip().upper()
+    earliest = today - timedelta(days=settings.ftd_lookback_days)
+    rows = data if isinstance(data, list) else []
+    return _ordered(rows, (_ftd_record(r, symbol, earliest, today) for r in rows))
+
+
+def _ftd_record(row: object, symbol: str, earliest: date, today: date) -> DelayedRecord | None:
+    if not isinstance(row, dict):
+        return None
+    fail_day = _to_date(row.get("date"))
+    quantity = _to_float(row.get("quantity"))
+    if fail_day is None or not earliest <= fail_day <= today or quantity is None or quantity <= 0:
+        return None
+    price = _to_float(row.get("price"))
+    notional = quantity * price if price is not None and price > 0 else None
+    return _as_of_record(symbol, "ftd", fail_day, row, usd=notional)
+
+
 # ---------------------------------------------------------------------------
 # Daily job
 # ---------------------------------------------------------------------------
@@ -460,8 +575,9 @@ async def run_delayed_job(
     """Fetch every delayed family for every ticker and append the rows not stored yet.
 
     ``now`` is the job's event time (D9): its ET date bounds the lookback windows
-    and it is stored as ``fetched_at``. One request per (ticker, family).
-    DailyLimit and Auth errors propagate; rows already committed stay.
+    and it is stored as ``fetched_at``. One request per (ticker, family), in the
+    order congress, insider, short interest, FTD. DailyLimit and Auth errors
+    propagate; rows already committed stay.
     """
     today, fetched_at = _clock(now)
     ensure_delayed_tables(engine)
@@ -497,6 +613,30 @@ async def refresh_insider(
 ) -> DelayedFamilyResult:
     """The insider family alone for one ticker (one request)."""
     return await _refresh_one(_insider, client, engine, ticker, now=now, settings=settings)
+
+
+async def refresh_short_interest(
+    client: UnusualWhalesClient,
+    engine: Engine,
+    ticker: str,
+    *,
+    now: datetime,
+    settings: DelayedSettings,
+) -> DelayedFamilyResult:
+    """The short-interest family alone for one ticker (one request)."""
+    return await _refresh_one(_short_interest, client, engine, ticker, now=now, settings=settings)
+
+
+async def refresh_ftds(
+    client: UnusualWhalesClient,
+    engine: Engine,
+    ticker: str,
+    *,
+    now: datetime,
+    settings: DelayedSettings,
+) -> DelayedFamilyResult:
+    """The FTD family alone for one ticker (one request)."""
+    return await _refresh_one(_ftds, client, engine, ticker, now=now, settings=settings)
 
 
 async def _refresh_one(
@@ -550,9 +690,18 @@ async def _get(
         return "degraded", None
 
 
-def _rows(body: Mapping[str, object]) -> list[object]:
+def _rows(body: Mapping[str, object] | None) -> list[object]:
+    """The ``data`` rows of a body. A single object (the spec's example shape) counts as one row."""
+    if body is None:
+        return []
     data = body.get("data")
+    if isinstance(data, dict):
+        return [data]
     return data if isinstance(data, list) else []
+
+
+def _empty(ticker: str, family: DelayedFamily, status: FetchStatus, body: object) -> DelayedFamilyResult:
+    return DelayedFamilyResult(ticker=ticker, family=family, status=status if body is None else "no_data")
 
 
 def _finish(
@@ -593,11 +742,9 @@ async def _congress(
         {"ticker": ticker, "limit": _CONGRESS_LIMIT},
         what=f"congress {ticker}",
     )
-    rows = _rows(body) if body is not None else []
+    rows = _rows(body)
     if not rows:
-        return DelayedFamilyResult(
-            ticker=ticker, family="congress", status=status if body is None else "no_data",
-        )
+        return _empty(ticker, "congress", status, body)
     parsed = parse_congress_trades(rows, ticker=ticker, today=today, settings=settings)
     return _finish(factory, ticker, "congress", parsed, fetched_at, truncated=len(rows) >= _CONGRESS_LIMIT)
 
@@ -622,16 +769,50 @@ async def _insider(
         },
         what=f"insider {ticker}",
     )
-    rows = _rows(body) if body is not None else []
+    rows = _rows(body)
     if body is None or not rows:
-        return DelayedFamilyResult(
-            ticker=ticker, family="insider", status=status if body is None else "no_data",
-        )
+        return _empty(ticker, "insider", status, body)
     parsed = parse_insider_transactions(rows, ticker=ticker, today=today, settings=settings)
     return _finish(factory, ticker, "insider", parsed, fetched_at, truncated=body.get("has_more") is True)
 
 
-_FAMILY_JOBS: Final[tuple[_FamilyJob, ...]] = (_congress, _insider)
+async def _short_interest(
+    client: UnusualWhalesClient,
+    factory: sessionmaker[Session],
+    ticker: str,
+    *,
+    today: date,
+    fetched_at: datetime,
+    settings: DelayedSettings,
+) -> DelayedFamilyResult:
+    status, body = await _get(
+        client, SHORT_INTEREST_PATH.format(ticker=ticker), None, what=f"short interest {ticker}",
+    )
+    rows = _rows(body)
+    if not rows:
+        return _empty(ticker, "short_interest", status, body)
+    parsed = parse_short_interest(rows, ticker=ticker, today=today, settings=settings)
+    return _finish(factory, ticker, "short_interest", parsed, fetched_at, truncated=False)
+
+
+async def _ftds(
+    client: UnusualWhalesClient,
+    factory: sessionmaker[Session],
+    ticker: str,
+    *,
+    today: date,
+    fetched_at: datetime,
+    settings: DelayedSettings,
+) -> DelayedFamilyResult:
+    status, body = await _get(client, FTDS_PATH.format(ticker=ticker), None, what=f"ftds {ticker}")
+    rows = _rows(body)
+    if not rows:
+        return _empty(ticker, "ftd", status, body)
+    parsed = parse_ftds(rows, ticker=ticker, today=today, settings=settings)
+    return _finish(factory, ticker, "ftd", parsed, fetched_at, truncated=False)
+
+
+_FAMILY_JOBS: Final[tuple[_FamilyJob, ...]] = (_congress, _insider, _short_interest, _ftds)
 
 
 def _store(
@@ -750,7 +931,7 @@ class DelayedItem:
     date_label: str
     filed_or_asof_date: date
     transaction_date: date | None
-    delay_days: int
+    delay_days: int  # filed - transaction; for the shorts families today - as-of (or fail) date
     delay_text: str
     side: TradeSide | None
     side_text: str | None
@@ -828,17 +1009,29 @@ def _superseded_insider_groups(records: Sequence[DelayedRecord]) -> set[str]:
 
 
 def _in_window(record: DelayedRecord, today: date, settings: DelayedSettings) -> bool:
-    if record.filed_or_asof_date > today or record.transaction_date is None:
+    dated = record.filed_or_asof_date
+    if dated > today:
         return False
+    if record.family == "congress":
+        return record.transaction_date is not None and dated >= today - timedelta(
+            days=settings.congress_lookback_days,
+        )
     if record.family == "insider":
-        return record.transaction_date >= today - timedelta(days=settings.insider_lookback_days)
-    return record.filed_or_asof_date >= today - timedelta(days=settings.congress_lookback_days)
+        return record.transaction_date is not None and record.transaction_date >= today - timedelta(
+            days=settings.insider_lookback_days,
+        )
+    if record.family == "short_interest":
+        return dated >= today - timedelta(days=settings.short_interest_lookback_days)
+    return dated >= today - timedelta(days=settings.ftd_lookback_days)
 
 
 def _item(record: DelayedRecord, closes: Sequence[ClosePoint], today: date) -> DelayedItem:
-    filed = record.filed_or_asof_date
-    traded = record.transaction_date or filed
-    delay = (filed - traded).days
+    dated = record.filed_or_asof_date
+    kind = _DATE_KIND[record.family]
+    if kind == "filed":
+        delay = (dated - (record.transaction_date or dated)).days
+    else:
+        delay = (today - dated).days
     payload = _payload(record.payload_json)
     flags: list[str] = []
     if record.flag_late:
@@ -853,11 +1046,11 @@ def _item(record: DelayedRecord, closes: Sequence[ClosePoint], today: date) -> D
         key=record.dedupe_key,
         family=record.family,
         family_label=_say(f"family.{record.family}"),
-        date_label=_say("date.filed"),
-        filed_or_asof_date=filed,
+        date_label=_say(f"date.{kind}"),
+        filed_or_asof_date=dated,
         transaction_date=record.transaction_date,
         delay_days=delay,
-        delay_text=_say("delay.filed", days=delay),
+        delay_text=_say(f"delay.{kind}", days=delay),
         side=record.side,
         side_text=_say(f"side.{record.side}") if record.side is not None else None,
         size_text=_size_text(record, payload),
@@ -865,7 +1058,7 @@ def _item(record: DelayedRecord, closes: Sequence[ClosePoint], today: date) -> D
         size_high_usd=record.size_high,
         flags=tuple(flags),
         who=_who(record, payload),
-        outcome=_outcome(closes, filed, today),
+        outcome=_outcome(closes, dated, today, kind),
     )
 
 
@@ -882,13 +1075,24 @@ def _who(record: DelayedRecord, payload: Mapping[str, object]) -> str | None:
         name = _text(payload.get("owner_name"))
         title = _text(payload.get("officer_title"))
         return f"{name} ({title})" if name is not None and title is not None else name
-    return _text(payload.get("name")) or _text(payload.get("reporter"))
+    if record.family == "congress":
+        return _text(payload.get("name")) or _text(payload.get("reporter"))
+    return None
 
 
 def _size_text(record: DelayedRecord, payload: Mapping[str, object]) -> str | None:
     if record.family == "congress":
         return record.size_text
-    shares = _to_float(payload.get("amount"))
+    if record.family == "short_interest":
+        si_float = _to_float(payload.get("si_float"))
+        if si_float is None:
+            return None
+        pct = f"{si_float * 100:.2f}"  # fraction -> percent
+        days_to_cover = _to_float(payload.get("days_to_cover"))
+        if days_to_cover is None:
+            return _say("size.short_interest_no_dtc", pct=pct)
+        return _say("size.short_interest", pct=pct, dtc=f"{days_to_cover:.2f}")
+    shares = _to_float(payload.get("amount" if record.family == "insider" else "quantity"))
     price = _to_float(payload.get("price"))
     if shares is None or price is None or record.size_low is None:
         return None
@@ -900,7 +1104,7 @@ def _size_text(record: DelayedRecord, payload: Mapping[str, object]) -> str | No
     )
 
 
-def _outcome(closes: Sequence[ClosePoint], base: date, today: date) -> DelayedOutcome:
+def _outcome(closes: Sequence[ClosePoint], base: date, today: date, kind: str) -> DelayedOutcome:
     move = pct_move_between(closes, base, today)
     if move is None or move.end.day <= move.start.day:
         return DelayedOutcome(
@@ -912,7 +1116,7 @@ def _outcome(closes: Sequence[ClosePoint], base: date, today: date) -> DelayedOu
         base_day=move.start.day,
         through_day=move.end.day,
         text=_say(
-            "outcome.filed",
+            f"outcome.{kind}",
             pct=f"{move.pct:+.1f}",
             base=move.start.day.isoformat(),
             through=move.end.day.isoformat(),

@@ -244,7 +244,10 @@ async def test_job_calls_only_recent_trades_and_appends_idempotently(engine: Eng
     assert [c for c in client.calls if c[0] == CONGRESS_RECENT_TRADES_PATH] == [
         (CONGRESS_RECENT_TRADES_PATH, {"ticker": "NVDA", "limit": 200}),
     ]
-    assert {path for path, _ in client.calls} == {CONGRESS_RECENT_TRADES_PATH, INSIDER_TRANSACTIONS_PATH}
+    assert {path for path, _ in client.calls} == {
+        CONGRESS_RECENT_TRADES_PATH, INSIDER_TRANSACTIONS_PATH,
+        dl.SHORT_INTEREST_PATH.format(ticker="NVDA"), dl.FTDS_PATH.format(ticker="NVDA"),
+    }
     assert all("unusual-trades" not in path for path, _ in client.calls)
     [result] = _congress_results(first)
     assert (result.status, result.inserted, result.already_stored, result.truncated) == ("ok", 6, 0, False)
