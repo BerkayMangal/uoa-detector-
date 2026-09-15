@@ -23,7 +23,7 @@ from zoneinfo import ZoneInfo
 import pytest
 from pydantic import SecretStr
 from sqlalchemy import select
-from webapp.board import atm, catalysts, oi_confirm, regime
+from webapp.board import atm, catalysts, etf_holdings, oi_confirm, regime
 from webapp.board.db import make_engine, session_factory
 from webapp.board.settings import BoardSettings, load_board_settings
 
@@ -58,6 +58,7 @@ def _sessions(tmp_path: Path) -> Any:
     oi_confirm.ensure_oi_confirm_tables(engine)
     catalysts.ensure_catalyst_tables(engine)
     regime.ensure_regime_tables(engine)
+    etf_holdings.ensure_etf_holding_tables(engine)
     return session_factory(engine)
 
 
@@ -354,3 +355,33 @@ async def test_live_greek_exposure(tmp_path: Path) -> None:
     assert 0 <= history.negative_days <= history.total_days
     assert 0 < history.percentile <= 100
     assert (now.astimezone(_ET).date() - history.as_of).days <= 7
+
+
+# ---------------------------------------------------------------------------
+# B6a
+# ---------------------------------------------------------------------------
+
+
+async def test_live_etf_holdings(tmp_path: Path) -> None:
+    client = _client()
+    sessions = _sessions(tmp_path)
+    settings = _settings()
+    now = datetime.now(UTC)
+    try:
+        report = await etf_holdings.refresh_etf_holdings(
+            client, sessions, etfs=["SMH"], settings=settings, now=now,
+        )
+    finally:
+        await client.aclose()
+    assert report.degraded == () and report.no_data == ()
+    assert report.skipped_broad == (), report  # SMH holds about 25 names
+    with sessions() as s:
+        rows = etf_holdings.load_focused_holdings(s)
+    assert len(rows) >= 10
+    assert {r.etf for r in rows} == {"SMH"}
+    assert all(0 < r.weight_pct <= 100 for r in rows)  # percent units, cash rows dropped
+    updated = {r.updated for r in rows}
+    assert all((now.astimezone(_ET).date() - d).days <= 14 for d in updated)
+    nvda = next((r for r in rows if r.ticker == "NVDA"), None)
+    assert nvda is not None
+    assert nvda.weight_pct >= settings.portfolio.cluster_min_member_weight_pct
