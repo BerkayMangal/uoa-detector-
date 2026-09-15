@@ -1,0 +1,152 @@
+{# One Alfa Board row: every print of one (ticker, side-aware direction) in the run, the
+   tradability chip of its dominant contract (A2), the evidence word, strength label and
+   evidence strip (A4), and the Denetim block, the only place the combined score appears
+   (R-EV2). Copy comes only from the frozen dictionaries passed by alfa_page.template_context(). #}
+{% set is_up = row.direction == 'up' %}
+{% set dir_color = '#10b981' if is_up else '#ef4444' %}
+{% set chip_style = {
+  'tradable': 'border-emerald-600 text-emerald-300',
+  'narrow': 'border-amber-600 text-amber-300',
+  'untradable': 'border-red-700 text-red-300',
+  'no_quote': 'border-dashed border-gray-600 text-gray-400 opacity-80',
+} %}
+{% set evidence_style = {
+  'supporting': 'border-emerald-700 text-emerald-300',
+  'against': 'border-red-700 text-red-300',
+  'neutral': 'border-gray-700 text-gray-300',
+  'unknown': 'border-dashed border-gray-600 text-gray-500 opacity-70',
+  'out_of_scope': 'border-dashed border-gray-600 text-gray-500 opacity-70',
+} %}
+<article class="rounded-lg border border-gray-800 bg-gray-900/40 px-4 py-3"
+         data-row data-ticker="{{ row.ticker }}" data-direction="{{ row.direction }}" data-clean-candidate="{{ 'true' if view.clean_candidate else 'false' }}">
+  <div class="flex flex-wrap items-baseline gap-x-5 gap-y-1">
+    <span class="text-lg font-bold text-white">{{ row.ticker }}</span>
+    <span class="text-sm font-semibold px-2 py-0.5 rounded" style="background:{{ dir_color }}22;color:{{ dir_color }}"
+          data-direction-label>{{ direction_labels[row.direction] }}</span>
+    <span class="text-sm"><span class="text-gray-400">{{ copy.col_premium }}</span>
+      <span class="text-white font-semibold" data-total-premium>${{ '{:,.0f}'.format(row.total_premium|float) }}</span></span>
+    <span class="text-sm"><span class="text-gray-400">{{ copy.col_prints }}</span>
+      <span class="text-white" data-print-count>{{ row.print_count }}</span></span>
+    <span class="text-sm"><span class="text-gray-400">{{ copy.col_contracts }}</span>
+      <span class="text-white" data-distinct-contracts>{{ row.distinct_contracts }}</span></span>
+  </div>
+
+  <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm" data-evidence>
+    <span class="font-semibold text-gray-100 tip" title="{{ evidence_hover }}" data-evidence-word>{{ view.evidence.word }}</span>
+    <span class="px-2 py-0.5 rounded bg-gray-800 text-xs font-semibold text-gray-200"
+          data-strength="{{ view.strength_key }}">{{ view.strength_text }}</span>
+  </div>
+  <div class="mt-1 flex flex-wrap gap-1.5 text-xs" data-evidence-strip>
+    {% for fam in view.evidence.families %}
+    <span class="px-2 py-0.5 rounded border {{ evidence_style[fam.state] }}"
+          data-family="{{ fam.family }}" data-family-state="{{ fam.state }}"{% if fam.hover %} title="{{ fam.hover }}"{% endif %}>{{ fam.text }}{% if fam.dimmed %} · <span data-unknown-not-clean>{{ unknown_not_clean }}</span>{% endif %}</span>
+    {% endfor %}
+  </div>
+
+  <div class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm" data-chip="{{ view.chip.state }}">
+    <span class="px-2 py-0.5 rounded border font-semibold {{ chip_style[view.chip.state] }}"
+          data-chip-label>{{ view.chip_text.label }}</span>
+    {% if view.chip_text.reason %}<span class="text-gray-300" data-chip-reason>{{ view.chip_text.reason }}</span>{% endif %}
+    <span><span class="text-gray-400">{{ chip_copy.spread }}</span> <span data-spread>{{ view.chip_text.spread }}</span></span>
+    {% if view.chip_text.bid_ask %}<span class="text-gray-300" data-bid-ask>{{ view.chip_text.bid_ask }}</span>{% endif %}
+    <span><span class="text-gray-400">{{ chip_copy.round_trip }}</span> <span data-round-trip>{{ view.chip_text.round_trip }}</span>
+      {% if view.chip_text.default_marker %}<span class="text-xs text-amber-300/80" data-default-value>{{ view.chip_text.default_marker }}</span>{% endif %}</span>
+    <span><span class="text-gray-400">{{ chip_copy.lot }}</span> <span data-lot>{{ view.chip_text.lot }}</span>
+      {% if view.chip_text.default_marker %}<span class="text-xs text-amber-300/80" data-default-value>{{ view.chip_text.default_marker }}</span>{% endif %}</span>
+    <span><span class="text-gray-400">{{ chip_copy.exit_depth }}</span> <span data-exit-depth>{{ view.chip_text.exit_depth }}</span></span>
+    {% if view.chip_text.quote_age or view.chip_text.last_trade %}
+    <span class="text-xs text-gray-500" data-quote-age>{{ view.chip_text.quote_age or '' }}{% if view.chip_text.quote_age and view.chip_text.last_trade %} · {% endif %}{{ view.chip_text.last_trade or '' }}</span>
+    {% endif %}
+  </div>
+
+  {# R-CA2: the bull and bear columns share width (two equal grid columns) and classes. #}
+  <div class="grid gap-3 md:grid-cols-2 mt-2" data-cases>
+    <div class="{{ case_class }}" data-case="bull">
+      <p class="{{ case_title_class }}" data-case-title>{{ narrative_copy.bull_title }}</p>
+      <p data-reason>{{ view.narrative.reason }}</p>
+    </div>
+    <div class="{{ case_class }}" data-case="bear">
+      <p class="{{ case_title_class }}" data-case-title>{{ narrative_copy.bear_title }}</p>
+      <p data-counter>{{ view.narrative.counter }}</p>
+      {% if view.narrative.checked %}<p data-checked>{{ view.narrative.checked }}</p>{% endif %}
+    </div>
+  </div>
+
+  <div class="grid gap-x-5 gap-y-1 md:grid-cols-4 mt-2 text-sm">
+    <div><span class="text-gray-400">{{ copy.col_dominant }}</span>
+      <span class="text-gray-100" data-dominant>{{ option_type_labels[row.dominant.key.option_type] }} {{ row.dominant.key.strike }} · {{ row.dominant.key.expiry }}</span>
+      {% if row.dominant.option_chain %}<span class="text-gray-500 text-xs" data-dominant-chain>{{ row.dominant.option_chain }}</span>{% endif %}
+    </div>
+    <div><span class="text-gray-400 tip" title="{{ copy.concentration_help }}">{{ copy.col_concentration }}</span>
+      <span class="text-gray-100" data-concentration>{% if row.concentration_pct is not none %}%{{ '%.0f'|format(row.concentration_pct) }}{% else %}{{ copy.unknown }}{% endif %}</span>
+    </div>
+    <div><span class="text-gray-400 tip" title="{{ copy.dominance_help }}">{{ copy.col_dominance }}</span>
+      <span class="text-gray-100" data-dominance>{% if row.dominance_pct is not none %}%{{ '%.0f'|format(row.dominance_pct) }}{% else %}{{ copy.unknown }}{% endif %}</span>
+    </div>
+    <div><span class="text-gray-400">{{ copy.col_position }}</span>
+      <span class="text-gray-100" data-position="{{ row.position_read }}">{{ position_labels[row.position_read] }}</span>
+    </div>
+  </div>
+
+  <div class="text-xs text-gray-400 mt-1 flex flex-wrap gap-2 items-center">
+    <span data-side-counts>{{ side_counts_text(row) }}</span>
+    {% if row.fallback_prints %}
+    <span class="border border-dashed border-gray-600 rounded px-1.5 py-0.5 text-gray-400"
+          data-fallback-marker>{{ fallback_marker }}</span>
+    {% endif %}
+  </div>
+
+  <details class="mt-2 text-sm">
+    <summary class="cursor-pointer text-gray-300">{{ detail_summary_text(row) }}</summary>
+    <div class="overflow-x-auto">
+      <table class="mt-2 w-full text-xs">
+        <thead class="text-gray-400">
+          <tr>
+            <th class="text-left pr-3 font-normal">{{ copy.th_time }}</th>
+            <th class="text-left pr-3 font-normal">{{ copy.th_contract }}</th>
+            <th class="text-right pr-3 font-normal">{{ copy.th_premium }}</th>
+            <th class="text-right pr-3 font-normal">{{ copy.th_price }}</th>
+            <th class="text-left pr-3 font-normal">{{ copy.th_side }}</th>
+            <th class="text-left font-normal">{{ copy.th_direction_source }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in row.prints %}
+          <tr class="border-t border-gray-800" data-print="{{ p.event_id }}">
+            <td class="pr-3">{{ p.timestamp.strftime('%H:%M:%S') }}</td>
+            <td class="pr-3">{{ option_type_labels[p.option_type] }} {{ p.strike }} · {{ p.expiry }}</td>
+            <td class="pr-3 text-right">${{ '{:,.0f}'.format(p.premium|float) }}</td>
+            <td class="pr-3 text-right">${{ p.option_price }}</td>
+            <td class="pr-3">{{ fill_side_label(p.fill_side) }}</td>
+            <td>{{ copy.source_side if p.side_aware else copy.source_type }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </details>
+
+  <details class="mt-2 text-sm" data-audit>
+    <summary class="cursor-pointer text-gray-400">{{ copy.audit_summary }}</summary>
+    <div class="mt-2 space-y-1 text-xs text-gray-400">
+      <p data-audit-source>{{ view.audit.source_text }}</p>
+      <p class="text-gray-200" data-audit-score>{{ view.audit.score_text }}</p>
+      <p data-audit-pre>{{ view.audit.pre_text }}</p>
+      {% if view.audit.inputs %}
+      <p class="text-gray-500">{{ copy.audit_inputs }}</p>
+      <ul class="flex flex-wrap gap-x-4 gap-y-0.5" data-audit-inputs>
+        {% for label, value in view.audit.inputs %}
+        <li>{{ label }}: <span class="text-gray-200">{{ value }}</span></li>
+        {% endfor %}
+      </ul>
+      {% endif %}
+      <p class="text-gray-500 pt-1">{{ ledger_copy.title }}</p>
+      <p data-ledger-profile>{{ view.ledger.profile_text }}</p>
+      <ul class="space-y-0.5" data-ledger>
+        {% for entry in view.ledger.entries %}
+        <li data-penalty="{{ entry.key }}" data-penalty-status="{{ entry.status }}"><span class="text-gray-200">{{ entry.name }}</span>: {{ entry.status_label }}{% if entry.details %} · {{ entry.detail_text }}{% endif %}</li>
+        {% endfor %}
+      </ul>
+    </div>
+  </details>
+</article>

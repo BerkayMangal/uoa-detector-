@@ -33,6 +33,7 @@ from uoa_detector.pipeline.stage import PipelineContext
 from uoa_detector.pipeline.stages import build_live_stage_pipeline
 from uoa_detector.sources.unusual_whales.client import UnusualWhalesClient
 from uoa_detector.sources.unusual_whales.flow_poll import UnusualWhalesFlowPollSource
+from webapp.board.telemetry import AlfaTelemetryWriter
 
 _logger = logging.getLogger(__name__)
 
@@ -134,6 +135,7 @@ async def run_live_worker(
         while True:
             client = None
             source = None
+            writer: AlfaTelemetryWriter | None = None
             # Whole loop body in the restart try: a transient DB/UW blip during
             # setup (run adoption, client, stage wiring) must back off + retry,
             # not kill live ingestion permanently (it would freeze silently
@@ -157,15 +159,28 @@ async def run_live_worker(
                 stages = build_live_stage_pipeline(
                     client, profile, degrade_transient_errors=True,
                 )
+                # Phase 5.2.A0c: keep each event's stage telemetry and print
+                # meta (fill side, option chain) in the alfa_* side tables.
+                # Bound to this iteration's degrading wrappers and to the run
+                # the store is writing. The writer never raises, and
+                # Pipeline.run closes it when the stream ends.
+                writer = AlfaTelemetryWriter.for_stages(
+                    database_url=database_url,
+                    run_id_source=lambda: store.active_run_id,
+                    stages=stages,
+                )
                 pipeline = Pipeline(
                     [source], stages, profile=profile, store=store,
                     context=PipelineContext(profile=profile),
+                    decision_record_writer=writer,
                 )
                 await pipeline.run()
             except asyncio.CancelledError:
                 raise
             except Exception:
                 _logger.exception("live worker error; restarting in %ss", _RESTART_BACKOFF_S)
+                if writer is not None:
+                    writer.close()
                 if source is not None:
                     with contextlib.suppress(Exception):
                         await source.close()

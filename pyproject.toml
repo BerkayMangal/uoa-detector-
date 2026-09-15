@@ -52,6 +52,8 @@ target-version = "py311"
 src = ["src", "tests"]
 
 [tool.ruff.lint]
+# Phase 5.2: the Alfa Board UI is Turkish (owner K3); dotless/dotted I are letters, not confusables.
+allowed-confusables = ["ı", "İ"]
 select = [
     "E", "F", "W",   # pycodestyle / pyflakes
     "I",             # isort

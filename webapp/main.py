@@ -1,9 +1,11 @@
 """UOA Screener — FastAPI app.
 
-Read-only dashboard over the detector's signals, a /gamma vol board, and a
-/journal. Filters/sort are a plain GET form (no JS framework); live runs
-auto-refresh via a meta reload. Templates use Tailwind via CDN — no build
-step. Repo calls are wrapped in `_safe` and a global exception handler shows
+``GET /`` is the Alfa Board (Phase 5.2.A7; ``GET /alfa`` stays as an alias):
+one row per ticker and direction with cost, evidence and a mandatory
+counter-argument, and the vol-premium board as a section. Also a /gamma vol
+board and a /journal. Controls are plain GET forms (no JS framework); a live
+run reloads once per board refresh cadence. Templates use Tailwind via CDN —
+no build step. Repo calls are wrapped in `_safe` and a global exception handler shows
 a clean error page, so a DB/feed blip degrades instead of 500-ing.
 
 Every route except ``GET /health`` is behind HTTP Basic auth (Phase 5.0.9):
@@ -22,7 +24,7 @@ import os
 import secrets
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, TypeVar, cast
+from typing import TYPE_CHECKING, TypeVar
 
 from fastapi import FastAPI, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -31,9 +33,13 @@ from starlette.datastructures import Headers
 from starlette.responses import PlainTextResponse
 
 from webapp import explanations, gamma, journal, pricing
+from webapp.board import alfa_page
+from webapp.board.copy_tr import IV_NOT_SELL_VOL
+from webapp.board.refresher import board_refresh_loop
+from webapp.board.settings import BoardSettings, load_board_settings
+from webapp.board.signals import BoardSignalReader
 from webapp.gamma_live import gamma_refresh_loop
-from webapp.notability import notability_score
-from webapp.repo import RunInfo, SignalFilters, SignalRepo
+from webapp.repo import RunInfo, SignalRepo
 from webapp.vol_board import VolBoardRow, build_vol_board, vol_board_summary
 from webapp.worker import live_config_from_env, run_live_worker
 
@@ -42,7 +48,8 @@ if TYPE_CHECKING:
 
     from starlette.types import ASGIApp, Receive, Scope, Send
 
-    from uoa_detector.backtest.store import StoredSignal
+    from webapp.board.evidence import LegacyScores
+    from webapp.board.signals import BoardPrint
 
 _logger = logging.getLogger(__name__)
 _BASE = Path(__file__).parent
@@ -68,6 +75,15 @@ async def _supervise(make_coro: object, name: str) -> None:
 
 @contextlib.asynccontextmanager
 async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
+    # Phase 5.2.A-fix3 (review RT-4): the board profile and the calibration values
+    # the board reads are loaded and validated before the app accepts traffic. A
+    # missing or invalid file fails startup, so a broken deploy fails its /health
+    # check instead of answering /health 200 while GET / returns 500.
+    try:
+        _load_board_profiles()
+    except Exception:
+        _logger.exception("board profiles could not be loaded; refusing to start")
+        raise
     # Opt-in live tasks: only start when LIVE_TICKERS (+ UW key + DB) is set.
     # Otherwise the app just serves stored signals (local dev, sample data).
     config = live_config_from_env()
@@ -83,6 +99,14 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
                 database_url=config["database_url"],  # type: ignore[arg-type]
             ),
             "gamma-refresh",
+        )))
+        # Phase 5.2.A2: the Alfa Board refresher (quotes, exit depth) on its own
+        # long-lived UW client. GET /alfa only reads what it writes.
+        tasks.append(asyncio.create_task(_supervise(
+            lambda: board_refresh_loop(
+                database_url=config["database_url"],  # type: ignore[arg-type]
+            ),
+            "board-refresh",
         )))
     try:
         yield
@@ -198,7 +222,6 @@ _EXPLAIN = {
     "glossary": explanations.GLOSSARY,
     "label_meaning": explanations.label_meaning,
     "headline": explanations.headline,
-    "conviction": explanations.conviction,
     "offline_axes": explanations.OFFLINE_LIVE_AXES,
 }
 
@@ -230,17 +253,6 @@ def _gamma() -> gamma.GammaRepo:
     return _GAMMA
 
 
-def _filters(
-    ticker: str, label: str, min_score: float | None,
-    sort: str, run_id: str | None,
-) -> SignalFilters:
-    return SignalFilters(
-        ticker=ticker or None, label=label or None,
-        min_score=min_score, sort=sort or "score",
-        run_id=run_id, limit=150,
-    )
-
-
 def _safe(fn: Callable[[], _T], default: _T) -> _T:
     """Call a repo accessor; on any DB error return a default so one failing
     widget can't blank the whole page. Logged for diagnosis."""
@@ -249,107 +261,6 @@ def _safe(fn: Callable[[], _T], default: _T) -> _T:
     except Exception:
         _logger.exception("repo call failed; serving fallback")
         return default
-
-
-def _signal_notability(sig: object) -> float:
-    """Map a ``StoredSignal`` (webapp.repo.signals -> StoredSignal) to the
-    notability primitives. Real field names verified against
-    ``uoa_detector.backtest.store.StoredSignal``:
-      - premium      -> ``premium`` (Decimal, $ paid)
-      - aggressive   -> ``sweep_classification`` present OR ``is_iso`` (there is
-                        NO fill_side/at-ask field on StoredSignal)
-      - cluster_density-> ``cluster_density_score`` (0..1; 0.0 if absent)
-      - age_minutes  -> derived from ``timestamp`` vs now(UTC) (no age field)
-      - dte          -> ``dte`` (int)
-    getattr defaults keep ordering safe if any field is missing/renamed."""
-    premium_raw = getattr(sig, "premium", 0.0)
-    try:
-        premium = float(premium_raw) if premium_raw is not None else 0.0
-    except (TypeError, ValueError):
-        premium = 0.0
-    aggressive = bool(getattr(sig, "sweep_classification", None)) or bool(
-        getattr(sig, "is_iso", False),
-    )
-    ts = getattr(sig, "timestamp", None)
-    age_minutes = 0.0
-    if isinstance(ts, datetime):
-        if ts.tzinfo is None:
-            ts = ts.replace(tzinfo=UTC)  # Postgres stores naive UTC
-        age_minutes = max((datetime.now(UTC) - ts).total_seconds() / 60.0, 0.0)
-    return notability_score(
-        premium=premium,
-        aggressive=aggressive,
-        cluster_density=float(getattr(sig, "cluster_density_score", 0.0) or 0.0),
-        age_minutes=age_minutes,
-        dte=int(getattr(sig, "dte", 30) or 30),
-    )
-
-
-@app.get("/", response_class=HTMLResponse)
-def dashboard(
-    request: Request, ticker: str = "", label: str = "",
-    min_score: float | None = None, sort: str = "score", run: str = "",
-) -> HTMLResponse:
-    repo = _repo()
-    runs: list[RunInfo] = _safe(repo.runs, [])
-    # Default to the newest run (today's live flow if the worker is running,
-    # else the sample backtest). An explicit ?run= overrides.
-    run_ids = {r.run_id for r in runs}
-    active = run if run in run_ids else (runs[0].run_id if runs else None)
-    current = next((r for r in runs if r.run_id == active), None)
-    # Freshness: show a pulsing LIVE only if the newest print is recent; a
-    # frozen feed (e.g. UW down) must read STALE, not a misleading LIVE.
-    fresh, age_min = False, None
-    if current is not None and current.latest_ts is not None:
-        ts = current.latest_ts
-        if ts.tzinfo is None:
-            ts = ts.replace(tzinfo=UTC)  # Postgres stores naive UTC
-        age_min = (datetime.now(UTC) - ts).total_seconds() / 60.0
-        fresh = age_min < 15
-    flt = _filters(ticker, label, min_score, sort, active)
-    matched_raw: list[StoredSignal] = _safe(lambda: repo.signals(flt), [])
-    # Re-order the flow feed by descriptive notability (loudest/most unusual
-    # first); the SQL sort still drives the page (truncation), this only
-    # reorders the already-loaded page for the "Notable flow" section.
-    matched = sorted(
-        cast("list[object]", matched_raw), key=_signal_notability, reverse=True,
-    )
-    no_options: tuple[list[str], list[str]] = ([], [])
-    options = _safe(lambda: repo.ticker_label_options(active), no_options)
-    # Build the gamma context ONCE and reuse it for both the vol board and the
-    # existing "gamma" key (avoid a second latest() round-trip).
-    gamma_ctx: dict[str, gamma.GammaContext] = _safe(lambda: _gamma().latest(), {})
-    vol_rows: list[VolBoardRow] = _safe(lambda: build_vol_board(
-        gamma_ctx,
-        earnings={t: c.next_earnings for t, c in gamma_ctx.items()},
-        now=datetime.now(UTC).date(),
-    ), [])
-    # `total` comes from the run's own count (already loaded in runs()) — no
-    # extra round-trip. One DISTINCT query covers both filter dropdowns.
-    total = current.count if current is not None else 0
-    return templates.TemplateResponse(
-        request,
-        "dashboard.html",
-        {
-            "signals": matched,
-            "tickers": options[0],
-            "labels": options[1],
-            "total": total,
-            "shown": len(matched),
-            "runs": runs, "current": current, "run": active or "",
-            "fresh": fresh, "age_min": age_min,
-            "ticker": ticker, "label": label, "min_score": min_score,
-            "sort": sort,
-            "gamma": gamma_ctx,
-            "vol_board": vol_rows,
-            "vol_summary": vol_board_summary(vol_rows),
-            # Vol-board copy helpers (Task 7 template needs these callable).
-            "vol_structure": explanations.vol_structure,
-            "vol_read": explanations.vol_read,
-            "vol_caveat": explanations.vol_caveat,
-            **_EXPLAIN,
-        },
-    )
 
 
 # ---------------------------------------------------------------------------
@@ -468,7 +379,141 @@ def gamma_page(request: Request) -> HTMLResponse:
     # Rich-IV long-gamma rows first, then cheap-IV short-gamma, then by IV percentile.
     order = {"sell": 0, "buy": 1, "neutral": 2}
     rows.sort(key=lambda g: (order.get(g.vol_signal, 9), -(g.iv_pct or 0)))
-    return templates.TemplateResponse(request, "gamma.html", {"rows": rows, **_EXPLAIN})
+    return templates.TemplateResponse(
+        request, "gamma.html", {"rows": rows, "iv_not_sell_vol": IV_NOT_SELL_VOL, **_EXPLAIN},
+    )
+
+
+# ---------------------------------------------------------------------------
+# Alfa Board (Phase 5.2): GET / since A7, GET /alfa kept as an alias (decision P12)
+# ---------------------------------------------------------------------------
+
+_BOARD_READER: BoardSignalReader | None = None
+_BOARD_SETTINGS: BoardSettings | None = None
+
+
+def _board_reader() -> BoardSignalReader:
+    global _BOARD_READER
+    if _BOARD_READER is None:
+        _BOARD_READER = BoardSignalReader()
+    return _BOARD_READER
+
+
+def _board_settings() -> BoardSettings:
+    global _BOARD_SETTINGS
+    if _BOARD_SETTINGS is None:
+        _BOARD_SETTINGS = load_board_settings()
+    return _BOARD_SETTINGS
+
+
+_SPREAD_CUTOFF_PCT: float | None = None
+
+
+def _spread_cutoff_pct() -> float:
+    """``penalty_triggers.spread_pct_threshold`` of the live calibration profile (read only)."""
+    global _SPREAD_CUTOFF_PCT
+    if _SPREAD_CUTOFF_PCT is None:
+        _SPREAD_CUTOFF_PCT = alfa_page.load_spread_cutoff_pct()
+    return _SPREAD_CUTOFF_PCT
+
+
+_LEGACY_SCORES: LegacyScores | None = None
+
+
+def _legacy_scores() -> LegacyScores:
+    """Legacy evidence scores of the live calibration profile (read only; Phase 5.2.A4)."""
+    global _LEGACY_SCORES
+    if _LEGACY_SCORES is None:
+        _LEGACY_SCORES = alfa_page.load_live_legacy_scores()
+    return _LEGACY_SCORES
+
+
+def _load_board_profiles() -> None:
+    """Load and validate every profile value the board reads; raises on a missing or invalid file.
+
+    Runs at startup (``_lifespan``) and replaces the lazily cached values, so the
+    files are checked on every start rather than on the first page request.
+    """
+    global _BOARD_SETTINGS, _SPREAD_CUTOFF_PCT, _LEGACY_SCORES
+    settings = load_board_settings()
+    cutoff = alfa_page.load_spread_cutoff_pct()
+    legacy = alfa_page.load_live_legacy_scores()
+    _BOARD_SETTINGS, _SPREAD_CUTOFF_PCT, _LEGACY_SCORES = settings, cutoff, legacy
+
+
+def _now() -> datetime:
+    """The board page's wall clock (quote and tape ages, the R-EM1 session date); a seam for tests."""
+    return datetime.now(UTC)
+
+
+@app.get("/", response_class=HTMLResponse)
+@app.get("/alfa", response_class=HTMLResponse)
+def alfa_board(request: Request, run: str = "", gate: str = "") -> HTMLResponse:
+    """The Alfa Board: one row per (ticker, side-aware direction) over the whole selected run.
+
+    Served at ``GET /`` since Phase 5.2.A7; ``GET /alfa`` stays as an alias
+    (decision P12). Reads the database only; no Unusual Whales call (contract
+    §4.1). A failed read renders an explicit "could not read" state, never an
+    empty board. The cost gate ``Alabileceklerimi göster`` is on unless
+    ``gate=off`` (§5 A2). Each row carries its evidence strip, reason and
+    counter-argument; the combined score is only in the row's audit block
+    (§5 A4-A6). ``Bugün temiz aday yok`` renders when no row is a clean
+    candidate (R-EM1). The vol-premium board stays as a section, with the
+    R-IV1 sentence (§5 A7).
+    """
+    settings = _board_settings()
+    runs_read: list[RunInfo] | None = _safe(_repo().runs, None)
+    runs = runs_read or []
+    run_ids = {r.run_id for r in runs}
+    active = run if run in run_ids else (runs[0].run_id if runs else None)
+    current = next((r for r in runs if r.run_id == active), None)
+    prints: list[BoardPrint] | None = None if runs_read is None else []
+    if active is not None:
+        run_id = active
+        prints = _safe(lambda: _board_reader().load_run(run_id), None)
+    page = alfa_page.build_alfa_page(
+        prints,
+        settings,
+        gate_on=gate != alfa_page.GATE_OFF_PARAM,
+        spread_cutoff_pct=_spread_cutoff_pct(),
+        now=_now(),
+        quote_source=lambda symbols: alfa_page.db_quote_source(_board_reader().engine)(symbols),
+        evidence_source=lambda run_id, requests: alfa_page.db_evidence_source(_board_reader().engine)(
+            run_id, requests,
+        ),
+        legacy_scores=_legacy_scores(),
+        profile_hash_source=lambda run_id, event_ids: alfa_page.db_profile_hash_source(_board_reader().engine)(
+            run_id, event_ids,
+        ),
+        profile_resolver=alfa_page.resolve_writing_profile,
+        run_latest_ts=current.latest_ts if current is not None else None,
+    )
+    gamma_ctx: dict[str, gamma.GammaContext] = _safe(lambda: _gamma().latest(), {})
+    vol_rows: list[VolBoardRow] = _safe(lambda: build_vol_board(
+        gamma_ctx,
+        earnings={t: c.next_earnings for t, c in gamma_ctx.items()},
+        now=datetime.now(UTC).date(),
+    ), [])
+    return templates.TemplateResponse(
+        request,
+        "alfa.html",
+        {
+            "page": page,
+            "runs": runs,
+            "run": active or "",
+            "board_path": request.url.path,
+            # A live run reloads once per board refresh cadence (new prints and quotes).
+            "live_reload_seconds": (
+                settings.refresh.cadence_seconds if current is not None and current.is_live else None
+            ),
+            "vol_board": vol_rows,
+            "vol_summary": vol_board_summary(vol_rows),
+            "vol_structure": explanations.vol_structure,
+            "vol_read": explanations.vol_read,
+            "vol_caveat": explanations.vol_caveat,
+            **alfa_page.template_context(),
+        },
+    )
 
 
 @app.get("/health")
