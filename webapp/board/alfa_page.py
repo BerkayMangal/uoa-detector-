@@ -53,7 +53,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Final, Literal
@@ -141,6 +141,13 @@ ALFA_COPY: Final[Mapping[str, str]] = MappingProxyType(
         ),
         "run_label": "Çalışma",
         "summary": "{rows} satır · {prints} baskı",
+        # Board-level freshness (restores the A7-removed page badge as a plain, dated line).
+        "freshness": "Son baskı {time} ET ({date}) · {age} önce",
+        "freshness_unknown": "Son baskı zamanı bilinmiyor",
+        "age_seconds": "{n} sn",
+        "age_minutes": "{n} dk",
+        "age_hours": "{h} sa {m} dk",
+        "age_days": "{n} gün",
         "empty_run": "Bu çalışmada baskı yok.",
         "no_runs": "Henüz kayıtlı çalışma yok.",
         "load_failed": "Baskılar okunamadı. Bu, boş bir tahta demek değil.",
@@ -288,6 +295,8 @@ class AlfaPage:
     clean_candidate_count: int = 0
     session_date: date | None = None  # ET date of the run's newest print
     today: date | None = None  # ET date of the page's clock
+    newest_print_at: datetime | None = None  # the run's newest print (or signal) time
+    rendered_at: datetime | None = None  # the page's clock
 
     @property
     def no_clean_candidate(self) -> bool:
@@ -315,6 +324,35 @@ class AlfaPage:
     @property
     def summary(self) -> str:
         return ALFA_COPY["summary"].format(rows=len(self.rows), prints=self.print_count)
+
+    @property
+    def freshness(self) -> str:
+        """The newest print's ET time, date and age; never an implied "live" claim."""
+        if self.newest_print_at is None or self.rendered_at is None:
+            return ALFA_COPY["freshness_unknown"]
+        newest = _aware(self.newest_print_at)
+        local = newest.astimezone(_ET)
+        return ALFA_COPY["freshness"].format(
+            time=local.strftime("%H:%M"),
+            date=local.date().isoformat(),
+            age=age_text(_aware(self.rendered_at) - newest),
+        )
+
+
+def _aware(moment: datetime) -> datetime:
+    return moment.replace(tzinfo=UTC) if moment.tzinfo is None else moment
+
+
+def age_text(delta: timedelta) -> str:
+    """A Turkish age: seconds under a minute, minutes under an hour, then hours, then days."""
+    seconds = max(0, int(delta.total_seconds()))
+    if seconds < 60:
+        return ALFA_COPY["age_seconds"].format(n=seconds)
+    if seconds < 3600:
+        return ALFA_COPY["age_minutes"].format(n=seconds // 60)
+    if seconds < 86400:
+        return ALFA_COPY["age_hours"].format(h=seconds // 3600, m=(seconds % 3600) // 60)
+    return ALFA_COPY["age_days"].format(n=seconds // 86400)
 
 
 def side_counts_text(row: BoardRow) -> str:
@@ -433,8 +471,7 @@ def is_clean_candidate(
 
 
 def _et_date(moment: datetime) -> date:
-    aware = moment.replace(tzinfo=UTC) if moment.tzinfo is None else moment
-    return aware.astimezone(_ET).date()
+    return _aware(moment).astimezone(_ET).date()
 
 
 def _view_order(view: AlfaRowView) -> tuple[int, int, int, Decimal, str, str]:
@@ -589,6 +626,8 @@ def build_alfa_page(
         clean_candidate_count=sum(1 for v in ordered if v.clean_candidate),
         session_date=_et_date(newest) if newest is not None else None,
         today=_et_date(moment),
+        newest_print_at=newest,
+        rendered_at=moment,
     )
 
 

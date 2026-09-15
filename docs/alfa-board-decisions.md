@@ -324,8 +324,12 @@ Each key was genuinely missing and is commented in `profiles/board_v1.yaml`.
   the live worker (fix7).
 - **Removed with the old dashboard (A7):** its 30 s reload and the page-level
   LIVE/STALE badge. The board reloads every `refresh.cadence_seconds`.
-  Per-row quote ages remain. A board-level freshness line is restored in a
-  follow-up fix if it is missing.
+  Per-row quote ages remain.
+- **Board freshness line (fix8).** It replaces the badge with a plain dated
+  sentence: `Son baskı HH:MM ET (YYYY-MM-DD) · N dk önce`. It is not a
+  LIVE/STALE verdict, because a quiet ticker set can go minutes without a
+  print and that is not staleness.
+  - **Undo:** remove the `data-freshness` span and `AlfaPage.freshness`.
 
 ### Registry (deferred, each with a reason in the fix commit bodies)
 

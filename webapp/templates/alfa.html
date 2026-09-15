@@ -53,7 +53,7 @@
   <div class="rounded-lg border border-gray-800 bg-gray-900/40 px-4 py-3 text-sm text-gray-400"
        data-state="empty-run">{{ copy.empty_run }}</div>
   {% else %}
-  <p class="text-sm text-gray-400 mb-3" data-summary>{{ page.summary }}</p>
+  <p class="text-sm text-gray-400 mb-3" data-summary>{{ page.summary }} · <span data-freshness>{{ page.freshness }}</span></p>
   {% if page.quotes_failed %}
   <div class="rounded-lg border border-dashed border-amber-700/60 bg-amber-900/10 px-4 py-2 mb-3 text-sm text-amber-200"
        data-state="quotes-failed">{{ copy.quotes_failed }}</div>
