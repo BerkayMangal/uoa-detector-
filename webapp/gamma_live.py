@@ -143,6 +143,28 @@ def _realized_vol(resp: object, *, window: int = 21) -> float | None:
     return math.sqrt(var) * math.sqrt(252)
 
 
+def _latest_iv_row(iv_data: object) -> dict[str, object] | None:
+    """Newest ``/api/stock/{t}/iv-rank`` row by ``date`` (Phase 5.2.0 hotfix).
+
+    The live payload lists the last ~5 sessions OLDEST first (probed
+    2026-09-15: ``data[0]`` was 2026-09-09, ``data[-1]`` 2026-09-15), so
+    taking ``data[0]`` served a six-day-old close, IV rank and ``as_of``.
+    Undated rows are ignored because their freshness is unknown; a bare dict
+    payload is returned as-is.
+    """
+    if isinstance(iv_data, dict):
+        return iv_data
+    if not isinstance(iv_data, list):
+        return None
+    dated = [
+        row for row in iv_data
+        if isinstance(row, dict) and isinstance(row.get("date"), str) and row["date"]
+    ]
+    if not dated:
+        return None
+    return max(dated, key=lambda row: str(row["date"]))
+
+
 async def fetch_one(
     client: UnusualWhalesClient,
     ticker: str,
@@ -156,7 +178,7 @@ async def fetch_one(
         return None
     rows = gex.get("data") if isinstance(gex, dict) else None
     iv_data = ivr.get("data") if isinstance(ivr, dict) else None
-    iv0 = iv_data[0] if isinstance(iv_data, list) and iv_data else iv_data
+    iv0 = _latest_iv_row(iv_data)
     if not isinstance(rows, list) or not isinstance(iv0, dict):
         return None
     ctx = context_from_uw(rows, iv0)
