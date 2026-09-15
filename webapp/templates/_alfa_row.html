@@ -1,6 +1,7 @@
-{# One Alfa Board row: every print of one (ticker, side-aware direction) in the run, plus the
-   tradability chip of its dominant contract (A2). Copy comes only from the frozen
-   dictionaries passed by alfa_page.template_context(). #}
+{# One Alfa Board row: every print of one (ticker, side-aware direction) in the run, the
+   tradability chip of its dominant contract (A2), the evidence word, strength label and
+   evidence strip (A4), and the Denetim block, the only place the combined score appears
+   (R-EV2). Copy comes only from the frozen dictionaries passed by alfa_page.template_context(). #}
 {% set is_up = row.direction == 'up' %}
 {% set dir_color = '#10b981' if is_up else '#ef4444' %}
 {% set chip_style = {
@@ -8,6 +9,13 @@
   'narrow': 'border-amber-600 text-amber-300',
   'untradable': 'border-red-700 text-red-300',
   'no_quote': 'border-dashed border-gray-600 text-gray-400 opacity-80',
+} %}
+{% set evidence_style = {
+  'supporting': 'border-emerald-700 text-emerald-300',
+  'against': 'border-red-700 text-red-300',
+  'neutral': 'border-gray-700 text-gray-300',
+  'unknown': 'border-dashed border-gray-600 text-gray-500 opacity-70',
+  'out_of_scope': 'border-dashed border-gray-600 text-gray-500 opacity-70',
 } %}
 <article class="rounded-lg border border-gray-800 bg-gray-900/40 px-4 py-3"
          data-row data-ticker="{{ row.ticker }}" data-direction="{{ row.direction }}">
@@ -21,6 +29,18 @@
       <span class="text-white" data-print-count>{{ row.print_count }}</span></span>
     <span class="text-sm"><span class="text-gray-400">{{ copy.col_contracts }}</span>
       <span class="text-white" data-distinct-contracts>{{ row.distinct_contracts }}</span></span>
+  </div>
+
+  <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm" data-evidence>
+    <span class="font-semibold text-gray-100 tip" title="{{ evidence_hover }}" data-evidence-word>{{ view.evidence.word }}</span>
+    <span class="px-2 py-0.5 rounded bg-gray-800 text-xs font-semibold text-gray-200"
+          data-strength="{{ view.strength_key }}">{{ view.strength_text }}</span>
+  </div>
+  <div class="mt-1 flex flex-wrap gap-1.5 text-xs" data-evidence-strip>
+    {% for fam in view.evidence.families %}
+    <span class="px-2 py-0.5 rounded border {{ evidence_style[fam.state] }}"
+          data-family="{{ fam.family }}" data-family-state="{{ fam.state }}"{% if fam.source %} title="{{ fam.source }}"{% endif %}>{{ fam.text }}{% if fam.dimmed %} · <span data-unknown-not-clean>{{ unknown_not_clean }}</span>{% endif %}</span>
+    {% endfor %}
   </div>
 
   <div class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm" data-chip="{{ view.chip.state }}">
@@ -90,6 +110,23 @@
           {% endfor %}
         </tbody>
       </table>
+    </div>
+  </details>
+
+  <details class="mt-2 text-sm" data-audit>
+    <summary class="cursor-pointer text-gray-400">{{ copy.audit_summary }}</summary>
+    <div class="mt-2 space-y-1 text-xs text-gray-400">
+      <p data-audit-source>{{ view.audit.source_text }}</p>
+      <p class="text-gray-200" data-audit-score>{{ view.audit.score_text }}</p>
+      <p data-audit-pre>{{ view.audit.pre_text }}</p>
+      {% if view.audit.inputs %}
+      <p class="text-gray-500">{{ copy.audit_inputs }}</p>
+      <ul class="flex flex-wrap gap-x-4 gap-y-0.5" data-audit-inputs>
+        {% for label, value in view.audit.inputs %}
+        <li>{{ label }}: <span class="text-gray-200">{{ value }}</span></li>
+        {% endfor %}
+      </ul>
+      {% endif %}
     </div>
   </details>
 </article>

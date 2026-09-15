@@ -50,6 +50,10 @@
   <div class="rounded-lg border border-dashed border-amber-700/60 bg-amber-900/10 px-4 py-2 mb-3 text-sm text-amber-200"
        data-state="quotes-failed">{{ copy.quotes_failed }}</div>
   {% endif %}
+  {% if page.evidence_failed %}
+  <div class="rounded-lg border border-dashed border-amber-700/60 bg-amber-900/10 px-4 py-2 mb-3 text-sm text-amber-200"
+       data-state="evidence-failed">{{ copy.evidence_failed }}</div>
+  {% endif %}
   {% for section in page.sections %}
   <section class="mb-6" data-section="{{ section.key }}">
     <h3 class="text-sm font-semibold text-gray-300 mb-2">{{ section_heading(section) }}</h3>

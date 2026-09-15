@@ -244,13 +244,19 @@ def test_alfa_read_failure_is_never_an_empty_board(
     assert 'data-state="no-runs"' not in body
 
 
-def test_alfa_does_not_show_the_combined_score(board: tuple[str, TestClient]) -> None:
+_AUDIT_BLOCK = re.compile(r"<details[^>]*data-audit[^>]*>.*?</details>", re.S)
+
+
+def test_alfa_shows_the_combined_score_only_in_the_audit_block(board: tuple[str, TestClient]) -> None:
+    """Phase 5.2.A4 (R-EV2) moved the score into the row's Denetim block; it stays off the face."""
     url, client = board
     _seed(url, _LIVE, [_Spec("x1", "SPY", "call", "760", "123000", "at_ask", score=0.7777)])
     body = client.get("/alfa").text
     assert "data-row" in body
     assert "0.7777" not in body
-    assert "0.78" not in body
+    assert "0.78" not in _AUDIT_BLOCK.sub("", body)
+    (audit,) = _AUDIT_BLOCK.findall(body)
+    assert "Birleşik skor (denetim, sınırsız ölçek): 0.78" in audit
 
 
 def test_alfa_makes_zero_unusual_whales_calls(

@@ -1,7 +1,7 @@
-"""The ``/alfa`` page view model and its frozen Turkish copy (Phase 5.2.A1, A2).
+"""The ``/alfa`` page view model and its frozen Turkish copy (Phase 5.2.A1, A2, A4).
 
-Contract: ``docs/phase-5.2-alfa-board-acceptance.md`` §4.1 ("Render"), §5 A1
-and §5 A2 ("Gate"); decisions P12, P15 and P16.
+Contract: ``docs/phase-5.2-alfa-board-acceptance.md`` §4.1 ("Render"), §5 A1,
+§5 A2 ("Gate") and §5 A4; decisions P12, P15 and P16.
 
 - A1: one row per (ticker, direction) over the whole run.
 - A2: each row carries the tradability chip of its dominant contract. The
@@ -10,12 +10,22 @@ and §5 A2 ("Gate"); decisions P12, P15 and P16.
     ``İŞLENMEZ``, each with its reason;
   - off: every row in one list, each with its chip.
   Rows are never hidden: every row appears in exactly one section.
+- A4: each row carries its evidence strip (``webapp/board/evidence.py``), the
+  derived evidence word with the hover ``Kâr olasılığı DEĞİL.``, and the
+  strength label through the R-UN2 guard.
+  - Inside every section rows sort by L desc, A asc, U asc, then total premium
+    desc (then ticker and direction, for a stable order).
+  - The combined score is never on the row face, on a chip, or a sort key. It
+    appears only in the row's ``Denetim`` block, next to its inputs, as
+    ``Birleşik skor (denetim, sınırsız ölçek): 0.xx``. It is not clamped.
+  - A failed evidence read is flagged on the page, and every family reads
+    ``bilinmiyor``: unknown, never clean.
 
 The template only shows strings from the frozen dictionaries here and in
-``direction.py``, ``aggregate.py`` and ``tradability.py`` (rule R-WD1).
-Summary and chip lines are formatted from frozen templates with row values;
-there is no free text. Quotes come from the database through a quote source;
-this module never calls Unusual Whales.
+``direction.py``, ``aggregate.py``, ``tradability.py`` and ``evidence.py``
+(rule R-WD1). Summary, chip and audit lines are formatted from frozen templates
+with row values; there is no free text. Quotes and evidence come from the
+database through injected sources; this module never calls Unusual Whales.
 """
 
 from __future__ import annotations
@@ -29,8 +39,20 @@ from typing import TYPE_CHECKING, Final, Literal
 
 from uoa_detector.calibration import load_profile
 from webapp.board.aggregate import POSITION_READ_LABELS, BoardRow, build_board_rows
-from webapp.board.copy_tr import GATE_LABEL
+from webapp.board.copy_tr import EVIDENCE_HOVER, GATE_LABEL, UNKNOWN_NOT_CLEAN
 from webapp.board.direction import DIRECTION_LABELS, FALLBACK_MARKER
+from webapp.board.evidence import (
+    EMPTY_INPUTS,
+    LegacyScores,
+    RowEvidence,
+    build_row_evidence,
+    evidence_sort_key,
+    guard_strength,
+    load_legacy_scores,
+    read_evidence_inputs,
+    request_for,
+    strength_label,
+)
 from webapp.board.quotes import dominant_symbol, read_board_quotes
 from webapp.board.tradability import (
     CHIP_COPY,
@@ -42,9 +64,12 @@ from webapp.board.tradability import (
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Mapping, Sequence
+    from decimal import Decimal
 
     from sqlalchemy.engine import Engine
 
+    from uoa_detector.backtest.store import StoredSignal
+    from webapp.board.evidence import EvidenceInputs, EvidenceRequest, StrengthKey
     from webapp.board.settings import BoardSettings
     from webapp.board.signals import BoardPrint
     from webapp.board.tradability import DepthView, QuoteView
@@ -52,12 +77,14 @@ if TYPE_CHECKING:
     QuoteSource = Callable[
         [Sequence[str]], tuple[Mapping[str, QuoteView], Mapping[str, DepthView]]
     ]
+    EvidenceSource = Callable[[str, Sequence[EvidenceRequest]], EvidenceInputs]
 
 _logger = logging.getLogger(__name__)
 
 SectionKey = Literal["main", "no_quote", "untradable", "all"]
 
-# The calibration profile the live worker scores with; only its spread cutoff is read.
+# The calibration profile the live worker scores with; only its spread cutoff
+# and its legacy evidence scores are read.
 LIVE_CALIBRATION_PROFILE: Final = Path("profiles/v5_default.yaml")
 GATE_OFF_PARAM: Final = "off"
 
@@ -103,6 +130,32 @@ ALFA_COPY: Final[Mapping[str, str]] = MappingProxyType(
         "section_count": "{title} ({count})",
         "main_empty": "Kapıdan geçen satır yok.",
         "quotes_failed": "Kotasyonlar okunamadı; maliyet hücreleri bilinmiyor.",
+        # A4: evidence and the audit block.
+        "evidence_failed": "Kanıt tabloları okunamadı; aileler bilinmiyor, bu temiz demek değil.",
+        "audit_summary": "Denetim",
+        "audit_source": "Kaynak baskı: {event_id} (baskın sözleşmenin en büyük baskısı)",
+        "audit_score": "Birleşik skor (denetim, sınırsız ölçek): {score}",
+        "audit_pre": "Ceza öncesi birleşik skor: {score}",
+        "audit_inputs": "Skorun girdileri",
+        "audit_record_missing": "kayıt okunamadı",
+    },
+)
+
+# StoredSignal field → audit label, in display order. M27's score is the
+# previous session's OI change, not this print (contract §5 A3, decision P10).
+AUDIT_INPUT_LABELS: Final[Mapping[str, str]] = MappingProxyType(
+    {
+        "uoa_score": "Akış baskısı (UOA)",
+        "convexity_score": "Konveksite",
+        "event_score": "Olay takvimi",
+        "gamma_score": "Dealer gamma",
+        "price_confirmation_score": "Fiyat teyidi",
+        "sector_confirmation_score": "Sektör",
+        "time_of_day_weight": "Gün içi zaman ağırlığı",
+        "cluster_density_score": "Küme yoğunluğu",
+        "relative_premium_score": "Göreli prim",
+        "dte_multiplier_applied": "Vade çarpanı",
+        "opening_closing_score": "önceki seans OI değişimi (bu baskı değil)",
     },
 )
 
@@ -139,11 +192,25 @@ class ChipText:
 
 
 @dataclass(frozen=True)
+class AuditView:
+    """The ``Denetim`` block: the only place the combined score is shown (R-EV2)."""
+
+    source_text: str
+    score_text: str
+    pre_text: str
+    inputs: tuple[tuple[str, str], ...]  # (label, value)
+
+
+@dataclass(frozen=True)
 class AlfaRowView:
     row: BoardRow
     symbol: str | None  # the dominant contract's quote symbol
     chip: TradabilityRead
     chip_text: ChipText
+    evidence: RowEvidence
+    strength_key: StrengthKey  # through the R-UN2 guard
+    strength_text: str  # through the R-UN2 guard
+    audit: AuditView
 
 
 @dataclass(frozen=True)
@@ -162,6 +229,7 @@ class AlfaPage:
     load_failed: bool
     gate_on: bool = True
     quotes_failed: bool = False
+    evidence_failed: bool = False
 
     @property
     def summary(self) -> str:
@@ -195,6 +263,11 @@ def _usd(value: float) -> str:
 def _share_pct(value: float) -> str:
     """Two decimals, trailing zeros dropped: a 1-lot share is usually below 1% of capital."""
     return f"{round(value, 2):g}"
+
+
+def _score(value: float | None) -> str:
+    """Two decimals, sign kept, never clamped: the score is not a 0-1 gauge."""
+    return ALFA_COPY["unknown"] if value is None else f"{value:.2f}"
 
 
 def chip_text(read: TradabilityRead) -> ChipText:
@@ -237,6 +310,33 @@ def chip_text(read: TradabilityRead) -> ChipText:
     )
 
 
+def build_audit(event_id: str | None, signal: StoredSignal | None) -> AuditView:
+    """The ``Denetim`` block of a row's source print (the largest print of the dominant contract)."""
+    source = ALFA_COPY["audit_source"].format(event_id=event_id or ALFA_COPY["unknown"])
+    if signal is None:
+        missing = ALFA_COPY["audit_record_missing"]
+        return AuditView(
+            source_text=source,
+            score_text=ALFA_COPY["audit_score"].format(score=missing),
+            pre_text=ALFA_COPY["audit_pre"].format(score=missing),
+            inputs=(),
+        )
+    return AuditView(
+        source_text=source,
+        score_text=ALFA_COPY["audit_score"].format(score=_score(signal.combined_score_post_penalty)),
+        pre_text=ALFA_COPY["audit_pre"].format(score=_score(signal.combined_score_pre_penalty)),
+        inputs=tuple(
+            (label, _score(getattr(signal, name))) for name, label in AUDIT_INPUT_LABELS.items()
+        ),
+    )
+
+
+def _view_order(view: AlfaRowView) -> tuple[int, int, int, Decimal, str, str]:
+    """L desc, A asc, U asc, total premium desc; ticker and direction only break exact ties."""
+    supporting, against, unknown, premium = evidence_sort_key(view.evidence.counts, view.row.total_premium)
+    return supporting, against, unknown, premium, view.row.ticker, view.row.direction
+
+
 def _sections(views: tuple[AlfaRowView, ...], gate_on: bool) -> tuple[AlfaSection, ...]:
     if not gate_on:
         return (AlfaSection(key="all", title=ALFA_COPY["section_all"], views=views),)
@@ -261,17 +361,22 @@ def build_alfa_page(
     spread_cutoff_pct: float | None = None,
     now: datetime | None = None,
     quote_source: QuoteSource | None = None,
+    evidence_source: EvidenceSource | None = None,
+    legacy_scores: LegacyScores | None = None,
 ) -> AlfaPage:
     """The page model; ``prints=None`` means the database read failed.
 
     Without a quote source every chip reads ``kotasyon yok``. A failed quote
     read sets ``quotes_failed`` and leaves every chip unknown, never clean.
+    Without an evidence source the telemetry families read as legacy (and
+    ``bilinmiyor`` without legacy scores). A failed evidence read sets
+    ``evidence_failed`` and every family reads ``bilinmiyor``.
     """
     if prints is None:
         return AlfaPage(
             rows=(), views=(), sections=(), print_count=0, load_failed=True, gate_on=gate_on,
         )
-    rows = tuple(build_board_rows(prints, settings.aggregation))
+    rows = build_board_rows(prints, settings.aggregation)
     symbols = tuple(dominant_symbol(r) for r in rows)
     wanted = [s for s in symbols if s is not None]
     quotes: Mapping[str, QuoteView] = {}
@@ -283,9 +388,19 @@ def build_alfa_page(
         except Exception:
             _logger.exception("alfa board: quote read failed; chips read kotasyon yok")
             quotes_failed = True
+    requests = [request_for(r) for r in rows]
+    inputs: EvidenceInputs = EMPTY_INPUTS
+    evidence_failed = False
+    if evidence_source is not None and requests:
+        try:
+            inputs = evidence_source(prints[0].run_id, requests)
+        except Exception:
+            _logger.exception("alfa board: evidence read failed; every family reads bilinmiyor")
+            evidence_failed = True
+    signals = {p.event_id: p.signal for p in prints}
     moment = now if now is not None else datetime.now(UTC)
     views: list[AlfaRowView] = []
-    for row, symbol in zip(rows, symbols, strict=True):
+    for row, symbol, request in zip(rows, symbols, requests, strict=True):
         chip = assess_tradability(
             row.ticker,
             quotes.get(symbol) if symbol is not None else None,
@@ -296,16 +411,41 @@ def build_alfa_page(
             sizing=settings.sizing,
             now=moment,
         )
-        views.append(AlfaRowView(row=row, symbol=symbol, chip=chip, chip_text=chip_text(chip)))
-    frozen_views = tuple(views)
+        signal = signals.get(request.event_id)
+        evidence = build_row_evidence(
+            row,
+            settings=settings,
+            now=moment,
+            signal=signal,
+            telemetry=inputs.telemetry.get(request.event_id),
+            tape=inputs.tapes.get((request.ticker, request.trade_date)),
+            ticker_info=inputs.infos.get(request.ticker),
+            legacy_scores=legacy_scores,
+            unread=evidence_failed,
+        )
+        strength = guard_strength(evidence.strength, evidence.counts, settings.evidence)
+        views.append(
+            AlfaRowView(
+                row=row,
+                symbol=symbol,
+                chip=chip,
+                chip_text=chip_text(chip),
+                evidence=evidence,
+                strength_key=strength,
+                strength_text=strength_label(strength, evidence.counts, settings.evidence),
+                audit=build_audit(request.event_id, signal),
+            ),
+        )
+    ordered = tuple(sorted(views, key=_view_order))
     return AlfaPage(
-        rows=rows,
-        views=frozen_views,
-        sections=_sections(frozen_views, gate_on),
+        rows=tuple(v.row for v in ordered),
+        views=ordered,
+        sections=_sections(ordered, gate_on),
         print_count=len(prints),
         load_failed=False,
         gate_on=gate_on,
         quotes_failed=quotes_failed,
+        evidence_failed=evidence_failed,
     )
 
 
@@ -318,9 +458,23 @@ def db_quote_source(engine: Engine) -> QuoteSource:
     return _source
 
 
+def db_evidence_source(engine: Engine) -> EvidenceSource:
+    """An evidence source reading telemetry, the net-premium tape and ticker info only."""
+
+    def _source(run_id: str, requests: Sequence[EvidenceRequest]) -> EvidenceInputs:
+        return read_evidence_inputs(engine, run_id, requests)
+
+    return _source
+
+
 def load_spread_cutoff_pct(profile_path: Path = LIVE_CALIBRATION_PROFILE) -> float:
     """``penalty_triggers.spread_pct_threshold`` of the live calibration profile (read only)."""
     return load_profile(profile_path).penalty_triggers.spread_pct_threshold
+
+
+def load_live_legacy_scores(profile_path: Path = LIVE_CALIBRATION_PROFILE) -> LegacyScores:
+    """Legacy evidence scores of the live calibration profile (read only)."""
+    return load_legacy_scores(profile_path)
 
 
 def template_context() -> dict[str, object]:
@@ -339,4 +493,6 @@ def template_context() -> dict[str, object]:
         "gate_label": GATE_LABEL,
         "gate_off_param": GATE_OFF_PARAM,
         "section_heading": section_heading,
+        "evidence_hover": EVIDENCE_HOVER,
+        "unknown_not_clean": UNKNOWN_NOT_CLEAN,
     }

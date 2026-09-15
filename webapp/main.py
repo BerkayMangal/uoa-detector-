@@ -47,6 +47,7 @@ if TYPE_CHECKING:
     from starlette.types import ASGIApp, Receive, Scope, Send
 
     from uoa_detector.backtest.store import StoredSignal
+    from webapp.board.evidence import LegacyScores
     from webapp.board.signals import BoardPrint
 
 _logger = logging.getLogger(__name__)
@@ -517,6 +518,17 @@ def _spread_cutoff_pct() -> float:
     return _SPREAD_CUTOFF_PCT
 
 
+_LEGACY_SCORES: LegacyScores | None = None
+
+
+def _legacy_scores() -> LegacyScores:
+    """Legacy evidence scores of the live calibration profile (read only; Phase 5.2.A4)."""
+    global _LEGACY_SCORES
+    if _LEGACY_SCORES is None:
+        _LEGACY_SCORES = alfa_page.load_live_legacy_scores()
+    return _LEGACY_SCORES
+
+
 @app.get("/alfa", response_class=HTMLResponse)
 def alfa_board(request: Request, run: str = "", gate: str = "") -> HTMLResponse:
     """One row per (ticker, side-aware direction) over the whole selected run.
@@ -524,6 +536,8 @@ def alfa_board(request: Request, run: str = "", gate: str = "") -> HTMLResponse:
     Reads the database only; no Unusual Whales call (contract §4.1). A failed
     read renders an explicit "could not read" state, never an empty board. The
     cost gate ``Alabileceklerimi göster`` is on unless ``gate=off`` (§5 A2).
+    Each row carries its evidence strip; the combined score is only in the
+    row's audit block (§5 A4).
     """
     settings = _board_settings()
     runs_read: list[RunInfo] | None = _safe(_repo().runs, None)
@@ -541,6 +555,10 @@ def alfa_board(request: Request, run: str = "", gate: str = "") -> HTMLResponse:
         spread_cutoff_pct=_spread_cutoff_pct(),
         now=datetime.now(UTC),
         quote_source=lambda symbols: alfa_page.db_quote_source(_board_reader().engine)(symbols),
+        evidence_source=lambda run_id, requests: alfa_page.db_evidence_source(_board_reader().engine)(
+            run_id, requests,
+        ),
+        legacy_scores=_legacy_scores(),
     )
     return templates.TemplateResponse(
         request,

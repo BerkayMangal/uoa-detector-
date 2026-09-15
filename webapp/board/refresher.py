@@ -1,7 +1,7 @@
-"""Alfa Board refresher: quotes, exit depth, net-premium tape, ticker info (Phase 5.2.A2, A3).
+"""Alfa Board refresher: quotes, exit depth, net-premium tape, ticker info (Phase 5.2.A2-A4).
 
 Contract: ``docs/phase-5.2-alfa-board-acceptance.md`` §4.1 ("Board refresher"),
-§4.4 (request budget), §5 A2 and §5 A3; decisions P16 and P17.
+§4.4 (request budget), §5 A2, §5 A3 and §5 A4; decisions P16 and P17.
 
 One cycle runs every ``refresh.cadence_seconds`` during regular trading hours:
 
@@ -14,7 +14,9 @@ One cycle runs every ``refresh.cadence_seconds`` during regular trading hours:
    One call per underlying, with at most ``refresh.max_symbols_per_request``
    symbols per call.
 3. Exit depth comes from ``/api/option-contract/{symbol}/flow?limit=1``, for
-   the dominant contracts of the top ``refresh.exit_depth_top_k`` rows.
+   the dominant contracts of the top ``refresh.exit_depth_top_k`` rows in the
+   board's order (A4: lehte desc, aleyhte asc, bilinmiyor asc, total premium
+   desc). If the evidence tables cannot be read, total premium order is used.
 4. A3: the net-premium tape, one ``/api/stock/{ticker}/net-prem-ticks`` call per
    board ticker (``webapp/board/netprem.py``).
 5. A3: ticker info, one ``/api/stock/{ticker}/info`` call per board ticker with
@@ -66,6 +68,13 @@ from uoa_detector.sources.unusual_whales.client import (
 )
 from webapp.board.aggregate import build_board_rows
 from webapp.board.db import make_engine
+from webapp.board.evidence import (
+    LegacyScores,
+    build_row_evidence,
+    evidence_sort_key,
+    read_evidence_inputs,
+    request_for,
+)
 from webapp.board.netprem import ensure_netprem_tables, fetch_net_prem_ticks, upsert_tape
 from webapp.board.quotes import (
     contract_symbol,
@@ -95,6 +104,7 @@ if TYPE_CHECKING:
     from uoa_detector.calibration.profile import UnusualWhalesSettings
     from webapp.board.aggregate import BoardRow
     from webapp.board.settings import BoardSettings
+    from webapp.board.signals import BoardPrint
     from webapp.journal import TradeRow
 
 _logger = logging.getLogger(__name__)
@@ -257,6 +267,49 @@ def _plan(
     return plan
 
 
+def board_order(
+    engine: Engine,
+    settings: BoardSettings,
+    run_id: str,
+    rows: Sequence[BoardRow],
+    prints: Sequence[BoardPrint],
+    *,
+    legacy_scores: LegacyScores | None,
+    now: datetime,
+) -> list[BoardRow]:
+    """Rows in the board's evidence order; total premium order when the evidence cannot be read."""
+    if not rows:
+        return []
+    requests = [request_for(row) for row in rows]
+    try:
+        inputs = read_evidence_inputs(engine, run_id, requests)
+    except Exception:
+        _logger.warning(
+            "board refresher: evidence tables unreadable; top-K depth keeps total premium order",
+            exc_info=True,
+        )
+        return list(rows)
+    signals = {p.event_id: p.signal for p in prints}
+    keys = [
+        evidence_sort_key(
+            build_row_evidence(
+                row,
+                settings=settings,
+                now=now,
+                signal=signals.get(request.event_id),
+                telemetry=inputs.telemetry.get(request.event_id),
+                tape=inputs.tapes.get((request.ticker, request.trade_date)),
+                ticker_info=inputs.infos.get(request.ticker),
+                legacy_scores=legacy_scores,
+            ).counts,
+            row.total_premium,
+        )
+        for row, request in zip(rows, requests, strict=True)
+    ]
+    order = sorted(range(len(rows)), key=lambda i: (keys[i], rows[i].ticker, rows[i].direction))
+    return [rows[i] for i in order]
+
+
 def _warn_soft_cap(soft_cap: SoftCap, cap: int | None, what: str) -> None:
     _logger.warning(
         "board refresher: daily request count %s reached the soft cap %s; %s paused",
@@ -273,11 +326,13 @@ async def run_quotes_cycle(
     journal: OpenTrades,
     soft_cap: SoftCap,
     clock: Callable[[], datetime],
+    legacy_scores: LegacyScores | None = None,
 ) -> CycleReport:
     """One quotes-and-depth cycle. Daily-limit and auth errors propagate."""
     now = clock()
     run_id = f"{_LIVE_RUN_PREFIX}{now.date().isoformat()}"
-    rows = build_board_rows(reader.load_run(run_id), settings.aggregation)
+    prints = reader.load_run(run_id)
+    rows = build_board_rows(prints, settings.aggregation)
     plan = _plan(journal_legs(journal.list(status=_OPEN_STATUS), now.date()), signal_legs(rows))
     refresh = settings.refresh
     requests = quotes_written = depths_written = degraded = 0
@@ -302,10 +357,11 @@ async def run_quotes_cycle(
                 continue
             quotes_written += upsert_quotes(engine, fetch.quotes, fetched_at=clock())
 
+    ranked = board_order(engine, settings, run_id, rows, prints, legacy_scores=legacy_scores, now=now)
     top_symbols = list(
         dict.fromkeys(
             symbol
-            for symbol in (dominant_symbol(row) for row in rows[: refresh.exit_depth_top_k])
+            for symbol in (dominant_symbol(row) for row in ranked[: refresh.exit_depth_top_k])
             if symbol is not None
         ),
     )
@@ -402,6 +458,7 @@ async def board_refresh_loop(
     """Refresh quotes, exit depth, the tape and ticker info until cancelled. Runs under ``_supervise``."""
     profile = load_profile(profile_path)
     settings = load_board_settings(board_profile_path)
+    legacy_scores = LegacyScores.from_profile(profile)
     refresh = settings.refresh
     now_fn: Callable[[], datetime] = clock or (lambda: datetime.now(UTC))
     pause: Callable[[float], Awaitable[None]] = sleep or asyncio.sleep
@@ -437,6 +494,7 @@ async def board_refresh_loop(
                 report = await run_quotes_cycle(
                     client, engine, settings,
                     reader=reader, journal=journal, soft_cap=soft_cap, clock=now_fn,
+                    legacy_scores=legacy_scores,
                 )
                 tape = await run_tape_cycle(
                     client, engine, tickers=report.tickers, soft_cap=soft_cap, clock=now_fn,
