@@ -35,7 +35,7 @@ from starlette.datastructures import Headers
 from starlette.responses import PlainTextResponse
 
 from webapp import explanations, gamma, journal, pricing
-from webapp.board import alfa_page, cards
+from webapp.board import alfa_page, cards, decision_ledger, fills, outcomes
 from webapp.board.copy_tr import IV_NOT_SELL_VOL
 from webapp.board.evidence import request_for
 from webapp.board.refresher import board_refresh_loop
@@ -292,6 +292,9 @@ def journal_page(request: Request) -> HTMLResponse:
             "stats": journal.aggregate(trades),
             "pnl": journal.option_pnl_usd,
             "excess": journal.directional_excess,
+            # Phase 5.2.C3: the fill form on a trade that came from a board card.
+            **_journal_fill_context(trades),
+            **fills.template_context(),
             **_EXPLAIN,
         },
     )
@@ -751,6 +754,260 @@ def alfa_card(
         params["gate"] = alfa_page.GATE_OFF_PARAM
     # The target is built here, never from a client value: no open redirect.
     return RedirectResponse(f"/?{urlencode(params)}", status_code=303)
+
+
+# ---------------------------------------------------------------------------
+# Fill capture (Phase 5.2.C3; docs/phase-5.2-decision-cards-acceptance.md §5)
+# ---------------------------------------------------------------------------
+
+_FILLS: fills.FillRepo | None = None
+_NO_FILLS: tuple[fills.Fill, ...] = ()
+
+
+def _fill_repo() -> fills.FillRepo:
+    """The append-only fill repository, bound to the board reader's engine."""
+    global _FILLS
+    engine = _board_reader().engine
+    if _FILLS is None or _FILLS.engine is not engine:
+        _FILLS = fills.FillRepo(engine)
+    return _FILLS
+
+
+def _assumed_quote(card: cards.DecisionCard) -> fills.AssumedQuote | None:
+    """The quote frozen into ``card``, or ``None`` when its snapshot holds no usable pair.
+
+    Always read on the server from the card itself (contract §5). A client value
+    could not be trusted here: the whole point of a fill record is to measure the
+    board's own cost assumption, and an assumption the client may rewrite
+    measures nothing.
+    """
+    return _safe(lambda: fills.assumed_quote_from_card(card.card), None)
+
+
+def _journal_fill_context(trades: Sequence[journal.TradeRow]) -> dict[str, object]:
+    """The decision cards linked onto these trades, with their quotes and fills.
+
+    Two reads for the whole page, never one per trade, and both wrapped: a
+    database without the ``alfa_`` tables (the journal predates the board) leaves
+    the journal exactly as it was.
+    """
+    empty: Mapping[str, cards.DecisionCard] = {}
+    linked = _safe(
+        lambda: cards.cards_for_trades(_board_reader().engine, [t.id for t in trades]), empty,
+    )
+    if not linked:
+        return {"fill_cards": empty, "fill_quotes": {}, "fill_rows": {}}
+    rows: dict[str, list[fills.Fill]] = {card.id: [] for card in linked.values()}
+    # Filtered in SQL, not in Python: a global read spends its row budget on the
+    # whole table, so a linked trade's own records would vanish from this page
+    # once other cards had filled it up.
+    for fill in _safe(lambda: _fill_repo().list_fills(card_ids=list(rows)), _NO_FILLS):
+        if fill.card_id in rows:
+            rows[fill.card_id].append(fill)
+    return {
+        "fill_cards": linked,
+        "fill_quotes": {card.id: _assumed_quote(card) for card in linked.values()},
+        "fill_rows": {card_id: tuple(found) for card_id, found in rows.items()},
+    }
+
+
+# ---------------------------------------------------------------------------
+# The pass ledger (Phase 5.2.C2a; docs/phase-5.2-decision-cards-acceptance.md §4)
+# ---------------------------------------------------------------------------
+
+_OUTCOMES: outcomes.OutcomeRepo | None = None
+_NO_OUTCOMES: tuple[outcomes.Outcome, ...] = ()
+
+
+def _outcome_repo() -> outcomes.OutcomeRepo:
+    """The append-only outcome repository, bound to the board reader's engine."""
+    global _OUTCOMES
+    engine = _board_reader().engine
+    if _OUTCOMES is None or _OUTCOMES.engine is not engine:
+        _OUTCOMES = outcomes.OutcomeRepo(engine)
+    return _OUTCOMES
+
+
+@app.get("/defter", response_class=HTMLResponse)
+def defter_page(request: Request, karar: str = "", hisse: str = "") -> HTMLResponse:
+    """The pass ledger: every recorded decision, taken and passed (contract §4).
+
+    Reads the database only; no Unusual Whales call. Two queries serve the whole
+    page — one for the cards the filters select, one for those cards' outcomes —
+    and the card list is capped at ``ledger.max_cards_per_page``, disclosed on
+    the page, so the route stays fast once the ledger holds thousands of cards.
+
+    An unknown ``karar`` value lists every decision rather than nothing: a
+    mistyped filter must not look like an empty ledger. A failed read renders an
+    explicit "could not read" state that says nothing was deleted.
+    """
+    settings = _board_settings()
+    limit = settings.ledger.max_cards_per_page
+    decision = cards.decision_for(karar.strip())
+    ticker = hisse.strip().upper()
+    listed: tuple[cards.DecisionCard, ...] | None = _safe(
+        lambda: _card_repo().list_cards(decision=decision, ticker=ticker or None, limit=limit),
+        None,
+    )
+    found = listed or ()
+    # Bounded by THIS page: one row per listed card per horizon, plus one. A read
+    # that leant on the repository's module default would start dropping stored
+    # outcomes the moment ledger.max_cards_per_page x horizons outgrew it, and a
+    # dropped row renders as "henüz hesaplanmadı" — a card that was measured
+    # reading as one that was not.
+    needed = len(found) * len(settings.outcomes.horizons_trading_days) + 1
+    stored = (
+        _safe(
+            lambda: _outcome_repo().list_outcomes(
+                card_ids=[c.id for c in found], limit=needed,
+            ),
+            _NO_OUTCOMES,
+        )
+        if found
+        else _NO_OUTCOMES
+    )
+    page = decision_ledger.build_ledger_page(
+        found,
+        stored,
+        horizons=settings.outcomes.horizons_trading_days,
+        min_n=settings.fills.min_n_for_stats,
+        limit=limit,
+        decision=decision or "",
+        ticker=ticker,
+        load_failed=listed is None,
+    )
+    return templates.TemplateResponse(
+        request,
+        "defter.html",
+        {
+            "page": page,
+            **decision_ledger.template_context(),
+            **outcomes.template_context(),
+            **_EXPLAIN,
+        },
+    )
+
+
+@app.get("/kart/{card_id}", response_class=HTMLResponse)
+def card_page(request: Request, card_id: str, dolum: str = "") -> HTMLResponse:
+    """One decision card, its assumed quote and its fills (contract §5).
+
+    Reads the database only; no Unusual Whales call. A card id that names nothing
+    renders the missing-card state with a 404 — never an invented card. ``?dolum=``
+    confirms a recorded fill, and only when that fill really belongs to this card.
+
+    The slippage summary on this page covers every recorded fill, not this card's
+    handful: the cost assumption is a property of the board, and one card's fills
+    will never reach ``fills.min_n_for_stats``. Below that sample size the summary
+    shows counts and nothing else (§5).
+    """
+    card = _safe(lambda: _card_repo().get_card(card_id), None)
+    recorded = _safe(lambda: _fill_repo().get_fill(dolum), None) if dolum else None
+    found = card is not None
+    window = _board_settings().fills.max_fills_per_summary
+    card_fills = (
+        _safe(lambda: _fill_repo().list_fills(card_id=card_id, limit=window), _NO_FILLS)
+        if found
+        else _NO_FILLS
+    )
+    # One row past the window tells the page whether the sample IS every stored
+    # fill or only its newest page, so the scope line can say which (§5: the
+    # summary must not claim a wider sample than it read).
+    sampled = (
+        _safe(lambda: _fill_repo().list_fills(limit=window + 1), _NO_FILLS)
+        if found
+        else _NO_FILLS
+    )
+    capped = len(sampled) > window
+    every_fill = sampled[:window] if capped else sampled
+    context: dict[str, object] = {
+        "card": card,
+        "can_fill": card is not None and cards.is_logged(card),
+        "assumed": _assumed_quote(card) if card is not None else None,
+        "fills": card_fills,
+        "summaries": fills.side_summaries(
+            every_fill, min_n=_board_settings().fills.min_n_for_stats,
+        ),
+        "summary_scope": fills.stats_scope_text(len(every_fill), capped=capped),
+        "card_meta": (
+            fills.card_meta_text(card.ticker, card.direction, card.created_at, card.id)
+            if card is not None
+            else ""
+        ),
+        "decision_text": (
+            fills.FILL_COPY["decision_log" if cards.is_logged(card) else "decision_pas"]
+            if card is not None
+            else ""
+        ),
+        "trade_line": fills.trade_line_text(card.trade_id) if card is not None else "",
+        "recorded_line": (
+            fills.recorded_text(recorded, ticker=card.ticker)
+            if recorded is not None and card is not None and recorded.card_id == card.id
+            else None
+        ),
+        **fills.template_context(),
+        **_EXPLAIN,
+    }
+    return templates.TemplateResponse(
+        request, "kart.html", context, status_code=200 if found else 404,
+    )
+
+
+@app.post("/alfa/fill", response_model=None)  # the union of two Response types is not a model
+def alfa_fill(
+    request: Request,
+    # Namespaced like the card form's fields, for the same reason: the board must
+    # never carry a control named "ticker", "label", "sort" or "min_score" again.
+    fill_card_id: str = Form(...),
+    fill_side: str = Form(...),
+    fill_price: float = Form(...),
+    fill_contracts: float = Form(...),
+) -> RedirectResponse | PlainTextResponse:
+    """Record one actual fill against a logged card's frozen quote (contract §5).
+
+    The form carries the owner's own three numbers and the card's id. Everything
+    else — the assumed bid, ask and mid, the quote's age at the card, and the
+    journal trade the fill belongs to — is read from the card on the server. The
+    route reads and writes the database only; no Unusual Whales call.
+
+    Nothing is written unless the card exists, records a taken decision, and
+    carries a usable quote: slippage measured against an invented quote would be
+    a fabricated number in an append-only table.
+    """
+    if not _same_origin(request):
+        return PlainTextResponse(cards.CARD_COPY["forbidden_origin"], status_code=403)
+    side = fills.side_for(fill_side)
+    if side is None:
+        return PlainTextResponse(fills.FILL_COPY["unknown_side"], status_code=400)
+    if not fills.usable_numbers(fill_price, fill_contracts):
+        # Finite AND positive: a form field typed ``float`` accepts ``inf``,
+        # ``1e400`` and ``nan``, none of which a fill table can ever unrecord.
+        return PlainTextResponse(fills.FILL_COPY["bad_numbers"], status_code=400)
+    card = _safe(lambda: _card_repo().get_card(fill_card_id), None) if fill_card_id else None
+    if card is None:
+        return PlainTextResponse(fills.FILL_COPY["card_not_found"], status_code=404)
+    if not cards.is_logged(card):
+        return PlainTextResponse(fills.FILL_COPY["not_logged"], status_code=400)
+    quote = _assumed_quote(card)
+    if quote is None:
+        return PlainTextResponse(fills.FILL_COPY["no_assumed_quote"], status_code=400)
+    try:
+        fill_id = _fill_repo().write_fill(
+            card_id=card.id,
+            trade_id=card.trade_id,
+            side=side,
+            fill_price=fill_price,
+            contracts=fill_contracts,
+            quote=quote,
+        )
+    except Exception:
+        # Deliberately not _safe: a failed write must never look like a recorded
+        # fill, and the generic error page ("Nothing is lost") is written for
+        # read-only views. Here nothing was recorded, and the owner must retype it.
+        _logger.exception("fill could not be written for card %s", card.id)
+        return PlainTextResponse(fills.FILL_COPY["write_failed"], status_code=500)
+    # Built from the stored card id, never from a client value: no open redirect.
+    return RedirectResponse(f"/kart/{card.id}?{urlencode({'dolum': fill_id})}", status_code=303)
 
 
 @app.get("/health")

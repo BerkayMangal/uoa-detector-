@@ -119,7 +119,24 @@ portfolio:
 
 fills:
   min_n_for_stats: 20                # below this sample size only counts are shown
+  # Phase 5.2.C32-fix2 (the key was missing): how many recorded fills the card
+  # page's slippage summary reads. The summary's scope line says which sample it
+  # covers - every stored fill, or only the newest this many - so a median and a
+  # count are never presented as covering more than they do. Nothing is deleted;
+  # older fills are only outside this window.
+  max_fills_per_summary: 500
+
+ledger:
+  # Phase 5.2.C2a (the key was missing): /defter renders at most this many cards,
+  # newest first, and discloses the cap on the page. It keeps the route fast once
+  # the ledger holds thousands of cards. Nothing is deleted: older cards are only
+  # paged out of this view, and every one of them stays in alfa_decision_card.
+  max_cards_per_page: 200
 
 outcomes:
   horizons_trading_days: [1, 5]
   job_time_et: "17:30"
+  # Phase 5.2.C2b (the key was missing): how many cards one outcome-job run scans,
+  # newest first. Cards whose horizons are already final cost nothing, so this only
+  # bounds the daily scan; no card is ever dropped from the ledger.
+  max_cards_per_run: 2000
