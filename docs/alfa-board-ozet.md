@@ -1,6 +1,6 @@
 # Alfa Board — Berkay için özet
 
-**Son güncelleme: 2026-09-16 08:45Z (TRT 11:45).** Bu dosya çalışma sürdükçe tazelenir; en son değil,
+**Son güncelleme: 2026-09-16 09:20Z (TRT 12:20).** Bu dosya çalışma sürdükçe tazelenir; en son değil,
 sürekli yazılır. Doğrulanmamış her şey "DOĞRULANMADI" diye etiketlidir.
 
 ---
@@ -10,14 +10,14 @@ sürekli yazılır. Doğrulanmamış her şey "DOĞRULANMADI" diye etiketlidir.
 - **Durum: ÇALIŞIYOR** (FAZ A canlıda).
 - **URL:** https://uoa-detector-production.up.railway.app/ — kullanıcı adı/şifre masaüstündeki
   `uoa-dashboard-login.txt` dosyasında.
-- **Canlı SHA:** `a01406c` (FAZ A merge'i, PR #10).
-- **Son doğrulama:** 2026-09-16 06:00Z / 09:00 TRT.
+- **Canlı SHA:** `7728ba0` (FAZ A; FAZ B+D geri alındı — aşağıda sebebi).
+- **Son doğrulama:** 2026-09-16 09:16Z / 12:16 TRT — sağlık 200, şifresiz 401, şifreli 200, dürüstlük denetimi 20 satırda PASS, logda hata yok.
 - **Durma sebebi:** — (çalışma sürüyor).
-- **Sırada:** FAZ B+D için PR #11 açık, CI bekleniyor; FAZ C1 (karar kartları) paralel yazılıyor.
+- **Sırada:** karar kartları (FAZ C1) ve render hızlandırması; FAZ B+D kodu dalda hazır, hız düzeltmesinden sonra geri gelecek.
 
 ## 2. GERİ ALMA KARTI
 
-**Son bilinen iyi SHA: `a01406c`.**
+**Son bilinen iyi SHA: `7728ba0`.**
 
 Tahta bozuksa, sadece şunu yapıştır:
 
@@ -62,8 +62,16 @@ FAZ A öncesine (eski dashboard) döner, veri kaybı olmaz.
 
 ## 6. YOKLUĞUNDA ALDIĞIM KARARLAR
 
-Henüz bu oturumda yeni karar yok; FAZ A kararları `docs/alfa-board-decisions.md` P1–P20'de.
-Bu bölüm her fazdan sonra dolacak (en fazla 7 madde, her biri "Claude: P## geri al" diye yapıştırılabilir).
+Hepsi `docs/alfa-board-decisions.md` P21–P27'de, gerekçesi ve nasıl geri alınacağıyla.
+
+| # | Karar | Geri almak için |
+|---|---|---|
+| P24 | Render bütçesi testi artık makineyi değil **ölçeği** ölçüyor; 1,5 s hedefi canlıda ölçülüyor | "Claude: P24'ü geri al" |
+| P25 | `/health` artık hangi commit'in ayakta olduğunu söylüyor; `verify_live_board.sh` deploy sonrası her şeyi tek komutta kontrol ediyor | "Claude: P25'i geri al" |
+| P22 | Günlük işler için saat + kalıcı gün işareti (restart'ta ne atlıyor ne tekrarlıyor) | "Claude: P22'yi geri al" |
+| P21 | Gecikmeli ailelerde "hiç sorulmadı" ile "soruldu, kayıt yok" ayrımı için ek tablo | "Claude: P21'i geri al" |
+| P26 | Karar kartları FAZ B beklenmeden yazıldı (tek geri dönüşsüz madde o) | "Claude: P26'yı geri al" |
+| — | **FAZ B+D canlıdan geri alındı** (9,4 s render); kod dalda duruyor | zaten geri alındı; geri getirmek için hız düzeltmesi şart |
 
 ## 7. PARA KARARI — THETADATA
 
@@ -87,9 +95,14 @@ yapılmadı, indirme başlatılmadı. Ayrıntı: `docs/thetadata-decision.md`.
 
 - **Karar kartları kapalı:** bugün pas geçtiğin işlemler hiçbir yere kaydedilmiyor — o veri geri gelmez.
   Bu, kalan sürede ilk hedefim.
-- **FAZ B/D arayüzü henüz canlıda değil:** büyüklük, başabaş/straddle, kovalama, açılış-kapanış,
-  katalizör çipi, rejim bandı, portföy örtüşmesi ve gecikmeli kanıt kovası tek dalda birleşti,
-  3.645 test yeşil, PR #11 açık. CI yeşil olunca canlıya alınacak ve doğrulanacak.
+- **FAZ B/D canlıya alındı ve GERİ ALINDI (09:14Z).** Sebebi tek kelimeyle: **hız**. Ölçümler:
+  tahta FAZ A+B+D ile **9,4 saniyede** açılıyordu; geri aldıktan sonra **3,9 saniye**; sözleşmedeki hedef
+  1,5 saniye. Kod kaybolmadı (`p52-faz-b`, `p52-faz-d`, `p52-int` dallarında duruyor), hız düzeltmesinden
+  sonra geri gelecek.
+- **Asıl mesele bundan büyük (REG-5):** yavaşlık FAZ B/D'nin icadı değil. Profil, render süresinin
+  **%95'inin şablon işi** olduğunu gösteriyor (tüm veri okuması, kanıt ve ceza defteri render başına
+  0,04 saniye). Yani **FAZ A tek başına da 3,9 saniye** — hedefin iki katından fazla. Bunu şimdiye kadar
+  kimse görmedi çünkü canlı render süresi hiç ölçülmüyordu; artık her deploy'da ölçülüyor.
 - **Yeni güvenlik rayları (PR #11 içinde):** `/health` artık hangi commit'in ayakta olduğunu söylüyor ve
   `scripts/verify_live_board.sh` tek komutla deploy sonrası tüm kontrolleri (sağlık, şifre duvarı, render,
   dürüstlük denetimi, `alfa_` satır sayıları) koşuyor.
