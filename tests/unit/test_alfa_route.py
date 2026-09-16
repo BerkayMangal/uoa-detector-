@@ -53,27 +53,7 @@ if TYPE_CHECKING:
 _TS = datetime(2026, 9, 15, 14, 0, tzinfo=UTC)
 _LIVE = "live-2026-09-15"
 _ROW = re.compile(r'data-row data-ticker="([^"]+)" data-direction="([^"]+)"')
-# Contract §4.1 asks for p95 <= 1.5 s at 2,000 signals. That number describes the
-# production box, and this test cannot see it: a shared CI runner measured 2.6 s
-# for the same tree that measures 0.5 s on an idle developer machine and >1.5 s
-# on the same machine under load. Raising the number for everyone would hide a
-# real regression, so what is asserted here is hardware-independent:
-#   - SCALE: 10x the signals may not cost more than _SCALE_SLACK x 10 the time.
-#     An N+1 or quadratic regression breaks this on any machine; a slow machine
-#     does not, because both measurements slow down together.
-#   - CEILING: an absolute, deliberately generous backstop against a
-#     catastrophic slowdown.
-# The contract's 1.5 s is verified where it is meaningful: scripts/verify_live_board.sh
-# measures and reports the live render time after every deploy.
-# Registry REG-4: FAZ B and FAZ D made the 2,000-signal render slower (production
-# runs are about 1,000 prints and 20 rows). Revisit before pointing the board at
-# runs of that size.
-_RENDER_BUDGET_P95_S = 1.5  # contract §4.1, verified in production
-_SCALE_SLACK = 2.0
-_RENDER_CEILING_P95_S = 8.0
-_BIG_N = 2000
-_SMALL_N = 200
-_SMALL_RUN = "live-2026-09-14"  # older than _LIVE, so the board still defaults to _LIVE
+_RENDER_BUDGET_P95_S = 1.5  # contract §4.1
 
 
 @dataclass(frozen=True)
@@ -299,12 +279,12 @@ def test_alfa_makes_zero_unusual_whales_calls(
     assert calls == []
 
 
-def _budget_specs(n: int, *, prefix: str = "b") -> list[_Spec]:
+def _budget_specs(n: int) -> list[_Spec]:
     tickers = [f"T{i:02d}" for i in range(25)]
     sides: list[str | None] = ["at_ask", "at_bid", "midpoint", None]
     return [
         _Spec(
-            event_id=f"{prefix}{i:05d}",
+            event_id=f"b{i:05d}",
             ticker=tickers[i % len(tickers)],
             option_type="call" if i % 3 else "put",
             strike=str(100 + (i % 10) * 5),
@@ -317,23 +297,10 @@ def _budget_specs(n: int, *, prefix: str = "b") -> list[_Spec]:
     ]
 
 
-def _p95_render(client: TestClient, path: str, rounds: int = 20) -> float:
-    """p95 of ``rounds`` renders of ``path``; the calibration for the scale assertion."""
-    durations: list[float] = []
-    for _ in range(rounds):
-        start = time.perf_counter()
-        response = client.get(path)
-        durations.append(time.perf_counter() - start)
-        assert response.status_code == 200
-    return sorted(durations)[max(0, math.ceil(0.95 * len(durations)) - 1)]
-
-
 def test_alfa_render_budget_p95_at_2000_signals(board: tuple[str, TestClient]) -> None:
     url, client = board
-    _seed(url, _SMALL_RUN, _budget_specs(_SMALL_N, prefix="s"))
-    _seed(url, _LIVE, _budget_specs(_BIG_N))
+    _seed(url, _LIVE, _budget_specs(2000))
 
-    small_p95 = _p95_render(client, f"/alfa?run={_SMALL_RUN}")
     durations: list[float] = []
     for _ in range(20):
         start = time.perf_counter()
@@ -346,12 +313,4 @@ def test_alfa_render_budget_p95_at_2000_signals(board: tuple[str, TestClient]) -
 
     durations.sort()
     p95 = durations[math.ceil(0.95 * len(durations)) - 1]
-    allowed = _SCALE_SLACK * (_BIG_N / _SMALL_N) * small_p95
-    assert p95 <= allowed, (
-        f"render scales worse than linearly: {_SMALL_N} signals p95 {small_p95:.3f}s, "
-        f"{_BIG_N} signals p95 {p95:.3f}s, allowed {allowed:.3f}s"
-    )
-    assert p95 <= _RENDER_CEILING_P95_S, (
-        f"p95 {p95:.3f}s over the {_RENDER_CEILING_P95_S:.1f}s ceiling "
-        f"(contract target {_RENDER_BUDGET_P95_S}s is verified in production); all: {durations}"
-    )
+    assert p95 <= _RENDER_BUDGET_P95_S, f"p95 {p95:.3f}s over budget; all: {durations}"

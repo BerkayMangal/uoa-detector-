@@ -27,18 +27,6 @@ Contract: ``docs/phase-5.2-alfa-board-acceptance.md`` §4.1 ("Render"), §5 A1,
   (``webapp/board/penalty_ledger.py``), with numbers from the calibration
   profile that wrote the row. Applied penalties feed the counter-argument's
   last priority.
-- B1: each row carries its position-size cell (``webapp/board/sizing.py``): one
-  lot in dollars and as a share of capital, and the profile risk bucket's lot
-  count. The ``max_r`` disclosure goes in the audit block only (R-EV2).
-- B2: each row carries the break-even move its dominant contract needs against
-  the move the ATM straddle prices in (``webapp/board/moves.py``), read from
-  ``alfa_atm`` through an injected source. Missing rows read ``bilinmiyor``,
-  and so do rows older than ``tradability.max_quote_age_seconds``, the cutoff
-  B3's chase spot already applies to the same table (review FB-H4).
-- B3: each row carries its chase verdict (``webapp/board/chase.py``): the print
-  price against the current ask, the underlying's move since, and the
-  since-print flow as context only. ``geç kaldın`` feeds the counter-argument's
-  priority 3, and the verdict is named in the fallback's checked list.
 - A7: the page counts clean candidates (R-EM1): İŞLENİR rows whose evidence is
   within ``clean_candidate``. ``min_supporting`` counts only families that
   point the row's way: a non-directional lehte family (dealer gamma, decision
@@ -65,7 +53,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from datetime import UTC, date, datetime, time, timedelta
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Final, Literal
@@ -73,15 +61,6 @@ from zoneinfo import ZoneInfo
 
 from uoa_detector.calibration import load_profile
 from webapp.board.aggregate import POSITION_READ_LABELS, BoardRow, build_board_rows
-from webapp.board.atm import read_board_atm
-from webapp.board.catalysts import (
-    CHIP_UNKNOWN,
-    EXPIRED_WINDOW,
-    KIND_LABELS,
-    M22_MAY_DIFFER,
-    read_board_catalysts,
-)
-from webapp.board.chase import ChaseRead, ChaseText, build_chase, chase_text
 from webapp.board.copy_tr import (
     EVIDENCE_HOVER,
     GATE_LABEL,
@@ -89,34 +68,20 @@ from webapp.board.copy_tr import (
     NO_CLEAN_CANDIDATE,
     UNKNOWN_NOT_CLEAN,
 )
-from webapp.board.delayed_panel import DelayedPanel, load_delayed_panels, unreadable_panel
 from webapp.board.direction import DIRECTION_LABELS, FALLBACK_MARKER
-from webapp.board.etf_holdings import read_focused_holdings
 from webapp.board.evidence import (
     EMPTY_INPUTS,
     LegacyScores,
     RowEvidence,
     build_row_evidence,
-    dominant_print,
     evidence_sort_key,
     guard_strength,
-    is_sold,
     load_legacy_scores,
     read_evidence_inputs,
     request_for,
     strength_label,
 )
-from webapp.board.moves import ATM_AGE_TEMPLATE, compare_moves
-from webapp.board.narrative import (
-    NARRATIVE_COPY,
-    CatalystCheck,
-    ChaseCheck,
-    PenaltyCheck,
-    RowNarrative,
-    build_narrative,
-)
-from webapp.board.netprem import read_net_premium_since_many
-from webapp.board.oi_confirm import board_state, oi_label, read_board_oi
+from webapp.board.narrative import NARRATIVE_COPY, PenaltyCheck, RowNarrative, build_narrative
 from webapp.board.penalty_ledger import (
     LEDGER_COPY,
     M24_STAGE,
@@ -125,28 +90,12 @@ from webapp.board.penalty_ledger import (
     read_profile_hashes,
     resolve_profile,
 )
-from webapp.board.portfolio import (
-    capital_header,
-    journal_overlap,
-    same_sector_links,
-    single_bet_clusters,
-)
 from webapp.board.quotes import dominant_symbol, read_board_quotes
-from webapp.board.regime import (
-    GAMMA_TICKERS,
-    STATUS_SEPARATOR,
-    RegimeInputs,
-    build_regime_band,
-    read_regime_inputs,
-)
-from webapp.board.sizing import SIZE_COPY, SizeRead, SizeText, build_size, size_text
-from webapp.board.ticker_info import read_ticker_infos
 from webapp.board.tradability import (
     CHIP_COPY,
     STATE_LABELS,
     TradabilityRead,
     assess_tradability,
-    executable_ask,
     format_pct,
 )
 
@@ -158,60 +107,17 @@ if TYPE_CHECKING:
 
     from uoa_detector.backtest.store import StoredSignal
     from uoa_detector.calibration.profile import CalibrationProfile
-    from webapp.board.atm import AtmView
-    from webapp.board.catalysts import CatalystChip
-    from webapp.board.direction import Direction
-    from webapp.board.etf_holdings import HoldingView
-    from webapp.board.evidence import (
-        EvidenceCounts,
-        EvidenceInputs,
-        EvidenceRequest,
-        OIConfirmState,
-        StrengthKey,
-    )
-    from webapp.board.netprem import TapeSummary
-    from webapp.board.oi_confirm import OiConfirmView
-    from webapp.board.portfolio import (
-        CapitalHeader,
-        OverlapView,
-        SectorLink,
-        SingleBetCluster,
-    )
-    from webapp.board.portfolio import (
-        Direction as PortfolioDirection,
-    )
-    from webapp.board.regime import RegimeBand
-    from webapp.board.settings import BoardSettings, CleanCandidateSettings, DelayedSettings
+    from webapp.board.evidence import EvidenceCounts, EvidenceInputs, EvidenceRequest, StrengthKey
+    from webapp.board.settings import BoardSettings, CleanCandidateSettings
     from webapp.board.signals import BoardPrint
     from webapp.board.tradability import DepthView, QuoteView
-    from webapp.journal import TradeRow
 
     QuoteSource = Callable[
         [Sequence[str]], tuple[Mapping[str, QuoteView], Mapping[str, DepthView]]
     ]
-    AtmSource = Callable[[Sequence[str]], Mapping[str, tuple[AtmView, ...]]]
-    # B4: (dominant contract symbol, the source print's ET trade date) → its T+1 confirmation.
-    OiKey = tuple[str, date]
-    OiSource = Callable[[Sequence[OiKey]], Mapping[OiKey, OiConfirmView]]
-    # B4: (ticker, the dominant contract's expiry close) plus the page clock → its chip.
-    CatalystKey = tuple[str, datetime]
-    CatalystSource = Callable[
-        [Sequence[CatalystKey], datetime], Mapping[CatalystKey, CatalystChip]
-    ]
-    # B5: the latest reading per regime source as of the page clock.
-    RegimeSource = Callable[[datetime], RegimeInputs]
-    # B6: the open journal, the focused-ETF holdings and the sector of each ticker.
-    TradesSource = Callable[[], Sequence[TradeRow]]
-    HoldingsSource = Callable[[], Sequence[HoldingView]]
-    SectorSource = Callable[[Sequence[str]], Mapping[str, str | None]]
-    # B3: (ticker, trade date, the source print's time) → the tape summed since that print.
-    FlowSinceKey = tuple[str, date, datetime]
-    FlowSinceSource = Callable[[Sequence[FlowSinceKey]], Mapping[FlowSinceKey, TapeSummary]]
     EvidenceSource = Callable[[str, Sequence[EvidenceRequest]], EvidenceInputs]
     ProfileHashSource = Callable[[str, Sequence[str]], Mapping[str, str]]
     ProfileResolver = Callable[[str], CalibrationProfile | None]
-    # Phase 5.2.D1: (row tickers, the page's ET date) → each ticker's delayed bucket.
-    DelayedSource = Callable[[Sequence[str], date], Mapping[str, DelayedPanel]]
 
 _logger = logging.getLogger(__name__)
 
@@ -283,14 +189,6 @@ ALFA_COPY: Final[Mapping[str, str]] = MappingProxyType(
         "audit_pre": "Ceza öncesi birleşik skor: {score}",
         "audit_inputs": "Skorun girdileri",
         "audit_record_missing": "kayıt okunamadı",
-        # B4: the T+1 opening/closing reading of the dominant contract.
-        "opening_title": "Açılış mı kapanış mı",
-        # B5: how old the reading behind a regime chip is (R-CO2's rule, for a chip).
-        "regime_age": "{age} önce alındı",
-        # B6: the portfolio-overlap strip and the matching open trade of a row.
-        "portfolio_title": "Tek bahis şeridi",
-        "overlap_detail_title": "Eşleşen açık işlem",
-        "detail_separator": " · ",
         # R-EM1 banner variants (review FA-04); "Bugün temiz aday yok" stays copy_tr.NO_CLEAN_CANDIDATE.
         "no_clean_candidate_dated": "{date} seansında temiz aday yok",
         "no_clean_candidate_undated": "Bu çalışmada temiz aday yok",
@@ -321,20 +219,6 @@ AUDIT_INPUT_LABELS: Final[Mapping[str, str]] = MappingProxyType(
 
 OPTION_TYPE_LABELS: Final[Mapping[str, str]] = MappingProxyType({"call": "call", "put": "put"})
 
-# B5: the regime band's own frozen copy, and the empty inputs a failed read renders from.
-REGIME_COPY: Final[Mapping[str, str]] = MappingProxyType({"status_separator": STATUS_SEPARATOR})
-EMPTY_REGIME_INPUTS: Final = RegimeInputs(
-    tide_buckets=(), gamma=(), gex=(), curve=None, vix=None, history=(),
-)
-REGIME_CHIP_KEYS: Final[tuple[str, ...]] = (
-    "tide",
-    *(f"gamma:{t}" for t in GAMMA_TICKERS),
-    *(f"flip:{t}" for t in GAMMA_TICKERS),
-    "curve",
-    "vix_curve",
-    "vix_spot",
-)
-
 FILL_SIDE_LABELS: Final[Mapping[str, str]] = MappingProxyType(
     {
         "at_ask": "ask (alım)",
@@ -348,16 +232,6 @@ FILL_SIDE_LABELS: Final[Mapping[str, str]] = MappingProxyType(
 
 _MAIN_STATES: Final = frozenset({"tradable", "narrow"})
 _ET: Final = ZoneInfo("America/New_York")
-# Market structure, not a cutoff: the regular session closes at 16:00 ET, which is where
-# the catalyst window of a contract expiring that day ends (contract §6 B4).
-_EXPIRY_CLOSE_ET: Final = time(16, 0)
-# The Açık pozisyon states that are a reading rather than an absence (R-UN1 dimming).
-_OI_KNOWN_STATES: Final = frozenset({"opening", "closing"})
-_NO_OI_ROW: Final = "yok"
-# B6: the board's direction as ``webapp/board/portfolio.py`` names it.
-_PORTFOLIO_DIRECTIONS: Final[Mapping[Direction, PortfolioDirection]] = MappingProxyType(
-    {"up": "yukarı", "down": "aşağı"},
-)
 
 
 @dataclass(frozen=True)
@@ -374,52 +248,6 @@ class ChipText:
     quote_age: str | None
     last_trade: str | None
     default_marker: str | None  # "(varsayılan değer)" while owner values are unconfirmed
-
-
-@dataclass(frozen=True)
-class MoveView:
-    """B2: the break-even move against the move the ATM straddle prices in."""
-
-    text: str
-    disclosure: str
-    age: str | None  # when the ATM row the comparison used was fetched (R-CO2)
-    fallback: bool  # the labelled IV estimate was used instead of a straddle
-    known: bool  # False: both halves read bilinmiyor
-
-
-@dataclass(frozen=True)
-class OpeningView:
-    """B4: the dominant contract's T+1 opening/closing reading and its catalyst chip."""
-
-    label: str  # oi_confirm.STATUS_LABELS, or "henüz doğrulanmadı" with no confirmation row
-    status: str  # the stored status, or "yok" when there is no row yet
-    state: OIConfirmState | None  # what the Açık pozisyon family read (None: T+1 awaited)
-    dimmed: bool  # unknown or out of scope: dashed and dimmed, never clean (R-UN1)
-    catalyst_text: str  # the chip, or the out-of-scope line of an expired contract
-    catalyst_in_window: tuple[str, ...]  # frozen kind labels; feeds the counter-argument (A5)
-    catalyst_dimmed: bool
-
-    @property
-    def catalyst_known(self) -> bool:
-        """Was the chip read at all? A dimmed chip is one whose count is not a zero.
-
-        Phase 5.2.B-fix3 (review FB-H3/FB-03): with no chip, or with any part
-        reading ``bilinmiyor``, the row must not claim ``vade içi katalizör (0)``
-        or ``data-catalyst="yok"`` (R-UN1).
-        """
-        return not self.catalyst_dimmed
-
-
-@dataclass(frozen=True)
-class RegimeView:
-    """B5: the board-level regime band, with each source's age.
-
-    Context only. It never enters the evidence counts, the strength label, the
-    clean-candidate rule or the counter-argument choice.
-    """
-
-    band: RegimeBand
-    ages: Mapping[str, str]  # chip key → how old the reading behind it is
 
 
 @dataclass(frozen=True)
@@ -445,16 +273,6 @@ class AlfaRowView:
     narrative: RowNarrative
     ledger: PenaltyLedger
     clean_candidate: bool  # R-EM1
-    # Phase 5.2.D1 (R-DL1): the delayed bucket. Never counted, never part of any score.
-    delayed: DelayedPanel | None = None
-    # FAZ B fields are appended with defaults, so every earlier construction stays valid.
-    size: SizeRead | None = None  # B1
-    size_text: SizeText | None = None  # B1
-    move: MoveView | None = None  # B2
-    chase: ChaseRead | None = None  # B3
-    chase_text: ChaseText | None = None  # B3
-    opening: OpeningView | None = None  # B4
-    overlap: OverlapView | None = None  # B6
 
 
 @dataclass(frozen=True)
@@ -479,12 +297,6 @@ class AlfaPage:
     today: date | None = None  # ET date of the page's clock
     newest_print_at: datetime | None = None  # the run's newest print (or signal) time
     rendered_at: datetime | None = None  # the page's clock
-    delayed_failed: bool = False  # Phase 5.2.D1: the delayed bucket could not be read
-    regime: RegimeView | None = None  # B5; None only when no regime source was supplied
-    # B6: the capital header and the single-bet strip. None and empty mean "no source".
-    capital: CapitalHeader | None = None
-    clusters: tuple[SingleBetCluster, ...] = ()
-    sector_links: tuple[SectorLink, ...] = ()
 
     @property
     def no_clean_candidate(self) -> bool:
@@ -638,123 +450,6 @@ def build_audit(event_id: str | None, signal: StoredSignal | None) -> AuditView:
     )
 
 
-def build_move_view(
-    row: BoardRow,
-    chip: TradabilityRead,
-    atm_rows: Sequence[AtmView],
-    now: datetime,
-    *,
-    max_age_seconds: int,
-) -> MoveView:
-    """B2: the dominant contract's break-even move vs the ATM straddle for that expiry.
-
-    The entry price is the executable ask (B1's rule), so an unexecutable or
-    stale quote reads ``bilinmiyor`` rather than pricing a break-even nobody
-    could pay. An ATM row older than ``max_age_seconds`` is refused the same
-    way: ``alfa_atm`` rows survive restarts and weekends, and B3's chase spot
-    already refuses them, so pricing a cost statement off one would make the two
-    halves of one row disagree (review FB-H4). The row that was used carries its
-    own age, and so does the newest stale row when nothing fresh is left, so a
-    ``bilinmiyor`` reading says why.
-    """
-    moment = _aware(now)
-    fresh = tuple(
-        r for r in atm_rows
-        if (moment - _aware(r.fetched_at)).total_seconds() <= max_age_seconds
-    )
-    key = row.dominant.key
-    option_type: Literal["call", "put"] = "call" if key.option_type == "call" else "put"
-    comparison = compare_moves(
-        option_type=option_type,
-        strike=float(key.strike),
-        expiry=key.expiry,
-        ask=executable_ask(chip),
-        atm_rows=fresh,
-        now=now,
-    )
-    expected = comparison.expected
-    used = (
-        next((r for r in fresh if r.expiry == expected.atm_expiry), None)
-        if expected is not None and expected.atm_expiry is not None
-        else None
-    )
-    if used is None and not fresh and atm_rows:
-        used = max(atm_rows, key=lambda r: _aware(r.fetched_at))
-    return MoveView(
-        text=comparison.text,
-        disclosure=comparison.disclosure,
-        age=(
-            ATM_AGE_TEMPLATE.format(age=age_text(_aware(now) - _aware(used.fetched_at)))
-            if used is not None
-            else None
-        ),
-        fallback=expected is not None and expected.source == "iv_estimate",
-        known=comparison.required_move_pct is not None or expected is not None,
-    )
-
-
-def build_regime_view(
-    inputs: RegimeInputs, *, settings: BoardSettings, now: datetime,
-) -> RegimeView:
-    """B5: the band plus the age of the reading behind each chip (contract §6 B5)."""
-    moment = _aware(now)
-    stamps: dict[str, datetime] = {}
-    if inputs.tide_buckets:
-        stamps["tide"] = inputs.tide_buckets[-1].fetched_at
-    for reading in inputs.gamma:
-        stamps[f"gamma:{reading.ticker}"] = reading.fetched_at
-    for levels in inputs.gex:
-        stamps[f"flip:{levels.ticker}"] = levels.fetched_at
-    if inputs.curve is not None:
-        stamps["curve"] = inputs.curve.fetched_at
-    if inputs.vix is not None:
-        stamps["vix_spot"] = inputs.vix.fetched_at
-    return RegimeView(
-        band=build_regime_band(inputs, settings=settings, now=now),
-        ages=MappingProxyType({
-            key: ALFA_COPY["regime_age"].format(age=age_text(moment - _aware(stamp)))
-            for key, stamp in stamps.items()
-        }),
-    )
-
-
-def expiry_close(expiry: date) -> datetime:
-    """The end of a row's catalyst window: its dominant contract's expiry, 16:00 ET (§6 B4)."""
-    return datetime.combine(expiry, _EXPIRY_CLOSE_ET, tzinfo=_ET)
-
-
-def build_opening_view(
-    oi: OiConfirmView | None, chip: CatalystChip | None, *, expired: bool,
-) -> OpeningView:
-    """B4: the row's opening/closing line and catalyst chip, from frozen labels only.
-
-    No confirmation row reads ``henüz doğrulanmadı`` — the T+1 job has not
-    answered for this contract yet, which is not the same as "not opening".
-    A chip that could not be read reads ``bilinmiyor``; a contract whose expiry
-    has passed has an empty window and reads out of scope, never "no catalyst".
-    """
-    state = board_state(oi)
-    if chip is not None:
-        catalyst_text = chip.text
-    elif expired:
-        catalyst_text = EXPIRED_WINDOW
-    else:
-        catalyst_text = CHIP_UNKNOWN
-    return OpeningView(
-        label=oi_label(oi),
-        status=oi.status if oi is not None else _NO_OI_ROW,
-        state=state,
-        dimmed=state not in _OI_KNOWN_STATES,
-        catalyst_text=catalyst_text,
-        catalyst_in_window=(
-            tuple(KIND_LABELS[part.kind] for part in chip.parts if part.state == "var")
-            if chip is not None
-            else ()
-        ),
-        catalyst_dimmed=chip is None or any(part.state == "bilinmiyor" for part in chip.parts),
-    )
-
-
 def is_clean_candidate(
     chip: TradabilityRead,
     counts: EvidenceCounts,
@@ -814,15 +509,6 @@ def build_alfa_page(
     profile_hash_source: ProfileHashSource | None = None,
     profile_resolver: ProfileResolver | None = None,
     run_latest_ts: datetime | None = None,
-    delayed_source: DelayedSource | None = None,
-    atm_source: AtmSource | None = None,
-    flow_since_source: FlowSinceSource | None = None,
-    oi_source: OiSource | None = None,
-    catalyst_source: CatalystSource | None = None,
-    regime_source: RegimeSource | None = None,
-    trades_source: TradesSource | None = None,
-    holdings_source: HoldingsSource | None = None,
-    sector_source: SectorSource | None = None,
 ) -> AlfaPage:
     """The page model; ``prints=None`` means the database read failed.
 
@@ -838,11 +524,10 @@ def build_alfa_page(
     the writing profile could not be read and shows no profile numbers.
     """
     moment = now if now is not None else datetime.now(UTC)
-    regime = _read_regime(regime_source, settings=settings, now=moment)
     if prints is None:
         return AlfaPage(
             rows=(), views=(), sections=(), print_count=0, load_failed=True, gate_on=gate_on,
-            today=_et_date(moment), regime=regime,
+            today=_et_date(moment),
         )
     rows = build_board_rows(prints, settings.aggregation)
     symbols = tuple(dominant_symbol(r) for r in rows)
@@ -871,85 +556,7 @@ def build_alfa_page(
             hashes = profile_hash_source(prints[0].run_id, [r.event_id for r in requests])
         except Exception:
             _logger.exception("alfa board: profile hash read failed; ledgers show no profile numbers")
-    panels: Mapping[str, DelayedPanel] = {}
-    delayed_failed = False
-    if delayed_source is not None and rows:
-        try:
-            panels = delayed_source([r.ticker for r in rows], _et_date(moment))
-        except Exception:
-            _logger.exception("alfa board: delayed read failed; the bucket reads bilinmiyor")
-            delayed_failed = True
-    atm_rows: Mapping[str, tuple[AtmView, ...]] = {}
-    if atm_source is not None and rows:
-        try:
-            atm_rows = atm_source([r.ticker for r in rows])
-        except Exception:
-            _logger.exception("alfa board: ATM read failed; the move comparison reads bilinmiyor")
-    oi_rows: Mapping[OiKey, OiConfirmView] = {}
-    if oi_source is not None and requests:
-        try:
-            oi_rows = oi_source([
-                (symbol, request.trade_date)
-                for symbol, request in zip(symbols, requests, strict=True)
-                if symbol is not None
-            ])
-        except Exception:
-            _logger.exception("alfa board: T+1 confirmation read failed; Açık pozisyon reads bilinmiyor")
-    chips: Mapping[CatalystKey, CatalystChip] = {}
-    if catalyst_source is not None and rows:
-        try:
-            chips = catalyst_source(
-                [
-                    (row.ticker.upper(), expiry_close(row.dominant.key.expiry))
-                    for row in rows
-                    if expiry_close(row.dominant.key.expiry) > moment
-                ],
-                moment,
-            )
-        except Exception:
-            _logger.exception("alfa board: catalyst read failed; the chip reads bilinmiyor")
-    today = _et_date(moment)
-    # B6: a failed journal read leaves the capital header out. Rendering "$0 at risk"
-    # from a read that failed would be a claim about the account, not an unknown.
-    trades: Sequence[TradeRow] | None = None
-    if trades_source is not None:
-        try:
-            trades = trades_source()
-        except Exception:
-            _logger.exception("alfa board: open journal read failed; no capital header is shown")
-    holdings: Sequence[HoldingView] = ()
-    if holdings_source is not None:
-        try:
-            holdings = holdings_source()
-        except Exception:
-            _logger.exception("alfa board: ETF holdings read failed; no cluster is claimed")
-    overlap_tickers = list(dict.fromkeys(
-        [row.ticker.strip().upper() for row in rows]
-        + [
-            trade.ticker.strip().upper()
-            for trade in (trades or ())
-            if isinstance(trade.ticker, str) and trade.ticker.strip()
-        ],
-    ))
-    sectors: Mapping[str, str | None] = {}
-    if sector_source is not None and overlap_tickers:
-        try:
-            sectors = sector_source(overlap_tickers)
-        except Exception:
-            _logger.exception("alfa board: sector read failed; no weak link is claimed")
     signals = {p.event_id: p.signal for p in prints}
-    flow_since: Mapping[FlowSinceKey, TapeSummary] = {}
-    if flow_since_source is not None and requests:
-        try:
-            flow_since = flow_since_source(
-                [
-                    (r.ticker, r.trade_date, signals[r.event_id].timestamp)
-                    for r in requests
-                    if r.event_id in signals
-                ],
-            )
-        except Exception:
-            _logger.exception("alfa board: since-print tape read failed; chase context reads bilinmiyor")
     views: list[AlfaRowView] = []
     for row, symbol, request in zip(rows, symbols, requests, strict=True):
         chip = assess_tradability(
@@ -963,12 +570,6 @@ def build_alfa_page(
             now=moment,
         )
         signal = signals.get(request.event_id)
-        window_end = expiry_close(row.dominant.key.expiry)
-        opening = build_opening_view(
-            oi_rows.get((symbol, request.trade_date)) if symbol is not None else None,
-            chips.get((row.ticker.upper(), window_end)),
-            expired=window_end <= moment,
-        )
         evidence = build_row_evidence(
             row,
             settings=settings,
@@ -977,7 +578,6 @@ def build_alfa_page(
             telemetry=inputs.telemetry.get(request.event_id),
             tape=inputs.tapes.get((request.ticker, request.trade_date)),
             ticker_info=inputs.infos.get(request.ticker),
-            oi_state=opening.state,
             legacy_scores=legacy_scores,
             unread=evidence_failed,
         )
@@ -989,24 +589,6 @@ def build_alfa_page(
             profile_hash=profile_hash,
             profile=profile_resolver(profile_hash) if profile_resolver is not None and profile_hash else None,
             m24_telemetry=stage_rows.get(M24_STAGE) if stage_rows is not None else None,
-        )
-        row_size = build_size(
-            signal=signal, chip=chip, sizing=settings.sizing, cost=settings.cost,
-        )
-        row_chase = build_chase(
-            signal=signal,
-            chip=chip,
-            direction=row.direction,
-            sold=is_sold(dominant_print(row), row.direction),
-            atm_rows=atm_rows.get(row.ticker, ()),
-            tape_since=(
-                flow_since.get((request.ticker, request.trade_date, signal.timestamp))
-                if signal is not None
-                else None
-            ),
-            settings=settings.chase,
-            max_spot_age_seconds=settings.tradability.max_quote_age_seconds,
-            now=moment,
         )
         views.append(
             AlfaRowView(
@@ -1021,41 +603,12 @@ def build_alfa_page(
                 narrative=build_narrative(
                     row, evidence, chip,
                     settings=settings.narrative,
-                    chase=ChaseCheck(verdict=row_chase.label, late=row_chase.late),
-                    # The catalyst check only ran when a source supplied the chip (§5 A5),
-                    # and a chip we could not read is named unknown, never a zero (B-fix3).
-                    catalyst=(
-                        CatalystCheck(
-                            in_window=opening.catalyst_in_window,
-                            known=opening.catalyst_known,
-                        )
-                        if catalyst_source is not None
-                        else None
-                    ),
                     penalties=PenaltyCheck(applied=ledger.applied_names),
                 ),
                 ledger=ledger,
                 clean_candidate=is_clean_candidate(
                     chip, evidence.counts, settings.clean_candidate,
                     non_directional_supporting=len(evidence.non_directional_supporting_labels()),
-                ),
-                delayed=_row_panel(row.ticker, panels, wired=delayed_source is not None),
-                size=row_size,
-                size_text=size_text(row_size),
-                move=build_move_view(
-                    row, chip, atm_rows.get(row.ticker, ()), moment,
-                    max_age_seconds=settings.tradability.max_quote_age_seconds,
-                ),
-                chase=row_chase,
-                chase_text=chase_text(row_chase),
-                opening=opening,
-                overlap=(
-                    journal_overlap(
-                        trades, ticker=row.ticker,
-                        direction=_PORTFOLIO_DIRECTIONS[row.direction], today=today,
-                    )
-                    if trades is not None
-                    else None
                 ),
             ),
         )
@@ -1072,54 +625,10 @@ def build_alfa_page(
         evidence_failed=evidence_failed,
         clean_candidate_count=sum(1 for v in ordered if v.clean_candidate),
         session_date=_et_date(newest) if newest is not None else None,
-        today=today,
+        today=_et_date(moment),
         newest_print_at=newest,
         rendered_at=moment,
-        delayed_failed=delayed_failed,
-        regime=regime,
-        capital=(
-            capital_header(trades, settings=settings, today=today) if trades is not None else None
-        ),
-        clusters=(
-            single_bet_clusters(overlap_tickers, holdings, settings=settings) if holdings else ()
-        ),
-        sector_links=(
-            same_sector_links(overlap_tickers, sectors, settings=settings) if sectors else ()
-        ),
     )
-
-
-def _row_panel(
-    ticker: str, panels: Mapping[str, DelayedPanel], *, wired: bool,
-) -> DelayedPanel | None:
-    """A row's delayed bucket; a missing or failed read renders unknown, never an empty block.
-
-    The reader keys its panels by ``ticker.strip().upper()``, so the lookup uses
-    the same spelling: a row ticker with surrounding whitespace used to miss a
-    panel that had been read and render the read-failure state (Phase
-    5.2.D-fix3, review FD-05).
-    """
-    if not wired:
-        return None
-    return panels.get(ticker.strip().upper()) or unreadable_panel(ticker)
-
-
-def _read_regime(
-    source: RegimeSource | None, *, settings: BoardSettings, now: datetime,
-) -> RegimeView | None:
-    """The regime band, or None when no source was supplied.
-
-    A failed read still renders the band: every chip then reads ``bilinmiyor``,
-    which is what a source we could not read means (R-UN1).
-    """
-    if source is None:
-        return None
-    try:
-        inputs = source(now)
-    except Exception:
-        _logger.exception("alfa board: regime read failed; every regime chip reads bilinmiyor")
-        inputs = EMPTY_REGIME_INPUTS
-    return build_regime_view(inputs, settings=settings, now=now)
 
 
 def db_quote_source(engine: Engine) -> QuoteSource:
@@ -1131,85 +640,11 @@ def db_quote_source(engine: Engine) -> QuoteSource:
     return _source
 
 
-def db_atm_source(engine: Engine) -> AtmSource:
-    """An ATM source reading ``alfa_atm`` only (B2; no Unusual Whales call)."""
-
-    def _source(tickers: Sequence[str]) -> Mapping[str, tuple[AtmView, ...]]:
-        return read_board_atm(engine, tickers)
-
-    return _source
-
-
-def db_flow_since_source(engine: Engine) -> FlowSinceSource:
-    """A since-print tape source reading ``alfa_net_prem`` only (B3 context; no UW call)."""
-
-    def _source(keys: Sequence[FlowSinceKey]) -> Mapping[FlowSinceKey, TapeSummary]:
-        return read_net_premium_since_many(engine, keys)
-
-    return _source
-
-
-def db_oi_source(engine: Engine) -> OiSource:
-    """A T+1 confirmation source reading ``alfa_oi_confirm`` only (B4; no UW call)."""
-
-    def _source(keys: Sequence[OiKey]) -> Mapping[OiKey, OiConfirmView]:
-        return read_board_oi(engine, keys)
-
-    return _source
-
-
-def db_catalyst_source(engine: Engine, settings: BoardSettings) -> CatalystSource:
-    """A catalyst source reading ``alfa_catalyst`` and its fetch coverage only (B4; no UW call)."""
-
-    def _source(keys: Sequence[CatalystKey], now: datetime) -> Mapping[CatalystKey, CatalystChip]:
-        return read_board_catalysts(engine, keys, settings=settings, now=now)
-
-    return _source
-
-
-def db_holdings_source(engine: Engine) -> HoldingsSource:
-    """A holdings source reading ``alfa_etf_holding`` only (B6; no Unusual Whales call)."""
-
-    def _source() -> Sequence[HoldingView]:
-        return read_focused_holdings(engine)
-
-    return _source
-
-
-def db_sector_source(engine: Engine) -> SectorSource:
-    """A sector source reading ``alfa_ticker_info`` only (B6; no Unusual Whales call)."""
-
-    def _source(tickers: Sequence[str]) -> Mapping[str, str | None]:
-        return {
-            ticker: info.sector for ticker, info in read_ticker_infos(engine, tickers).items()
-        }
-
-    return _source
-
-
-def db_regime_source(engine: Engine) -> RegimeSource:
-    """A regime source reading ``alfa_regime`` only (B5; no Unusual Whales call)."""
-
-    def _source(now: datetime) -> RegimeInputs:
-        return read_regime_inputs(engine, now=now)
-
-    return _source
-
-
 def db_evidence_source(engine: Engine) -> EvidenceSource:
     """An evidence source reading telemetry, the net-premium tape and ticker info only."""
 
     def _source(run_id: str, requests: Sequence[EvidenceRequest]) -> EvidenceInputs:
         return read_evidence_inputs(engine, run_id, requests)
-
-    return _source
-
-
-def db_delayed_source(engine: Engine, settings: DelayedSettings) -> DelayedSource:
-    """A delayed source reading ``alfa_delayed``, its fetch coverage and ``alfa_daily_close`` only."""
-
-    def _source(tickers: Sequence[str], today: date) -> Mapping[str, DelayedPanel]:
-        return load_delayed_panels(engine, tickers, today=today, settings=settings)
 
     return _source
 
@@ -1260,11 +695,6 @@ def template_context() -> dict[str, object]:
         "case_class": CASE_CLASS,
         "case_title_class": CASE_TITLE_CLASS,
         "ledger_copy": LEDGER_COPY,
-        "size_copy": SIZE_COPY,
         "no_clean_candidate_label": NO_CLEAN_CANDIDATE,
         "iv_not_sell_vol": IV_NOT_SELL_VOL,
-        # B4: the audit block discloses that the chip and M22's event score can disagree.
-        "catalyst_note": M22_MAY_DIFFER,
-        # B5: the band's own frozen copy (the tripwire line and its status).
-        "regime_copy": REGIME_COPY,
     }

@@ -374,108 +374,20 @@ def read_tape_summaries(
     return out
 
 
-def _since_summary(
-    session: Session, ticker: str, trade_date: date, since: datetime,
+def read_net_premium_since(
+    engine: Engine, ticker: str, trade_date: date, since: datetime,
 ) -> TapeSummary | None:
-    """The tape of one (ticker, trade_date) summed from the minute containing ``since``."""
+    """The tape summed from the minute containing ``since`` onwards, or None without rows."""
+    start = _as_utc(since).replace(second=0, microsecond=0)
     stmt = (
         select(*_summary_columns())
         .where(
             AlfaNetPrem.ticker == ticker.strip().upper(),
             AlfaNetPrem.trade_date == trade_date,
-            AlfaNetPrem.tape_time >= _as_utc(since).replace(second=0, microsecond=0),
+            AlfaNetPrem.tape_time >= start,
         )
         .group_by(AlfaNetPrem.ticker, AlfaNetPrem.trade_date)
     )
-    row = session.execute(stmt).first()
+    with Session(engine) as session:
+        row = session.execute(stmt).first()
     return None if row is None else _summary(row)
-
-
-def read_net_premium_since(
-    engine: Engine, ticker: str, trade_date: date, since: datetime,
-) -> TapeSummary | None:
-    """The tape summed from the minute containing ``since`` onwards, or None without rows."""
-    with Session(engine) as session:
-        return _since_summary(session, ticker, trade_date, since)
-
-
-def read_net_premium_since_many(
-    engine: Engine, keys: Iterable[tuple[str, date, datetime]],
-) -> dict[tuple[str, date, datetime], TapeSummary]:
-    """Since-print sums for many rows (B3), in ONE query (Phase 5.2.B-fix7).
-
-    Each row starts at its own print, so a grouped SQL sum cannot serve them
-    all; one aggregate per row was one round trip per board row instead
-    (review RB-02). The minutes of the wanted (ticker, trade date) pairs are
-    read once, from the earliest print onwards, and each row's sum is taken
-    over its own slice in Python. Keys with no tape row are absent from the
-    result, and the caller reads that as ``bilinmiyor``.
-    """
-    wanted = list(
-        dict.fromkeys(
-            (ticker.strip().upper(), trade_date, _as_utc(since))
-            for ticker, trade_date, since in keys
-        ),
-    )
-    if not wanted:
-        return {}
-    earliest = min(since for _ticker, _day, since in wanted).replace(second=0, microsecond=0)
-    stmt = select(
-        AlfaNetPrem.ticker,
-        AlfaNetPrem.trade_date,
-        AlfaNetPrem.tape_time,
-        AlfaNetPrem.net_call_premium,
-        AlfaNetPrem.net_put_premium,
-        AlfaNetPrem.fetched_at,
-    ).where(
-        AlfaNetPrem.ticker.in_({ticker for ticker, _day, _since in wanted}),
-        AlfaNetPrem.trade_date.in_({day for _ticker, day, _since in wanted}),
-        AlfaNetPrem.tape_time >= earliest,
-    )
-    minutes: dict[tuple[str, date], list[_Minute]] = {}
-    with Session(engine) as session:
-        for row in session.execute(stmt):
-            minute = _minute_row(row)
-            minutes.setdefault((minute.ticker, minute.trade_date), []).append(minute)
-    out: dict[tuple[str, date, datetime], TapeSummary] = {}
-    for ticker, trade_date, since in wanted:
-        start = since.replace(second=0, microsecond=0)
-        slice_ = [m for m in minutes.get((ticker, trade_date), ()) if m.tape_time >= start]
-        if not slice_:
-            continue
-        out[(ticker, trade_date, since)] = TapeSummary(
-            ticker=ticker,
-            trade_date=trade_date,
-            net_call_premium=sum(m.net_call_premium for m in slice_),
-            net_put_premium=sum(m.net_put_premium for m in slice_),
-            minutes=len(slice_),
-            first_tape_time=min(m.tape_time for m in slice_),
-            last_tape_time=max(m.tape_time for m in slice_),
-            fetched_at=max(m.fetched_at for m in slice_),
-        )
-    return out
-
-
-@dataclass(frozen=True)
-class _Minute:
-    """One stored tape minute, as the batched since-print reader needs it."""
-
-    ticker: str
-    trade_date: date
-    tape_time: datetime
-    net_call_premium: float
-    net_put_premium: float
-    fetched_at: datetime
-
-
-# Any (D12 ORM boundary): one untyped SQLAlchemy Row of the select above, unpacked by position.
-def _minute_row(row: Any) -> _Minute:
-    ticker, trade_date, tape_time, call_premium, put_premium, fetched_at = row
-    return _Minute(
-        ticker=ticker,
-        trade_date=trade_date,
-        tape_time=_as_utc(tape_time),
-        net_call_premium=float(call_premium),
-        net_put_premium=float(put_premium),
-        fetched_at=_as_utc(fetched_at),
-    )

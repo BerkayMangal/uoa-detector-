@@ -117,26 +117,6 @@ _INFO_ROWS: dict[str, dict[str, Any]] = {
     "SPY": {"symbol": "SPY", "sector": None, "issue_type": "ETF"},
     "SMCI": {"symbol": "SMCI", "sector": "Technology", "issue_type": "Common Stock"},
 }
-# Phase 5.2.B-jobs: the daily-job clock runs the pre-market and after-the-open jobs on the
-# first tick of an ET day. They answer empty here; their own tests cover their contents.
-_DAILY_JOB_PATHS: frozenset[str] = frozenset({
-    "/api/market/fda-calendar", "/api/market/economic-calendar",
-    "/api/stock/SPY/greek-exposure", "/api/stock/QQQ/greek-exposure",
-})
-_DAILY_JOB_CALLS = 7  # catalysts: 2 earnings + 2 FDA + 1 economic calendar; gamma history: 2
-# Phase 5.2.B5b: the regime band's seven per-cycle calls (contract §4.4).
-_REGIME_PATHS: frozenset[str] = frozenset({
-    "/api/market/market-tide",
-    "/api/stock/SPY/spot-exposures", "/api/stock/QQQ/spot-exposures",
-    "/api/stock/SPY/gex-levels", "/api/stock/QQQ/gex-levels",
-    "/api/stock/SPY/volatility/term-structure", "/api/stock/VIX/volatility/term-structure",
-})
-_REGIME_CALLS = len(_REGIME_PATHS)
-# Phase 5.2.B2b: the loop also fetches the ATM straddle (expiry list once per ET day).
-_EXPIRY_ROWS: list[dict[str, Any]] = [
-    {"expires": "2026-09-18", "open_interest": 531720, "volume": 25428, "chains": 150},
-    {"expires": "2026-09-25", "open_interest": 42125, "volume": 6353, "chains": 124},
-]
 
 # (event_id, ticker, type, strike, dte, premium, fill_side, recorded chain)
 _SPECS = [
@@ -215,16 +195,10 @@ class _FakeClient:
         if path.endswith("/flow"):
             symbol = path.split("/")[3]
             return {"data": [_FLOW_ROWS[symbol]] if symbol in _FLOW_ROWS else [], "date": "2026-09-15"}
-        if path.endswith("/expiry-breakdown"):
-            return {"data": list(_EXPIRY_ROWS)}
-        if path.endswith("/atm-chains"):
-            return {"data": []}
         if path.endswith("/net-prem-ticks"):
             return {"data": list(_TAPE_ROWS)}
         if path.endswith("/info"):
             return {"data": _INFO_ROWS[path.split("/")[3]]}
-        if path in _DAILY_JOB_PATHS or path in _REGIME_PATHS or path.startswith("/api/earnings/"):
-            return {"data": []}
         raise AssertionError(path)
 
     async def aclose(self) -> None:
@@ -555,13 +529,9 @@ async def test_loop_keeps_one_client_across_cycles_and_closes_it(url: str) -> No
     slept, made = await _run_loop(url, client, max_sleeps=3)
     assert slept == [_SETTINGS.refresh.cadence_seconds] * 3
     assert len(made) == 1
-    # Per cycle: SPY and SMCI quotes, three depth calls, (B2b) two atm-chains and (A3) two
-    # net-premium tapes; the expiry list and ticker info on the first cycle of the day only.
-    # Phase 5.2.B-jobs (D10): the daily-job clock adds its once-a-day calls to the first tick.
-    # Phase 5.2.B5b (D10): the regime band adds seven calls to every cycle.
-    assert len(client.calls) == (
-        3 * 5 + 3 * 2 + 3 * 2 + 2 + 2 + _DAILY_JOB_CALLS + 3 * _REGIME_CALLS
-    )
+    # Per cycle: SPY and SMCI quotes, three depth calls and (A3) two net-premium tapes;
+    # ticker info for SPY and SMCI on the first cycle of the day only.
+    assert len(client.calls) == 3 * 5 + 3 * 2 + 2
     assert client.closed is True
 
 

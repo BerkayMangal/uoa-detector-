@@ -181,19 +181,6 @@ def one_lot_pct_of_capital(ask: float, capital_usd: float) -> float:
     return float(_dec(ask) * _CONTRACT_MULTIPLIER / _dec(capital_usd) * _PERCENT)
 
 
-def executable_ask(read: TradabilityRead) -> float | None:
-    """The ask an entry could actually pay, or ``None``.
-
-    ``None`` for a missing, unreturned, null, crossed or stale quote (every
-    ``kotasyon yok`` state) and for an ask that is not positive. It is the same
-    rule the cost cells follow (review FA-01/FA-02, fix1), so a row that shows
-    no round trip also shows no size (B1) and no chase verdict (B3).
-    """
-    if read.state == "no_quote" or read.lot_cost_usd is None:
-        return None
-    return read.ask if read.ask is not None and read.ask > 0 else None
-
-
 def format_pct(value: float) -> str:
     """One decimal, trailing zero dropped: 17.0 → ``17``, 5.25 → ``5.2``."""
     return f"{round(value, 1):g}"

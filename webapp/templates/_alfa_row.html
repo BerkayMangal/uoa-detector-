@@ -72,12 +72,6 @@
     </div>
   </div>
 
-  {% include "_alfa_size.html" %}
-  {% include "_alfa_moves.html" %}
-  {% include "_alfa_chase.html" %}
-  {% include "_alfa_opening.html" %}
-  {% include "_alfa_overlap.html" %}
-
   <div class="grid gap-x-5 gap-y-1 md:grid-cols-4 mt-2 text-sm">
     <div><span class="text-gray-400">{{ copy.col_dominant }}</span>
       <span class="text-gray-100" data-dominant>{{ option_type_labels[row.dominant.key.option_type] }} {{ row.dominant.key.strike }} · {{ row.dominant.key.expiry }}</span>
@@ -132,16 +126,12 @@
     </div>
   </details>
 
-  {% include "_alfa_delayed.html" %}
-
   <details class="mt-2 text-sm" data-audit>
     <summary class="cursor-pointer text-gray-400">{{ copy.audit_summary }}</summary>
     <div class="mt-2 space-y-1 text-xs text-gray-400">
       <p data-audit-source>{{ view.audit.source_text }}</p>
       <p class="text-gray-200" data-audit-score>{{ view.audit.score_text }}</p>
       <p data-audit-pre>{{ view.audit.pre_text }}</p>
-      {% if view.size_text %}<p data-size-audit>{{ view.size_text.audit_note }}</p>{% endif %}
-      {% if view.opening %}<p data-catalyst-audit>{{ catalyst_note }}</p>{% endif %}
       {% if view.audit.inputs %}
       <p class="text-gray-500">{{ copy.audit_inputs }}</p>
       <ul class="flex flex-wrap gap-x-4 gap-y-0.5" data-audit-inputs>

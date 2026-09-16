@@ -185,8 +185,7 @@ def test_gate_on_by_default_sections_and_chips(board: TestClient) -> None:
     assert "137 kontrat (son işlem anında)" in aaa
     assert re.search(r"kotasyon \d+ sn önce alındı", aaa)
     assert re.search(r"son işlem \d+ dk önce", aaa)
-    # Phase 5.2.B1 (D10): the size cell (contract §6 B1) adds a third disclosed-default marker.
-    assert aaa.count("(varsayılan değer)") == 3  # round trip, 1 contract, and the size cell
+    assert aaa.count("(varsayılan değer)") == 2  # next to the cost and the size cell
 
     bbb = _row_html(body, "BBB")
     assert 'data-chip="untradable"' in bbb

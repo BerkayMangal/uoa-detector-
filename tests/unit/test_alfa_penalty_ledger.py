@@ -295,11 +295,8 @@ def test_applied_penalties_become_the_last_counter_argument() -> None:
     assert views["AAA"].narrative.counter == "AMA ceza defterinde uygulanan: Düşük açık pozisyon."
     assert views["AAA"].ledger.applied_names == ("Düşük açık pozisyon",)
     assert views["BBB"].narrative.counter == NO_COUNTER_FOUND
-    # Phase 5.2.B3 (D10): build_alfa_page now always passes a ChaseCheck, so the fallback's
-    # checked list names the chase check too (contract §5 A5: only checks that actually ran).
     assert views["BBB"].narrative.checked == (
-        "Bakılanlar: maliyet (İŞLENİR), aleyhte aile (0), kovalama (hâlâ makul), "
-        "bilinmeyen aile (1), ceza defteri (0 uygulanan)."
+        "Bakılanlar: maliyet (İŞLENİR), aleyhte aile (0), bilinmeyen aile (1), ceza defteri (0 uygulanan)."
     )
     assert views["BBB"].ledger.profile_text.startswith("Sayılar satırı yazan profilden: v5_default")
 
