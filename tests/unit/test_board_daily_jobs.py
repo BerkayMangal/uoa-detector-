@@ -507,5 +507,8 @@ async def test_a_not_found_is_no_data_not_a_key_failure(engine: Engine) -> None:
         "UnusualWhales GET /x returned HTTP 404: not found", status_code=404,
     )
     report = await _tick(engine, [_failing("a", missing), _recording("b", log)])
-    assert [status for _name, status, _detail in report.ran] == ["failed", "success"]
+    # Phase 5.2.B-fix1 (D10, review FB-02): a not-found answer is no data (program rule 9),
+    # so it is marked "success" with a "no data" detail instead of "failed", which used to
+    # re-spend the job's requests every cadence until ET midnight.
+    assert [status for _name, status, _detail in report.ran] == ["success", "success"]
     assert log == ["b"]

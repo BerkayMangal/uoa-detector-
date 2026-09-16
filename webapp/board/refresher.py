@@ -225,6 +225,26 @@ class SoftCap:
         return self._count is not None and self._day == now.date() and self._count >= self._cap
 
 
+class DailyJobCap:
+    """The soft cap as the daily-job clock sees it (Phase 5.2.B-fix1, review FB-H1/FB-01).
+
+    Contract §4.1 makes the daily jobs non-critical fetches, so they pause with
+    the rest of the non-critical work. ``run_daily_jobs`` only asks whether the
+    cap is reached; observing the client's last seen ``x-uw-daily-req-count``
+    here keeps that answer current between two jobs of the same tick without
+    giving the clock a client attribute of its own.
+    """
+
+    def __init__(self, cap: SoftCap, client: BoardClient, clock: Callable[[], datetime]) -> None:
+        self._cap = cap
+        self._client = client
+        self._clock = clock
+
+    def reached(self, now: datetime) -> bool:
+        self._cap.observe(self._client.last_daily_request_count, self._clock())
+        return self._cap.reached(now)
+
+
 @dataclass(frozen=True)
 class CycleReport:
     run_id: str | None  # None: no live run has a print on the current ET trading date
@@ -953,7 +973,9 @@ async def board_refresh_loop(
                 jobs_report = await run_daily_jobs(
                     client, engine, settings,
                     jobs=jobs, reader=reader, journal=journal, now=now,
+                    cap=DailyJobCap(soft_cap, client, now_fn),
                 )
+                soft_cap.observe(client.last_daily_request_count, now_fn())
                 if open_now:
                     reports = await _run_market_cycle(
                         client, engine, settings,

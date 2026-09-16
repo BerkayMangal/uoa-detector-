@@ -29,10 +29,13 @@ FAZ C appends its outcome job as one more entry.
 - today is a trading day (``trading_day_only`` jobs only);
 - ``alfa_job_run`` holds no success marker for (job, ET date);
 - its last attempt, if any, is at least ``refresh.cadence_seconds`` old, so a
-  failed job retries at most once per cadence.
+  failed job retries at most once per cadence;
+- it has been attempted fewer than ``refresh.daily_job_max_attempts`` times
+  today, so a job that keeps failing stops instead of re-spending its requests
+  every cadence until ET midnight (review FB-H1/FB-02).
 
-**Markers.** ``alfa_job_run`` (job_name, et_date) records status, start, finish
-and a short detail. It is rebuildable: it carries no forward evidence, only
+**Markers.** ``alfa_job_run`` (job_name, et_date) records status, start, finish,
+the attempt count and a short detail. It is rebuildable: it carries no forward evidence, only
 what ran. Because the marker is keyed by the ET date and written on success, a
 Railway restart neither repeats a finished day's job nor skips one that had not
 run yet — catch-up after a restart is intended.
@@ -43,11 +46,15 @@ one wasted set of requests whose jobs then store nothing.
 
 **Isolation.** One job's exception is logged and marked ``failed``; the rest of
 the due jobs still run. ``UnusualWhalesDailyLimitError`` and a key failure
-(HTTP 401/403) propagate to the loop, which backs off. Any other 4xx, a
-not-found and the degraded-error family are that job's own business: the data
-layers already report them without raising. Daily jobs are non-critical for the
-soft cap in the sense that they never pause journal-leg quotes; the loop pauses
-them with the rest of the non-critical work.
+(HTTP 401/403) propagate to the loop, which backs off. Any other 4xx and the
+degraded-error family are that job's own business: the data layers already
+report them without raising. A not-found answer is no data (program rule 9): it
+is marked ``success`` with a ``no data`` detail, so an empty source does not
+become a daily retry loop.
+
+**Soft cap.** Daily jobs are non-critical fetches (contract §4.1), so the loop
+hands its ``SoftCap`` in as ``cap``. While it is reached, the step runs nothing
+and marks nothing: every pending job stays due for a later tick.
 """
 
 from __future__ import annotations
@@ -60,7 +67,7 @@ from decimal import ROUND_HALF_UP, Decimal
 from typing import TYPE_CHECKING, Final, Literal, Protocol, cast
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import Date, DateTime, String, select
+from sqlalchemy import Date, DateTime, Integer, String, select
 from sqlalchemy.orm import Mapped, Session, mapped_column
 
 from uoa_detector.sources.unusual_whales.client import (
@@ -123,6 +130,8 @@ class AlfaJobRun(AlfaBase):
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     detail: Mapped[str | None] = mapped_column(String, nullable=True)
+    # Phase 5.2.B-fix1: attempts of this (job, ET date), so a job that keeps failing stops.
+    attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
 
 def ensure_job_run_tables(engine: Engine) -> None:
@@ -138,6 +147,7 @@ class JobState:
     started_at: datetime
     finished_at: datetime | None
     detail: str | None
+    attempts: int = 0  # Phase 5.2.B-fix1: attempts started on this ET date
 
     @property
     def succeeded(self) -> bool:
@@ -178,6 +188,17 @@ class JobRun(Protocol):
     """One job body: it runs and returns a short English detail for the marker."""
 
     async def __call__(self, ctx: JobContext) -> str: ...
+
+
+class RequestCap(Protocol):
+    """What the clock needs from the refresher's ``SoftCap`` (contract §4.1).
+
+    The clock only asks whether the key-wide daily request count has reached
+    the cap; the refresher's adapter observes the client's latest count first,
+    so the answer stays current between two jobs of the same tick.
+    """
+
+    def reached(self, now: datetime) -> bool: ...
 
 
 @dataclass(frozen=True)
@@ -322,8 +343,14 @@ def is_due(
     now: datetime,
     state: JobState | None,
     cadence_seconds: int,
+    max_attempts: int | None = None,
 ) -> bool:
-    """Contract §4.1: past its ET time today, a trading day, not done, not retried too soon."""
+    """Contract §4.1: past its ET time today, a trading day, not done, not retried too soon.
+
+    ``max_attempts`` bounds the attempts of one (job, ET date): once they are
+    spent the job is no longer offered today (None: no bound, the behaviour
+    before Phase 5.2.B-fix1).
+    """
     today = et_date(now)
     if job.trading_day_only and not is_trading_day(today):
         return False
@@ -333,7 +360,9 @@ def is_due(
         return True
     if state.succeeded:
         return False
-    return _as_utc(now) - _as_utc(state.started_at) >= timedelta(seconds=cadence_seconds)
+    if _as_utc(now) - _as_utc(state.started_at) < timedelta(seconds=cadence_seconds):
+        return False
+    return max_attempts is None or state.attempts < max_attempts
 
 
 def due_jobs(
@@ -342,11 +371,15 @@ def due_jobs(
     now: datetime,
     states: Mapping[str, JobState],
     cadence_seconds: int,
+    max_attempts: int | None = None,
 ) -> list[DailyJob]:
     """The due jobs, in registry order."""
     return [
         job for job in jobs
-        if is_due(job, now=now, state=states.get(job.name), cadence_seconds=cadence_seconds)
+        if is_due(
+            job, now=now, state=states.get(job.name), cadence_seconds=cadence_seconds,
+            max_attempts=max_attempts,
+        )
     ]
 
 
@@ -356,6 +389,7 @@ def seconds_until_next_job(
     now: datetime,
     states: Mapping[str, JobState],
     cadence_seconds: int,
+    max_attempts: int | None = None,
 ) -> float | None:
     """Seconds until the next job is due (0.0 when one is due now), or None with no jobs.
 
@@ -367,14 +401,25 @@ def seconds_until_next_job(
     waits: list[float] = []
     for job in jobs:
         state = states.get(job.name)
-        if is_due(job, now=now, state=state, cadence_seconds=cadence_seconds):
+        if is_due(
+            job, now=now, state=state, cadence_seconds=cadence_seconds,
+            max_attempts=max_attempts,
+        ):
             return 0.0
-        waits.append(_wait_for(job, now=moment, state=state, cadence_seconds=cadence_seconds))
+        waits.append(_wait_for(
+            job, now=moment, state=state, cadence_seconds=cadence_seconds,
+            max_attempts=max_attempts,
+        ))
     return min(waits) if waits else None
 
 
 def _wait_for(
-    job: DailyJob, *, now: datetime, state: JobState | None, cadence_seconds: int,
+    job: DailyJob,
+    *,
+    now: datetime,
+    state: JobState | None,
+    cadence_seconds: int,
+    max_attempts: int | None = None,
 ) -> float:
     today = et_date(now)
     day = today
@@ -385,6 +430,10 @@ def _wait_for(
         if not job.trading_day_only or is_trading_day(day):
             due_at = scheduled_at(job, day).astimezone(UTC)
             if state is not None and not state.succeeded and day == today:
+                if max_attempts is not None and state.attempts >= max_attempts:
+                    # Today's attempts are spent: the next chance is the job's next day.
+                    day += timedelta(days=1)
+                    continue
                 due_at = max(due_at, _as_utc(state.started_at) + timedelta(seconds=cadence_seconds))
             if due_at > now:
                 candidates.append(due_at)
@@ -421,14 +470,18 @@ def read_job_states(engine: Engine, *, day: date) -> dict[str, JobState]:
             started_at=_as_utc(row.started_at),
             finished_at=_as_utc(row.finished_at) if row.finished_at is not None else None,
             detail=row.detail,
+            attempts=row.attempts or 0,
         )
         for row in rows
     }
 
 
 def mark_started(engine: Engine, *, job: str, day: date, now: datetime) -> None:
-    """Record the attempt before it runs, so a crash still spaces the retry."""
-    _write(engine, job=job, day=day, status="running", started_at=_as_utc(now), finished_at=None, detail=None)
+    """Record the attempt before it runs, so a crash still spaces the retry and counts."""
+    _write(
+        engine, job=job, day=day, status="running", started_at=_as_utc(now),
+        finished_at=None, detail=None, count_attempt=True,
+    )
 
 
 def mark_finished(
@@ -449,6 +502,7 @@ def _write(
     started_at: datetime | None,
     finished_at: datetime | None,
     detail: str | None,
+    count_attempt: bool = False,
 ) -> None:
     _ready(engine)
     with Session(engine) as session, session.begin():
@@ -457,9 +511,11 @@ def _write(
             session.add(AlfaJobRun(
                 job_name=job, et_date=day, status=status,
                 started_at=started_at or finished_at or datetime.now(UTC),
-                finished_at=finished_at, detail=detail,
+                finished_at=finished_at, detail=detail, attempts=int(count_attempt),
             ))
             return
+        if count_attempt:
+            row.attempts = (row.attempts or 0) + 1
         row.status = status
         if started_at is not None:
             row.started_at = started_at
@@ -607,19 +663,33 @@ async def run_daily_jobs(
     reader: RunReader,
     journal: OpenTrades | None,
     now: datetime,
+    cap: RequestCap | None = None,
 ) -> JobsReport:
     """Run every due job once, in registry order.
 
     Nothing is read from the database until at least one job is due, so a tick
     with nothing to do costs one small marker query. A job's own exception is
     logged and marked ``failed``; the daily limit and a key failure propagate.
+
+    ``cap`` is the refresher's daily-request soft cap. While it is reached the
+    step runs nothing and marks nothing, so every pending job stays due for a
+    later tick (contract §4.1; review FB-H1/FB-01).
     """
     day = et_date(now)
     cadence = settings.refresh.cadence_seconds
     states = await asyncio.to_thread(read_job_states, engine, day=day)
-    pending = due_jobs(jobs, now=now, states=states, cadence_seconds=cadence)
+    pending = due_jobs(
+        jobs, now=now, states=states, cadence_seconds=cadence,
+        max_attempts=settings.refresh.daily_job_max_attempts,
+    )
     if not pending:
         return JobsReport(et_date=day, due=(), ran=())
+    if cap is not None and cap.reached(now):
+        _logger.warning(
+            "board daily jobs: daily request soft cap reached; %d job(s) wait for a later tick",
+            len(pending),
+        )
+        return JobsReport(et_date=day, due=tuple(job.name for job in pending), ran=())
     tickers = await asyncio.to_thread(
         job_tickers, engine, reader, journal, settings=settings, now=now,
     )
@@ -629,6 +699,12 @@ async def run_daily_jobs(
     )
     ran: list[tuple[str, JobStatus, str]] = []
     for job in pending:
+        if cap is not None and cap.reached(now):
+            _logger.warning(
+                "board daily jobs: daily request soft cap reached; %s waits for a later tick",
+                job.name,
+            )
+            break
         await asyncio.to_thread(mark_started, engine, job=job.name, day=day, now=now)
         try:
             detail = await job.run(ctx)
@@ -636,9 +712,11 @@ async def run_daily_jobs(
             await _finish(engine, job.name, day, now, "failed", f"daily limit: {exc}")
             raise
         except UnusualWhalesNotFoundError as exc:
+            # Program rule 9: a not-found answer is no data, not a failure. Marking it
+            # failed would re-spend the job's requests every cadence (review FB-02).
             _logger.warning("board daily job %s: no data (%s)", job.name, exc)
-            await _finish(engine, job.name, day, now, "failed", f"not found: {exc}")
-            ran.append((job.name, "failed", "not found"))
+            await _finish(engine, job.name, day, now, "success", f"no data: {exc}")
+            ran.append((job.name, "success", "no data"))
         except UnusualWhalesAuthError as exc:
             await _finish(engine, job.name, day, now, "failed", f"auth: {exc}")
             if is_key_failure(exc):
