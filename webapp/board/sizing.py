@@ -40,6 +40,7 @@ lives here (D8): capital, R and the commission come from ``BoardSettings``.
 
 from __future__ import annotations
 
+import logging
 import math
 from dataclasses import dataclass
 from decimal import Decimal
@@ -56,6 +57,8 @@ if TYPE_CHECKING:
     from uoa_detector.backtest.store import StoredSignal
     from webapp.board.settings import CostSettings, SizingSettings
     from webapp.board.tradability import TradabilityRead
+
+_logger = logging.getLogger(__name__)
 
 # Market structure, not a cutoff: one US equity option contract covers 100 shares.
 _CONTRACT_MULTIPLIER: Final = Decimal(100)
@@ -154,6 +157,27 @@ def bucket_for_label(label: SignalLabel) -> RiskBucket:
     return LABEL_BUCKETS[label]
 
 
+def _bucket_name(signal: StoredSignal | None) -> str | None:
+    """The source print's risk bucket, or None when it cannot be named.
+
+    ``bucket_for_label`` stays strict, so the parity test fails loudly if a label
+    is added to ``SignalLabel`` without a mapping here. The render path must not
+    turn that into a 500 though: an unmapped label reads the same "kaynak
+    baskının kaydı okunamadı" the cell already uses for an unreadable source
+    print (review FB-07). ``RiskSizer`` itself defaults an unmapped label to
+    ``DISCARD``, so the board is the only place that could have raised.
+    """
+    if signal is None:
+        return None
+    try:
+        return bucket_for_label(signal.label).value
+    except KeyError:
+        _logger.warning(
+            "alfa size: label %s has no risk bucket; the cell reads bilinmiyor", signal.label,
+        )
+        return None
+
+
 def lots_for(risk_usd: float | None, ask: float | None, commission_per_contract_usd: float) -> int | None:
     """``floor(risk / (ask x 100 + commission))``; None when risk or the ask is unknown."""
     if risk_usd is None or ask is None:
@@ -176,7 +200,7 @@ def build_size(
     """The size cell of one row, from its source print and its tradability chip."""
     ask = executable_ask(chip)
     max_r = signal.max_r if signal is not None else None
-    bucket = bucket_for_label(signal.label).value if signal is not None else None
+    bucket = _bucket_name(signal)
     risk = max_r * sizing.r_usd if max_r is not None else None
     return SizeRead(
         bucket=bucket,
