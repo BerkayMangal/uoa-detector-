@@ -17,13 +17,6 @@ from sqlalchemy import create_engine
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
-# Phase 5.2.PERF7: the board reads about twenty sources per render and Railway's
-# Postgres lives in another project, so a connection the proxy has already dropped
-# costs a full reconnect on its next use (0.37 s, measured live). pool_pre_ping
-# checks a connection before handing it out and replaces only a dead one. An earlier
-# attempt also set pool_recycle=280 s and made things worse: these pages are read
-# minutes apart, so every render exceeded the window and paid the reconnect anyway.
-
 TABLE_PREFIX = "alfa_"
 _DEFAULT_URL = "sqlite:///webapp/seed.db"
 
@@ -43,7 +36,7 @@ def normalize_database_url(url: str) -> str:
 def make_engine(database_url: str | None = None) -> Engine:
     """Engine for ``database_url``, or ``$DATABASE_URL``, or the local seed DB."""
     url = database_url or os.environ.get("DATABASE_URL", _DEFAULT_URL)
-    return create_engine(normalize_database_url(url), future=True, pool_pre_ping=True)
+    return create_engine(normalize_database_url(url), future=True)
 
 
 def create_tables(engine: Engine) -> None:
