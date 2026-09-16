@@ -27,6 +27,9 @@ Contract: ``docs/phase-5.2-alfa-board-acceptance.md`` §4.1 ("Render"), §5 A1,
   (``webapp/board/penalty_ledger.py``), with numbers from the calibration
   profile that wrote the row. Applied penalties feed the counter-argument's
   last priority.
+- B1: each row carries its position-size cell (``webapp/board/sizing.py``): one
+  lot in dollars and as a share of capital, and the profile risk bucket's lot
+  count. The ``max_r`` disclosure goes in the audit block only (R-EV2).
 - A7: the page counts clean candidates (R-EM1): İŞLENİR rows whose evidence is
   within ``clean_candidate``. ``min_supporting`` counts only families that
   point the row's way: a non-directional lehte family (dealer gamma, decision
@@ -91,6 +94,7 @@ from webapp.board.penalty_ledger import (
     resolve_profile,
 )
 from webapp.board.quotes import dominant_symbol, read_board_quotes
+from webapp.board.sizing import SIZE_COPY, SizeRead, SizeText, build_size, size_text
 from webapp.board.tradability import (
     CHIP_COPY,
     STATE_LABELS,
@@ -273,6 +277,9 @@ class AlfaRowView:
     narrative: RowNarrative
     ledger: PenaltyLedger
     clean_candidate: bool  # R-EM1
+    # FAZ B fields are appended with defaults, so every earlier construction stays valid.
+    size: SizeRead | None = None  # B1
+    size_text: SizeText | None = None  # B1
 
 
 @dataclass(frozen=True)
@@ -590,6 +597,9 @@ def build_alfa_page(
             profile=profile_resolver(profile_hash) if profile_resolver is not None and profile_hash else None,
             m24_telemetry=stage_rows.get(M24_STAGE) if stage_rows is not None else None,
         )
+        row_size = build_size(
+            signal=signal, chip=chip, sizing=settings.sizing, cost=settings.cost,
+        )
         views.append(
             AlfaRowView(
                 row=row,
@@ -610,6 +620,8 @@ def build_alfa_page(
                     chip, evidence.counts, settings.clean_candidate,
                     non_directional_supporting=len(evidence.non_directional_supporting_labels()),
                 ),
+                size=row_size,
+                size_text=size_text(row_size),
             ),
         )
     ordered = tuple(sorted(views, key=_view_order))
@@ -695,6 +707,7 @@ def template_context() -> dict[str, object]:
         "case_class": CASE_CLASS,
         "case_title_class": CASE_TITLE_CLASS,
         "ledger_copy": LEDGER_COPY,
+        "size_copy": SIZE_COPY,
         "no_clean_candidate_label": NO_CLEAN_CANDIDATE,
         "iv_not_sell_vol": IV_NOT_SELL_VOL,
     }
