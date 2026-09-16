@@ -37,7 +37,9 @@ def test_dashboard_renders_vol_board(monkeypatch) -> None:
     body = _body(monkeypatch, {"NVDA": _ctx("NVDA", 0.9)})
     assert "NVDA" in body
     assert "IV-rank" in body or "IV rank" in body
-    assert "Notable flow" in body
+    # Phase 5.2.A7 (D10): "/" is the Alfa Board; the per-print "Notable flow" cards are gone.
+    assert 'id="alfa-board"' in body
+    assert "Notable flow" not in body
     # Honesty is rendered: the vol-board caveat shows on the page. (The stronger
     # no-"buy"-language guarantee is unit-tested at the copy level in
     # test_vol_board.py; base.html also carries a global "not a buy signal" line.)

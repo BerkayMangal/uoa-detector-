@@ -130,24 +130,6 @@ def headline(option_type: str, label: str, swept: bool, dte: int) -> str:
     return " · ".join(bits)
 
 
-def conviction(score: float | None) -> tuple[str, int]:
-    """Map the combined score to a (tier word, 0-100 meter %) for display.
-
-    Conviction = how strong / corroborated the signal is. Deliberately NOT a
-    probability of profit — the backtest found no mechanical edge.
-    """
-    if score is None:
-        return ("—", 0)
-    pct = max(0, min(100, round(score / 0.5 * 100)))
-    if score >= 0.40:
-        return ("Strong", pct)
-    if score >= 0.30:
-        return ("Moderate", pct)
-    if score >= 0.20:
-        return ("Weak", pct)
-    return ("Noise", pct)
-
-
 def vol_structure(*, regime: str) -> str:
     """Structure TEMPLATE text (type, not strikes) shown per gamma regime, with
     the research outcome attached. Descriptive — never a recommendation."""

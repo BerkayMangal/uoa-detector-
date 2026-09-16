@@ -10,6 +10,9 @@
   costs, tail stress and walk-forward (<code>docs/edge_to_money.md</code>), and the long-gamma +
   high-IV conditioning is WEAK out of sample (<code>docs/study_D_result.md</code>).
 </p>
+{# Phase 5.2.A7, R-IV1: IV rank (richness) shows on this page, so this sentence always renders. #}
+<p class="rounded-lg border border-amber-800/40 bg-amber-900/15 px-3 py-2 mb-4 max-w-3xl text-sm text-amber-100"
+   lang="tr" data-iv-not-sell-vol>{{ iv_not_sell_vol }}</p>
 
 <div class="overflow-x-auto rounded-lg border border-gray-800">
 <table class="w-full text-sm">
@@ -36,7 +39,9 @@
           {{ '⚡ short — amplifies' if g.regime=='short' else 'long — suppresses' }}
         </span>
       </td>
-      <td class="text-right text-gray-200">${{ '%.2f'|format(g.spot) }}</td>
+      <td class="text-right text-gray-200">${{ '%.2f'|format(g.spot) }}
+        {#- Phase 5.2.A-fix5 (R-CO2, review FA-09): every price shows its as-of date. #}
+        <div class="text-[10px] text-gray-500" data-spot-as-of>as of {{ g.as_of }}</div></td>
       <td class="text-right text-gray-400">{{ '${:.0f}'.format(g.flip) if g.flip else '—' }}
         {%- if g.flip %}<span class="text-gray-600 text-xs"> {{ '↑' if g.spot > g.flip else '↓' }}</span>{% endif %}</td>
       <td class="text-right text-red-300">{{ '${:.0f}'.format(g.put_wall) if g.put_wall else '—' }}</td>
