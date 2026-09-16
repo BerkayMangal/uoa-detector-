@@ -1,6 +1,6 @@
 # Alfa Board — Berkay için özet
 
-**Son güncelleme: 2026-09-16 13:45Z (TRT 16:45).** Bu dosya çalışma sürdükçe tazelenir; en son değil,
+**Son güncelleme: 2026-09-16 14:20Z (TRT 17:20).** Bu dosya çalışma sürdükçe tazelenir; en son değil,
 sürekli yazılır. Doğrulanmamış her şey "DOĞRULANMADI" diye etiketlidir.
 
 ---
@@ -10,8 +10,8 @@ sürekli yazılır. Doğrulanmamış her şey "DOĞRULANMADI" diye etiketlidir.
 - **Durum: ÇALIŞIYOR** — FAZ A, B, C ve D canlıda.
 - **URL:** https://uoa-detector-production.up.railway.app/ — kullanıcı adı/şifre masaüstündeki
   `uoa-dashboard-login.txt` dosyasında.
-- **Canlı SHA:** `f8d9821` — tahta, doğrulama rayları, hız düzeltmeleri, karar kartları, FAZ B/D, pas defteri ve dolum kaydı.
-- **Son doğrulama:** 2026-09-16 13:38Z / 16:38 TRT, **piyasa açıkken, gerçek veriyle** — tahta 0,56 saniyede açıldı, 17 satır: 9 İŞLENİR, 3 DAR, 2 İŞLENMEZ, 3 kotasyon yok. Son baskı 31 saniye önceydi.
+- **Canlı SHA:** `fdefddc` — tahta, raylar, karar kartları, FAZ B/D, pas defteri ve dolum kaydı.
+- **Son doğrulama:** 2026-09-16 14:10Z / 17:10 TRT, seans içinde — sağlık 200, şifresiz 401, şifreli 200, dürüstlük denetimi PASS, `/defter` 0,58 s. **Tahta 9,2-10,4 saniyede açılıyor** (hedef 1,5 s); sebebi aşağıda, iş doğru çalışıyor ama yavaş.
 - **Durma sebebi:** — (çalışma sürüyor).
 - **Sırada:** tahtanın yavaşlığında suçlu kaynağı isimlendiren ölçüm (canlıya alınıyor), sonra düzeltme; ardından 13:30Z açılışında canlı veriyle doğrulama.
 
@@ -132,43 +132,29 @@ yapılmadı, indirme başlatılmadı. Ayrıntı: `docs/thetadata-decision.md`.
 
 ## 9. OLMAYANLAR / BOZULANLAR
 
-- **Karar kartları kapalı:** bugün pas geçtiğin işlemler hiçbir yere kaydedilmiyor — o veri geri gelmez.
-  Bu, kalan sürede ilk hedefim.
-- **FAZ B/D canlıya alındı ve GERİ ALINDI (09:14Z).** Sebebi tek kelimeyle: **hız**. Ölçümler:
-  tahta FAZ A+B+D ile **9,4 saniyede** açılıyordu; geri aldıktan sonra **3,9 saniye**; sözleşmedeki hedef
-  1,5 saniye. Kod kaybolmadı (`p52-faz-b`, `p52-faz-d`, `p52-int` dallarında duruyor), hız düzeltmesinden
-  sonra geri gelecek.
-- **Asıl mesele bundan büyük (REG-5):** yavaşlık FAZ B/D'nin icadı değil; **FAZ A tek başına da 3,8-3,9
-  saniye** ve hedef 1,5 saniye. Bunu şimdiye kadar kimse görmedi çünkü canlı render süresi hiç ölçülmüyordu.
-- **Hız hikâyesi, baştan sona:** sabah tahta **3,8 saniyede** açılıyordu (FAZ B+D ile 9,4 s) ve sözleşme
-  hedefi 1,5 saniyeydi. Sebep: satır şablonu her satır için yeniden derleniyormuş — tek satırlık ayar
-  hatası. Düzeltince **0,40 saniyeye** indi; FAZ B+D geri gelince 0,94 saniye oldu.
-- **Sonra bir deploy'da yine 9 saniye gördüm ve tahmin etmek yerine ölçtüm:** artık her render tek satır log
-  basıyor. Ölçüm, o 9 saniyenin **render olmadığını** gösterdi — sunucu tarafı 0,3 saniyeydi; kayıp süre
-  istek uygulamaya girmeden önce, deploy sonrası konteyner ısınmasında geçiyordu. Şu an altı ardışık
-  ölçümde uçtan uca 0,55–0,72 saniye.
-- **Hız hikâyesi kapandı, iki gerçek sebep vardı ve ikisi de ölçümle bulundu:**
-  1. **Satır şablonu her satır için yeniden derleniyordu.** Tek satırlık ayar hatası; düzeltince yerelde
-     50 satırlık render 0,64 s → 0,024 s (27 kat).
-  2. **Her istekte veritabanına yeniden bağlanılıyordu.** Tahta bir sayfada ~20 kaynak okuyor ve veritabanı
-     ayrı bir Railway projesinde; proxy'nin düşürdüğü bağlantıyı yenilemek her seferinde ~0,37 saniye
-     yiyordu. Bağlantı havuzuna ön-kontrol ve yenileme eklendi: çalışma listesi 0,37 s → **0,017 s**,
-     gamma okuması 0,38 s → **0,014 s**.
-- **Sonuç:** tahta artık **1,2-1,6 saniyede** açılıyor (sunucu tarafı 0,9-1,0 s), sözleşme sınırı 1,5 s.
-- **Bunu bilmen gereken bir tuzak var:** her deploy'dan sonra birkaç dakikalık "soğuk" pencere oluyor ve
-  aynı sürüm o aralıkta 5-11 saniye ölçülebiliyor. Bugün bu yüzden bir geri-alma hazırlayıp iptal ettim.
-  Yavaş gördüğünde birkaç dakika sonra tekrar bak; loglardaki `board timing:` satırı hangi aşamanın
-  yavaşladığını zaten söylüyor.
-- **Pratikte senin için anlamı:** tahta normalde yarım saniyede açılır; **yeni bir deploy'dan sonraki ilk
-  birkaç dakikada yavaş olabilir**, bu kendiliğinden geçer. Bir daha yavaşlarsa loglardaki `board timing:`
-  satırı hangi aşamanın yavaşladığını doğrudan söyler.
-- **FAZ B+D geri geliyor:** hız engeli kalktığı için kod güncel main üzerine yeniden hazırlandı ve
-  testleri yeşil; canlıya alınıp aynı ölçümle doğrulanacak.
-- **Doğrulama rayları canlıda (PR #12):** `/health` artık hangi commit'in ayakta olduğunu söylüyor;
-  `scripts/verify_live_board.sh` tek komutla deploy sonrası her şeyi kontrol ediyor (sağlık + SHA, şifre
-  duvarı, **sayfa açılma süresi**, dürüstlük denetimi, `alfa_` satır sayıları); `scripts/audit_board_html.py`
-  dürüstlük kurallarını **canlı HTML üzerinde** denetliyor ve sıfır satır denetlerse "geçti" demiyor, düşüyor.
-  Bu raylar olmasaydı 9,4 saniyelik tahta fark edilmeden canlıda kalacaktı.
+- **Eksik özellik yok.** Karar kartları, pas defteri `/defter`, dolum kaydı, FAZ B ve FAZ D'nin tamamı
+  canlıda ve dürüstlük denetiminden geçiyor.
+- **Bozuk olan tek şey hız: tahta seans içinde 9-10 saniyede açılıyor** (hedef 1,5 saniye). Sayfa doğru,
+  veriler doğru, sadece yavaş. `/defter` 0,58 saniye, yani sorun tahtaya özel.
+- **Sebep nerede olduğu ölçümle daraltıldı, nerede olmadığı kanıtlandı:**
+  - **Veritabanı değil:** bugünün telemetri okuması canlı veritabanında **1,2 milisaniye** ve bütün
+    `alfa_` tablolarında indeks var.
+  - **Şablon değil:** sabah bulunan "satır şablonu her satırda yeniden derleniyor" hatası düzeltildi ve
+    canlıda; render aşaması 0,01 saniye.
+  - **Bağlantı havuzu değil:** ön-kontrolü (`pre_ping`) iki kez denedim, ikisinde de tahtayı 12 saniyeye
+    çıkardı, ikisinde de ölçüp geri aldım. Kod şu an temiz.
+  - **Veri hacmiyle büyüyor:** telemetri satırları 858'den 3.588'e çıkarken sayfa modeli 0,59 saniyeden
+    7,7 saniyeye çıktı, satır sayısı sabitken. Yani Python tarafında, biriken veriyle kötüleşen bir okuma.
+- **Sıradaki adım küçük ve belirli:** sayfa modelinin içindeki kaynakları tek tek ölçen logu canlıya almak
+  (bugün yamayı iki kez yanlış yere uyguladım), suçlu okumayı isimlendirip sözlüğe çevirmek, aynı ölçümle
+  doğrulamak. Bu düzeltilene kadar tahta çalışır ama açılması yavaş.
+- **Ölçüm kuralı:** her deploy'dan sonra 3-5 dakika bekle; aynı sürüm o aralıkta 5-13 saniye ölçülebiliyor.
+  Bugün bir kez erken ölçüp doğru bir şeyi geri aldım, bir kez de erken ölçümü "soğuk" sayıp yanlış bir
+  şeyi tuttum.
+- **Doğrulama rayları canlıda:** `/health` hangi commit'in ayakta olduğunu söylüyor;
+  `scripts/verify_live_board.sh` deploy sonrası sağlık + şifre duvarı + **açılma süresi** + dürüstlük
+  denetimi + `alfa_` satır sayılarını tek komutta koşuyor; `scripts/audit_board_html.py` kuralları canlı
+  HTML üzerinde denetliyor ve sıfır satır denetlerse "geçti" demiyor.
 
 ## 10. YAPMADIKLARIM (negatif teyit)
 
