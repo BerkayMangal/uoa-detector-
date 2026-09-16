@@ -1,6 +1,6 @@
 # Alfa Board — Berkay için özet
 
-**Son güncelleme: 2026-09-16 12:55Z (TRT 15:55).** Bu dosya çalışma sürdükçe tazelenir; en son değil,
+**Son güncelleme: 2026-09-16 13:45Z (TRT 16:45).** Bu dosya çalışma sürdükçe tazelenir; en son değil,
 sürekli yazılır. Doğrulanmamış her şey "DOĞRULANMADI" diye etiketlidir.
 
 ---
@@ -11,7 +11,7 @@ sürekli yazılır. Doğrulanmamış her şey "DOĞRULANMADI" diye etiketlidir.
 - **URL:** https://uoa-detector-production.up.railway.app/ — kullanıcı adı/şifre masaüstündeki
   `uoa-dashboard-login.txt` dosyasında.
 - **Canlı SHA:** `f8d9821` — tahta, doğrulama rayları, hız düzeltmeleri, karar kartları, FAZ B/D, pas defteri ve dolum kaydı.
-- **Son doğrulama:** 2026-09-16 12:50Z / 15:50 TRT — sağlık 200 ve ayakta olan commit'i doğru bildiriyor, şifresiz 401, şifreli 200, dürüstlük denetimi 20 satırda PASS, logda hata yok; **tahta 1,2-1,6 saniyede**, `/defter` 0,25 saniyede açılıyor (sözleşme sınırı 1,5 saniye).
+- **Son doğrulama:** 2026-09-16 13:38Z / 16:38 TRT, **piyasa açıkken, gerçek veriyle** — tahta 0,56 saniyede açıldı, 17 satır: 9 İŞLENİR, 3 DAR, 2 İŞLENMEZ, 3 kotasyon yok. Son baskı 31 saniye önceydi.
 - **Durma sebebi:** — (çalışma sürüyor).
 - **Sırada:** tahtanın yavaşlığında suçlu kaynağı isimlendiren ölçüm (canlıya alınıyor), sonra düzeltme; ardından 13:30Z açılışında canlı veriyle doğrulama.
 
@@ -36,6 +36,28 @@ FAZ A öncesine (eski dashboard) döner, veri kaybı olmaz.
    ve **kanıt şeridi** (altı aile: Akış, Dealer gamma, Karanlık havuz, Sektör, Fiyat teyidi, Açık pozisyon).
 3. Her satırda **`AMA …`** ile başlayan karşı-argüman cümlesi olmalı. Yoksa bu bir hatadır.
 4. `Denetim` bloğunu aç → 0–1 skoru ve ceza defteri **yalnızca burada** görünür; satır yüzünde asla.
+
+## 3.5 AÇILIŞTAN SONRA NE ÖLÇTÜM (16:38 TRT, canlı veri)
+
+Sabahki kontroller piyasa kapalıyken yapılmıştı; kapalıyken her şeyin "bilinmiyor" demesi hiçbir şey
+kanıtlamaz. Açılıştan sonra ölçtüklerim:
+
+| Ne | Gerçek değer |
+|---|---|
+| Satırlar ve çipler | 17 satır: 9 İŞLENİR, 3 DAR, 2 İŞLENMEZ, 3 kotasyon yok |
+| Kanıt aileleri | 17 lehte, 15 aleyhte, 48 nötr (ölçüldü), 18 bilinmiyor — artık ölçülüyor |
+| Maliyet | `Gidiş-dönüş (1 kontrat, iki bacak, komisyon dahil) $11.30`, makas %1,4, bid $6.95 / ask $7.05 |
+| Kotasyon yaşı | `kotasyon 179 sn önce alındı · son işlem 3 dk önce` |
+| Başabaş / straddle | 14 satırda, ör. `Başabaş için %3.8 gerekir` |
+| Kovalama | 14 satırda, ör. `baskı $14.15 → şimdi $14.65 (ask), %3.5 yukarıda` |
+| Rejim bandı | `IV vadesi contango (IV30 %13.7…)` |
+| Gecikmeli kova | 17 satırın hepsinde `ek kanıt (gecikmeli)` |
+| Çıkış derinliği | ör. `712 kontrat (son işlem anında)` |
+| Veri tabloları | kotasyon 44, ATM 27, vade 238, net prim 54, telemetri 858, rejim 13, derinlik 10 satır |
+
+**Dikkatini çekecek tek şey:** pozisyon büyüklüğü her satırda **"0 lot"** diyor. Bu bir hata değil —
+varsayılan R değeri 100 $ ve bir kontrat ~705 $, yani 1 lot bile riski aşıyor. Gerçek sermaye ve R
+değerlerini söylediğin anda bu hücre anlamlı sayıya döner (aşağıda 1. madde).
 
 ## 4. ŞU AN NORMAL OLAN ŞEYLER (bug sanma)
 
