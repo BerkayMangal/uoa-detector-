@@ -16,6 +16,6 @@
   <span class="px-2 py-0.5 rounded border {{ opening_style['unknown'] if view.opening.dimmed else opening_style[view.opening.state] }}"
         data-oi-label>{{ view.opening.label }}</span>
   <span class="px-2 py-0.5 rounded border {{ 'border-dashed border-gray-600 text-gray-500 opacity-70' if view.opening.catalyst_dimmed else 'border-gray-700 text-gray-300' }}"
-        data-catalyst="{{ 'var' if view.opening.catalyst_in_window else 'yok' }}">{{ view.opening.catalyst_text }}</span>
+        data-catalyst="{{ 'var' if view.opening.catalyst_in_window else ('yok' if view.opening.catalyst_known else 'bilinmiyor') }}">{{ view.opening.catalyst_text }}</span>
 </div>
 {% endif %}

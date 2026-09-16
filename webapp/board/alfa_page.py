@@ -394,6 +394,16 @@ class OpeningView:
     catalyst_in_window: tuple[str, ...]  # frozen kind labels; feeds the counter-argument (A5)
     catalyst_dimmed: bool
 
+    @property
+    def catalyst_known(self) -> bool:
+        """Was the chip read at all? A dimmed chip is one whose count is not a zero.
+
+        Phase 5.2.B-fix3 (review FB-H3/FB-03): with no chip, or with any part
+        reading ``bilinmiyor``, the row must not claim ``vade içi katalizör (0)``
+        or ``data-catalyst="yok"`` (R-UN1).
+        """
+        return not self.catalyst_dimmed
+
 
 @dataclass(frozen=True)
 class RegimeView:
@@ -981,9 +991,13 @@ def build_alfa_page(
                     row, evidence, chip,
                     settings=settings.narrative,
                     chase=ChaseCheck(verdict=row_chase.label, late=row_chase.late),
-                    # The catalyst check only ran when a source supplied the chip (§5 A5).
+                    # The catalyst check only ran when a source supplied the chip (§5 A5),
+                    # and a chip we could not read is named unknown, never a zero (B-fix3).
                     catalyst=(
-                        CatalystCheck(in_window=opening.catalyst_in_window)
+                        CatalystCheck(
+                            in_window=opening.catalyst_in_window,
+                            known=opening.catalyst_known,
+                        )
                         if catalyst_source is not None
                         else None
                     ),

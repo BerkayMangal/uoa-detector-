@@ -174,7 +174,9 @@ def test_a_catalyst_inside_the_window_renders_and_a_never_fetched_source_reads_u
     assert kat is not None
     assert kat.startswith("Vade içinde katalizör: Kazanç: 17.09 kapanış sonrası")
     assert "FDA: bilinmiyor" in kat and "Makro: bilinmiyor" in kat
-    other = _cell(rows["ACI"], 'data-catalyst="yok"')
+    # Phase 5.2.B-fix3 (D10, review FB-H3): ACI's sources were never fetched, so the
+    # attribute reads "bilinmiyor" with the chip text instead of the clean "yok".
+    other = _cell(rows["ACI"], 'data-catalyst="bilinmiyor"')
     assert other == "Vade içinde katalizör: Kazanç: bilinmiyor · FDA: bilinmiyor · Makro: bilinmiyor"
 
 
@@ -189,7 +191,9 @@ def test_the_fallback_checked_list_names_the_catalyst_check(client: TestClient) 
     assert counter == "Bariz bir karşı argüman bulunamadı — bu bir onay değildir"
     checked = _cell(row, "<p data-checked")
     assert checked is not None
-    assert "vade içi katalizör (0)" in checked
+    # Phase 5.2.B-fix3 (D10, review FB-H3): the same row's chip is unreadable, so the
+    # check is named unknown rather than counted as a measured zero (R-UN1).
+    assert "vade içi katalizör (bilinmiyor)" in checked
 
 
 # ---------------------------------------------------------------------------
