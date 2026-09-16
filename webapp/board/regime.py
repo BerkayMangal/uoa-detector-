@@ -30,8 +30,11 @@ is out of scope.
 Pure: ``build_regime_band`` turns loaded readings into sentence parts, chips and
 the three tripwires, with the ``BoardSettings.regime`` cutoffs. A source older than
 ``regime.max_source_age_seconds`` renders ``bilinmiyor``. The daily greek-exposure
-reading counts as fresh when it was fetched on the current ET date. The band never
-enters the evidence count.
+reading counts as fresh when it was fetched on the current ET date, and the two
+term-structure readings must also carry the vendor's own date of today: they are
+daily rows, so ageing them by our fetch time alone would render a week-old reading
+as current (Phase 5.2.B-fix5, review FB-H5). The band never enters the evidence
+count.
 
 UW errors: NotFound is no data; rate limit, transient and an open breaker mark the
 source degraded and the job continues; daily limit and auth errors propagate.
@@ -124,6 +127,8 @@ TIDE_TEMPLATE: Final = (
 )
 GAMMA_TEMPLATE: Final = "{ticker} {word}: {value}/%1"
 PERCENTILE_TEMPLATE: Final = "1 yıllık yüzdelik %{pct} ({as_of} itibarıyla)"
+# Phase 5.2.B-fix5: the vendor's own date on a daily-dated reading (review FB-H5).
+AS_OF_TEMPLATE: Final = "({as_of} itibarıyla)"
 FLIP_TEMPLATE: Final = "{ticker} en yakın strike işaret değişimi {level} (spottan %{distance})"
 CURVE_TEMPLATE: Final = (
     "SPY IV vadesi {word} (IV{short_dte}G %{short_iv} · IV{long_dte}G %{long_iv})"
@@ -515,8 +520,26 @@ def build_regime_band(
     history = {
         h.ticker: h for h in inputs.history if h.fetched_at.astimezone(_ET).date() == today
     }
-    curve = inputs.curve if inputs.curve and fresh(None, inputs.curve.fetched_at) else None
-    vix = inputs.vix if inputs.vix and fresh(None, inputs.vix.fetched_at) else None
+    def dated_fresh(as_of: date | None, fetched_at: datetime) -> bool:
+        """A vendor-dated reading: fresh by our fetch clock, and not dated before today.
+
+        The term-structure rows carry the vendor's own date. Ageing them by our
+        fetch time alone let a week-old reading render as "2 dk önce alındı" and
+        drive the curve tripwire (review FB-H5). A reading without a date keeps
+        the fetch-time rule.
+        """
+        return fresh(None, fetched_at) and (as_of is None or as_of >= today)
+
+    curve = (
+        inputs.curve
+        if inputs.curve and dated_fresh(inputs.curve.as_of, inputs.curve.fetched_at)
+        else None
+    )
+    vix = (
+        inputs.vix
+        if inputs.vix and dated_fresh(inputs.vix.as_of, inputs.vix.fetched_at)
+        else None
+    )
 
     chips: list[RegimeChip] = []
     parts: list[str] = []
@@ -582,7 +605,9 @@ def build_regime_band(
             word=CURVE_WORDS[curve_state], short_dte=curve.short_dte,
             short_iv=_vol(curve.short_iv), long_dte=curve.long_dte, long_iv=_vol(curve.long_iv),
         )
-        chips.append(RegimeChip(key="curve", state=curve_state, known=True, text=text))
+        chips.append(RegimeChip(
+            key="curve", state=curve_state, known=True, text=text + _as_of_suffix(curve.as_of),
+        ))
     else:
         text = SOURCE_UNKNOWN_TEMPLATE.format(label=CURVE_LABEL)
         chips.append(RegimeChip(key="curve", state="unknown", known=False, text=text))
@@ -593,7 +618,9 @@ def build_regime_band(
     ))
     if vix is not None:
         text = VIX_SPOT_TEMPLATE.format(value=f"{vix.vix_spot:.1f}")
-        chips.append(RegimeChip(key="vix_spot", state="context", known=True, text=text))
+        chips.append(RegimeChip(
+            key="vix_spot", state="context", known=True, text=text + _as_of_suffix(vix.as_of),
+        ))
     else:
         text = SOURCE_UNKNOWN_TEMPLATE.format(label=VIX_TICKER)
         chips.append(RegimeChip(key="vix_spot", state="unknown", known=False, text=text))
@@ -608,6 +635,15 @@ def build_regime_band(
         sentence_parts=tuple(parts), sentence=PART_SEPARATOR.join(parts), chips=tuple(chips),
         tripwire_head=TRIPWIRE_HEAD, tripwires=tripwires,
     )
+
+
+def _as_of_suffix(as_of: date | None) -> str:
+    """`` · (15.09 itibarıyla)`` for a vendor-dated reading; empty without a date.
+
+    The sentence keeps the contract's wording; the date is disclosed on the chip,
+    the way the one-year gamma percentile already discloses its own (B-fix5).
+    """
+    return "" if as_of is None else PART_SEPARATOR + AS_OF_TEMPLATE.format(as_of=f"{as_of:%d.%m}")
 
 
 def tide_reversal(
