@@ -117,6 +117,13 @@ _INFO_ROWS: dict[str, dict[str, Any]] = {
     "SPY": {"symbol": "SPY", "sector": None, "issue_type": "ETF"},
     "SMCI": {"symbol": "SMCI", "sector": "Technology", "issue_type": "Common Stock"},
 }
+# Phase 5.2.B-jobs: the daily-job clock runs the pre-market and after-the-open jobs on the
+# first tick of an ET day. They answer empty here; their own tests cover their contents.
+_DAILY_JOB_PATHS: frozenset[str] = frozenset({
+    "/api/market/fda-calendar", "/api/market/economic-calendar",
+    "/api/stock/SPY/greek-exposure", "/api/stock/QQQ/greek-exposure",
+})
+_DAILY_JOB_CALLS = 7  # catalysts: 2 earnings + 2 FDA + 1 economic calendar; gamma history: 2
 # Phase 5.2.B2b: the loop also fetches the ATM straddle (expiry list once per ET day).
 _EXPIRY_ROWS: list[dict[str, Any]] = [
     {"expires": "2026-09-18", "open_interest": 531720, "volume": 25428, "chains": 150},
@@ -208,6 +215,8 @@ class _FakeClient:
             return {"data": list(_TAPE_ROWS)}
         if path.endswith("/info"):
             return {"data": _INFO_ROWS[path.split("/")[3]]}
+        if path in _DAILY_JOB_PATHS or path.startswith("/api/earnings/"):
+            return {"data": []}
         raise AssertionError(path)
 
     async def aclose(self) -> None:
@@ -540,7 +549,8 @@ async def test_loop_keeps_one_client_across_cycles_and_closes_it(url: str) -> No
     assert len(made) == 1
     # Per cycle: SPY and SMCI quotes, three depth calls, (B2b) two atm-chains and (A3) two
     # net-premium tapes; the expiry list and ticker info on the first cycle of the day only.
-    assert len(client.calls) == 3 * 5 + 3 * 2 + 3 * 2 + 2 + 2
+    # Phase 5.2.B-jobs (D10): the daily-job clock adds its once-a-day calls to the first tick.
+    assert len(client.calls) == 3 * 5 + 3 * 2 + 3 * 2 + 2 + 2 + _DAILY_JOB_CALLS
     assert client.closed is True
 
 

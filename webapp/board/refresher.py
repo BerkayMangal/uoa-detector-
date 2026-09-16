@@ -76,7 +76,6 @@ import asyncio
 import contextlib
 import logging
 import math
-import re
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime
 from decimal import Decimal, InvalidOperation
@@ -102,7 +101,19 @@ from webapp.board.atm import (
     refresh_expiry_breakdown,
     tickers_needing_expiries,
 )
+from webapp.board.catalysts import ensure_catalyst_tables
+from webapp.board.daily_close import ensure_daily_close_tables
+from webapp.board.daily_jobs import (
+    build_registry,
+    ensure_job_run_tables,
+    et_date,
+    read_job_states,
+    run_daily_jobs,
+    seconds_until_next_job,
+)
 from webapp.board.db import make_engine, session_factory
+from webapp.board.delayed import ensure_delayed_tables
+from webapp.board.etf_holdings import ensure_etf_holding_tables
 from webapp.board.evidence import (
     LegacyScores,
     build_row_evidence,
@@ -112,6 +123,7 @@ from webapp.board.evidence import (
     trade_date_et,
 )
 from webapp.board.netprem import TapeFetch, ensure_netprem_tables, fetch_net_prem_ticks, upsert_tape
+from webapp.board.oi_confirm import ensure_oi_confirm_tables
 from webapp.board.quotes import (
     DepthFetch,
     QuoteFetch,
@@ -124,6 +136,7 @@ from webapp.board.quotes import (
     upsert_depths,
     upsert_quotes,
 )
+from webapp.board.regime import ensure_regime_tables
 from webapp.board.settings import DEFAULT_BOARD_PROFILE, load_board_settings
 from webapp.board.signals import BoardSignalReader
 from webapp.board.ticker_info import (
@@ -133,6 +146,7 @@ from webapp.board.ticker_info import (
     tickers_needing_info,
     upsert_ticker_infos,
 )
+from webapp.board.uw_errors import is_key_failure
 from webapp.journal import JournalRepo
 
 if TYPE_CHECKING:
@@ -142,6 +156,7 @@ if TYPE_CHECKING:
 
     from uoa_detector.calibration.profile import UnusualWhalesSettings
     from webapp.board.aggregate import BoardRow
+    from webapp.board.daily_jobs import DailyJob, JobsReport
     from webapp.board.settings import BoardSettings
     from webapp.board.signals import BoardPrint
     from webapp.journal import TradeRow
@@ -153,9 +168,6 @@ _LIVE_RUN_PREFIX: Final = "live-"
 _ISO_DATE_LENGTH: Final = len("YYYY-MM-DD")
 _OPEN_STATUS: Final = "open"
 _OPTION_INSTRUMENTS: Final = frozenset({"call", "put"})
-# HTTP statuses that mean the key itself failed (every call would fail the same way).
-_KEY_FAILURE_STATUSES: Final = frozenset({401, 403})
-_HTTP_STATUS: Final = re.compile(r"HTTP (\d{3})")
 
 _T = TypeVar("_T")
 
@@ -259,12 +271,6 @@ class _Tally:
     degraded: int = 0
     skipped: bool = False
     ranked: list[BoardRow] = field(default_factory=list)  # board (evidence) order, for B2
-
-
-def is_key_failure(error: UnusualWhalesAuthError) -> bool:
-    """True for HTTP 401/403, or an auth error whose status cannot be read; False for another 4xx."""
-    found = _HTTP_STATUS.search(str(error))
-    return found is None or int(found.group(1)) in _KEY_FAILURE_STATUSES
 
 
 def _warn_degraded_4xx(what: str, error: UnusualWhalesAuthError) -> None:
@@ -729,6 +735,91 @@ async def run_ticker_info_job(
     return StepReport(requests=requests, written=written, degraded_fetches=degraded, skipped_non_critical=skipped)
 
 
+@dataclass(frozen=True)
+class _CycleReports:
+    """One RTH cycle's reports. An isolated step that failed is ``None``."""
+
+    cycle: CycleReport
+    atm: StepReport | None
+    tape: StepReport | None
+    info: StepReport | None
+
+
+async def _run_market_cycle(
+    client: BoardClient,
+    engine: Engine,
+    settings: BoardSettings,
+    *,
+    reader: BoardSignalReader,
+    journal: OpenTrades,
+    soft_cap: SoftCap,
+    clock: Callable[[], datetime],
+    legacy_scores: LegacyScores | None,
+) -> _CycleReports:
+    """Quotes and depth, then the ATM straddle, the net-premium tape and ticker info."""
+    cadence = settings.refresh.cadence_seconds
+    report = await run_quotes_cycle(
+        client, engine, settings,
+        reader=reader, journal=journal, soft_cap=soft_cap, clock=clock,
+        legacy_scores=legacy_scores,
+    )
+    atm_report = await _isolated(
+        "atm",
+        run_atm_cycle(
+            client, engine, settings,
+            wanted=grouped_expiries(report.wanted_expiries), soft_cap=soft_cap, clock=clock,
+        ),
+        cadence,
+    )
+    tape = await _isolated(
+        "tape",
+        run_tape_cycle(client, engine, tickers=report.tickers, soft_cap=soft_cap, clock=clock),
+        cadence,
+    )
+    info = await _isolated(
+        "ticker info",
+        run_ticker_info_job(client, engine, tickers=report.tickers, soft_cap=soft_cap, clock=clock),
+        cadence,
+    )
+    return _CycleReports(cycle=report, atm=atm_report, tape=tape, info=info)
+
+
+def _log_cycle(reports: _CycleReports) -> None:
+    report = reports.cycle
+    _logger.info(
+        "board refresher %s: %d requests, %d quotes, %d depths, %d degraded, non-critical paused=%s",
+        report.run_id, report.requests, report.quotes_written, report.depths_written,
+        report.degraded_fetches, report.skipped_non_critical,
+    )
+    steps = (("atm", reports.atm), ("tape", reports.tape), ("ticker info", reports.info))
+    for step, step_report in steps:
+        if step_report is not None:
+            _logger.info(
+                "board refresher %s: %s %d requests, %d written, %d degraded",
+                report.run_id, step, step_report.requests, step_report.written,
+                step_report.degraded_fetches,
+            )
+
+
+async def _closed_market_sleep(
+    engine: Engine, jobs: Sequence[DailyJob], settings: BoardSettings, now: datetime,
+) -> float:
+    """Outside RTH: wake for the next due daily job, capped by ``closed_market_sleep_seconds``."""
+    capped = float(settings.refresh.closed_market_sleep_seconds)
+    try:
+        states = await _off_loop(read_job_states, engine, day=et_date(now))
+    except Exception:
+        _logger.warning(
+            "board refresher: daily-job markers unreadable; sleeping the closed-market interval",
+            exc_info=True,
+        )
+        return capped
+    wait = seconds_until_next_job(
+        jobs, now=now, states=states, cadence_seconds=settings.refresh.cadence_seconds,
+    )
+    return capped if wait is None else max(1.0, min(capped, wait))
+
+
 async def board_refresh_loop(
     *,
     database_url: str,
@@ -753,6 +844,16 @@ async def board_refresh_loop(
         ensure_netprem_tables(engine)
         ensure_ticker_info_tables(engine)
         ensure_atm_tables(engine)
+        # The daily jobs' tables and their run markers (Phase 5.2.B-jobs). Append-only
+        # tables (alfa_oi_confirm, alfa_regime, alfa_delayed, alfa_daily_close) are only
+        # ever created here, never dropped or reset.
+        ensure_oi_confirm_tables(engine)
+        ensure_catalyst_tables(engine)
+        ensure_regime_tables(engine)
+        ensure_etf_holding_tables(engine)
+        ensure_daily_close_tables(engine)
+        ensure_delayed_tables(engine)
+        ensure_job_run_tables(engine)
         reader = BoardSignalReader(engine=engine)
         journal: OpenTrades = (
             journal_factory(database_url) if journal_factory is not None else JournalRepo(database_url)
@@ -766,40 +867,33 @@ async def board_refresh_loop(
             )
         )
         soft_cap = SoftCap(refresh.daily_request_soft_cap)
-        _logger.info("board refresher started (cadence %ss)", refresh.cadence_seconds)
+        jobs = build_registry(settings)
+        _logger.info(
+            "board refresher started (cadence %ss, %d daily jobs)",
+            refresh.cadence_seconds, len(jobs),
+        )
         while True:
-            if not is_market_open(now_fn()):
-                await pause(refresh.closed_market_sleep_seconds)
-                continue
+            now = now_fn()
             if client.circuit_breaker.is_open():
                 _logger.warning("board refresher: UW circuit breaker is open; skipping this cycle")
                 await pause(refresh.cadence_seconds)
                 continue
+            open_now = is_market_open(now)
+            jobs_report: JobsReport | None = None
+            reports: _CycleReports | None = None
             try:
-                report = await run_quotes_cycle(
+                # The daily-job clock runs on every tick, RTH or not: the pre-market and
+                # post-close jobs sit outside the RTH gate (Phase 5.2.B-jobs).
+                jobs_report = await run_daily_jobs(
                     client, engine, settings,
-                    reader=reader, journal=journal, soft_cap=soft_cap, clock=now_fn,
-                    legacy_scores=legacy_scores,
+                    jobs=jobs, reader=reader, journal=journal, now=now,
                 )
-                atm_report = await _isolated(
-                    "atm",
-                    run_atm_cycle(
+                if open_now:
+                    reports = await _run_market_cycle(
                         client, engine, settings,
-                        wanted=grouped_expiries(report.wanted_expiries),
-                        soft_cap=soft_cap, clock=now_fn,
-                    ),
-                    refresh.cadence_seconds,
-                )
-                tape = await _isolated(
-                    "tape",
-                    run_tape_cycle(client, engine, tickers=report.tickers, soft_cap=soft_cap, clock=now_fn),
-                    refresh.cadence_seconds,
-                )
-                info = await _isolated(
-                    "ticker info",
-                    run_ticker_info_job(client, engine, tickers=report.tickers, soft_cap=soft_cap, clock=now_fn),
-                    refresh.cadence_seconds,
-                )
+                        reader=reader, journal=journal, soft_cap=soft_cap, clock=now_fn,
+                        legacy_scores=legacy_scores,
+                    )
             except UnusualWhalesDailyLimitError:
                 _logger.warning(
                     "board refresher: UW daily request limit reached; backing off %ss",
@@ -814,19 +908,16 @@ async def board_refresh_loop(
             except Exception:
                 _logger.exception("board refresher cycle failed; next attempt in %ss", refresh.cadence_seconds)
             else:
-                _logger.info(
-                    "board refresher %s: %d requests, %d quotes, %d depths, %d degraded, non-critical paused=%s",
-                    report.run_id, report.requests, report.quotes_written, report.depths_written,
-                    report.degraded_fetches, report.skipped_non_critical,
-                )
-                for step, step_report in (("atm", atm_report), ("tape", tape), ("ticker info", info)):
-                    if step_report is not None:
-                        _logger.info(
-                            "board refresher %s: %s %d requests, %d written, %d degraded",
-                            report.run_id, step, step_report.requests, step_report.written,
-                            step_report.degraded_fetches,
-                        )
-            await pause(refresh.cadence_seconds)
+                if jobs_report is not None and jobs_report.ran:
+                    _logger.info(
+                        "board refresher daily jobs (%s): %s", jobs_report.et_date, jobs_report.ran,
+                    )
+                if reports is not None:
+                    _log_cycle(reports)
+            if open_now:
+                await pause(refresh.cadence_seconds)
+            else:
+                await pause(await _closed_market_sleep(engine, jobs, settings, now_fn()))
     finally:
         if client is not None:
             with contextlib.suppress(Exception):

@@ -67,8 +67,8 @@ if TYPE_CHECKING:
     from sqlalchemy.engine import Engine
     from sqlalchemy.orm import Session, sessionmaker
 
-    from uoa_detector.sources.unusual_whales.client import UnusualWhalesClient
     from webapp.board.settings import BoardSettings, RegimeSettings
+    from webapp.board.uw_errors import JsonClient
 
 MARKET_TIDE_PATH: Final = "/api/market/market-tide"
 SPOT_EXPOSURES_PATH: Final = "/api/stock/{ticker}/spot-exposures"
@@ -313,7 +313,7 @@ class RegimeBand:
 
 
 async def refresh_regime(
-    client: UnusualWhalesClient,
+    client: JsonClient,
     sessions: sessionmaker[Session],
     *,
     settings: BoardSettings,
@@ -331,7 +331,7 @@ async def refresh_regime(
 
 
 async def refresh_market_tide(
-    client: UnusualWhalesClient, sessions: sessionmaker[Session], *,
+    client: JsonClient, sessions: sessionmaker[Session], *,
     settings: BoardSettings, now: datetime,
 ) -> RegimeRefreshReport:
     del settings
@@ -348,7 +348,7 @@ async def refresh_market_tide(
 
 
 async def refresh_spot_exposures(
-    client: UnusualWhalesClient, sessions: sessionmaker[Session], *,
+    client: JsonClient, sessions: sessionmaker[Session], *,
     tickers: Sequence[str] = GAMMA_TICKERS, settings: BoardSettings, now: datetime,
 ) -> RegimeRefreshReport:
     del settings
@@ -365,7 +365,7 @@ async def refresh_spot_exposures(
 
 
 async def refresh_gex_levels(
-    client: UnusualWhalesClient, sessions: sessionmaker[Session], *,
+    client: JsonClient, sessions: sessionmaker[Session], *,
     tickers: Sequence[str] = GAMMA_TICKERS, settings: BoardSettings, now: datetime,
 ) -> RegimeRefreshReport:
     del settings
@@ -383,7 +383,7 @@ async def refresh_gex_levels(
 
 
 async def refresh_iv_term_structure(
-    client: UnusualWhalesClient, sessions: sessionmaker[Session], *,
+    client: JsonClient, sessions: sessionmaker[Session], *,
     settings: BoardSettings, now: datetime,
 ) -> RegimeRefreshReport:
     fetched_at = _as_utc(now)
@@ -400,7 +400,7 @@ async def refresh_iv_term_structure(
 
 
 async def refresh_vix_spot(
-    client: UnusualWhalesClient, sessions: sessionmaker[Session], *,
+    client: JsonClient, sessions: sessionmaker[Session], *,
     settings: BoardSettings, now: datetime,
 ) -> RegimeRefreshReport:
     del settings
@@ -417,7 +417,7 @@ async def refresh_vix_spot(
 
 
 async def refresh_gamma_history(
-    client: UnusualWhalesClient, sessions: sessionmaker[Session], *,
+    client: JsonClient, sessions: sessionmaker[Session], *,
     tickers: Sequence[str] = GAMMA_TICKERS, settings: BoardSettings, now: datetime,
 ) -> RegimeRefreshReport:
     """Daily job: one-year daily net gamma percentile and negative-day base rate."""
@@ -742,7 +742,7 @@ def _merge(reports: Sequence[RegimeRefreshReport], fetched_at: datetime) -> Regi
 
 
 async def _one(
-    client: UnusualWhalesClient,
+    client: JsonClient,
     sessions: sessionmaker[Session],
     acc: _Acc,
     *,

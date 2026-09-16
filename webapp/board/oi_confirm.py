@@ -57,8 +57,8 @@ if TYPE_CHECKING:
     from sqlalchemy.engine import CursorResult, Engine
     from sqlalchemy.orm import Session, sessionmaker
 
-    from uoa_detector.sources.unusual_whales.client import UnusualWhalesClient
     from webapp.board.settings import BoardSettings
+    from webapp.board.uw_errors import JsonClient
 
 HISTORIC_PATH: Final = "/api/option-contract/{symbol}/historic"
 # Request window from contract §4.4 (`historic?limit=5`): enough rows to hold T and T+1
@@ -187,7 +187,7 @@ class OiConfirmView:
 
 
 async def confirm_open_interest(
-    client: UnusualWhalesClient,
+    client: JsonClient,
     sessions: sessionmaker[Session],
     *,
     flagged: Sequence[FlaggedContract],

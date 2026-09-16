@@ -57,8 +57,8 @@ if TYPE_CHECKING:
     from sqlalchemy.engine import Engine
     from sqlalchemy.orm import Session, sessionmaker
 
-    from uoa_detector.sources.unusual_whales.client import UnusualWhalesClient
     from webapp.board.settings import BoardSettings
+    from webapp.board.uw_errors import JsonClient
 
 EARNINGS_PATH: Final = "/api/earnings/{ticker}"
 FDA_PATH: Final = "/api/market/fda-calendar"
@@ -223,7 +223,7 @@ class CatalystChip:
 
 
 async def refresh_catalysts(
-    client: UnusualWhalesClient,
+    client: JsonClient,
     sessions: sessionmaker[Session],
     *,
     tickers: Sequence[str],
@@ -246,7 +246,7 @@ async def refresh_catalysts(
 
 
 async def refresh_earnings(
-    client: UnusualWhalesClient,
+    client: JsonClient,
     sessions: sessionmaker[Session],
     *,
     tickers: Sequence[str],
@@ -268,7 +268,7 @@ async def refresh_earnings(
 
 
 async def refresh_fda(
-    client: UnusualWhalesClient,
+    client: JsonClient,
     sessions: sessionmaker[Session],
     *,
     tickers: Sequence[str],
@@ -292,7 +292,7 @@ async def refresh_fda(
 
 
 async def refresh_macro(
-    client: UnusualWhalesClient,
+    client: JsonClient,
     sessions: sessionmaker[Session],
     *,
     settings: BoardSettings,
@@ -418,7 +418,7 @@ class _Accumulator:
 
 
 async def _fetch(
-    client: UnusualWhalesClient, path: str, params: dict[str, Any] | None,
+    client: JsonClient, path: str, params: dict[str, Any] | None,
 ) -> tuple[FetchStatus, dict[str, Any] | None]:
     try:
         return "ok", await client.request_json(path, params=params)

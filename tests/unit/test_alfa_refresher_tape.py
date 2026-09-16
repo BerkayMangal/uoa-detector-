@@ -80,6 +80,14 @@ _EXPIRIES: list[dict[str, Any]] = [
     {"expires": "2026-09-18", "open_interest": 531720, "volume": 25428, "chains": 150},
     {"expires": "2026-09-25", "open_interest": 42125, "volume": 6353, "chains": 124},
 ]
+# Phase 5.2.B-jobs: the daily-job clock's pre-market and after-the-open jobs, in the order
+# the registry runs them on the first tick of an ET day (oi_confirm needs no call here).
+_DAILY_JOBS = [
+    "/api/earnings/SPY", "/api/earnings/SMCI",
+    "/api/market/fda-calendar", "/api/market/fda-calendar", "/api/market/economic-calendar",
+    "/api/stock/SPY/greek-exposure", "/api/stock/QQQ/greek-exposure",
+]
+_DAILY_JOB_PATHS: frozenset[str] = frozenset(_DAILY_JOBS)
 
 
 class _FakeClient:
@@ -114,6 +122,8 @@ class _FakeClient:
             return {"data": list(_TAPE)}
         if path.endswith("/info"):
             return {"data": _INFO[path.split("/")[3]]}
+        if path in _DAILY_JOB_PATHS or path.startswith("/api/earnings/"):
+            return {"data": []}
         raise AssertionError(path)
 
     async def aclose(self) -> None:
@@ -330,7 +340,9 @@ async def test_loop_runs_quotes_depth_tape_then_ticker_info_on_one_client(url: s
         "/api/stock/SMCI/net-prem-ticks",
     ]
     expiry_list = ["/api/stock/SPY/expiry-breakdown", "/api/stock/SMCI/expiry-breakdown"]
+    # Phase 5.2.B-jobs (D10): the daily-job clock runs before the RTH cycle, once per ET day.
     assert client.calls == [
+        *_DAILY_JOBS,
         *cycle[:4], *expiry_list, *cycle[4:],
         "/api/stock/SPY/info", "/api/stock/SMCI/info",
         *cycle,

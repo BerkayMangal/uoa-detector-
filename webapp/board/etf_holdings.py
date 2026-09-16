@@ -49,8 +49,8 @@ if TYPE_CHECKING:
     from sqlalchemy.engine import Engine
     from sqlalchemy.orm import Session, sessionmaker
 
-    from uoa_detector.sources.unusual_whales.client import UnusualWhalesClient
     from webapp.board.settings import BoardSettings
+    from webapp.board.uw_errors import JsonClient
 
 HOLDINGS_PATH: Final = "/api/etfs/{etf}/holdings"
 _STOCK_TYPE: Final = "stock"
@@ -100,7 +100,7 @@ class HoldingView:
 
 
 async def refresh_etf_holdings(
-    client: UnusualWhalesClient,
+    client: JsonClient,
     sessions: sessionmaker[Session],
     *,
     etfs: Sequence[str] | None = None,

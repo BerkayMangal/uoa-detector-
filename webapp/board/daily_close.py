@@ -41,13 +41,13 @@ from sqlalchemy.orm import Mapped, Session, mapped_column, sessionmaker
 
 from uoa_detector.sources.unusual_whales.client import (
     CircuitBreakerOpenError,
-    UnusualWhalesClient,
     UnusualWhalesDailyLimitError,
     UnusualWhalesNotFoundError,
     UnusualWhalesRateLimitError,
     UnusualWhalesTransientError,
 )
 from webapp.board.db import AlfaBase, session_factory
+from webapp.board.uw_errors import JsonClient
 from webapp.ohlc import RegularClose, regular_session_closes
 
 _logger = logging.getLogger(__name__)
@@ -170,7 +170,7 @@ class DailyCloseJobResult:
 
 
 async def run_daily_close_job(
-    client: UnusualWhalesClient,
+    client: JsonClient,
     engine: Engine,
     tickers: Iterable[str],
     *,
@@ -205,7 +205,7 @@ def load_closes(engine: Engine, ticker: str) -> tuple[ClosePoint, ...]:
 
 
 async def _refresh_ticker(
-    client: UnusualWhalesClient,
+    client: JsonClient,
     factory: sessionmaker[Session],
     ticker: str,
     *,

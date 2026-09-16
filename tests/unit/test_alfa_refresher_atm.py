@@ -93,6 +93,15 @@ _CHAINS: dict[str, list[dict[str, Any]]] = {
 }
 
 
+# Phase 5.2.B-jobs: the daily-job clock's calls on the first tick of an ET day, in order.
+_DAILY_JOBS = [
+    "/api/earnings/SPY", "/api/earnings/SMCI",
+    "/api/market/fda-calendar", "/api/market/fda-calendar", "/api/market/economic-calendar",
+    "/api/stock/SPY/greek-exposure", "/api/stock/QQQ/greek-exposure",
+]
+_DAILY_JOB_PATHS: frozenset[str] = frozenset(_DAILY_JOBS)
+
+
 class _FakeClient:
     def __init__(
         self,
@@ -125,6 +134,8 @@ class _FakeClient:
             return {"data": []}
         if path.endswith("/info"):
             return {"data": {"issue_type": "ETF", "sector": None}}
+        if path in _DAILY_JOB_PATHS or path.startswith("/api/earnings/"):
+            return {"data": []}
         raise AssertionError(path)
 
     async def aclose(self) -> None:
@@ -395,7 +406,9 @@ async def test_the_loop_runs_atm_between_depth_and_the_tape(url: str) -> None:
     _seed(url)
     client = _FakeClient()
     await _run_loop(url, client)
+    # Phase 5.2.B-jobs (D10): the daily-job clock runs before the RTH cycle, once per ET day.
     assert [path for path, _p in client.calls] == [
+        *_DAILY_JOBS,
         "/api/stock/SPY/option-contracts",
         "/api/stock/SMCI/option-contracts",
         "/api/option-contract/SPY260918C00757000/flow",
@@ -442,6 +455,7 @@ async def test_uw_calls_per_cycle_stay_inside_the_atm_budget(url: str) -> None:
     tickers = 2
     depth = 2  # one dominant contract per row, inside exit_depth_top_k
     steady = tickers + depth + tickers + tickers
-    assert len(client.calls) == 3 * steady + 2 * tickers
+    # Phase 5.2.B-jobs (D10): plus the daily-job clock's once-a-day calls on the first tick.
+    assert len(client.calls) == 3 * steady + 2 * tickers + len(_DAILY_JOBS)
     assert len(_paths(client, "/atm-chains")) == 3 * tickers
     assert len(_paths(client, "/expiry-breakdown")) == tickers
