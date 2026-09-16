@@ -28,6 +28,12 @@ alone runs 20-40 days per active ticker inside its window), so the newest
 ``delayed.max_items_per_family`` items are listed and the rest are disclosed as
 a number. Nothing is deleted: ``alfa_delayed`` stays append-only.
 
+The cap is applied to the RECORDS, before the items are built (Phase 5.2.D-fix2,
+review FD-02): the tables are append-only, so building every stored row only to
+drop all but five of them made the render cost grow every day. The counts and
+the collapsed summary read from ``DelayedFamilyWindow``, which still describes
+the whole window, so nothing the cap skips is understated.
+
 ``RENDERED_FAMILIES`` grows per commit (D1 Kongre, D2 İçeriden, D3 Short and
 FTD) so each commit stays green on its own.
 """
@@ -45,6 +51,7 @@ from webapp.board.delayed import (
     BUCKET_LABEL,
     EXCLUSION_NOTE,
     DelayedFamily,
+    DelayedFamilyWindow,
     build_delayed_evidence,
     ensure_delayed_tables,
     family_label,
@@ -135,8 +142,15 @@ def build_delayed_panel(
     coverage: Mapping[str, CoverageView],
     *,
     settings: DelayedSettings,
+    windows: Sequence[DelayedFamilyWindow] = (),
 ) -> DelayedPanel:
-    """Group a ticker's delayed items into the rendered families, with their coverage state."""
+    """Group a ticker's delayed items into the rendered families, with their coverage state.
+
+    ``windows`` describes each family's whole lookback window when ``items``
+    were already capped to what the row displays (Phase 5.2.D-fix2). Without it
+    the window is read off the items, which is what an uncapped caller passes.
+    """
+    by_family = {window.family: window for window in windows}
     return DelayedPanel(
         ticker=ticker.strip().upper(),
         bucket_label=BUCKET_LABEL,
@@ -146,6 +160,7 @@ def build_delayed_panel(
                 family,
                 [item for item in items if item.family == family],
                 coverage.get(family),
+                by_family.get(family),
                 settings=settings,
             )
             for family in RENDERED_FAMILIES
@@ -200,12 +215,14 @@ def load_delayed_panels(
     for symbol in symbols:
         evidence = build_delayed_evidence(
             symbol, records.get(symbol, ()), closes.get(symbol, ()), today=today, settings=settings,
+            max_per_family=settings.max_items_per_family,  # build only what the row shows
         )
         out[symbol] = build_delayed_panel(
             symbol,
             evidence.items,
             coverage_by_family(coverage, symbol),
             settings=settings,
+            windows=evidence.windows,
         )
     return out
 
@@ -225,6 +242,7 @@ def _family_panel(
     family: DelayedFamily,
     items: Sequence[DelayedItem],
     coverage: CoverageView | None,
+    window: DelayedFamilyWindow | None,
     *,
     settings: DelayedSettings,
 ) -> DelayedFamilyPanel:
@@ -235,8 +253,9 @@ def _family_panel(
             family=family, label=label, state=state, state_text=text, dimmed=True,
             items=(), omitted=0, omitted_text=None, notes=_empty_notes(coverage),
         )
+    whole = window if window is not None else _window_from_items(family, items)
     shown = tuple(items[: settings.max_items_per_family])
-    omitted = len(items) - len(shown)
+    omitted = whole.total - len(shown)  # the window, never the built slice
     return DelayedFamilyPanel(
         family=family,
         label=label,
@@ -247,23 +266,34 @@ def _family_panel(
         omitted=omitted,
         omitted_text=_say("omitted", shown=len(shown), omitted=omitted) if omitted else None,
         notes=_notes(coverage),
-        summary_text=_summary(family, items),  # over the window, not over the shown items
+        summary_text=_summary(family, whole),  # over the window, not over the shown items
     )
 
 
-def _summary(family: DelayedFamily, items: Sequence[DelayedItem]) -> str | None:
+def _window_from_items(family: DelayedFamily, items: Sequence[DelayedItem]) -> DelayedFamilyWindow:
+    """The window of a caller that passed every item and no window (the D1-D3 API)."""
+    sizes = [item.size_low_usd for item in items if item.size_low_usd is not None]
+    return DelayedFamilyWindow(
+        family=family,
+        total=len(items),
+        known_size_usd=sum(sizes),
+        unknown_sizes=len(items) - len(sizes),
+        newest_date=max((item.filed_or_asof_date for item in items), default=None),
+    )
+
+
+def _summary(family: DelayedFamily, window: DelayedFamilyWindow) -> str | None:
     """A collapsed family's one-line total. Unknown amounts are disclosed, never assumed zero."""
-    if family not in COLLAPSED_FAMILIES or not items:
+    if family not in COLLAPSED_FAMILIES or not window.total or window.newest_date is None:
         return None
-    known = [item.size_low_usd for item in items if item.size_low_usd is not None]
-    newest = max(item.filed_or_asof_date for item in items).isoformat()
-    total = f"{sum(known):,.0f}"
-    unknown = len(items) - len(known)
-    if unknown:
+    total = f"{window.known_size_usd:,.0f}"
+    newest = window.newest_date.isoformat()
+    if window.unknown_sizes:
         return _say(
-            "summary.ftd_partial", days=len(items), usd=total, unknown=unknown, date=newest,
+            "summary.ftd_partial",
+            days=window.total, usd=total, unknown=window.unknown_sizes, date=newest,
         )
-    return _say("summary.ftd", days=len(items), usd=total, date=newest)
+    return _say("summary.ftd", days=window.total, usd=total, date=newest)
 
 
 def _empty_state(coverage: CoverageView | None) -> tuple[PanelState, str]:
