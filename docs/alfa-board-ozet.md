@@ -48,18 +48,34 @@ FAZ A öncesine (eski dashboard) döner, veri kaybı olmaz.
 
 ## 5. CANLIDA VAR / CANLIDA YOK
 
-| Canlıda VAR | Canlıda YOK (henüz) |
+**Canlıda olanlar** (hepsi 10:17Z'de doğrulandı, tahta 0,94 saniyede açılıyor):
+
+| Ne | Ne işe yarar |
 |---|---|
-| Hisse+yön başına tek satır, tüm baskılar toplanmış | Pozisyon büyüklüğü ($ ve sermaye %'si) |
-| İşlem çipi + maliyet kapısı ("Alabileceklerimi göster") | Başabaş vs ATM straddle karşılaştırması |
-| Alış/satış tarafından yön okuması | Kovalama hükmü ("geç kaldın") |
-| Altı aileli kanıt şeridi, bilinmeyen = taranmış ve sayılmaz | Rejim bandı (piyasa gelgiti, dealer gamma, VIX) |
-| Zorunlu `AMA` karşı-argümanı | Portföy örtüşmesi ("zaten bu bahittesin") |
-| Ceza defteri + skor yalnızca Denetim bloğunda | Gecikmeli kanıt kovası (Kongre / İçeriden / Short-FTD) |
-| | *(yukarıdaki 6 satır PR #11'de hazır ve yeşil, canlıya alınmayı bekliyor)* |
-| "Bugün temiz aday yok" durumu | Pas defteri `/defter` ve dolum kaydı (yazılıyor) |
-| **Karar kartları: `Logla` / `Pas geç`** — bastığın an satırın gördüğün hâli dondurulup kalıcı olarak saklanır | |
-| Vol board + "bu 'vol sat' demek değildir" cümlesi | Pas defteri `/defter` ve dolum kaydı |
+| Hisse + yön başına tek satır | Bir ismin tüm baskıları tek yerde toplanır, dağınık kart yığını yok |
+| İşlem çipi + maliyet kapısı ("Alabileceklerimi göster") | Alış ask'ten, çıkış bid'den, komisyon dahil; kotasyonun yaşı yazılı |
+| Altı aileli kanıt şeridi | Bilinmeyen aile taranmış ve sayılmaz; 3+ bilinmeyende "Güçlü" yasak |
+| Zorunlu `AMA` karşı-argümanı | Her satır kendi aleyhine en güçlü cümleyi de söyler |
+| Ceza defteri + 0–1 skoru **yalnız Denetim bloğunda** | Skor satır yüzünde, çipte veya sıralamada asla görünmez |
+| **Karar kartları: `Logla` / `Pas geç`** | Bastığın an satırın gördüğün hâli dondurulur ve kalıcı saklanır — pas geçtiklerin de |
+| Pozisyon büyüklüğü (1 lot $ ve sermaye %'si, risk kovası) | Sermaye/R değerleri henüz senin onayında: "(varsayılan değer)" yazıyor |
+| Başabaş vs ATM straddle | "Başabaş için %X gerekir · straddle bu vadeye %Y fiyatlıyor" — olasılık iddiası yok |
+| Kovalama hükmü | "hâlâ makul / dikkat / geç kaldın"; "geç kaldın" doğrudan `AMA`ya düşer |
+| Açılış-kapanış (T+1 OI teyidi) + katalizör çipi | Pozisyon açılıyor mu kapanıyor mu; vadeye kadar katalizör var mı |
+| Rejim bandı | Piyasa gelgiti, SPY/QQQ dealer gamma, IV vade yapısı + 3 tetikleyici. Kanıt sayımına **girmez** |
+| Portföy örtüşmesi | "zaten bu bahittesin" rozeti, sermaye başlığı, tek-bahis şeridi |
+| Gecikmeli kanıt kovası (Kongre / İçeriden / Short-FTD) | Bildirim tarihi ve gecikmesiyle; **asla sayılmaz** |
+| Günlük iş saati | Seans öncesi/sonrası işler restart'ta ne atlıyor ne tekrarlıyor |
+| Deploy doğrulama rayları | Her deploy sonrası sağlık + şifre duvarı + **açılma süresi** + dürüstlük denetimi tek komutta |
+
+**Canlıda olmayanlar:**
+
+| Ne yok | Sana maliyeti |
+|---|---|
+| Pas defteri `/defter` ve sonuç işi | Kartlar birikiyor ama karşılaştırmalı tabloyu henüz göremiyorsun (yazılıyor) |
+| Dolum kaydı (gerçek fill vs kartın donmuş kotasyonu) | Maliyet varsayımının canlı testi henüz yok (yazılıyor) |
+| VIX vade yapısı | UW volatilite eklentisi yok; tahtada "kapsam-dışı" yazıyor |
+| ThetaData bağlantısı | Bilinçli: tahta ThetaData'ya bağlı değil (bkz. para kararı) |
 
 ## 6. YOKLUĞUNDA ALDIĞIM KARARLAR
 
