@@ -57,8 +57,8 @@ if TYPE_CHECKING:
     from webapp.board.delayed_coverage import CoverageView
     from webapp.board.settings import DelayedSettings
 
-# Families with a rendered block. D1 ships Kongre; D2 and D3 append to this tuple.
-RENDERED_FAMILIES: Final[tuple[DelayedFamily, ...]] = ("congress",)
+# Families with a rendered block. D1 shipped Kongre, D2 İçeriden; D3 appends the shorts.
+RENDERED_FAMILIES: Final[tuple[DelayedFamily, ...]] = ("congress", "insider")
 
 PanelState = Literal["items", "empty", "never_fetched", "unanswered", "unreadable"]
 

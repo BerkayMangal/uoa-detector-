@@ -30,7 +30,7 @@ from webapp.board.copy_tr import NO_CLEAN_CANDIDATE
 from webapp.board.daily_close import AlfaDailyClose, ensure_daily_close_tables
 from webapp.board.db import make_engine, session_factory
 from webapp.board.delayed import CONGRESS_RECENT_TRADES_PATH, run_delayed_job
-from webapp.board.delayed_panel import load_delayed_panels
+from webapp.board.delayed_panel import RENDERED_FAMILIES, load_delayed_panels
 from webapp.board.evidence import STAGE_BY_FAMILY
 from webapp.board.honesty import ensure_clean, forbidden_words
 from webapp.board.netprem import ensure_netprem_tables
@@ -327,7 +327,7 @@ def test_a_fresh_database_reads_bilinmiyor_and_never_an_empty_clean_block(
 ) -> None:
     _engine, client = board
     body = client.get("/").text
-    assert body.count('data-delayed-state="never_fetched"') == len(_ROWS)
+    assert body.count('data-delayed-state="never_fetched"') == len(_ROWS) * len(RENDERED_FAMILIES)
     assert "bilinmiyor — bu aile hiç çekilmedi" in html.unescape(body)
     assert "kayıt yok" not in html.unescape(body)
     assert body.count("border-dashed") >= len(_ROWS)  # dashed and dimmed, never clean
@@ -418,7 +418,7 @@ def test_a_failed_delayed_read_renders_unknown_not_an_empty_bucket(
 
     monkeypatch.setattr(page_module, "load_delayed_panels", _boom)
     body = client.get("/").text
-    assert body.count('data-delayed-state="unreadable"') == len(_ROWS)
+    assert body.count('data-delayed-state="unreadable"') == len(_ROWS) * len(RENDERED_FAMILIES)
     assert "gecikmeli ek kanıt okunamadı; bu, kayıt yok demek değil" in html.unescape(body)
     assert "data-delayed-item=" not in body
 
