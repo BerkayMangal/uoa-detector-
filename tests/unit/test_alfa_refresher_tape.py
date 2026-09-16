@@ -75,6 +75,27 @@ _INFO: dict[str, dict[str, Any]] = {
     "SPY": {"symbol": "SPY", "sector": None, "issue_type": "ETF"},
     "SMCI": {"symbol": "SMCI", "sector": "Technology", "issue_type": "Common Stock"},
 }
+# Phase 5.2.B2b: the loop also runs the ATM straddle step.
+_EXPIRIES: list[dict[str, Any]] = [
+    {"expires": "2026-09-18", "open_interest": 531720, "volume": 25428, "chains": 150},
+    {"expires": "2026-09-25", "open_interest": 42125, "volume": 6353, "chains": 124},
+]
+# Phase 5.2.B-jobs: the daily-job clock's pre-market and after-the-open jobs, in the order
+# the registry runs them on the first tick of an ET day (oi_confirm needs no call here).
+_DAILY_JOBS = [
+    "/api/earnings/SPY", "/api/earnings/SMCI",
+    "/api/market/fda-calendar", "/api/market/fda-calendar", "/api/market/economic-calendar",
+    "/api/stock/SPY/greek-exposure", "/api/stock/QQQ/greek-exposure",
+]
+_DAILY_JOB_PATHS: frozenset[str] = frozenset(_DAILY_JOBS)
+# Phase 5.2.B5b: the regime band's seven calls, in the order the cycle makes them.
+_REGIME = [
+    "/api/market/market-tide",
+    "/api/stock/SPY/spot-exposures", "/api/stock/QQQ/spot-exposures",
+    "/api/stock/SPY/gex-levels", "/api/stock/QQQ/gex-levels",
+    "/api/stock/SPY/volatility/term-structure", "/api/stock/VIX/volatility/term-structure",
+]
+_REGIME_PATHS: frozenset[str] = frozenset(_REGIME)
 
 
 class _FakeClient:
@@ -101,12 +122,16 @@ class _FakeClient:
         for suffix, error in self._errors.items():
             if path.endswith(suffix):
                 raise error
-        if path.endswith(("/option-contracts", "/flow")):
+        if path.endswith(("/option-contracts", "/flow", "/atm-chains")):
             return {"data": []}
+        if path.endswith("/expiry-breakdown"):
+            return {"data": list(_EXPIRIES)}
         if path.endswith("/net-prem-ticks"):
             return {"data": list(_TAPE)}
         if path.endswith("/info"):
             return {"data": _INFO[path.split("/")[3]]}
+        if path in _DAILY_JOB_PATHS or path in _REGIME_PATHS or path.startswith("/api/earnings/"):
+            return {"data": []}
         raise AssertionError(path)
 
     async def aclose(self) -> None:
@@ -310,15 +335,28 @@ async def test_loop_runs_quotes_depth_tape_then_ticker_info_on_one_client(url: s
             clock=lambda: _NOW, sleep=_sleep,
         )
 
+    # Phase 5.2.B2b (D10): the ATM straddle step runs between depth and the tape, and the
+    # expiry list is fetched once per ET day, just before that day's first atm-chains call.
     cycle = [
         "/api/stock/SPY/option-contracts",
         "/api/stock/SMCI/option-contracts",
         "/api/option-contract/SPY260918C00760000/flow",
         "/api/option-contract/SMCI260918C00037000/flow",
+        "/api/stock/SPY/atm-chains",
+        "/api/stock/SMCI/atm-chains",
         "/api/stock/SPY/net-prem-ticks",
         "/api/stock/SMCI/net-prem-ticks",
     ]
-    assert client.calls == [*cycle, "/api/stock/SPY/info", "/api/stock/SMCI/info", *cycle]
+    expiry_list = ["/api/stock/SPY/expiry-breakdown", "/api/stock/SMCI/expiry-breakdown"]
+    # Phase 5.2.B-jobs (D10): the daily-job clock runs before the RTH cycle, once per ET day.
+    # Phase 5.2.B5b (D10): the regime band closes every cycle with its seven calls.
+    assert client.calls == [
+        *_DAILY_JOBS,
+        *cycle[:4], *expiry_list, *cycle[4:],
+        "/api/stock/SPY/info", "/api/stock/SMCI/info",
+        *_REGIME,
+        *cycle, *_REGIME,
+    ]
     assert len(made) == 1
     assert client.closed is True
     engine = make_engine(url)
