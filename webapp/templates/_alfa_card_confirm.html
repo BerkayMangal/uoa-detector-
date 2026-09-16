@@ -1,0 +1,9 @@
+{# The board's answer after "Pas geç" (Phase 5.2.C1b, decision-cards contract §3).
+
+   Rendered only when ?pas= names a card that really exists in alfa_decision_card, so a
+   made-up link can never claim a record was written. The text comes from the frozen
+   CARD_COPY dictionary. #}
+{% if pas_card %}
+<div class="rounded-lg border border-gray-600 bg-gray-900/70 px-4 py-2 mb-3 text-sm text-gray-100"
+     data-state="card-recorded" data-card-id="{{ pas_card.id }}" data-card-decision="{{ pas_card.decision }}">{{ pas_recorded_text(pas_card) }}</div>
+{% endif %}

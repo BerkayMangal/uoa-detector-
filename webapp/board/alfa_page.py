@@ -61,6 +61,7 @@ from zoneinfo import ZoneInfo
 
 from uoa_detector.calibration import load_profile
 from webapp.board.aggregate import POSITION_READ_LABELS, BoardRow, build_board_rows
+from webapp.board.cards import CARD_COPY
 from webapp.board.copy_tr import (
     EVIDENCE_HOVER,
     GATE_LABEL,
@@ -697,4 +698,6 @@ def template_context() -> dict[str, object]:
         "ledger_copy": LEDGER_COPY,
         "no_clean_candidate_label": NO_CLEAN_CANDIDATE,
         "iv_not_sell_vol": IV_NOT_SELL_VOL,
+        # Phase 5.2.C1b: the decision-card buttons every row carries.
+        "card_copy": CARD_COPY,
     }
