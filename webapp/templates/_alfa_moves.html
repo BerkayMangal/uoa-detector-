@@ -1,0 +1,11 @@
+{# Phase 5.2.B2b (contract §6 B2): required move vs the move the ATM straddle prices in.
+   Both halves come from webapp/board/moves.py's frozen templates, with the ATM strike offset
+   and the nearest-expiry substitution disclosed, the IV fallback labelled, and the ATM row's
+   age shown (R-CO2). No probability is stated anywhere (R-EV1). #}
+{% if view.move %}
+<div class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm" data-move="{{ 'known' if view.move.known else 'unknown' }}">
+  <span class="text-gray-100" data-move-text>{{ view.move.text }}</span>
+  {% if view.move.disclosure %}<span class="text-xs text-gray-500" data-move-disclosure>{{ view.move.disclosure }}</span>{% endif %}
+  {% if view.move.age %}<span class="text-xs text-gray-500" data-move-age>{{ view.move.age }}</span>{% endif %}
+</div>
+{% endif %}

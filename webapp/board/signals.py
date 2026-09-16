@@ -25,9 +25,11 @@ from __future__ import annotations
 import logging
 import threading
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import select
+from sqlalchemy import func, select
+from sqlalchemy.orm import Session
 
 from uoa_detector.backtest.sqlite_models import SignalRow
 from uoa_detector.backtest.store import StoredSignal
@@ -38,10 +40,35 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
 
     from sqlalchemy.engine import Engine
-    from sqlalchemy.orm import Session
 
 _logger = logging.getLogger(__name__)
 _LIVE_PREFIX = "live-"
+
+
+def live_run_tips(engine: Engine) -> list[tuple[datetime, str]]:
+    """``(newest print time, run_id)`` for every ``live-*`` run, newest print first.
+
+    The single source of "which live run is current" for the refresher and the
+    daily-job clock: the live worker keeps writing into the run id it started
+    with across a UTC midnight, so a run id is never derived from the calendar
+    date (review RT-2).
+    """
+    stmt = (
+        select(SignalRow.run_id, func.max(SignalRow.ts))
+        .where(SignalRow.run_id.like(f"{_LIVE_PREFIX}%"))
+        .group_by(SignalRow.run_id)
+    )
+    with Session(engine) as session:
+        tips = [
+            (_as_utc(ts), run_id)
+            for run_id, ts in session.execute(stmt)
+            if isinstance(ts, datetime)
+        ]
+    return sorted(tips, reverse=True)
+
+
+def _as_utc(value: datetime) -> datetime:
+    return value.replace(tzinfo=UTC) if value.tzinfo is None else value.astimezone(UTC)
 
 
 @dataclass(frozen=True)

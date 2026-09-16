@@ -1,0 +1,14 @@
+{# Phase 5.2.B1 (contract §6 B1): the row's position-size cell. 1 lot in dollars and as a share
+   of capital, the profile risk bucket's lot count, and an honest 0-lot reading. Every string comes
+   from webapp/board/sizing.py's frozen dictionary; the max_r disclosure lives in the audit block
+   only (R-EV2). The quote age stays visible even when the size reads bilinmiyor (R-CO2). #}
+{% if view.size_text %}
+<div class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm" data-size="{{ 'known' if view.size.lots is not none else 'unknown' }}">
+  <span class="text-gray-400">{{ view.size_text.title }}</span>
+  <span class="text-gray-100" data-size-lot>{{ view.size_text.lot }}</span>
+  <span class="text-gray-300" data-size-bucket>{{ view.size_text.risk_bucket }}</span>
+  {% if view.size_text.zero_note %}<span class="text-amber-300" data-size-zero>{{ view.size_text.zero_note }}</span>{% endif %}
+  {% if view.size_text.default_marker %}<span class="text-xs text-amber-300/80" data-size-default>{{ view.size_text.default_marker }}</span>{% endif %}
+  {% if view.chip_text.quote_age %}<span class="text-xs text-gray-500" data-size-quote-age>{{ view.chip_text.quote_age }}</span>{% endif %}
+</div>
+{% endif %}

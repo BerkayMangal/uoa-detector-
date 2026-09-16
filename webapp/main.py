@@ -487,6 +487,21 @@ def alfa_board(request: Request, run: str = "", gate: str = "") -> HTMLResponse:
         ),
         profile_resolver=alfa_page.resolve_writing_profile,
         run_latest_ts=current.latest_ts if current is not None else None,
+        delayed_source=lambda tickers, today: alfa_page.db_delayed_source(
+            _board_reader().engine, settings.delayed,
+        )(tickers, today),
+        atm_source=lambda tickers: alfa_page.db_atm_source(_board_reader().engine)(tickers),
+        flow_since_source=lambda keys: alfa_page.db_flow_since_source(_board_reader().engine)(keys),
+        oi_source=lambda keys: alfa_page.db_oi_source(_board_reader().engine)(keys),
+        catalyst_source=lambda keys, moment: alfa_page.db_catalyst_source(
+            _board_reader().engine, settings,
+        )(keys, moment),
+        regime_source=lambda moment: alfa_page.db_regime_source(_board_reader().engine)(moment),
+        # B6: the open journal, the focused-ETF holdings and the sectors behind the strip.
+        # A failed read is handled inside build_alfa_page, which then claims nothing.
+        trades_source=lambda: _journal().list("open"),
+        holdings_source=lambda: alfa_page.db_holdings_source(_board_reader().engine)(),
+        sector_source=lambda tickers: alfa_page.db_sector_source(_board_reader().engine)(tickers),
     )
     gamma_ctx: dict[str, gamma.GammaContext] = _safe(lambda: _gamma().latest(), {})
     vol_rows: list[VolBoardRow] = _safe(lambda: build_vol_board(
@@ -517,5 +532,12 @@ def alfa_board(request: Request, run: str = "", gate: str = "") -> HTMLResponse:
 
 
 @app.get("/health")
-def health() -> dict[str, bool]:
-    return {"ok": True}
+def health() -> dict[str, str | bool]:
+    """Liveness, plus the commit this instance is running.
+
+    Phase 5.2.RAIL2: a deploy check must be able to prove WHICH build answered,
+    not only that something answered. Railway sets RAILWAY_GIT_COMMIT_SHA; the
+    value is a public commit id, never a secret.
+    """
+    sha = os.environ.get("RAILWAY_GIT_COMMIT_SHA", "")
+    return {"ok": True, "sha": sha[:7] if sha else "unknown"}

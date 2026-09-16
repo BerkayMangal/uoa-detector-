@@ -103,6 +103,7 @@ class RefreshSettings(_Strict):
     max_symbols_per_request: int = Field(ge=1)
     atm_expiries: int = Field(ge=1, le=5)
     daily_request_soft_cap: int = Field(gt=0)
+    daily_job_max_attempts: int = Field(ge=1)  # Phase 5.2.B-fix1
     closed_market_sleep_seconds: int = Field(ge=60)
     daily_limit_backoff_seconds: int = Field(ge=60)
 
@@ -140,6 +141,9 @@ class DelayedSettings(_Strict):
     congress_late_days: int = Field(ge=1)
     congress_lookback_days: int = Field(ge=1)
     insider_lookback_days: int = Field(ge=1)
+    short_interest_lookback_days: int = Field(ge=1)  # Phase 5.2.D3a
+    ftd_lookback_days: int = Field(ge=1)  # Phase 5.2.D3a
+    max_items_per_family: int = Field(ge=1)  # Phase 5.2.D1: display cap per family
     job_time_et: str = Field(pattern=_CLOCK)
 
 

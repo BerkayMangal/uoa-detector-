@@ -1,0 +1,21 @@
+{# Phase 5.2.B4b (contract §6 B4): opening or closing, and the catalyst chip.
+
+   The opening/closing reading comes only from the T+1 open-interest confirmation
+   (decision P10), through webapp/board/oi_confirm.py's frozen labels. The catalyst chip
+   covers the window between now and the dominant contract's expiry close, from
+   webapp/board/catalysts.py. Unknown and out-of-scope states render dashed and dimmed and
+   are never painted as clean (R-UN1); the chip never enters the evidence counts. #}
+{% set opening_style = {
+  'opening': 'border-emerald-700 text-emerald-300',
+  'closing': 'border-red-700 text-red-300',
+  'unknown': 'border-dashed border-gray-600 text-gray-500 opacity-70',
+} %}
+{% if view.opening %}
+<div class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm" data-opening="{{ view.opening.status }}">
+  <span class="text-gray-400">{{ copy.opening_title }}</span>
+  <span class="px-2 py-0.5 rounded border {{ opening_style['unknown'] if view.opening.dimmed else opening_style[view.opening.state] }}"
+        data-oi-label>{{ view.opening.label }}</span>
+  <span class="px-2 py-0.5 rounded border {{ 'border-dashed border-gray-600 text-gray-500 opacity-70' if view.opening.catalyst_dimmed else 'border-gray-700 text-gray-300' }}"
+        data-catalyst="{{ 'var' if view.opening.catalyst_in_window else ('yok' if view.opening.catalyst_known else 'bilinmiyor') }}">{{ view.opening.catalyst_text }}</span>
+</div>
+{% endif %}
