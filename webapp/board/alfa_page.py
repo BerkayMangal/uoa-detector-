@@ -32,7 +32,9 @@ Contract: ``docs/phase-5.2-alfa-board-acceptance.md`` §4.1 ("Render"), §5 A1,
   count. The ``max_r`` disclosure goes in the audit block only (R-EV2).
 - B2: each row carries the break-even move its dominant contract needs against
   the move the ATM straddle prices in (``webapp/board/moves.py``), read from
-  ``alfa_atm`` through an injected source. Missing rows read ``bilinmiyor``.
+  ``alfa_atm`` through an injected source. Missing rows read ``bilinmiyor``,
+  and so do rows older than ``tradability.max_quote_age_seconds``, the cutoff
+  B3's chase spot already applies to the same table (review FB-H4).
 - B3: each row carries its chase verdict (``webapp/board/chase.py``): the print
   price against the current ask, the underlying's move since, and the
   since-print flow as context only. ``geç kaldın`` feeds the counter-argument's
@@ -635,13 +637,25 @@ def build_move_view(
     chip: TradabilityRead,
     atm_rows: Sequence[AtmView],
     now: datetime,
+    *,
+    max_age_seconds: int,
 ) -> MoveView:
     """B2: the dominant contract's break-even move vs the ATM straddle for that expiry.
 
     The entry price is the executable ask (B1's rule), so an unexecutable or
     stale quote reads ``bilinmiyor`` rather than pricing a break-even nobody
-    could pay. The ATM row that was actually used carries its own age.
+    could pay. An ATM row older than ``max_age_seconds`` is refused the same
+    way: ``alfa_atm`` rows survive restarts and weekends, and B3's chase spot
+    already refuses them, so pricing a cost statement off one would make the two
+    halves of one row disagree (review FB-H4). The row that was used carries its
+    own age, and so does the newest stale row when nothing fresh is left, so a
+    ``bilinmiyor`` reading says why.
     """
+    moment = _aware(now)
+    fresh = tuple(
+        r for r in atm_rows
+        if (moment - _aware(r.fetched_at)).total_seconds() <= max_age_seconds
+    )
     key = row.dominant.key
     option_type: Literal["call", "put"] = "call" if key.option_type == "call" else "put"
     comparison = compare_moves(
@@ -649,15 +663,17 @@ def build_move_view(
         strike=float(key.strike),
         expiry=key.expiry,
         ask=executable_ask(chip),
-        atm_rows=atm_rows,
+        atm_rows=fresh,
         now=now,
     )
     expected = comparison.expected
     used = (
-        next((r for r in atm_rows if r.expiry == expected.atm_expiry), None)
+        next((r for r in fresh if r.expiry == expected.atm_expiry), None)
         if expected is not None and expected.atm_expiry is not None
         else None
     )
+    if used is None and not fresh and atm_rows:
+        used = max(atm_rows, key=lambda r: _aware(r.fetched_at))
     return MoveView(
         text=comparison.text,
         disclosure=comparison.disclosure,
@@ -1010,7 +1026,10 @@ def build_alfa_page(
                 ),
                 size=row_size,
                 size_text=size_text(row_size),
-                move=build_move_view(row, chip, atm_rows.get(row.ticker, ()), moment),
+                move=build_move_view(
+                    row, chip, atm_rows.get(row.ticker, ()), moment,
+                    max_age_seconds=settings.tradability.max_quote_age_seconds,
+                ),
                 chase=row_chase,
                 chase_text=chase_text(row_chase),
                 opening=opening,
