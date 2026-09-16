@@ -374,20 +374,52 @@ def read_tape_summaries(
     return out
 
 
-def read_net_premium_since(
-    engine: Engine, ticker: str, trade_date: date, since: datetime,
+def _since_summary(
+    session: Session, ticker: str, trade_date: date, since: datetime,
 ) -> TapeSummary | None:
-    """The tape summed from the minute containing ``since`` onwards, or None without rows."""
-    start = _as_utc(since).replace(second=0, microsecond=0)
+    """The tape of one (ticker, trade_date) summed from the minute containing ``since``."""
     stmt = (
         select(*_summary_columns())
         .where(
             AlfaNetPrem.ticker == ticker.strip().upper(),
             AlfaNetPrem.trade_date == trade_date,
-            AlfaNetPrem.tape_time >= start,
+            AlfaNetPrem.tape_time >= _as_utc(since).replace(second=0, microsecond=0),
         )
         .group_by(AlfaNetPrem.ticker, AlfaNetPrem.trade_date)
     )
-    with Session(engine) as session:
-        row = session.execute(stmt).first()
+    row = session.execute(stmt).first()
     return None if row is None else _summary(row)
+
+
+def read_net_premium_since(
+    engine: Engine, ticker: str, trade_date: date, since: datetime,
+) -> TapeSummary | None:
+    """The tape summed from the minute containing ``since`` onwards, or None without rows."""
+    with Session(engine) as session:
+        return _since_summary(session, ticker, trade_date, since)
+
+
+def read_net_premium_since_many(
+    engine: Engine, keys: Iterable[tuple[str, date, datetime]],
+) -> dict[tuple[str, date, datetime], TapeSummary]:
+    """Since-print sums for many rows (B3), in one session.
+
+    Each row starts at its own print, so the sums cannot share one grouped
+    query; they share the connection instead. Keys with no tape row are absent
+    from the result, and the caller reads that as ``bilinmiyor``.
+    """
+    wanted = list(
+        dict.fromkeys(
+            (ticker.strip().upper(), trade_date, _as_utc(since))
+            for ticker, trade_date, since in keys
+        ),
+    )
+    if not wanted:
+        return {}
+    out: dict[tuple[str, date, datetime], TapeSummary] = {}
+    with Session(engine) as session:
+        for ticker, trade_date, since in wanted:
+            summary = _since_summary(session, ticker, trade_date, since)
+            if summary is not None:
+                out[(ticker, trade_date, since)] = summary
+    return out

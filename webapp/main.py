@@ -488,6 +488,7 @@ def alfa_board(request: Request, run: str = "", gate: str = "") -> HTMLResponse:
         profile_resolver=alfa_page.resolve_writing_profile,
         run_latest_ts=current.latest_ts if current is not None else None,
         atm_source=lambda tickers: alfa_page.db_atm_source(_board_reader().engine)(tickers),
+        flow_since_source=lambda keys: alfa_page.db_flow_since_source(_board_reader().engine)(keys),
     )
     gamma_ctx: dict[str, gamma.GammaContext] = _safe(lambda: _gamma().latest(), {})
     vol_rows: list[VolBoardRow] = _safe(lambda: build_vol_board(

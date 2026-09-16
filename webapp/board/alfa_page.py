@@ -33,6 +33,10 @@ Contract: ``docs/phase-5.2-alfa-board-acceptance.md`` §4.1 ("Render"), §5 A1,
 - B2: each row carries the break-even move its dominant contract needs against
   the move the ATM straddle prices in (``webapp/board/moves.py``), read from
   ``alfa_atm`` through an injected source. Missing rows read ``bilinmiyor``.
+- B3: each row carries its chase verdict (``webapp/board/chase.py``): the print
+  price against the current ask, the underlying's move since, and the
+  since-print flow as context only. ``geç kaldın`` feeds the counter-argument's
+  priority 3, and the verdict is named in the fallback's checked list.
 - A7: the page counts clean candidates (R-EM1): İŞLENİR rows whose evidence is
   within ``clean_candidate``. ``min_supporting`` counts only families that
   point the row's way: a non-directional lehte family (dealer gamma, decision
@@ -68,6 +72,7 @@ from zoneinfo import ZoneInfo
 from uoa_detector.calibration import load_profile
 from webapp.board.aggregate import POSITION_READ_LABELS, BoardRow, build_board_rows
 from webapp.board.atm import read_board_atm
+from webapp.board.chase import ChaseRead, ChaseText, build_chase, chase_text
 from webapp.board.copy_tr import (
     EVIDENCE_HOVER,
     GATE_LABEL,
@@ -81,15 +86,24 @@ from webapp.board.evidence import (
     LegacyScores,
     RowEvidence,
     build_row_evidence,
+    dominant_print,
     evidence_sort_key,
     guard_strength,
+    is_sold,
     load_legacy_scores,
     read_evidence_inputs,
     request_for,
     strength_label,
 )
 from webapp.board.moves import ATM_AGE_TEMPLATE, compare_moves
-from webapp.board.narrative import NARRATIVE_COPY, PenaltyCheck, RowNarrative, build_narrative
+from webapp.board.narrative import (
+    NARRATIVE_COPY,
+    ChaseCheck,
+    PenaltyCheck,
+    RowNarrative,
+    build_narrative,
+)
+from webapp.board.netprem import read_net_premium_since_many
 from webapp.board.penalty_ledger import (
     LEDGER_COPY,
     M24_STAGE,
@@ -119,6 +133,7 @@ if TYPE_CHECKING:
     from uoa_detector.calibration.profile import CalibrationProfile
     from webapp.board.atm import AtmView
     from webapp.board.evidence import EvidenceCounts, EvidenceInputs, EvidenceRequest, StrengthKey
+    from webapp.board.netprem import TapeSummary
     from webapp.board.settings import BoardSettings, CleanCandidateSettings
     from webapp.board.signals import BoardPrint
     from webapp.board.tradability import DepthView, QuoteView
@@ -127,6 +142,9 @@ if TYPE_CHECKING:
         [Sequence[str]], tuple[Mapping[str, QuoteView], Mapping[str, DepthView]]
     ]
     AtmSource = Callable[[Sequence[str]], Mapping[str, tuple[AtmView, ...]]]
+    # B3: (ticker, trade date, the source print's time) → the tape summed since that print.
+    FlowSinceKey = tuple[str, date, datetime]
+    FlowSinceSource = Callable[[Sequence[FlowSinceKey]], Mapping[FlowSinceKey, TapeSummary]]
     EvidenceSource = Callable[[str, Sequence[EvidenceRequest]], EvidenceInputs]
     ProfileHashSource = Callable[[str, Sequence[str]], Mapping[str, str]]
     ProfileResolver = Callable[[str], CalibrationProfile | None]
@@ -300,6 +318,8 @@ class AlfaRowView:
     size: SizeRead | None = None  # B1
     size_text: SizeText | None = None  # B1
     move: MoveView | None = None  # B2
+    chase: ChaseRead | None = None  # B3
+    chase_text: ChaseText | None = None  # B3
 
 
 @dataclass(frozen=True)
@@ -578,6 +598,7 @@ def build_alfa_page(
     profile_resolver: ProfileResolver | None = None,
     run_latest_ts: datetime | None = None,
     atm_source: AtmSource | None = None,
+    flow_since_source: FlowSinceSource | None = None,
 ) -> AlfaPage:
     """The page model; ``prints=None`` means the database read failed.
 
@@ -632,6 +653,18 @@ def build_alfa_page(
         except Exception:
             _logger.exception("alfa board: ATM read failed; the move comparison reads bilinmiyor")
     signals = {p.event_id: p.signal for p in prints}
+    flow_since: Mapping[FlowSinceKey, TapeSummary] = {}
+    if flow_since_source is not None and requests:
+        try:
+            flow_since = flow_since_source(
+                [
+                    (r.ticker, r.trade_date, signals[r.event_id].timestamp)
+                    for r in requests
+                    if r.event_id in signals
+                ],
+            )
+        except Exception:
+            _logger.exception("alfa board: since-print tape read failed; chase context reads bilinmiyor")
     views: list[AlfaRowView] = []
     for row, symbol, request in zip(rows, symbols, requests, strict=True):
         chip = assess_tradability(
@@ -668,6 +701,21 @@ def build_alfa_page(
         row_size = build_size(
             signal=signal, chip=chip, sizing=settings.sizing, cost=settings.cost,
         )
+        row_chase = build_chase(
+            signal=signal,
+            chip=chip,
+            direction=row.direction,
+            sold=is_sold(dominant_print(row), row.direction),
+            atm_rows=atm_rows.get(row.ticker, ()),
+            tape_since=(
+                flow_since.get((request.ticker, request.trade_date, signal.timestamp))
+                if signal is not None
+                else None
+            ),
+            settings=settings.chase,
+            max_spot_age_seconds=settings.tradability.max_quote_age_seconds,
+            now=moment,
+        )
         views.append(
             AlfaRowView(
                 row=row,
@@ -681,6 +729,7 @@ def build_alfa_page(
                 narrative=build_narrative(
                     row, evidence, chip,
                     settings=settings.narrative,
+                    chase=ChaseCheck(verdict=row_chase.label, late=row_chase.late),
                     penalties=PenaltyCheck(applied=ledger.applied_names),
                 ),
                 ledger=ledger,
@@ -691,6 +740,8 @@ def build_alfa_page(
                 size=row_size,
                 size_text=size_text(row_size),
                 move=build_move_view(row, chip, atm_rows.get(row.ticker, ()), moment),
+                chase=row_chase,
+                chase_text=chase_text(row_chase),
             ),
         )
     ordered = tuple(sorted(views, key=_view_order))
@@ -726,6 +777,15 @@ def db_atm_source(engine: Engine) -> AtmSource:
 
     def _source(tickers: Sequence[str]) -> Mapping[str, tuple[AtmView, ...]]:
         return read_board_atm(engine, tickers)
+
+    return _source
+
+
+def db_flow_since_source(engine: Engine) -> FlowSinceSource:
+    """A since-print tape source reading ``alfa_net_prem`` only (B3 context; no UW call)."""
+
+    def _source(keys: Sequence[FlowSinceKey]) -> Mapping[FlowSinceKey, TapeSummary]:
+        return read_net_premium_since_many(engine, keys)
 
     return _source
 
