@@ -493,6 +493,7 @@ def alfa_board(request: Request, run: str = "", gate: str = "") -> HTMLResponse:
         catalyst_source=lambda keys, moment: alfa_page.db_catalyst_source(
             _board_reader().engine, settings,
         )(keys, moment),
+        regime_source=lambda moment: alfa_page.db_regime_source(_board_reader().engine)(moment),
     )
     gamma_ctx: dict[str, gamma.GammaContext] = _safe(lambda: _gamma().latest(), {})
     vol_rows: list[VolBoardRow] = _safe(lambda: build_vol_board(

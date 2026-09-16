@@ -100,6 +100,14 @@ _DAILY_JOBS = [
     "/api/stock/SPY/greek-exposure", "/api/stock/QQQ/greek-exposure",
 ]
 _DAILY_JOB_PATHS: frozenset[str] = frozenset(_DAILY_JOBS)
+# Phase 5.2.B5b: the regime band's seven calls, in the order the cycle makes them.
+_REGIME = [
+    "/api/market/market-tide",
+    "/api/stock/SPY/spot-exposures", "/api/stock/QQQ/spot-exposures",
+    "/api/stock/SPY/gex-levels", "/api/stock/QQQ/gex-levels",
+    "/api/stock/SPY/volatility/term-structure", "/api/stock/VIX/volatility/term-structure",
+]
+_REGIME_PATHS: frozenset[str] = frozenset(_REGIME)
 
 
 class _FakeClient:
@@ -134,7 +142,7 @@ class _FakeClient:
             return {"data": []}
         if path.endswith("/info"):
             return {"data": {"issue_type": "ETF", "sector": None}}
-        if path in _DAILY_JOB_PATHS or path.startswith("/api/earnings/"):
+        if path in _DAILY_JOB_PATHS or path in _REGIME_PATHS or path.startswith("/api/earnings/"):
             return {"data": []}
         raise AssertionError(path)
 
@@ -421,6 +429,8 @@ async def test_the_loop_runs_atm_between_depth_and_the_tape(url: str) -> None:
         "/api/stock/SMCI/net-prem-ticks",
         "/api/stock/SPY/info",
         "/api/stock/SMCI/info",
+        # Phase 5.2.B5b (D10): the regime band closes the cycle.
+        *_REGIME,
     ]
 
 
@@ -454,7 +464,8 @@ async def test_uw_calls_per_cycle_stay_inside_the_atm_budget(url: str) -> None:
     await _run_loop(url, client, max_sleeps=3)
     tickers = 2
     depth = 2  # one dominant contract per row, inside exit_depth_top_k
-    steady = tickers + depth + tickers + tickers
+    # Phase 5.2.B5b (D10): the regime band adds seven per-cycle calls, whatever the ticker count.
+    steady = tickers + depth + tickers + tickers + len(_REGIME)
     # Phase 5.2.B-jobs (D10): plus the daily-job clock's once-a-day calls on the first tick.
     assert len(client.calls) == 3 * steady + 2 * tickers + len(_DAILY_JOBS)
     assert len(_paths(client, "/atm-chains")) == 3 * tickers

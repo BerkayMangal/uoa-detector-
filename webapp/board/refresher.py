@@ -136,7 +136,7 @@ from webapp.board.quotes import (
     upsert_depths,
     upsert_quotes,
 )
-from webapp.board.regime import ensure_regime_tables
+from webapp.board.regime import ensure_regime_tables, refresh_regime
 from webapp.board.settings import DEFAULT_BOARD_PROFILE, load_board_settings
 from webapp.board.signals import BoardSignalReader
 from webapp.board.ticker_info import (
@@ -723,6 +723,41 @@ async def run_tape_cycle(
     return StepReport(requests=requests, written=written, degraded_fetches=degraded, skipped_non_critical=skipped)
 
 
+async def run_regime_cycle(
+    client: BoardClient,
+    engine: Engine,
+    settings: BoardSettings,
+    *,
+    soft_cap: SoftCap,
+    clock: Callable[[], datetime],
+) -> StepReport:
+    """B5: market tide, SPY/QQQ spot exposures and gex levels, SPY and VIX term structure.
+
+    Seven non-critical requests per cycle (contract §4.4, ≈550 a day). The step
+    pauses whole at the soft cap. ``UnusualWhalesDailyLimitError`` and a key
+    failure (401/403) propagate; any other 4xx marks the step degraded and the
+    cycle continues (review RT-3). Each source's own no-data and degraded
+    answers are reported by ``refresh_regime`` without raising.
+    """
+    now = clock()
+    if soft_cap.reached(now):
+        _warn_soft_cap(soft_cap, None, "the regime band")
+        return StepReport(requests=0, written=0, degraded_fetches=0, skipped_non_critical=True)
+    try:
+        report = await refresh_regime(client, session_factory(engine), settings=settings, now=now)
+    except UnusualWhalesAuthError as exc:
+        if is_key_failure(exc):
+            raise
+        _warn_degraded_4xx("regime", exc)
+        return StepReport(requests=0, written=0, degraded_fetches=1, skipped_non_critical=False)
+    finally:
+        soft_cap.observe(client.last_daily_request_count, clock())
+    return StepReport(
+        requests=report.requests, written=len(report.stored),
+        degraded_fetches=len(report.degraded), skipped_non_critical=False,
+    )
+
+
 async def run_ticker_info_job(
     client: BoardClient,
     engine: Engine,
@@ -765,6 +800,7 @@ class _CycleReports:
     atm: StepReport | None
     tape: StepReport | None
     info: StepReport | None
+    regime: StepReport | None
 
 
 async def _run_market_cycle(
@@ -803,7 +839,12 @@ async def _run_market_cycle(
         run_ticker_info_job(client, engine, tickers=report.tickers, soft_cap=soft_cap, clock=clock),
         cadence,
     )
-    return _CycleReports(cycle=report, atm=atm_report, tape=tape, info=info)
+    regime = await _isolated(
+        "regime",
+        run_regime_cycle(client, engine, settings, soft_cap=soft_cap, clock=clock),
+        cadence,
+    )
+    return _CycleReports(cycle=report, atm=atm_report, tape=tape, info=info, regime=regime)
 
 
 def _log_cycle(reports: _CycleReports) -> None:
@@ -813,7 +854,10 @@ def _log_cycle(reports: _CycleReports) -> None:
         report.run_id, report.requests, report.quotes_written, report.depths_written,
         report.degraded_fetches, report.skipped_non_critical,
     )
-    steps = (("atm", reports.atm), ("tape", reports.tape), ("ticker info", reports.info))
+    steps = (
+        ("atm", reports.atm), ("tape", reports.tape), ("ticker info", reports.info),
+        ("regime", reports.regime),
+    )
     for step, step_report in steps:
         if step_report is not None:
             _logger.info(

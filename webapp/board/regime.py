@@ -49,7 +49,7 @@ from zoneinfo import ZoneInfo
 
 from pydantic import TypeAdapter, ValidationError
 from sqlalchemy import DateTime, String, Text, select
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, Session, mapped_column
 
 from uoa_detector.sources.unusual_whales.client import (
     CircuitBreakerOpenError,
@@ -65,7 +65,7 @@ if TYPE_CHECKING:
 
     from sqlalchemy import Table
     from sqlalchemy.engine import Engine
-    from sqlalchemy.orm import Session, sessionmaker
+    from sqlalchemy.orm import sessionmaker
 
     from webapp.board.settings import BoardSettings, RegimeSettings
     from webapp.board.uw_errors import JsonClient
@@ -144,6 +144,8 @@ TRIPWIRE_CURVE_TEMPLATE: Final = (
 TRIPWIRE_STATUS: Final[Mapping[str, str]] = {
     "fired": "tetiklendi", "not_fired": "tetiklenmedi", "unknown": "bilinmiyor",
 }
+# Phase 5.2.B5b: between a tripwire line and its status, on the rendered band.
+STATUS_SEPARATOR: Final = " — "
 PART_SEPARATOR: Final = " · "
 
 _ET: Final = ZoneInfo("America/New_York")
@@ -437,6 +439,23 @@ async def refresh_gamma_history(
 # ---------------------------------------------------------------------------
 # Reader
 # ---------------------------------------------------------------------------
+
+
+# The engine whose regime history is known to exist (the render path checks once).
+_tables_ready_for: list[Engine] = []
+
+
+def read_regime_inputs(engine: Engine, *, now: datetime) -> RegimeInputs:
+    """The band's inputs for the render path: database reads only, and no UW call.
+
+    Creates the table once per engine, so a fresh database renders the band's
+    ``bilinmiyor`` chips instead of failing.
+    """
+    if not _tables_ready_for or _tables_ready_for[0] is not engine:
+        ensure_regime_tables(engine)
+        _tables_ready_for[:] = [engine]
+    with Session(engine) as session:
+        return load_regime_inputs(session, now=now)
 
 
 def load_regime_inputs(session: Session, *, now: datetime) -> RegimeInputs:

@@ -88,6 +88,14 @@ _DAILY_JOBS = [
     "/api/stock/SPY/greek-exposure", "/api/stock/QQQ/greek-exposure",
 ]
 _DAILY_JOB_PATHS: frozenset[str] = frozenset(_DAILY_JOBS)
+# Phase 5.2.B5b: the regime band's seven calls, in the order the cycle makes them.
+_REGIME = [
+    "/api/market/market-tide",
+    "/api/stock/SPY/spot-exposures", "/api/stock/QQQ/spot-exposures",
+    "/api/stock/SPY/gex-levels", "/api/stock/QQQ/gex-levels",
+    "/api/stock/SPY/volatility/term-structure", "/api/stock/VIX/volatility/term-structure",
+]
+_REGIME_PATHS: frozenset[str] = frozenset(_REGIME)
 
 
 class _FakeClient:
@@ -122,7 +130,7 @@ class _FakeClient:
             return {"data": list(_TAPE)}
         if path.endswith("/info"):
             return {"data": _INFO[path.split("/")[3]]}
-        if path in _DAILY_JOB_PATHS or path.startswith("/api/earnings/"):
+        if path in _DAILY_JOB_PATHS or path in _REGIME_PATHS or path.startswith("/api/earnings/"):
             return {"data": []}
         raise AssertionError(path)
 
@@ -341,11 +349,13 @@ async def test_loop_runs_quotes_depth_tape_then_ticker_info_on_one_client(url: s
     ]
     expiry_list = ["/api/stock/SPY/expiry-breakdown", "/api/stock/SMCI/expiry-breakdown"]
     # Phase 5.2.B-jobs (D10): the daily-job clock runs before the RTH cycle, once per ET day.
+    # Phase 5.2.B5b (D10): the regime band closes every cycle with its seven calls.
     assert client.calls == [
         *_DAILY_JOBS,
         *cycle[:4], *expiry_list, *cycle[4:],
         "/api/stock/SPY/info", "/api/stock/SMCI/info",
-        *cycle,
+        *_REGIME,
+        *cycle, *_REGIME,
     ]
     assert len(made) == 1
     assert client.closed is True

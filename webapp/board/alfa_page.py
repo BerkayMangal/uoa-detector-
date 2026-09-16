@@ -122,6 +122,13 @@ from webapp.board.penalty_ledger import (
     resolve_profile,
 )
 from webapp.board.quotes import dominant_symbol, read_board_quotes
+from webapp.board.regime import (
+    GAMMA_TICKERS,
+    STATUS_SEPARATOR,
+    RegimeInputs,
+    build_regime_band,
+    read_regime_inputs,
+)
 from webapp.board.sizing import SIZE_COPY, SizeRead, SizeText, build_size, size_text
 from webapp.board.tradability import (
     CHIP_COPY,
@@ -151,6 +158,7 @@ if TYPE_CHECKING:
     )
     from webapp.board.netprem import TapeSummary
     from webapp.board.oi_confirm import OiConfirmView
+    from webapp.board.regime import RegimeBand
     from webapp.board.settings import BoardSettings, CleanCandidateSettings
     from webapp.board.signals import BoardPrint
     from webapp.board.tradability import DepthView, QuoteView
@@ -167,6 +175,8 @@ if TYPE_CHECKING:
     CatalystSource = Callable[
         [Sequence[CatalystKey], datetime], Mapping[CatalystKey, CatalystChip]
     ]
+    # B5: the latest reading per regime source as of the page clock.
+    RegimeSource = Callable[[datetime], RegimeInputs]
     # B3: (ticker, trade date, the source print's time) → the tape summed since that print.
     FlowSinceKey = tuple[str, date, datetime]
     FlowSinceSource = Callable[[Sequence[FlowSinceKey]], Mapping[FlowSinceKey, TapeSummary]]
@@ -246,6 +256,8 @@ ALFA_COPY: Final[Mapping[str, str]] = MappingProxyType(
         "audit_record_missing": "kayıt okunamadı",
         # B4: the T+1 opening/closing reading of the dominant contract.
         "opening_title": "Açılış mı kapanış mı",
+        # B5: how old the reading behind a regime chip is (R-CO2's rule, for a chip).
+        "regime_age": "{age} önce alındı",
         # R-EM1 banner variants (review FA-04); "Bugün temiz aday yok" stays copy_tr.NO_CLEAN_CANDIDATE.
         "no_clean_candidate_dated": "{date} seansında temiz aday yok",
         "no_clean_candidate_undated": "Bu çalışmada temiz aday yok",
@@ -275,6 +287,20 @@ AUDIT_INPUT_LABELS: Final[Mapping[str, str]] = MappingProxyType(
 )
 
 OPTION_TYPE_LABELS: Final[Mapping[str, str]] = MappingProxyType({"call": "call", "put": "put"})
+
+# B5: the regime band's own frozen copy, and the empty inputs a failed read renders from.
+REGIME_COPY: Final[Mapping[str, str]] = MappingProxyType({"status_separator": STATUS_SEPARATOR})
+EMPTY_REGIME_INPUTS: Final = RegimeInputs(
+    tide_buckets=(), gamma=(), gex=(), curve=None, vix=None, history=(),
+)
+REGIME_CHIP_KEYS: Final[tuple[str, ...]] = (
+    "tide",
+    *(f"gamma:{t}" for t in GAMMA_TICKERS),
+    *(f"flip:{t}" for t in GAMMA_TICKERS),
+    "curve",
+    "vix_curve",
+    "vix_spot",
+)
 
 FILL_SIDE_LABELS: Final[Mapping[str, str]] = MappingProxyType(
     {
@@ -338,6 +364,18 @@ class OpeningView:
 
 
 @dataclass(frozen=True)
+class RegimeView:
+    """B5: the board-level regime band, with each source's age.
+
+    Context only. It never enters the evidence counts, the strength label, the
+    clean-candidate rule or the counter-argument choice.
+    """
+
+    band: RegimeBand
+    ages: Mapping[str, str]  # chip key → how old the reading behind it is
+
+
+@dataclass(frozen=True)
 class AuditView:
     """The ``Denetim`` block: the only place the combined score is shown (R-EV2)."""
 
@@ -391,6 +429,7 @@ class AlfaPage:
     today: date | None = None  # ET date of the page's clock
     newest_print_at: datetime | None = None  # the run's newest print (or signal) time
     rendered_at: datetime | None = None  # the page's clock
+    regime: RegimeView | None = None  # B5; None only when no regime source was supplied
 
     @property
     def no_clean_candidate(self) -> bool:
@@ -585,6 +624,31 @@ def build_move_view(
     )
 
 
+def build_regime_view(
+    inputs: RegimeInputs, *, settings: BoardSettings, now: datetime,
+) -> RegimeView:
+    """B5: the band plus the age of the reading behind each chip (contract §6 B5)."""
+    moment = _aware(now)
+    stamps: dict[str, datetime] = {}
+    if inputs.tide_buckets:
+        stamps["tide"] = inputs.tide_buckets[-1].fetched_at
+    for reading in inputs.gamma:
+        stamps[f"gamma:{reading.ticker}"] = reading.fetched_at
+    for levels in inputs.gex:
+        stamps[f"flip:{levels.ticker}"] = levels.fetched_at
+    if inputs.curve is not None:
+        stamps["curve"] = inputs.curve.fetched_at
+    if inputs.vix is not None:
+        stamps["vix_spot"] = inputs.vix.fetched_at
+    return RegimeView(
+        band=build_regime_band(inputs, settings=settings, now=now),
+        ages=MappingProxyType({
+            key: ALFA_COPY["regime_age"].format(age=age_text(moment - _aware(stamp)))
+            for key, stamp in stamps.items()
+        }),
+    )
+
+
 def expiry_close(expiry: date) -> datetime:
     """The end of a row's catalyst window: its dominant contract's expiry, 16:00 ET (§6 B4)."""
     return datetime.combine(expiry, _EXPIRY_CLOSE_ET, tzinfo=_ET)
@@ -685,6 +749,7 @@ def build_alfa_page(
     flow_since_source: FlowSinceSource | None = None,
     oi_source: OiSource | None = None,
     catalyst_source: CatalystSource | None = None,
+    regime_source: RegimeSource | None = None,
 ) -> AlfaPage:
     """The page model; ``prints=None`` means the database read failed.
 
@@ -700,10 +765,11 @@ def build_alfa_page(
     the writing profile could not be read and shows no profile numbers.
     """
     moment = now if now is not None else datetime.now(UTC)
+    regime = _read_regime(regime_source, settings=settings, now=moment)
     if prints is None:
         return AlfaPage(
             rows=(), views=(), sections=(), print_count=0, load_failed=True, gate_on=gate_on,
-            today=_et_date(moment),
+            today=_et_date(moment), regime=regime,
         )
     rows = build_board_rows(prints, settings.aggregation)
     symbols = tuple(dominant_symbol(r) for r in rows)
@@ -883,7 +949,26 @@ def build_alfa_page(
         today=_et_date(moment),
         newest_print_at=newest,
         rendered_at=moment,
+        regime=regime,
     )
+
+
+def _read_regime(
+    source: RegimeSource | None, *, settings: BoardSettings, now: datetime,
+) -> RegimeView | None:
+    """The regime band, or None when no source was supplied.
+
+    A failed read still renders the band: every chip then reads ``bilinmiyor``,
+    which is what a source we could not read means (R-UN1).
+    """
+    if source is None:
+        return None
+    try:
+        inputs = source(now)
+    except Exception:
+        _logger.exception("alfa board: regime read failed; every regime chip reads bilinmiyor")
+        inputs = EMPTY_REGIME_INPUTS
+    return build_regime_view(inputs, settings=settings, now=now)
 
 
 def db_quote_source(engine: Engine) -> QuoteSource:
@@ -927,6 +1012,15 @@ def db_catalyst_source(engine: Engine, settings: BoardSettings) -> CatalystSourc
 
     def _source(keys: Sequence[CatalystKey], now: datetime) -> Mapping[CatalystKey, CatalystChip]:
         return read_board_catalysts(engine, keys, settings=settings, now=now)
+
+    return _source
+
+
+def db_regime_source(engine: Engine) -> RegimeSource:
+    """A regime source reading ``alfa_regime`` only (B5; no Unusual Whales call)."""
+
+    def _source(now: datetime) -> RegimeInputs:
+        return read_regime_inputs(engine, now=now)
 
     return _source
 
@@ -991,4 +1085,6 @@ def template_context() -> dict[str, object]:
         "iv_not_sell_vol": IV_NOT_SELL_VOL,
         # B4: the audit block discloses that the chip and M22's event score can disagree.
         "catalyst_note": M22_MAY_DIFFER,
+        # B5: the band's own frozen copy (the tripwire line and its status).
+        "regime_copy": REGIME_COPY,
     }
