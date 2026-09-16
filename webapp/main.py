@@ -35,7 +35,7 @@ from starlette.datastructures import Headers
 from starlette.responses import PlainTextResponse
 
 from webapp import explanations, gamma, journal, pricing
-from webapp.board import alfa_page, cards, fills
+from webapp.board import alfa_page, cards, decision_ledger, fills, outcomes
 from webapp.board.copy_tr import IV_NOT_SELL_VOL
 from webapp.board.evidence import request_for
 from webapp.board.refresher import board_refresh_loop
@@ -793,6 +793,72 @@ def _journal_fill_context(trades: Sequence[journal.TradeRow]) -> dict[str, objec
         "fill_quotes": {card.id: _assumed_quote(card) for card in linked.values()},
         "fill_rows": {card_id: tuple(found) for card_id, found in rows.items()},
     }
+
+
+# ---------------------------------------------------------------------------
+# The pass ledger (Phase 5.2.C2a; docs/phase-5.2-decision-cards-acceptance.md §4)
+# ---------------------------------------------------------------------------
+
+_OUTCOMES: outcomes.OutcomeRepo | None = None
+_NO_OUTCOMES: tuple[outcomes.Outcome, ...] = ()
+
+
+def _outcome_repo() -> outcomes.OutcomeRepo:
+    """The append-only outcome repository, bound to the board reader's engine."""
+    global _OUTCOMES
+    engine = _board_reader().engine
+    if _OUTCOMES is None or _OUTCOMES.engine is not engine:
+        _OUTCOMES = outcomes.OutcomeRepo(engine)
+    return _OUTCOMES
+
+
+@app.get("/defter", response_class=HTMLResponse)
+def defter_page(request: Request, karar: str = "", hisse: str = "") -> HTMLResponse:
+    """The pass ledger: every recorded decision, taken and passed (contract §4).
+
+    Reads the database only; no Unusual Whales call. Two queries serve the whole
+    page — one for the cards the filters select, one for those cards' outcomes —
+    and the card list is capped at ``ledger.max_cards_per_page``, disclosed on
+    the page, so the route stays fast once the ledger holds thousands of cards.
+
+    An unknown ``karar`` value lists every decision rather than nothing: a
+    mistyped filter must not look like an empty ledger. A failed read renders an
+    explicit "could not read" state that says nothing was deleted.
+    """
+    settings = _board_settings()
+    limit = settings.ledger.max_cards_per_page
+    decision = cards.decision_for(karar.strip())
+    ticker = hisse.strip().upper()
+    listed: tuple[cards.DecisionCard, ...] | None = _safe(
+        lambda: _card_repo().list_cards(decision=decision, ticker=ticker or None, limit=limit),
+        None,
+    )
+    found = listed or ()
+    stored = (
+        _safe(lambda: _outcome_repo().list_outcomes(card_ids=[c.id for c in found]), _NO_OUTCOMES)
+        if found
+        else _NO_OUTCOMES
+    )
+    page = decision_ledger.build_ledger_page(
+        found,
+        stored,
+        horizons=settings.outcomes.horizons_trading_days,
+        min_n=settings.fills.min_n_for_stats,
+        limit=limit,
+        decision=decision or "",
+        ticker=ticker,
+        load_failed=listed is None,
+    )
+    return templates.TemplateResponse(
+        request,
+        "defter.html",
+        {
+            "page": page,
+            **decision_ledger.template_context(),
+            **outcomes.template_context(),
+            **_EXPLAIN,
+        },
+    )
 
 
 @app.get("/kart/{card_id}", response_class=HTMLResponse)

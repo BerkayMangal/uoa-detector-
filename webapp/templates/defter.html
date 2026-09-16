@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{# The pass ledger — /defter (Phase 5.2.C2a, decision-cards contract §4).
+
+   Every decision the owner recorded, taken and passed, newest first, each with the
+   snapshot frozen the day of the press and its counterfactual outcomes. Reads the
+   database only — no Unusual Whales call — and recomputes nothing: a card says what
+   it said that day, and a field the card never carried reads "bilinmiyor".
+
+   The page is capped at `ledger.max_cards_per_page` and says so, so a full page is
+   never mistaken for the whole ledger. Nothing is deleted; older cards are only
+   paged out of this view.
+
+   Every visible Turkish string comes from the frozen dictionaries in
+   webapp/board/decision_ledger.py and webapp/board/outcomes.py. #}
+{% block content %}
+<section id="alfa-defter" lang="tr">
+  <div class="flex items-baseline gap-3 flex-wrap mb-3">
+    <h2 class="text-xl font-bold text-white">{{ defter_copy.page_title }}</h2>
+    <span class="text-sm text-gray-400">{{ defter_copy.intro }}</span>
+  </div>
+
+  {% include "_alfa_ledger_filters.html" %}
+
+  {% if page.load_failed %}
+  <div class="rounded-lg border border-dashed border-amber-700/60 bg-amber-900/10 px-4 py-3 text-sm text-amber-200"
+       data-state="load-failed">{{ defter_copy.load_failed }}</div>
+  {% elif not page.rows %}
+  <div class="rounded-lg border border-gray-800 bg-gray-900/40 px-4 py-3 text-sm text-gray-400"
+       data-state="empty">{{ page.empty_text }}</div>
+  {% else %}
+  <p class="text-xs text-gray-500 mb-3" data-cap>{{ page.cap_text }}</p>
+
+  {% include "_alfa_ledger_stats.html" %}
+
+  <div class="mt-4 grid gap-3" data-cards>
+    {% for row in page.rows %}{% include "_alfa_ledger_card.html" %}{% endfor %}
+  </div>
+
+  {% if page.capped %}
+  <p class="mt-3 text-xs text-amber-300/90" data-state="capped">{{ defter_copy.capped }}</p>
+  {% endif %}
+  {% endif %}
+</section>
+{% endblock %}

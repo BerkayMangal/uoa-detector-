@@ -154,6 +154,12 @@ class FillsSettings(_Strict):
     min_n_for_stats: int = Field(ge=1)
 
 
+class LedgerSettings(_Strict):
+    """Phase 5.2.C2a: the /defter page cap (the ledger itself is never trimmed)."""
+
+    max_cards_per_page: int = Field(ge=1)
+
+
 class OutcomesSettings(_Strict):
     horizons_trading_days: tuple[int, ...] = Field(min_length=1)
     job_time_et: str = Field(pattern=_CLOCK)
@@ -191,6 +197,7 @@ class BoardSettings(_Strict):
     delayed: DelayedSettings
     portfolio: PortfolioSettings
     fills: FillsSettings
+    ledger: LedgerSettings
     outcomes: OutcomesSettings
 
     def content_hash(self) -> str:
