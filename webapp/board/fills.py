@@ -106,6 +106,9 @@ FILL_COPY: Final[Mapping[str, str]] = MappingProxyType(
         "counts_only": "{n} dolum kaydı; istatistik için yetersiz örnek",
         "stats_title": "Kayma özeti",
         "stats_scope_all": "tüm dolum kayıtları",
+        # Said instead of "tüm" when the read stopped at its bound: a median over
+        # the newest N fills is not a median over all of them.
+        "stats_scope_recent": "son {n} dolum kaydı",
         "fills_title": "Dolum kayıtları",
         "fills_empty": "Bu kart için dolum kaydı yok.",
         "sample_size": "{n} dolum kaydı",
@@ -519,6 +522,18 @@ def slippage_stats(fills: Sequence[Fill], *, min_n: int) -> SlippageStats:
         n=n, min_n=min_n, median_usd=median_usd, q1_usd=q1_usd, q3_usd=q3_usd,
         median_pct=median_pct, q1_pct=q1_pct, q3_pct=q3_pct,
     )
+
+
+def stats_scope_text(n: int, *, capped: bool) -> str:
+    """Names the sample a slippage summary was computed over.
+
+    ``tüm dolum kayıtları`` only when the read really did reach every stored
+    fill. When it stopped at its bound the label names the window instead
+    (``son 500 dolum kaydı``): a median over the newest ``n`` is not a median
+    over all of them, and a count that stops at ``n`` is not the table's count.
+    The bound is ``fills.max_fills_per_summary`` from the board profile.
+    """
+    return FILL_COPY["stats_scope_recent"].format(n=n) if capped else FILL_COPY["stats_scope_all"]
 
 
 @dataclass(frozen=True)

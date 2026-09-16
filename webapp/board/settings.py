@@ -152,6 +152,8 @@ class PortfolioSettings(_Strict):
 
 class FillsSettings(_Strict):
     min_n_for_stats: int = Field(ge=1)
+    # Phase 5.2.C32-fix2: how many fills the card page's slippage summary reads.
+    max_fills_per_summary: int = Field(ge=1)
 
 
 class LedgerSettings(_Strict):

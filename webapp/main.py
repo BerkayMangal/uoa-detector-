@@ -877,8 +877,22 @@ def card_page(request: Request, card_id: str, dolum: str = "") -> HTMLResponse:
     card = _safe(lambda: _card_repo().get_card(card_id), None)
     recorded = _safe(lambda: _fill_repo().get_fill(dolum), None) if dolum else None
     found = card is not None
-    card_fills = _safe(lambda: _fill_repo().list_fills(card_id=card_id), _NO_FILLS) if found else _NO_FILLS
-    every_fill = _safe(lambda: _fill_repo().list_fills(), _NO_FILLS) if found else _NO_FILLS
+    window = _board_settings().fills.max_fills_per_summary
+    card_fills = (
+        _safe(lambda: _fill_repo().list_fills(card_id=card_id, limit=window), _NO_FILLS)
+        if found
+        else _NO_FILLS
+    )
+    # One row past the window tells the page whether the sample IS every stored
+    # fill or only its newest page, so the scope line can say which (§5: the
+    # summary must not claim a wider sample than it read).
+    sampled = (
+        _safe(lambda: _fill_repo().list_fills(limit=window + 1), _NO_FILLS)
+        if found
+        else _NO_FILLS
+    )
+    capped = len(sampled) > window
+    every_fill = sampled[:window] if capped else sampled
     context: dict[str, object] = {
         "card": card,
         "can_fill": card is not None and cards.is_logged(card),
@@ -887,7 +901,7 @@ def card_page(request: Request, card_id: str, dolum: str = "") -> HTMLResponse:
         "summaries": fills.side_summaries(
             every_fill, min_n=_board_settings().fills.min_n_for_stats,
         ),
-        "summary_scope": fills.FILL_COPY["stats_scope_all"],
+        "summary_scope": fills.stats_scope_text(len(every_fill), capped=capped),
         "card_meta": (
             fills.card_meta_text(card.ticker, card.direction, card.created_at, card.id)
             if card is not None
