@@ -1,6 +1,6 @@
 # Alfa Board — Berkay için özet
 
-**Son güncelleme: 2026-09-16 12:20Z (TRT 15:20).** Bu dosya çalışma sürdükçe tazelenir; en son değil,
+**Son güncelleme: 2026-09-16 12:25Z (TRT 15:25).** Bu dosya çalışma sürdükçe tazelenir; en son değil,
 sürekli yazılır. Doğrulanmamış her şey "DOĞRULANMADI" diye etiketlidir.
 
 ---
@@ -11,9 +11,9 @@ sürekli yazılır. Doğrulanmamış her şey "DOĞRULANMADI" diye etiketlidir.
 - **URL:** https://uoa-detector-production.up.railway.app/ — kullanıcı adı/şifre masaüstündeki
   `uoa-dashboard-login.txt` dosyasında.
 - **Canlı SHA:** `eae4faf` (tahta + raylar + hız düzeltmesi + karar kartları + FAZ B/D + pas defteri ve dolum kaydı).
-- **Son doğrulama:** 2026-09-16 12:10Z / 15:10 TRT — sağlık 200 ve ayakta olan commit'i doğru bildiriyor, şifresiz 401, şifreli 200, dürüstlük denetimi 20 satırda PASS, logda hata yok; tahta **1,3 saniyede**, `/defter` 0,27 saniyede açılıyor (sözleşme sınırı 1,5 saniye).
+- **Son doğrulama:** 2026-09-16 12:20Z / 15:20 TRT — sağlık 200 ve ayakta olan commit'i doğru bildiriyor, şifresiz 401, şifreli 200, dürüstlük denetimi 20 satırda PASS, logda hata yok. **Ama tahta şu an 8,4 saniyede açılıyor** (sözleşme sınırı 1,5 s); `/defter` 0,27 saniye. Sebebi ölçülüyor — aşağıda.
 - **Durma sebebi:** — (çalışma sürüyor).
-- **Sırada:** 13:30Z açılışından sonra canlı veriyle doğrulama (kotasyonlar, maliyet çipleri, kanıt aileleri) ve REG-7'deki bağlantı havuzu düzeltmesi.
+- **Sırada:** tahtanın yavaşlığında suçlu kaynağı isimlendiren ölçüm (canlıya alınıyor), sonra düzeltme; ardından 13:30Z açılışında canlı veriyle doğrulama.
 
 ## 2. GERİ ALMA KARTI
 
@@ -125,6 +125,16 @@ yapılmadı, indirme başlatılmadı. Ayrıntı: `docs/thetadata-decision.md`.
   basıyor. Ölçüm, o 9 saniyenin **render olmadığını** gösterdi — sunucu tarafı 0,3 saniyeydi; kayıp süre
   istek uygulamaya girmeden önce, deploy sonrası konteyner ısınmasında geçiyordu. Şu an altı ardışık
   ölçümde uçtan uca 0,55–0,72 saniye.
+- **Şu an tahta yavaş ve bunu süslemiyorum: 8,4 saniye.** Doğru çalışıyor (içerik, kanıtlar, maliyet,
+  karar kartları, dürüstlük denetimi hepsi geçiyor) ama açılması yavaş.
+- **Bugün bu üçüncü yavaşlama ve her seferinde ölçtüm.** Bu seferki ölçüm şunu söylüyor: süre satır
+  kaynaklarını okuyan kısımda (**sayfa modeli 7,4 saniye**), şablonda ya da baskı okumada değil. Değişen tek
+  şey **veri**: günlük işler katalizör ve T+1 açık-pozisyon tablolarını doldurdu; o tablolar boşken aynı
+  sayfa 0,26 saniyeydi. Yani şüpheli, satır başına yapılan katalizör/OI okumaları.
+- **REG-7 (daha önce ölçülen):** çalışma listesi ve gamma okuması bazı deploy'larda istek başına 0,37'şer
+  saniye sürüyor — bu da sorgu maliyeti değil, her istekte yeni veritabanı bağlantısı açılması demek.
+- **Sıradaki adım tahmin değil:** hangi kaynağın yediğini isimlendiren ölçüm canlıya alınıyor; düzeltme
+  ondan sonra ve aynı ölçümle doğrulanacak.
 - **Pratikte senin için anlamı:** tahta normalde yarım saniyede açılır; **yeni bir deploy'dan sonraki ilk
   birkaç dakikada yavaş olabilir**, bu kendiliğinden geçer. Bir daha yavaşlarsa loglardaki `board timing:`
   satırı hangi aşamanın yavaşladığını doğrudan söyler.
