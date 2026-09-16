@@ -57,6 +57,20 @@
       </form>
     </div>
     {% if t.thesis %}<p class="mt-1 text-xs text-gray-500">{{ t.thesis }}</p>{% endif %}
+    {# Phase 5.2.C3: a trade linked to a board decision card takes fills here, measured
+       against that card's frozen quote (decision-cards contract §5). The sample-wide
+       slippage summary lives on the card page, not once per trade. #}
+    {% set fill_card = (fill_cards|default({})).get(t.id) %}
+    {% if fill_card %}
+    {% with card=fill_card, assumed=(fill_quotes|default({})).get(fill_card.id), fills=(fill_rows|default({})).get(fill_card.id, ()), summaries=() %}
+    <div class="mt-2" lang="tr">
+      {% include "_alfa_fill_form.html" %}
+      {% include "_alfa_fill_list.html" %}
+      <a href="/kart/{{ card.id }}" class="mt-1 inline-block text-xs text-gray-400 hover:text-gray-200"
+         data-card-link="{{ card.id }}">{{ fill_copy.open_card }}</a>
+    </div>
+    {% endwith %}
+    {% endif %}
   </div>
 {% endfor %}
 </div>
@@ -79,7 +93,11 @@
       <td class="text-right text-gray-400">${{ '%.2f'|format(t.entry_price) }} → ${{ '%.2f'|format(t.exit_price) }}</td>
       <td class="text-right font-semibold {{ 'text-emerald-400' if p is not none and p>=0 else 'text-red-400' }}">{{ '${:,.0f}'.format(p) if p is not none else '—' }}</td>
       <td class="text-right font-mono {{ 'text-emerald-400' if e is not none and e>=0 else 'text-red-400' }}">{{ '%+.2f%%'|format(e*100) if e is not none else '—' }}</td>
-      <td class="pl-3 text-gray-500 text-xs">{{ t.thesis }}</td>
+      <td class="pl-3 text-gray-500 text-xs">{{ t.thesis }}
+        {% set fill_card = (fill_cards|default({})).get(t.id) %}
+        {% if fill_card %}<a href="/kart/{{ fill_card.id }}" class="text-gray-400 hover:text-gray-200"
+           data-card-link="{{ fill_card.id }}" lang="tr">{{ fill_copy.open_card }}</a>{% endif %}
+      </td>
     </tr>
   {% endfor %}
   {% if not closed_trades %}<tr><td colspan="7" class="py-3 text-gray-500 text-center">No closed trades yet.</td></tr>{% endif %}

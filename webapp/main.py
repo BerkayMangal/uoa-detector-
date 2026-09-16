@@ -35,7 +35,7 @@ from starlette.datastructures import Headers
 from starlette.responses import PlainTextResponse
 
 from webapp import explanations, gamma, journal, pricing
-from webapp.board import alfa_page, cards
+from webapp.board import alfa_page, cards, fills
 from webapp.board.copy_tr import IV_NOT_SELL_VOL
 from webapp.board.evidence import request_for
 from webapp.board.refresher import board_refresh_loop
@@ -292,6 +292,9 @@ def journal_page(request: Request) -> HTMLResponse:
             "stats": journal.aggregate(trades),
             "pnl": journal.option_pnl_usd,
             "excess": journal.directional_excess,
+            # Phase 5.2.C3: the fill form on a trade that came from a board card.
+            **_journal_fill_context(trades),
+            **fills.template_context(),
             **_EXPLAIN,
         },
     )
@@ -738,6 +741,164 @@ def alfa_card(
         params["gate"] = alfa_page.GATE_OFF_PARAM
     # The target is built here, never from a client value: no open redirect.
     return RedirectResponse(f"/?{urlencode(params)}", status_code=303)
+
+
+# ---------------------------------------------------------------------------
+# Fill capture (Phase 5.2.C3; docs/phase-5.2-decision-cards-acceptance.md §5)
+# ---------------------------------------------------------------------------
+
+_FILLS: fills.FillRepo | None = None
+_NO_FILLS: tuple[fills.Fill, ...] = ()
+
+
+def _fill_repo() -> fills.FillRepo:
+    """The append-only fill repository, bound to the board reader's engine."""
+    global _FILLS
+    engine = _board_reader().engine
+    if _FILLS is None or _FILLS.engine is not engine:
+        _FILLS = fills.FillRepo(engine)
+    return _FILLS
+
+
+def _assumed_quote(card: cards.DecisionCard) -> fills.AssumedQuote | None:
+    """The quote frozen into ``card``, or ``None`` when its snapshot holds no usable pair.
+
+    Always read on the server from the card itself (contract §5). A client value
+    could not be trusted here: the whole point of a fill record is to measure the
+    board's own cost assumption, and an assumption the client may rewrite
+    measures nothing.
+    """
+    return _safe(lambda: fills.assumed_quote_from_card(card.card), None)
+
+
+def _journal_fill_context(trades: Sequence[journal.TradeRow]) -> dict[str, object]:
+    """The decision cards linked onto these trades, with their quotes and fills.
+
+    Two reads for the whole page, never one per trade, and both wrapped: a
+    database without the ``alfa_`` tables (the journal predates the board) leaves
+    the journal exactly as it was.
+    """
+    empty: Mapping[str, cards.DecisionCard] = {}
+    linked = _safe(
+        lambda: cards.cards_for_trades(_board_reader().engine, [t.id for t in trades]), empty,
+    )
+    if not linked:
+        return {"fill_cards": empty, "fill_quotes": {}, "fill_rows": {}}
+    rows: dict[str, list[fills.Fill]] = {card.id: [] for card in linked.values()}
+    for fill in _safe(lambda: _fill_repo().list_fills(), _NO_FILLS):
+        if fill.card_id in rows:
+            rows[fill.card_id].append(fill)
+    return {
+        "fill_cards": linked,
+        "fill_quotes": {card.id: _assumed_quote(card) for card in linked.values()},
+        "fill_rows": {card_id: tuple(found) for card_id, found in rows.items()},
+    }
+
+
+@app.get("/kart/{card_id}", response_class=HTMLResponse)
+def card_page(request: Request, card_id: str, dolum: str = "") -> HTMLResponse:
+    """One decision card, its assumed quote and its fills (contract §5).
+
+    Reads the database only; no Unusual Whales call. A card id that names nothing
+    renders the missing-card state with a 404 — never an invented card. ``?dolum=``
+    confirms a recorded fill, and only when that fill really belongs to this card.
+
+    The slippage summary on this page covers every recorded fill, not this card's
+    handful: the cost assumption is a property of the board, and one card's fills
+    will never reach ``fills.min_n_for_stats``. Below that sample size the summary
+    shows counts and nothing else (§5).
+    """
+    card = _safe(lambda: _card_repo().get_card(card_id), None)
+    recorded = _safe(lambda: _fill_repo().get_fill(dolum), None) if dolum else None
+    found = card is not None
+    card_fills = _safe(lambda: _fill_repo().list_fills(card_id=card_id), _NO_FILLS) if found else _NO_FILLS
+    every_fill = _safe(lambda: _fill_repo().list_fills(), _NO_FILLS) if found else _NO_FILLS
+    context: dict[str, object] = {
+        "card": card,
+        "can_fill": card is not None and cards.is_logged(card),
+        "assumed": _assumed_quote(card) if card is not None else None,
+        "fills": card_fills,
+        "summaries": fills.side_summaries(
+            every_fill, min_n=_board_settings().fills.min_n_for_stats,
+        ),
+        "summary_scope": fills.FILL_COPY["stats_scope_all"],
+        "card_meta": (
+            fills.card_meta_text(card.ticker, card.direction, card.created_at, card.id)
+            if card is not None
+            else ""
+        ),
+        "decision_text": (
+            fills.FILL_COPY["decision_log" if cards.is_logged(card) else "decision_pas"]
+            if card is not None
+            else ""
+        ),
+        "trade_line": fills.trade_line_text(card.trade_id) if card is not None else "",
+        "recorded_line": (
+            fills.recorded_text(recorded, ticker=card.ticker)
+            if recorded is not None and card is not None and recorded.card_id == card.id
+            else None
+        ),
+        **fills.template_context(),
+        **_EXPLAIN,
+    }
+    return templates.TemplateResponse(
+        request, "kart.html", context, status_code=200 if found else 404,
+    )
+
+
+@app.post("/alfa/fill", response_model=None)  # the union of two Response types is not a model
+def alfa_fill(
+    request: Request,
+    # Namespaced like the card form's fields, for the same reason: the board must
+    # never carry a control named "ticker", "label", "sort" or "min_score" again.
+    fill_card_id: str = Form(...),
+    fill_side: str = Form(...),
+    fill_price: float = Form(...),
+    fill_contracts: float = Form(...),
+) -> RedirectResponse | PlainTextResponse:
+    """Record one actual fill against a logged card's frozen quote (contract §5).
+
+    The form carries the owner's own three numbers and the card's id. Everything
+    else — the assumed bid, ask and mid, the quote's age at the card, and the
+    journal trade the fill belongs to — is read from the card on the server. The
+    route reads and writes the database only; no Unusual Whales call.
+
+    Nothing is written unless the card exists, records a taken decision, and
+    carries a usable quote: slippage measured against an invented quote would be
+    a fabricated number in an append-only table.
+    """
+    if not _same_origin(request):
+        return PlainTextResponse(cards.CARD_COPY["forbidden_origin"], status_code=403)
+    side = fills.side_for(fill_side)
+    if side is None:
+        return PlainTextResponse(fills.FILL_COPY["unknown_side"], status_code=400)
+    if fill_price <= 0 or fill_contracts <= 0:
+        return PlainTextResponse(fills.FILL_COPY["bad_numbers"], status_code=400)
+    card = _safe(lambda: _card_repo().get_card(fill_card_id), None) if fill_card_id else None
+    if card is None:
+        return PlainTextResponse(fills.FILL_COPY["card_not_found"], status_code=404)
+    if not cards.is_logged(card):
+        return PlainTextResponse(fills.FILL_COPY["not_logged"], status_code=400)
+    quote = _assumed_quote(card)
+    if quote is None:
+        return PlainTextResponse(fills.FILL_COPY["no_assumed_quote"], status_code=400)
+    try:
+        fill_id = _fill_repo().write_fill(
+            card_id=card.id,
+            trade_id=card.trade_id,
+            side=side,
+            fill_price=fill_price,
+            contracts=fill_contracts,
+            quote=quote,
+        )
+    except Exception:
+        # Deliberately not _safe: a failed write must never look like a recorded
+        # fill, and the generic error page ("Nothing is lost") is written for
+        # read-only views. Here nothing was recorded, and the owner must retype it.
+        _logger.exception("fill could not be written for card %s", card.id)
+        return PlainTextResponse(fills.FILL_COPY["write_failed"], status_code=500)
+    # Built from the stored card id, never from a client value: no open redirect.
+    return RedirectResponse(f"/kart/{card.id}?{urlencode({'dolum': fill_id})}", status_code=303)
 
 
 @app.get("/health")

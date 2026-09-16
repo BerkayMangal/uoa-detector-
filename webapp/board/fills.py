@@ -46,7 +46,7 @@ from sqlalchemy import DateTime, Float, Integer, String, select
 from sqlalchemy.orm import Mapped, mapped_column
 
 from webapp.board.db import AlfaBase, session_factory
-from webapp.board.tradability import format_pct, spread_pct_of_mid
+from webapp.board.tradability import CHIP_COPY, format_pct, spread_pct_of_mid
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Mapping, Sequence
@@ -104,11 +104,13 @@ FILL_COPY: Final[Mapping[str, str]] = MappingProxyType(
         # Contract §5's example line, with the count filled in.
         "counts_only": "{n} dolum kaydı; istatistik için yetersiz örnek",
         "stats_title": "Kayma özeti",
+        "stats_scope_all": "tüm dolum kayıtları",
         "fills_title": "Dolum kayıtları",
         "fills_empty": "Bu kart için dolum kaydı yok.",
         "sample_size": "{n} dolum kaydı",
         "recorded": "Dolum kaydedildi: {ticker} {side} · {contracts} kontrat · {price}",
         "card_title": "Karar kartı",
+        "back_to_board": "Tahtaya dön",
         "card_meta": "{ticker} {direction} · {created} · kart {card_id}",
         "card_missing": "Kart bulunamadı.",
         "trade_link": "Bağlı işlem: {trade_id}",
@@ -230,6 +232,17 @@ def assumed_quote_from_card(card: Json) -> AssumedQuote | None:
 def assumed_quote_text(quote: AssumedQuote) -> str:
     """``kart anındaki kotasyon, {n} sn yaşında`` — never "NBBO at fill" (contract §5)."""
     return FILL_COPY["assumed_quote"].format(n=quote.age_seconds)
+
+
+def assumed_bid_ask_text(quote: AssumedQuote) -> str:
+    """The card's bid and ask, in the board's own frozen wording (``bid $x / ask $y``).
+
+    Reuses ``tradability.CHIP_COPY`` rather than restating it: the fill page must
+    show the same quote in the same words as the row the card was cut from. The
+    mid is not among them — it is the denominator of a percentage here, as it is
+    on the board, and never a price the owner is shown.
+    """
+    return CHIP_COPY["bid_ask"].format(bid=f"{quote.bid:.2f}", ask=f"{quote.ask:.2f}")
 
 
 # ---------------------------------------------------------------------------
@@ -553,6 +566,26 @@ def recorded_text(fill: Fill, *, ticker: str) -> str:
     )
 
 
+_CREATED_FORMAT: Final = "%Y-%m-%d %H:%M UTC"
+
+
+def card_meta_text(ticker: str, direction: str, created_at: datetime, card_id: str) -> str:
+    """The card page's identity line: what was decided, on what, and when (frozen copy)."""
+    return FILL_COPY["card_meta"].format(
+        ticker=ticker,
+        direction=direction,
+        created=created_at.astimezone(UTC).strftime(_CREATED_FORMAT),
+        card_id=card_id,
+    )
+
+
+def trade_line_text(trade_id: str | None) -> str:
+    """Names the journal trade a card is linked to, or says plainly that it has none."""
+    if not trade_id:
+        return FILL_COPY["trade_unlinked"]
+    return FILL_COPY["trade_link"].format(trade_id=trade_id)
+
+
 def template_context() -> dict[str, object]:
     """Frozen copy and formatting helpers for the fill templates."""
     return {
@@ -564,4 +597,5 @@ def template_context() -> dict[str, object]:
         "fill_pct_text": pct_text,
         "fill_contracts_text": contracts_text,
         "fill_assumed_quote_text": assumed_quote_text,
+        "fill_bid_ask_text": assumed_bid_ask_text,
     }

@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{# One decision card and its fills (Phase 5.2.C3, decision-cards contract §5).
+
+   Reached from the journal (a trade linked to a card) and by its own link. Reads the
+   database only — no Unusual Whales call — and a card id that names nothing renders
+   the missing-card state with a 404 rather than an invented card.
+
+   Only a logged card takes fills: a pass was never traded, so it has no fill to
+   record, and the form is replaced by the line that says so. Every visible Turkish
+   string comes from the frozen FILL_COPY dictionary in webapp/board/fills.py. #}
+{% block content %}
+<section id="alfa-card" lang="tr">
+  <div class="flex items-baseline gap-3 flex-wrap mb-3">
+    <h2 class="text-xl font-bold text-white">{{ fill_copy.card_title }}</h2>
+    <a href="/" class="text-sm text-gray-400 hover:text-gray-200" data-back>{{ fill_copy.back_to_board }}</a>
+  </div>
+
+  {% if not card %}
+  <p class="text-sm text-gray-300" data-state="card-missing">{{ fill_copy.card_missing }}</p>
+  {% else %}
+  <p class="text-sm text-gray-200" data-card-meta data-card-id="{{ card.id }}">{{ card_meta }} ·
+    <span data-card-decision="{{ card.decision }}">{{ decision_text }}</span></p>
+  <p class="mt-1 text-xs text-gray-500" data-trade-line>{{ trade_line }}</p>
+
+  {% if recorded_line %}
+  <div class="mt-3 rounded-lg border border-gray-600 bg-gray-900/70 px-4 py-2 text-sm text-gray-100"
+       data-state="fill-recorded">{{ recorded_line }}</div>
+  {% endif %}
+
+  <div class="mt-3">
+    {% if can_fill %}
+    {% include "_alfa_fill_form.html" %}
+    {% else %}
+    <p class="text-sm text-gray-300" data-state="not-logged">{{ fill_copy.not_logged }}</p>
+    {% endif %}
+  </div>
+
+  {% include "_alfa_fill_list.html" %}
+  {% endif %}
+</section>
+{% endblock %}
