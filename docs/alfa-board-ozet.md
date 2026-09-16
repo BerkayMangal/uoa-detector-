@@ -11,7 +11,7 @@ sürekli yazılır. Doğrulanmamış her şey "DOĞRULANMADI" diye etiketlidir.
 - **URL:** https://uoa-detector-production.up.railway.app/ — kullanıcı adı/şifre masaüstündeki
   `uoa-dashboard-login.txt` dosyasında.
 - **Canlı SHA:** `b7abd78` (FAZ A + raylar + şablon önbelleği + **karar kartları** + **FAZ B ve D**).
-- **Son doğrulama:** 2026-09-16 10:17Z / 13:17 TRT — sağlık 200 ve ayakta olan commit'i doğru bildiriyor, şifresiz 401, şifreli 200, dürüstlük denetimi 20 satırda PASS, logda hata yok, **sayfa açılma süresi 0,94 saniye** (sabah 3,8 saniyeydi; sözleşme hedefi 1,5 saniye).
+- **Son doğrulama:** 2026-09-16 10:40Z / 13:40 TRT — sağlık 200 ve ayakta olan commit'i doğru bildiriyor, şifresiz 401, şifreli 200, dürüstlük denetimi 20 satırda PASS, logda hata yok, **sayfa 0,6 saniyede açılıyor** (sunucu tarafı 0,3 saniye).
 - **Durma sebebi:** — (çalışma sürüyor).
 - **Sırada:** karar kartları (FAZ C1) ve render hızlandırması; FAZ B+D kodu dalda hazır, hız düzeltmesinden sonra geri gelecek.
 
@@ -118,9 +118,16 @@ yapılmadı, indirme başlatılmadı. Ayrıntı: `docs/thetadata-decision.md`.
   sonra geri gelecek.
 - **Asıl mesele bundan büyük (REG-5):** yavaşlık FAZ B/D'nin icadı değil; **FAZ A tek başına da 3,8-3,9
   saniye** ve hedef 1,5 saniye. Bunu şimdiye kadar kimse görmedi çünkü canlı render süresi hiç ölçülmüyordu.
-- **Sebep bulundu ve çözüldü:** satır şablonu her satır için yeniden derleniyormuş. Düzeltmeden sonra
-  **canlı tahta 3,8 saniyeden 0,40 saniyeye indi**; 6.300 baskılık en büyük koşu bile 1,03 saniye.
-  Sözleşmedeki hedef 1,5 saniyeydi, artık rahatça altındayız.
+- **Hız hikâyesi, baştan sona:** sabah tahta **3,8 saniyede** açılıyordu (FAZ B+D ile 9,4 s) ve sözleşme
+  hedefi 1,5 saniyeydi. Sebep: satır şablonu her satır için yeniden derleniyormuş — tek satırlık ayar
+  hatası. Düzeltince **0,40 saniyeye** indi; FAZ B+D geri gelince 0,94 saniye oldu.
+- **Sonra bir deploy'da yine 9 saniye gördüm ve tahmin etmek yerine ölçtüm:** artık her render tek satır log
+  basıyor. Ölçüm, o 9 saniyenin **render olmadığını** gösterdi — sunucu tarafı 0,3 saniyeydi; kayıp süre
+  istek uygulamaya girmeden önce, deploy sonrası konteyner ısınmasında geçiyordu. Şu an altı ardışık
+  ölçümde uçtan uca 0,55–0,72 saniye.
+- **Pratikte senin için anlamı:** tahta normalde yarım saniyede açılır; **yeni bir deploy'dan sonraki ilk
+  birkaç dakikada yavaş olabilir**, bu kendiliğinden geçer. Bir daha yavaşlarsa loglardaki `board timing:`
+  satırı hangi aşamanın yavaşladığını doğrudan söyler.
 - **FAZ B+D geri geliyor:** hız engeli kalktığı için kod güncel main üzerine yeniden hazırlandı ve
   testleri yeşil; canlıya alınıp aynı ölçümle doğrulanacak.
 - **Doğrulama rayları canlıda (PR #12):** `/health` artık hangi commit'in ayakta olduğunu söylüyor;
