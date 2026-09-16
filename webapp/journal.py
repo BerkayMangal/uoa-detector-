@@ -32,13 +32,6 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
 
 from webapp.repo import _normalize_url
 
-# Phase 5.2.PERF7: the board reads about twenty sources per render and Railway's
-# Postgres lives in another project, so a connection the proxy has already dropped
-# costs a full reconnect on its next use (0.37 s, measured live). pool_pre_ping
-# checks a connection before handing it out and replaces only a dead one. An earlier
-# attempt also set pool_recycle=280 s and made things worse: these pages are read
-# minutes apart, so every render exceeded the window and paid the reconnect anyway.
-
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
@@ -214,7 +207,7 @@ class JournalRepo:
         url = _normalize_url(
             database_url or os.environ.get("DATABASE_URL", "sqlite:///webapp/seed.db"),
         )
-        self._engine = create_engine(url, future=True, pool_pre_ping=True)
+        self._engine = create_engine(url, future=True)
         _Base.metadata.create_all(self._engine)
         self._session = sessionmaker(self._engine, future=True)
 
