@@ -354,12 +354,27 @@ def load_oi_confirm(session: Session, option_symbol: str, trade_date: date) -> O
 def load_oi_confirms(
     session: Session, keys: Iterable[tuple[str, date]],
 ) -> dict[tuple[str, date], OiConfirmView]:
-    out: dict[tuple[str, date], OiConfirmView] = {}
-    for symbol, trade_date in keys:
-        view = load_oi_confirm(session, symbol, trade_date)
-        if view is not None:
-            out[(view.option_symbol, view.trade_date)] = view
-    return out
+    """Every stored confirmation among ``keys``, in ONE query (Phase 5.2.B-fix7).
+
+    The render path asks for one key per board row, so a ``session.get`` per key
+    was one round trip per row (review RB-02). The symbols and the trade dates
+    are filtered in SQL and the exact pairs in Python, which keeps the statement
+    dialect-neutral.
+    """
+    wanted = {(symbol.strip().upper(), trade_date) for symbol, trade_date in keys}
+    if not wanted:
+        return {}
+    rows = session.scalars(
+        select(AlfaOiConfirm).where(
+            AlfaOiConfirm.option_symbol.in_({symbol for symbol, _day in wanted}),
+            AlfaOiConfirm.trade_date.in_({day for _symbol, day in wanted}),
+        ),
+    ).all()
+    return {
+        (row.option_symbol, row.trade_date): oi_confirm_view(row)
+        for row in rows
+        if (row.option_symbol, row.trade_date) in wanted
+    }
 
 
 def oi_label(view: OiConfirmView | None) -> str:

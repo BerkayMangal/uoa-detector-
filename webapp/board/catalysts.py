@@ -343,6 +343,39 @@ def load_catalyst_inputs(
     )
 
 
+def load_catalyst_inputs_many(
+    session: Session, tickers: Sequence[str],
+) -> dict[str, tuple[tuple[CatalystView, ...], tuple[CatalystFetchView, ...]]]:
+    """Stored events and fetch coverage for many tickers, in TWO queries (Phase 5.2.B-fix7).
+
+    The render path asks for one chip per board row, so loading each ticker on
+    its own was two round trips per ticker (review RB-02). The market-wide macro
+    rows are read once and handed to every ticker, exactly as the single-ticker
+    loader does.
+    """
+    symbols = [t.strip().upper() for t in tickers if t.strip()]
+    if not symbols:
+        return {}
+    lookup = {*symbols, MACRO_TICKER}
+    events = session.scalars(
+        select(AlfaCatalyst)
+        .where(AlfaCatalyst.ticker.in_(lookup))
+        .order_by(AlfaCatalyst.starts_at, AlfaCatalyst.kind, AlfaCatalyst.title),
+    ).all()
+    fetches = session.scalars(
+        select(AlfaCatalystFetch).where(AlfaCatalystFetch.ticker.in_(lookup)),
+    ).all()
+    views = [_event_view(e) for e in events if e.kind in _KINDS]
+    fetch_views = [_fetch_view(f) for f in fetches if f.source in _KINDS]
+    return {
+        symbol: (
+            tuple(v for v in views if v.ticker in (symbol, MACRO_TICKER)),
+            tuple(f for f in fetch_views if f.ticker in (symbol, MACRO_TICKER)),
+        )
+        for symbol in dict.fromkeys(symbols)
+    }
+
+
 def read_catalyst_chip(
     session: Session,
     *,
@@ -385,15 +418,13 @@ def read_board_catalysts(
         _tables_ready_for[:] = [engine]
     out: dict[tuple[str, datetime], CatalystChip] = {}
     with Session(engine) as session:
-        loaded: dict[str, tuple[tuple[CatalystView, ...], tuple[CatalystFetchView, ...]]] = {}
-        for ticker, end in dict.fromkeys(wanted):
-            if ticker not in loaded:
-                loaded[ticker] = load_catalyst_inputs(session, ticker)
-            events, fetches = loaded[ticker]
-            out[(ticker, end)] = catalyst_chip(
-                events, fetches, ticker=ticker, window_start=now, window_end=end,
-                settings=settings,
-            )
+        loaded = load_catalyst_inputs_many(session, [ticker for ticker, _end in wanted])
+    for ticker, end in dict.fromkeys(wanted):
+        events, fetches = loaded.get(ticker, ((), ()))
+        out[(ticker, end)] = catalyst_chip(
+            events, fetches, ticker=ticker, window_start=now, window_end=end,
+            settings=settings,
+        )
     return out
 
 
