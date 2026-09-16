@@ -651,10 +651,16 @@ def build_alfa_page(
 def _row_panel(
     ticker: str, panels: Mapping[str, DelayedPanel], *, wired: bool,
 ) -> DelayedPanel | None:
-    """A row's delayed bucket; a missing or failed read renders unknown, never an empty block."""
+    """A row's delayed bucket; a missing or failed read renders unknown, never an empty block.
+
+    The reader keys its panels by ``ticker.strip().upper()``, so the lookup uses
+    the same spelling: a row ticker with surrounding whitespace used to miss a
+    panel that had been read and render the read-failure state (Phase
+    5.2.D-fix3, review FD-05).
+    """
     if not wired:
         return None
-    return panels.get(ticker.upper()) or unreadable_panel(ticker)
+    return panels.get(ticker.strip().upper()) or unreadable_panel(ticker)
 
 
 def db_quote_source(engine: Engine) -> QuoteSource:
