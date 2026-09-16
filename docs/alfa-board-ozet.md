@@ -1,23 +1,23 @@
 # Alfa Board — Berkay için özet
 
-**Son güncelleme: 2026-09-16 10:20Z (TRT 13:20).** Bu dosya çalışma sürdükçe tazelenir; en son değil,
+**Son güncelleme: 2026-09-16 12:20Z (TRT 15:20).** Bu dosya çalışma sürdükçe tazelenir; en son değil,
 sürekli yazılır. Doğrulanmamış her şey "DOĞRULANMADI" diye etiketlidir.
 
 ---
 
 ## 1. BOARD DURUMU
 
-- **Durum: ÇALIŞIYOR** (FAZ A canlıda).
+- **Durum: ÇALIŞIYOR** — FAZ A, B, C ve D canlıda.
 - **URL:** https://uoa-detector-production.up.railway.app/ — kullanıcı adı/şifre masaüstündeki
   `uoa-dashboard-login.txt` dosyasında.
-- **Canlı SHA:** `b7abd78` (FAZ A + raylar + şablon önbelleği + **karar kartları** + **FAZ B ve D**).
-- **Son doğrulama:** 2026-09-16 10:40Z / 13:40 TRT — sağlık 200 ve ayakta olan commit'i doğru bildiriyor, şifresiz 401, şifreli 200, dürüstlük denetimi 20 satırda PASS, logda hata yok, **sayfa 0,6 saniyede açılıyor** (sunucu tarafı 0,3 saniye).
+- **Canlı SHA:** `eae4faf` (tahta + raylar + hız düzeltmesi + karar kartları + FAZ B/D + pas defteri ve dolum kaydı).
+- **Son doğrulama:** 2026-09-16 12:10Z / 15:10 TRT — sağlık 200 ve ayakta olan commit'i doğru bildiriyor, şifresiz 401, şifreli 200, dürüstlük denetimi 20 satırda PASS, logda hata yok; tahta **1,3 saniyede**, `/defter` 0,27 saniyede açılıyor (sözleşme sınırı 1,5 saniye).
 - **Durma sebebi:** — (çalışma sürüyor).
-- **Sırada:** karar kartları (FAZ C1) ve render hızlandırması; FAZ B+D kodu dalda hazır, hız düzeltmesinden sonra geri gelecek.
+- **Sırada:** 13:30Z açılışından sonra canlı veriyle doğrulama (kotasyonlar, maliyet çipleri, kanıt aileleri) ve REG-7'deki bağlantı havuzu düzeltmesi.
 
 ## 2. GERİ ALMA KARTI
 
-**Son bilinen iyi SHA: `5431cc8`.**
+**Son bilinen iyi SHA: `eae4faf`.**
 
 Tahta bozuksa, sadece şunu yapıştır:
 
