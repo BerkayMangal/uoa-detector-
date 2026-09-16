@@ -837,8 +837,19 @@ def defter_page(request: Request, karar: str = "", hisse: str = "") -> HTMLRespo
         None,
     )
     found = listed or ()
+    # Bounded by THIS page: one row per listed card per horizon, plus one. A read
+    # that leant on the repository's module default would start dropping stored
+    # outcomes the moment ledger.max_cards_per_page x horizons outgrew it, and a
+    # dropped row renders as "henüz hesaplanmadı" — a card that was measured
+    # reading as one that was not.
+    needed = len(found) * len(settings.outcomes.horizons_trading_days) + 1
     stored = (
-        _safe(lambda: _outcome_repo().list_outcomes(card_ids=[c.id for c in found]), _NO_OUTCOMES)
+        _safe(
+            lambda: _outcome_repo().list_outcomes(
+                card_ids=[c.id for c in found], limit=needed,
+            ),
+            _NO_OUTCOMES,
+        )
         if found
         else _NO_OUTCOMES
     )
