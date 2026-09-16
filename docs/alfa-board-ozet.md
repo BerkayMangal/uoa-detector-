@@ -1,6 +1,6 @@
 # Alfa Board — Berkay için özet
 
-**Son güncelleme: 2026-09-16 07:45Z (TRT 10:45).** Bu dosya çalışma sürdükçe tazelenir; en son değil,
+**Son güncelleme: 2026-09-16 08:45Z (TRT 11:45).** Bu dosya çalışma sürdükçe tazelenir; en son değil,
 sürekli yazılır. Doğrulanmamış her şey "DOĞRULANMADI" diye etiketlidir.
 
 ---
@@ -12,7 +12,8 @@ sürekli yazılır. Doğrulanmamış her şey "DOĞRULANMADI" diye etiketlidir.
   `uoa-dashboard-login.txt` dosyasında.
 - **Canlı SHA:** `a01406c` (FAZ A merge'i, PR #10).
 - **Son doğrulama:** 2026-09-16 06:00Z / 09:00 TRT.
-- **Durma sebebi:** — (çalışma sürüyor; bu satır bittiğinde güncellenecek).
+- **Durma sebebi:** — (çalışma sürüyor).
+- **Sırada:** FAZ B+D için PR #11 açık, CI bekleniyor; FAZ C1 (karar kartları) paralel yazılıyor.
 
 ## 2. GERİ ALMA KARTI
 
@@ -55,6 +56,7 @@ FAZ A öncesine (eski dashboard) döner, veri kaybı olmaz.
 | Altı aileli kanıt şeridi, bilinmeyen = taranmış ve sayılmaz | Rejim bandı (piyasa gelgiti, dealer gamma, VIX) |
 | Zorunlu `AMA` karşı-argümanı | Portföy örtüşmesi ("zaten bu bahittesin") |
 | Ceza defteri + skor yalnızca Denetim bloğunda | Gecikmeli kanıt kovası (Kongre / İçeriden / Short-FTD) |
+| | *(yukarıdaki 6 satır PR #11'de hazır ve yeşil, canlıya alınmayı bekliyor)* |
 | "Bugün temiz aday yok" durumu | **Karar kartları (Logla / Pas geç) — en kritik eksik** |
 | Vol board + "bu 'vol sat' demek değildir" cümlesi | Pas defteri `/defter` ve dolum kaydı |
 
@@ -85,8 +87,12 @@ yapılmadı, indirme başlatılmadı. Ayrıntı: `docs/thetadata-decision.md`.
 
 - **Karar kartları kapalı:** bugün pas geçtiğin işlemler hiçbir yere kaydedilmiyor — o veri geri gelmez.
   Bu, kalan sürede ilk hedefim.
-- **FAZ B/D arayüzü henüz canlıda değil:** büyüklük, maliyet-karşılaştırma, rejim ve gecikmeli kanıt
-  branch'lerde hazır, entegrasyonu sürüyor.
+- **FAZ B/D arayüzü henüz canlıda değil:** büyüklük, başabaş/straddle, kovalama, açılış-kapanış,
+  katalizör çipi, rejim bandı, portföy örtüşmesi ve gecikmeli kanıt kovası tek dalda birleşti,
+  3.645 test yeşil, PR #11 açık. CI yeşil olunca canlıya alınacak ve doğrulanacak.
+- **Yeni güvenlik rayları (PR #11 içinde):** `/health` artık hangi commit'in ayakta olduğunu söylüyor ve
+  `scripts/verify_live_board.sh` tek komutla deploy sonrası tüm kontrolleri (sağlık, şifre duvarı, render,
+  dürüstlük denetimi, `alfa_` satır sayıları) koşuyor.
 
 ## 10. YAPMADIKLARIM (negatif teyit)
 
