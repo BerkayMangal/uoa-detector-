@@ -1,0 +1,26 @@
+{# Phase 5.2.B6b (contract §6 B6): the capital header and the single-bet strip.
+
+   The header is the open long premium at risk against sizing.capital_usd, in dollars and
+   percent, carrying "(varsayılan değer)" while the owner has not confirmed those values
+   (decision P15). The strip names the strong links (board and open-journal tickers that
+   each weigh enough in the same focused ETF, with that ETF's holdings date) and, below
+   them, the weak same-sector links, which are shown but never merged into a cluster.
+
+   A failed journal read renders no header at all: "$0 at risk" would be a claim about the
+   account, not an unknown. Every string comes from webapp/board/portfolio.py. #}
+{% if page.capital %}
+<section class="rounded-lg border border-gray-800 bg-gray-900/40 px-4 py-3 mb-4" data-portfolio>
+  <p class="text-sm text-gray-100" data-capital>{{ page.capital.text }}</p>
+  {% if page.clusters or page.sector_links %}
+  <p class="mt-2 text-xs font-semibold text-gray-400" data-single-bet-title>{{ copy.portfolio_title }}</p>
+  <ul class="mt-1 space-y-0.5 text-xs text-gray-400" data-single-bet>
+    {% for cluster in page.clusters %}
+    <li data-cluster="{{ cluster.label_etf }}">{{ cluster.text }}</li>
+    {% endfor %}
+    {% for link in page.sector_links %}
+    <li class="opacity-80" data-sector-link>{{ link.text }}</li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+</section>
+{% endif %}

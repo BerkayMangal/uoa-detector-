@@ -31,7 +31,7 @@ from decimal import Decimal, InvalidOperation
 from typing import TYPE_CHECKING, Final, cast
 
 from sqlalchemy import Date, DateTime, Float, String, delete, select
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, Session, mapped_column
 
 from uoa_detector.sources.unusual_whales.client import (
     CircuitBreakerOpenError,
@@ -47,7 +47,7 @@ if TYPE_CHECKING:
 
     from sqlalchemy import Table
     from sqlalchemy.engine import Engine
-    from sqlalchemy.orm import Session, sessionmaker
+    from sqlalchemy.orm import sessionmaker
 
     from webapp.board.settings import BoardSettings
     from webapp.board.uw_errors import JsonClient
@@ -151,6 +151,23 @@ async def refresh_etf_holdings(
         fetched_at=fetched_at, stored=tuple(stored), skipped_broad=tuple(broad),
         no_data=tuple(no_data), degraded=tuple(degraded), requests=requests,
     )
+
+
+# The engine whose holdings table is known to exist (the render path checks once).
+_tables_ready_for: list[Engine] = []
+
+
+def read_focused_holdings(engine: Engine) -> tuple[HoldingView, ...]:
+    """Every stored focused-ETF holding for the render path: one query, and no UW call.
+
+    Creates the table once per engine, so a fresh database renders no cluster
+    instead of failing.
+    """
+    if not _tables_ready_for or _tables_ready_for[0] is not engine:
+        ensure_etf_holding_tables(engine)
+        _tables_ready_for[:] = [engine]
+    with Session(engine) as session:
+        return load_focused_holdings(session)
 
 
 def load_focused_holdings(session: Session) -> tuple[HoldingView, ...]:

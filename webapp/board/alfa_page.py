@@ -88,6 +88,7 @@ from webapp.board.copy_tr import (
     UNKNOWN_NOT_CLEAN,
 )
 from webapp.board.direction import DIRECTION_LABELS, FALLBACK_MARKER
+from webapp.board.etf_holdings import read_focused_holdings
 from webapp.board.evidence import (
     EMPTY_INPUTS,
     LegacyScores,
@@ -121,6 +122,12 @@ from webapp.board.penalty_ledger import (
     read_profile_hashes,
     resolve_profile,
 )
+from webapp.board.portfolio import (
+    capital_header,
+    journal_overlap,
+    same_sector_links,
+    single_bet_clusters,
+)
 from webapp.board.quotes import dominant_symbol, read_board_quotes
 from webapp.board.regime import (
     GAMMA_TICKERS,
@@ -130,6 +137,7 @@ from webapp.board.regime import (
     read_regime_inputs,
 )
 from webapp.board.sizing import SIZE_COPY, SizeRead, SizeText, build_size, size_text
+from webapp.board.ticker_info import read_ticker_infos
 from webapp.board.tradability import (
     CHIP_COPY,
     STATE_LABELS,
@@ -149,6 +157,8 @@ if TYPE_CHECKING:
     from uoa_detector.calibration.profile import CalibrationProfile
     from webapp.board.atm import AtmView
     from webapp.board.catalysts import CatalystChip
+    from webapp.board.direction import Direction
+    from webapp.board.etf_holdings import HoldingView
     from webapp.board.evidence import (
         EvidenceCounts,
         EvidenceInputs,
@@ -158,10 +168,20 @@ if TYPE_CHECKING:
     )
     from webapp.board.netprem import TapeSummary
     from webapp.board.oi_confirm import OiConfirmView
+    from webapp.board.portfolio import (
+        CapitalHeader,
+        OverlapView,
+        SectorLink,
+        SingleBetCluster,
+    )
+    from webapp.board.portfolio import (
+        Direction as PortfolioDirection,
+    )
     from webapp.board.regime import RegimeBand
     from webapp.board.settings import BoardSettings, CleanCandidateSettings
     from webapp.board.signals import BoardPrint
     from webapp.board.tradability import DepthView, QuoteView
+    from webapp.journal import TradeRow
 
     QuoteSource = Callable[
         [Sequence[str]], tuple[Mapping[str, QuoteView], Mapping[str, DepthView]]
@@ -177,6 +197,10 @@ if TYPE_CHECKING:
     ]
     # B5: the latest reading per regime source as of the page clock.
     RegimeSource = Callable[[datetime], RegimeInputs]
+    # B6: the open journal, the focused-ETF holdings and the sector of each ticker.
+    TradesSource = Callable[[], Sequence[TradeRow]]
+    HoldingsSource = Callable[[], Sequence[HoldingView]]
+    SectorSource = Callable[[Sequence[str]], Mapping[str, str | None]]
     # B3: (ticker, trade date, the source print's time) → the tape summed since that print.
     FlowSinceKey = tuple[str, date, datetime]
     FlowSinceSource = Callable[[Sequence[FlowSinceKey]], Mapping[FlowSinceKey, TapeSummary]]
@@ -258,6 +282,10 @@ ALFA_COPY: Final[Mapping[str, str]] = MappingProxyType(
         "opening_title": "Açılış mı kapanış mı",
         # B5: how old the reading behind a regime chip is (R-CO2's rule, for a chip).
         "regime_age": "{age} önce alındı",
+        # B6: the portfolio-overlap strip and the matching open trade of a row.
+        "portfolio_title": "Tek bahis şeridi",
+        "overlap_detail_title": "Eşleşen açık işlem",
+        "detail_separator": " · ",
         # R-EM1 banner variants (review FA-04); "Bugün temiz aday yok" stays copy_tr.NO_CLEAN_CANDIDATE.
         "no_clean_candidate_dated": "{date} seansında temiz aday yok",
         "no_clean_candidate_undated": "Bu çalışmada temiz aday yok",
@@ -321,6 +349,10 @@ _EXPIRY_CLOSE_ET: Final = time(16, 0)
 # The Açık pozisyon states that are a reading rather than an absence (R-UN1 dimming).
 _OI_KNOWN_STATES: Final = frozenset({"opening", "closing"})
 _NO_OI_ROW: Final = "yok"
+# B6: the board's direction as ``webapp/board/portfolio.py`` names it.
+_PORTFOLIO_DIRECTIONS: Final[Mapping[Direction, PortfolioDirection]] = MappingProxyType(
+    {"up": "yukarı", "down": "aşağı"},
+)
 
 
 @dataclass(frozen=True)
@@ -405,6 +437,7 @@ class AlfaRowView:
     chase: ChaseRead | None = None  # B3
     chase_text: ChaseText | None = None  # B3
     opening: OpeningView | None = None  # B4
+    overlap: OverlapView | None = None  # B6
 
 
 @dataclass(frozen=True)
@@ -430,6 +463,10 @@ class AlfaPage:
     newest_print_at: datetime | None = None  # the run's newest print (or signal) time
     rendered_at: datetime | None = None  # the page's clock
     regime: RegimeView | None = None  # B5; None only when no regime source was supplied
+    # B6: the capital header and the single-bet strip. None and empty mean "no source".
+    capital: CapitalHeader | None = None
+    clusters: tuple[SingleBetCluster, ...] = ()
+    sector_links: tuple[SectorLink, ...] = ()
 
     @property
     def no_clean_candidate(self) -> bool:
@@ -750,6 +787,9 @@ def build_alfa_page(
     oi_source: OiSource | None = None,
     catalyst_source: CatalystSource | None = None,
     regime_source: RegimeSource | None = None,
+    trades_source: TradesSource | None = None,
+    holdings_source: HoldingsSource | None = None,
+    sector_source: SectorSource | None = None,
 ) -> AlfaPage:
     """The page model; ``prints=None`` means the database read failed.
 
@@ -827,6 +867,35 @@ def build_alfa_page(
             )
         except Exception:
             _logger.exception("alfa board: catalyst read failed; the chip reads bilinmiyor")
+    today = _et_date(moment)
+    # B6: a failed journal read leaves the capital header out. Rendering "$0 at risk"
+    # from a read that failed would be a claim about the account, not an unknown.
+    trades: Sequence[TradeRow] | None = None
+    if trades_source is not None:
+        try:
+            trades = trades_source()
+        except Exception:
+            _logger.exception("alfa board: open journal read failed; no capital header is shown")
+    holdings: Sequence[HoldingView] = ()
+    if holdings_source is not None:
+        try:
+            holdings = holdings_source()
+        except Exception:
+            _logger.exception("alfa board: ETF holdings read failed; no cluster is claimed")
+    overlap_tickers = list(dict.fromkeys(
+        [row.ticker.strip().upper() for row in rows]
+        + [
+            trade.ticker.strip().upper()
+            for trade in (trades or ())
+            if isinstance(trade.ticker, str) and trade.ticker.strip()
+        ],
+    ))
+    sectors: Mapping[str, str | None] = {}
+    if sector_source is not None and overlap_tickers:
+        try:
+            sectors = sector_source(overlap_tickers)
+        except Exception:
+            _logger.exception("alfa board: sector read failed; no weak link is claimed")
     signals = {p.event_id: p.signal for p in prints}
     flow_since: Mapping[FlowSinceKey, TapeSummary] = {}
     if flow_since_source is not None and requests:
@@ -931,6 +1000,14 @@ def build_alfa_page(
                 chase=row_chase,
                 chase_text=chase_text(row_chase),
                 opening=opening,
+                overlap=(
+                    journal_overlap(
+                        trades, ticker=row.ticker,
+                        direction=_PORTFOLIO_DIRECTIONS[row.direction], today=today,
+                    )
+                    if trades is not None
+                    else None
+                ),
             ),
         )
     ordered = tuple(sorted(views, key=_view_order))
@@ -946,10 +1023,19 @@ def build_alfa_page(
         evidence_failed=evidence_failed,
         clean_candidate_count=sum(1 for v in ordered if v.clean_candidate),
         session_date=_et_date(newest) if newest is not None else None,
-        today=_et_date(moment),
+        today=today,
         newest_print_at=newest,
         rendered_at=moment,
         regime=regime,
+        capital=(
+            capital_header(trades, settings=settings, today=today) if trades is not None else None
+        ),
+        clusters=(
+            single_bet_clusters(overlap_tickers, holdings, settings=settings) if holdings else ()
+        ),
+        sector_links=(
+            same_sector_links(overlap_tickers, sectors, settings=settings) if sectors else ()
+        ),
     )
 
 
@@ -1012,6 +1098,26 @@ def db_catalyst_source(engine: Engine, settings: BoardSettings) -> CatalystSourc
 
     def _source(keys: Sequence[CatalystKey], now: datetime) -> Mapping[CatalystKey, CatalystChip]:
         return read_board_catalysts(engine, keys, settings=settings, now=now)
+
+    return _source
+
+
+def db_holdings_source(engine: Engine) -> HoldingsSource:
+    """A holdings source reading ``alfa_etf_holding`` only (B6; no Unusual Whales call)."""
+
+    def _source() -> Sequence[HoldingView]:
+        return read_focused_holdings(engine)
+
+    return _source
+
+
+def db_sector_source(engine: Engine) -> SectorSource:
+    """A sector source reading ``alfa_ticker_info`` only (B6; no Unusual Whales call)."""
+
+    def _source(tickers: Sequence[str]) -> Mapping[str, str | None]:
+        return {
+            ticker: info.sector for ticker, info in read_ticker_infos(engine, tickers).items()
+        }
 
     return _source
 

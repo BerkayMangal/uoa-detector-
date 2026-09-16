@@ -494,6 +494,11 @@ def alfa_board(request: Request, run: str = "", gate: str = "") -> HTMLResponse:
             _board_reader().engine, settings,
         )(keys, moment),
         regime_source=lambda moment: alfa_page.db_regime_source(_board_reader().engine)(moment),
+        # B6: the open journal, the focused-ETF holdings and the sectors behind the strip.
+        # A failed read is handled inside build_alfa_page, which then claims nothing.
+        trades_source=lambda: _journal().list("open"),
+        holdings_source=lambda: alfa_page.db_holdings_source(_board_reader().engine)(),
+        sector_source=lambda tickers: alfa_page.db_sector_source(_board_reader().engine)(tickers),
     )
     gamma_ctx: dict[str, gamma.GammaContext] = _safe(lambda: _gamma().latest(), {})
     vol_rows: list[VolBoardRow] = _safe(lambda: build_vol_board(
