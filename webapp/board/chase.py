@@ -24,8 +24,12 @@ entry would pay now, and how far the underlying has moved since.
   ``bilinmiyor``: the option half of the line still stands on its own.
 - **Flow context** is the net premium in the row's direction since the print
   (``netprem.read_net_premium_since``): ``sürüyor`` / ``döndü`` /
-  ``bilinmiyor``. It is context only. It never enters the verdict, and it is
-  never counted as evidence (K1).
+  ``bilinmiyor``, plus a fourth reading for a tape that was read and sums to
+  exactly zero (Phase 5.2.B-fix9, review FB-06). The contract names three
+  labels, but folding a measured flat tape into ``bilinmiyor`` is the
+  conflation decision P8 exists to prevent, so the measured case says so in its
+  own words. It is context only. It never enters the verdict, and it is never
+  counted as evidence (K1).
 - **Sold-option rows.** The board is written for a buyer entering at the ask
   (R-CO1), so the verdict stays ask-based even when the row's direction came
   from a sold option. The line says so rather than implying the owner would be
@@ -57,7 +61,7 @@ if TYPE_CHECKING:
     from webapp.board.tradability import TradabilityRead
 
 ChaseVerdict = Literal["reasonable", "caution", "late", "no_quote"]
-FlowContext = Literal["continuing", "reversed", "unknown"]
+FlowContext = Literal["continuing", "reversed", "flat", "unknown"]
 
 _PERCENT: Final = Decimal(100)
 
@@ -79,6 +83,9 @@ FLOW_LABELS: Final[Mapping[FlowContext, str]] = MappingProxyType(
         "continuing": "akış baskıdan beri sürüyor",
         "reversed": "akış baskıdan beri döndü",
         "unknown": "akış baskıdan beri: bilinmiyor",
+        # Phase 5.2.B-fix9 (review FB-06, decision P8): a tape that was read and sums to
+        # zero is a measurement, not an absence. The contract's three labels are unchanged.
+        "flat": "akış baskıdan beri: ölçüldü, yön göstermiyor",
     },
 )
 
@@ -203,7 +210,8 @@ def flow_context(tape: TapeSummary | None, direction: Direction) -> FlowContext:
         return "continuing"
     if net < 0:
         return "reversed"
-    return "unknown"
+    # Read, and exactly flat: decision P8 keeps a measured reading out of "bilinmiyor".
+    return "flat"
 
 
 def build_chase(

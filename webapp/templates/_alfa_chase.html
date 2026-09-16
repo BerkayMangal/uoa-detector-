@@ -14,6 +14,9 @@
   <span class="px-2 py-0.5 rounded border font-semibold {{ chase_style[view.chase.verdict] }}"
         data-chase-verdict>{{ view.chase_text.verdict }}</span>
   <span class="text-gray-100" data-chase-line>{{ view.chase_text.line }}</span>
+  {# R-CO2: this line quotes an executable ask ("şimdi $x (ask)"), so it carries that quote's
+     age, under its own attribute so the chip's first-match regexes are unaffected (RB-03). #}
+  {% if view.chip_text.quote_age %}<span class="text-xs text-gray-500" data-chase-quote-age>{{ view.chip_text.quote_age }}</span>{% endif %}
   <span class="text-xs text-gray-500" data-chase-flow>{{ view.chase_text.flow }}</span>
   {% if view.chase_text.sold_note %}<span class="text-xs text-gray-500" data-chase-sold>{{ view.chase_text.sold_note }}</span>{% endif %}
 </div>
