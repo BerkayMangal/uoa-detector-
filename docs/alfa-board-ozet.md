@@ -1,6 +1,6 @@
 # Alfa Board — Berkay için özet
 
-**Son güncelleme: 2026-09-16 09:20Z (TRT 12:20).** Bu dosya çalışma sürdükçe tazelenir; en son değil,
+**Son güncelleme: 2026-09-16 09:25Z (TRT 12:25).** Bu dosya çalışma sürdükçe tazelenir; en son değil,
 sürekli yazılır. Doğrulanmamış her şey "DOĞRULANMADI" diye etiketlidir.
 
 ---
@@ -10,8 +10,8 @@ sürekli yazılır. Doğrulanmamış her şey "DOĞRULANMADI" diye etiketlidir.
 - **Durum: ÇALIŞIYOR** (FAZ A canlıda).
 - **URL:** https://uoa-detector-production.up.railway.app/ — kullanıcı adı/şifre masaüstündeki
   `uoa-dashboard-login.txt` dosyasında.
-- **Canlı SHA:** `7728ba0` (FAZ A; FAZ B+D geri alındı — aşağıda sebebi).
-- **Son doğrulama:** 2026-09-16 09:16Z / 12:16 TRT — sağlık 200, şifresiz 401, şifreli 200, dürüstlük denetimi 20 satırda PASS, logda hata yok.
+- **Canlı SHA:** `d060cea` (FAZ A + belgeler; FAZ B+D geri alındı — aşağıda sebebi).
+- **Son doğrulama:** 2026-09-16 09:22Z / 12:22 TRT — sağlık 200, şifresiz 401, şifreli 200, dürüstlük denetimi 20 satırda PASS, logda hata yok, **sayfa açılma süresi 4,1 saniye**.
 - **Durma sebebi:** — (çalışma sürüyor).
 - **Sırada:** karar kartları (FAZ C1) ve render hızlandırması; FAZ B+D kodu dalda hazır, hız düzeltmesinden sonra geri gelecek.
 

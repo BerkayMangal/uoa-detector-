@@ -169,7 +169,11 @@ def test_health_is_open_in_every_case(
     _apply_env(monkeypatch, env)
     r = client.get("/health", headers=headers)
     assert r.status_code == 200
-    assert r.json() == {"ok": True}
+    body = r.json()
+    assert body["ok"] is True
+    # Phase 5.2.RAIL2: /health also reports the deployed commit, so a deploy
+    # check can prove which build answered. The route stays open in every case.
+    assert body["sha"]
 
 
 def test_unknown_path_is_gated_before_routing(
