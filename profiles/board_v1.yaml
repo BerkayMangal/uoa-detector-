@@ -120,3 +120,7 @@ ledger:
 outcomes:
   horizons_trading_days: [1, 5]
   job_time_et: "17:30"
+  # Phase 5.2.C2b (the key was missing): how many cards one outcome-job run scans,
+  # newest first. Cards whose horizons are already final cost nothing, so this only
+  # bounds the daily scan; no card is ever dropped from the ledger.
+  max_cards_per_run: 2000

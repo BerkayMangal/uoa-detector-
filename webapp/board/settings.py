@@ -163,6 +163,7 @@ class LedgerSettings(_Strict):
 class OutcomesSettings(_Strict):
     horizons_trading_days: tuple[int, ...] = Field(min_length=1)
     job_time_et: str = Field(pattern=_CLOCK)
+    max_cards_per_run: int = Field(ge=1)  # Phase 5.2.C2b: the daily job's scan bound
 
 
 class TapeSettings(_Strict):
