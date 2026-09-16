@@ -499,9 +499,6 @@ def _build_board_page(
         ),
         profile_resolver=alfa_page.resolve_writing_profile,
         run_latest_ts=run_latest_ts,
-        delayed_source=lambda tickers, today: alfa_page.db_delayed_source(
-            _board_reader().engine, settings.delayed,
-        )(tickers, today),
     )
 
 
