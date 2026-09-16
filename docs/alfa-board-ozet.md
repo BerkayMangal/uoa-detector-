@@ -1,6 +1,6 @@
 # Alfa Board — Berkay için özet
 
-**Son güncelleme: 2026-09-16 09:25Z (TRT 12:25).** Bu dosya çalışma sürdükçe tazelenir; en son değil,
+**Son güncelleme: 2026-09-16 09:35Z (TRT 12:35).** Bu dosya çalışma sürdükçe tazelenir; en son değil,
 sürekli yazılır. Doğrulanmamış her şey "DOĞRULANMADI" diye etiketlidir.
 
 ---
@@ -10,14 +10,14 @@ sürekli yazılır. Doğrulanmamış her şey "DOĞRULANMADI" diye etiketlidir.
 - **Durum: ÇALIŞIYOR** (FAZ A canlıda).
 - **URL:** https://uoa-detector-production.up.railway.app/ — kullanıcı adı/şifre masaüstündeki
   `uoa-dashboard-login.txt` dosyasında.
-- **Canlı SHA:** `d060cea` (FAZ A + belgeler; FAZ B+D geri alındı — aşağıda sebebi).
-- **Son doğrulama:** 2026-09-16 09:22Z / 12:22 TRT — sağlık 200, şifresiz 401, şifreli 200, dürüstlük denetimi 20 satırda PASS, logda hata yok, **sayfa açılma süresi 4,1 saniye**.
+- **Canlı SHA:** `2632298` (FAZ A + doğrulama rayları; FAZ B+D geri alındı — aşağıda sebebi).
+- **Son doğrulama:** 2026-09-16 09:33Z / 12:33 TRT — sağlık 200 ve **ayakta olan commit'i doğru bildiriyor**, şifresiz 401, şifreli 200, dürüstlük denetimi 20 satırda PASS, logda hata yok, **sayfa açılma süresi 3,9 saniye**.
 - **Durma sebebi:** — (çalışma sürüyor).
 - **Sırada:** karar kartları (FAZ C1) ve render hızlandırması; FAZ B+D kodu dalda hazır, hız düzeltmesinden sonra geri gelecek.
 
 ## 2. GERİ ALMA KARTI
 
-**Son bilinen iyi SHA: `7728ba0`.**
+**Son bilinen iyi SHA: `2632298`.**
 
 Tahta bozuksa, sadece şunu yapıştır:
 
@@ -103,9 +103,11 @@ yapılmadı, indirme başlatılmadı. Ayrıntı: `docs/thetadata-decision.md`.
   **%95'inin şablon işi** olduğunu gösteriyor (tüm veri okuması, kanıt ve ceza defteri render başına
   0,04 saniye). Yani **FAZ A tek başına da 3,9 saniye** — hedefin iki katından fazla. Bunu şimdiye kadar
   kimse görmedi çünkü canlı render süresi hiç ölçülmüyordu; artık her deploy'da ölçülüyor.
-- **Yeni güvenlik rayları (PR #11 içinde):** `/health` artık hangi commit'in ayakta olduğunu söylüyor ve
-  `scripts/verify_live_board.sh` tek komutla deploy sonrası tüm kontrolleri (sağlık, şifre duvarı, render,
-  dürüstlük denetimi, `alfa_` satır sayıları) koşuyor.
+- **Doğrulama rayları canlıda (PR #12):** `/health` artık hangi commit'in ayakta olduğunu söylüyor;
+  `scripts/verify_live_board.sh` tek komutla deploy sonrası her şeyi kontrol ediyor (sağlık + SHA, şifre
+  duvarı, **sayfa açılma süresi**, dürüstlük denetimi, `alfa_` satır sayıları); `scripts/audit_board_html.py`
+  dürüstlük kurallarını **canlı HTML üzerinde** denetliyor ve sıfır satır denetlerse "geçti" demiyor, düşüyor.
+  Bu raylar olmasaydı 9,4 saniyelik tahta fark edilmeden canlıda kalacaktı.
 
 ## 10. YAPMADIKLARIM (negatif teyit)
 
