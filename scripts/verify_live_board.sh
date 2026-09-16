@@ -32,9 +32,19 @@ try:
     d = json.load(sys.stdin)
 except Exception:
     sys.exit(0)
-u, p = d.get("BASIC_AUTH_USERNAME"), d.get("BASIC_AUTH_PASSWORD")
-if u and p:
-    print("user = %s:%s" % (u, p))
+# The service names them WEB_AUTH_*; the alternatives are tried so the script
+# keeps working if the variable is ever renamed. Values are written straight
+# into a curl config on stdout and never printed.
+for user_key, pass_key in (
+    ("WEB_AUTH_USER", "WEB_AUTH_PASSWORD"),
+    ("WEB_AUTH_USERNAME", "WEB_AUTH_PASSWORD"),
+    ("BASIC_AUTH_USER", "BASIC_AUTH_PASSWORD"),
+    ("BASIC_AUTH_USERNAME", "BASIC_AUTH_PASSWORD"),
+):
+    u, p = d.get(user_key), d.get(pass_key)
+    if u and p:
+        print("user = \"%s:%s\"" % (u, p))
+        break
 '
 }
 
@@ -54,6 +64,10 @@ code=$(curl -s -o /dev/null -w '%{http_code}' "$URL/")
 [ "$code" = 401 ] && note "/ without credentials" "401" || bad "/ without credentials" "$code"
 code=$(auth_curl_cfg | curl -s -K - -o "$TMP/page.html" -w '%{http_code}' "$URL/")
 [ "$code" = 200 ] && note "/ with credentials" "200" || bad "/ with credentials" "$code"
+# Contract §4.1 asks for a p95 under 1.5 s. Unit tests cannot measure that (the
+# runner's speed is not the product's), so the real number is taken here.
+render=$(auth_curl_cfg | curl -s -K - -o /dev/null -w '%{time_total}' "$URL/")
+note "live render (s)" "$render"
 
 # 3. honesty audit on the live html
 if [ -s "$TMP/page.html" ]; then
