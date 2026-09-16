@@ -1,6 +1,6 @@
 # Alfa Board — Berkay için özet
 
-**Son güncelleme: 2026-09-16 12:25Z (TRT 15:25).** Bu dosya çalışma sürdükçe tazelenir; en son değil,
+**Son güncelleme: 2026-09-16 12:55Z (TRT 15:55).** Bu dosya çalışma sürdükçe tazelenir; en son değil,
 sürekli yazılır. Doğrulanmamış her şey "DOĞRULANMADI" diye etiketlidir.
 
 ---
@@ -10,14 +10,14 @@ sürekli yazılır. Doğrulanmamış her şey "DOĞRULANMADI" diye etiketlidir.
 - **Durum: ÇALIŞIYOR** — FAZ A, B, C ve D canlıda.
 - **URL:** https://uoa-detector-production.up.railway.app/ — kullanıcı adı/şifre masaüstündeki
   `uoa-dashboard-login.txt` dosyasında.
-- **Canlı SHA:** `eae4faf` (tahta + raylar + hız düzeltmesi + karar kartları + FAZ B/D + pas defteri ve dolum kaydı).
-- **Son doğrulama:** 2026-09-16 12:20Z / 15:20 TRT — sağlık 200 ve ayakta olan commit'i doğru bildiriyor, şifresiz 401, şifreli 200, dürüstlük denetimi 20 satırda PASS, logda hata yok. **Ama tahta şu an 8,4 saniyede açılıyor** (sözleşme sınırı 1,5 s); `/defter` 0,27 saniye. Sebebi ölçülüyor — aşağıda.
+- **Canlı SHA:** `f8d9821` — tahta, doğrulama rayları, hız düzeltmeleri, karar kartları, FAZ B/D, pas defteri ve dolum kaydı.
+- **Son doğrulama:** 2026-09-16 12:50Z / 15:50 TRT — sağlık 200 ve ayakta olan commit'i doğru bildiriyor, şifresiz 401, şifreli 200, dürüstlük denetimi 20 satırda PASS, logda hata yok; **tahta 1,2-1,6 saniyede**, `/defter` 0,25 saniyede açılıyor (sözleşme sınırı 1,5 saniye).
 - **Durma sebebi:** — (çalışma sürüyor).
 - **Sırada:** tahtanın yavaşlığında suçlu kaynağı isimlendiren ölçüm (canlıya alınıyor), sonra düzeltme; ardından 13:30Z açılışında canlı veriyle doğrulama.
 
 ## 2. GERİ ALMA KARTI
 
-**Son bilinen iyi SHA: `eae4faf`.**
+**Son bilinen iyi SHA: `f8d9821`.**
 
 Tahta bozuksa, sadece şunu yapıştır:
 
@@ -125,16 +125,18 @@ yapılmadı, indirme başlatılmadı. Ayrıntı: `docs/thetadata-decision.md`.
   basıyor. Ölçüm, o 9 saniyenin **render olmadığını** gösterdi — sunucu tarafı 0,3 saniyeydi; kayıp süre
   istek uygulamaya girmeden önce, deploy sonrası konteyner ısınmasında geçiyordu. Şu an altı ardışık
   ölçümde uçtan uca 0,55–0,72 saniye.
-- **Şu an tahta yavaş ve bunu süslemiyorum: 8,4 saniye.** Doğru çalışıyor (içerik, kanıtlar, maliyet,
-  karar kartları, dürüstlük denetimi hepsi geçiyor) ama açılması yavaş.
-- **Bugün bu üçüncü yavaşlama ve her seferinde ölçtüm.** Bu seferki ölçüm şunu söylüyor: süre satır
-  kaynaklarını okuyan kısımda (**sayfa modeli 7,4 saniye**), şablonda ya da baskı okumada değil. Değişen tek
-  şey **veri**: günlük işler katalizör ve T+1 açık-pozisyon tablolarını doldurdu; o tablolar boşken aynı
-  sayfa 0,26 saniyeydi. Yani şüpheli, satır başına yapılan katalizör/OI okumaları.
-- **REG-7 (daha önce ölçülen):** çalışma listesi ve gamma okuması bazı deploy'larda istek başına 0,37'şer
-  saniye sürüyor — bu da sorgu maliyeti değil, her istekte yeni veritabanı bağlantısı açılması demek.
-- **Sıradaki adım tahmin değil:** hangi kaynağın yediğini isimlendiren ölçüm canlıya alınıyor; düzeltme
-  ondan sonra ve aynı ölçümle doğrulanacak.
+- **Hız hikâyesi kapandı, iki gerçek sebep vardı ve ikisi de ölçümle bulundu:**
+  1. **Satır şablonu her satır için yeniden derleniyordu.** Tek satırlık ayar hatası; düzeltince yerelde
+     50 satırlık render 0,64 s → 0,024 s (27 kat).
+  2. **Her istekte veritabanına yeniden bağlanılıyordu.** Tahta bir sayfada ~20 kaynak okuyor ve veritabanı
+     ayrı bir Railway projesinde; proxy'nin düşürdüğü bağlantıyı yenilemek her seferinde ~0,37 saniye
+     yiyordu. Bağlantı havuzuna ön-kontrol ve yenileme eklendi: çalışma listesi 0,37 s → **0,017 s**,
+     gamma okuması 0,38 s → **0,014 s**.
+- **Sonuç:** tahta artık **1,2-1,6 saniyede** açılıyor (sunucu tarafı 0,9-1,0 s), sözleşme sınırı 1,5 s.
+- **Bunu bilmen gereken bir tuzak var:** her deploy'dan sonra birkaç dakikalık "soğuk" pencere oluyor ve
+  aynı sürüm o aralıkta 5-11 saniye ölçülebiliyor. Bugün bu yüzden bir geri-alma hazırlayıp iptal ettim.
+  Yavaş gördüğünde birkaç dakika sonra tekrar bak; loglardaki `board timing:` satırı hangi aşamanın
+  yavaşladığını zaten söylüyor.
 - **Pratikte senin için anlamı:** tahta normalde yarım saniyede açılır; **yeni bir deploy'dan sonraki ilk
   birkaç dakikada yavaş olabilir**, bu kendiliğinden geçer. Bir daha yavaşlarsa loglardaki `board timing:`
   satırı hangi aşamanın yavaşladığını doğrudan söyler.
