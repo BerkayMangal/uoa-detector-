@@ -21,13 +21,16 @@ Two rules shape the whole module:
   answer ``None`` rather than raising, and ``None`` renders as ``bilinmiyor``.
   A ledger that 500s on an old card would lose the very history it exists to
   show.
-- **Counts below the sample gate.** Under ``fills.min_n_for_stats`` measured
-  cards in a group, only counts are shown — the contract's own line, ``12 pas,
-  3 log; istatistik için yetersiz örnek``. :func:`outcomes.excess_stats` returns
-  ``None`` for every statistic in that case, so a template cannot leak a median
-  by accident. There is no hit rate, no average and no t-statistic here at any
-  sample size, and log and pas are measured with identical math so the two stay
-  comparable (§4).
+- **Counts until EVERY group clears the sample gate.** Contract §4: "Nothing is
+  aggregated unless each group has at least ``fills.min_n_for_stats`` cards with
+  final outcomes. Below that, only counts are shown" — the contract's own line,
+  ``12 pas, 3 log; istatistik için yetersiz örnek``. So a full log sample does
+  not unlock a median while the pas control group is thin, and vice versa:
+  :attr:`HorizonSummary.reportable_groups` is empty until both are ready, and
+  :func:`outcomes.excess_stats` returns ``None`` for every statistic of a group
+  below the gate, so a template cannot leak one by accident. There is no hit
+  rate, no average and no t-statistic here at any sample size, and log and pas
+  are measured with identical math so the two stay comparable (§4).
 """
 
 from __future__ import annotations
@@ -288,12 +291,34 @@ class HorizonSummary:
 
     @property
     def enough(self) -> bool:
-        """True when at least one group has a reportable sample."""
-        return any(group.stats.enough for group in self.groups)
+        """True only when EVERY group has a reportable sample (contract §4).
+
+        "Nothing is aggregated unless each group has at least
+        ``fills.min_n_for_stats`` cards with final outcomes." One full group is
+        not enough: a median for the taken cards shown beside a three-card
+        control group is an invitation to read a comparison that the samples
+        cannot support, which is the one thing the pass ledger exists to avoid.
+        """
+        return bool(self.groups) and all(group.stats.enough for group in self.groups)
+
+    @property
+    def reportable_groups(self) -> tuple[DecisionGroup, ...]:
+        """The groups whose statistics may be shown — none until the gate opens.
+
+        The template iterates this rather than :attr:`groups`, so it cannot
+        render a median while any group is still below the gate even by
+        accident. When it is non-empty, every group in it has a measured sample
+        at or above ``min_n``.
+        """
+        return self.groups if self.enough else ()
 
     @property
     def counts_text(self) -> str:
-        """``12 pas, 3 log`` — with the contract's "yetersiz örnek" tail below the gate."""
+        """``12 pas, 3 log`` — with the contract's "yetersiz örnek" tail below the gate.
+
+        The tail is attached while ANY group is short, so the line never reads
+        as a finished measurement of a sample that is not there yet.
+        """
         counts = {group.decision: group.final_n for group in self.groups}
         key = "counts" if self.enough else "counts_only"
         return DEFTER_COPY[key].format(
@@ -324,8 +349,10 @@ def build_summaries(
     """One summary per horizon, each with one group per decision, count-gated.
 
     ``min_n`` is ``fills.min_n_for_stats`` from the board profile — never a
-    literal. The gate is per group: a sample of taken cards that reaches it does
-    not unlock the passed cards' median, and vice versa.
+    literal. Each group counts its own measured cards, and the gate opens only
+    when EVERY group has reached ``min_n`` (contract §4): log and pas are
+    reported together or not at all, because the comparison between them is the
+    only reason the numbers are shown.
     """
     return tuple(
         HorizonSummary(

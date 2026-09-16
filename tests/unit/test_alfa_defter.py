@@ -13,8 +13,8 @@ Pins:
   - one cell per profile horizon, and a horizon with no stored row reads
     ``henüz hesaplanmadı``: never a zero;
   - the contract's own counts line, byte for byte, below the gate;
-  - the gate is per group and holds in BOTH directions at
-    ``fills.min_n_for_stats``;
+  - the gate holds in BOTH directions at ``fills.min_n_for_stats``, and one full
+    group alone unlocks nothing (contract §4: "each group");
   - only rows that reached a final status are counted, and only measured ones
     enter a statistic;
   - the cap is disclosed, and an empty ledger says which kind of nothing it is;
@@ -302,20 +302,22 @@ def test_below_the_gate_no_group_reports_a_statistic() -> None:
     assert summary.counts_text.endswith("istatistik için yetersiz örnek")
 
 
-def test_at_the_gate_only_that_group_reports_a_statistic() -> None:
+def test_one_group_at_the_gate_alone_reports_nothing() -> None:
+    """Contract §4: "unless EACH group has at least ``fills.min_n_for_stats``"."""
     log_cards, log_outcomes = _measured("log", _MIN_N)
     pas_cards, pas_outcomes = _measured("pas", _MIN_N - 1)
     page = _page([*log_cards, *pas_cards], [*log_outcomes, *pas_outcomes])
     summary = page.summaries[0]  # type: ignore[attr-defined]
     groups = {group.decision: group for group in summary.groups}
+    # Each group still counts its own measured sample...
     assert groups["log"].stats.enough is True
-    assert groups["log"].stats.median_pct is not None
-    # The other side is gated on its own sample, exactly like the two fill sides.
     assert groups["pas"].stats.enough is False
     assert groups["pas"].stats.median_pct is None
-    assert summary.enough is True
-    # With a reportable group the line is counts WITHOUT the "yetersiz örnek" tail.
-    assert summary.counts_text == f"{_MIN_N - 1} pas, {_MIN_N} log"
+    # ...but nothing is reportable while the control group is one card short, so
+    # no median is ever shown beside a sample that cannot support a comparison.
+    assert summary.enough is False
+    assert summary.reportable_groups == ()
+    assert summary.counts_text == f"{_MIN_N - 1} pas, {_MIN_N} log; istatistik için yetersiz örnek"
 
 
 def test_only_final_rows_are_counted() -> None:

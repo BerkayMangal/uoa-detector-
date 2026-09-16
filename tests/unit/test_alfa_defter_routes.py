@@ -341,19 +341,17 @@ def test_below_the_gate_the_summary_shows_counts_and_nothing_else(
     assert "Çeyrekler arası aralık" not in summary
 
 
-def test_at_the_gate_that_group_reports_a_median(
+def test_at_the_gate_one_group_alone_still_renders_counts_only(
     board: tuple[TestClient, ModuleType, str],
 ) -> None:
+    """Contract §4: the gate needs EACH group, so a full pas sample alone shows no median."""
     client, _m, url = board
     _bulk(url, decision="pas", n=_MIN_N, measured=_MIN_N)
     summary = _horizon(_defter(client), _HORIZONS[0])
-    assert f"{_MIN_N} pas, 0 log" in summary
-    assert "istatistik için yetersiz örnek" not in summary
-    assert "Medyan fark" in summary
-    assert f"{_MIN_N} kart" in summary
-    # The other side has its own empty sample and stays gated.
-    assert 'data-group="log"' not in summary
-    assert 'data-group="pas"' in summary
+    assert f"{_MIN_N} pas, 0 log; istatistik için yetersiz örnek" in summary
+    assert "Medyan fark" not in summary
+    # Neither group is rendered: the log control group has nothing in it at all.
+    assert "data-group=" not in summary
 
 
 def test_the_summary_never_claims_significance(

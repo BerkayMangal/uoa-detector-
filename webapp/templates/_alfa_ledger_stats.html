@@ -1,14 +1,16 @@
 {# The count-gated ledger summary (Phase 5.2.C2a, decision-cards contract §4).
 
-   Below `fills.min_n_for_stats` measured cards in BOTH groups, this shows a count and
+   Until EVERY group has `fills.min_n_for_stats` measured cards, this shows a count and
    nothing else — the contract's own line, "12 pas, 3 log; istatistik için yetersiz
-   örnek". At or above it, a group shows the median and the interquartile range of its
-   market-neutral excess. There is no hit rate, no average, no t-statistic and no
+   örnek". At or above it, each group shows the median and the interquartile range of
+   its market-neutral excess. There is no hit rate, no average, no t-statistic and no
    significance claim at any sample size.
 
-   The gate is per group: a sample of taken cards that reaches it does not unlock the
-   passed cards' median. `excess_stats` returns None for every statistic below the
-   gate, so this template cannot show one even if it tried.
+   Contract §4: "Nothing is aggregated unless each group has at least
+   `fills.min_n_for_stats` cards with final outcomes." So a full log sample does not
+   unlock a median beside a three-card pas group. `reportable_groups` is empty until
+   the gate opens, and `excess_stats` returns None for every statistic of a group below
+   it, so this template cannot show one even if it tried.
 
    Context: `page.summaries`. #}
 <div class="rounded-md border border-gray-800 bg-gray-950/40 px-3 py-2" data-summary>
@@ -17,8 +19,7 @@
   <div class="mt-1 text-xs" data-horizon="{{ summary.horizon_days }}">
     <span class="text-gray-200 font-semibold">{{ summary.horizon_text }}</span>
     <span class="text-gray-400" data-counts>{{ summary.counts_text }}</span>
-    {% for group in summary.groups %}
-    {% if group.stats.enough %}
+    {% for group in summary.reportable_groups %}
     <span class="ml-2" data-group="{{ group.decision }}">
       <span class="text-gray-200">{{ group.decision }}</span>
       <span class="text-gray-400" data-sample-size>{{ group.sample_text }}</span> ·
@@ -27,7 +28,6 @@
       <span class="text-gray-400">{{ defter_copy.iqr }}</span>
       <span class="font-mono text-gray-100" data-iqr>{{ group.q1_text }} … {{ group.q3_text }}</span>
     </span>
-    {% endif %}
     {% endfor %}
   </div>
   {% endfor %}
