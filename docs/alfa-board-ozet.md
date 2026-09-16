@@ -1,6 +1,6 @@
 # Alfa Board — Berkay için özet
 
-**Son güncelleme: 2026-09-16 14:20Z (TRT 17:20).** Bu dosya çalışma sürdükçe tazelenir; en son değil,
+**Son güncelleme: 2026-09-16 14:45Z (TRT 17:45).** Bu dosya çalışma sürdükçe tazelenir; en son değil,
 sürekli yazılır. Doğrulanmamış her şey "DOĞRULANMADI" diye etiketlidir.
 
 ---
@@ -10,8 +10,8 @@ sürekli yazılır. Doğrulanmamış her şey "DOĞRULANMADI" diye etiketlidir.
 - **Durum: ÇALIŞIYOR** — FAZ A, B, C ve D canlıda.
 - **URL:** https://uoa-detector-production.up.railway.app/ — kullanıcı adı/şifre masaüstündeki
   `uoa-dashboard-login.txt` dosyasında.
-- **Canlı SHA:** `fdefddc` — tahta, raylar, karar kartları, FAZ B/D, pas defteri ve dolum kaydı.
-- **Son doğrulama:** 2026-09-16 14:10Z / 17:10 TRT, seans içinde — sağlık 200, şifresiz 401, şifreli 200, dürüstlük denetimi PASS, `/defter` 0,58 s. **Tahta 9,2-10,4 saniyede açılıyor** (hedef 1,5 s); sebebi aşağıda, iş doğru çalışıyor ama yavaş.
+- **Canlı SHA:** `3c9368f` — tahta, raylar, karar kartları, FAZ B/D, pas defteri, dolum kaydı.
+- **Son doğrulama:** 2026-09-16 14:41Z / 17:41 TRT, seans içinde ve deploy'dan 5 dakika sonra — sağlık 200, şifresiz 401, dürüstlük denetimi **PASS** (20 satır: 16 İŞLENİR, 4 DAR), **tahta 0,56-0,80 saniyede**, `/defter` 0,22 saniyede açılıyor (hedef 1,5 s).
 - **Durma sebebi:** — (çalışma sürüyor).
 - **Sırada:** tahtanın yavaşlığında suçlu kaynağı isimlendiren ölçüm (canlıya alınıyor), sonra düzeltme; ardından 13:30Z açılışında canlı veriyle doğrulama.
 
@@ -134,27 +134,27 @@ yapılmadı, indirme başlatılmadı. Ayrıntı: `docs/thetadata-decision.md`.
 
 - **Eksik özellik yok.** Karar kartları, pas defteri `/defter`, dolum kaydı, FAZ B ve FAZ D'nin tamamı
   canlıda ve dürüstlük denetiminden geçiyor.
-- **Bozuk olan tek şey hız: tahta seans içinde 9-10 saniyede açılıyor** (hedef 1,5 saniye). Sayfa doğru,
-  veriler doğru, sadece yavaş. `/defter` 0,58 saniye, yani sorun tahtaya özel.
-- **Sebep nerede olduğu ölçümle daraltıldı, nerede olmadığı kanıtlandı:**
-  - **Veritabanı değil:** bugünün telemetri okuması canlı veritabanında **1,2 milisaniye** ve bütün
-    `alfa_` tablolarında indeks var.
-  - **Şablon değil:** sabah bulunan "satır şablonu her satırda yeniden derleniyor" hatası düzeltildi ve
-    canlıda; render aşaması 0,01 saniye.
-  - **Bağlantı havuzu değil:** ön-kontrolü (`pre_ping`) iki kez denedim, ikisinde de tahtayı 12 saniyeye
-    çıkardı, ikisinde de ölçüp geri aldım. Kod şu an temiz.
-  - **Veri hacmiyle büyüyor:** telemetri satırları 858'den 3.588'e çıkarken sayfa modeli 0,59 saniyeden
-    7,7 saniyeye çıktı, satır sayısı sabitken. Yani Python tarafında, biriken veriyle kötüleşen bir okuma.
-- **Sıradaki adım küçük ve belirli:** sayfa modelinin içindeki kaynakları tek tek ölçen logu canlıya almak
-  (bugün yamayı iki kez yanlış yere uyguladım), suçlu okumayı isimlendirip sözlüğe çevirmek, aynı ölçümle
-  doğrulamak. Bu düzeltilene kadar tahta çalışır ama açılması yavaş.
-- **Ölçüm kuralı:** her deploy'dan sonra 3-5 dakika bekle; aynı sürüm o aralıkta 5-13 saniye ölçülebiliyor.
-  Bugün bir kez erken ölçüp doğru bir şeyi geri aldım, bir kez de erken ölçümü "soğuk" sayıp yanlış bir
-  şeyi tuttum.
+- **Hız: şu an sorun yok, ama tam açıklayamadığım bir dalgalanma var.** Son ölçüm (deploy'dan 5 dk sonra,
+  seans içinde): tahta **0,56-0,80 saniye**, sunucu tarafı 0,30 saniye, `/defter` 0,22 saniye — hedefin
+  belirgin altında.
+- **Gün içinde iki kez 9-10 saniye gördüm ve sebebini bulamadım.** Elediklerim ölçümle kanıtlı:
+  - **veritabanı değil** (canlı sorgu 1,2 ms, tüm `alfa_` tabloları indeksli),
+  - **şablon değil** (o hata bulundu, düzeltildi ve canlıda; render aşaması 0,02 s),
+  - **bağlantı havuzu değil** (`pre_ping` iki kez denendi, ikisinde de 12 saniyeye çıkardı, ikisinde de
+    ölçülüp geri alındı),
+  - **veri hacmi de değil** — yavaş ölçümlerde 269 baskı vardı, şimdiki hızlı ölçümde 367; yani "veri
+    büyüdükçe yavaşlıyor" tezim de yanlış çıktı.
+  Geriye üretim ortamına özgü, tekrarlanabilir olmayan bir dalgalanma kalıyor. Her render'ın aşama süreleri
+  artık loglanıyor (`board timing:` satırı), yani bir daha olursa hangi aşamada olduğu anında görülecek.
+- **Senin için pratik anlamı:** tahta hızlı. Bir gün yavaş bulursan birkaç dakika sonra tekrar bak; hâlâ
+  yavaşsa loglardaki `board timing:` satırı hangi aşamanın yediğini söyler ve düzeltme oradan başlar.
+- **Ölçüm kuralı (bugünün en pahalı dersi):** her deploy'dan sonra 3-5 dakika bekle; aynı sürüm o aralıkta
+  5-13 saniye ölçülebiliyor. Bugün bir kez erken ölçüp doğru bir şeyi geri aldım, bir kez de erken ölçümü
+  "soğuk" sayıp yanlış bir şeyi tuttum.
 - **Doğrulama rayları canlıda:** `/health` hangi commit'in ayakta olduğunu söylüyor;
-  `scripts/verify_live_board.sh` deploy sonrası sağlık + şifre duvarı + **açılma süresi** + dürüstlük
-  denetimi + `alfa_` satır sayılarını tek komutta koşuyor; `scripts/audit_board_html.py` kuralları canlı
-  HTML üzerinde denetliyor ve sıfır satır denetlerse "geçti" demiyor.
+  `scripts/verify_live_board.sh` deploy sonrası sağlık + şifre duvarı + açılma süresi + dürüstlük denetimi +
+  `alfa_` satır sayılarını tek komutta koşuyor; `scripts/audit_board_html.py` kuralları canlı HTML üzerinde
+  denetliyor (bugün bir yanlış alarmı da düzeltildi).
 
 ## 10. YAPMADIKLARIM (negatif teyit)
 
