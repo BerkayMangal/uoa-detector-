@@ -79,14 +79,20 @@ def main(path: str) -> int:
     else:
         notes.append("R-UN1: no unknown family rendered")
 
-    quoted = [r for r in rows if 'data-chip="tradable"' in r or 'data-chip="wide"' in r]
+    # The chip states are tradable / narrow (DAR) / untradable (İŞLENMEZ) / no_quote.
+    # A DAR row HAS a quote — it is thin, not missing — and an İŞLENMEZ row has one too;
+    # only a no_quote row must say "kotasyon yok". Reading "wide" here counted every DAR
+    # row as unquoted and failed a page that was correct (2026-09-16).
+    quoted = [r for r in rows if 'data-chip="tradable"' in r or 'data-chip="narrow"' in r]
     aged = [r for r in quoted if "sn önce" in visible_text(r) or "dk önce" in visible_text(r)]
     check(len(aged) == len(quoted), "R-CO1 every quoted row states its quote age",
           f"{len(quoted) - len(aged)} of {len(quoted)} quoted rows have no age")
-    unquoted = len(rows) - len(quoted)
-    if unquoted:
-        notes.append(f"rows without a usable quote: {unquoted} (must read 'kotasyon yok')")
-        check(text.count("kotasyon yok") >= 1, "R-CO1 unquoted rows say kotasyon yok")
+    missing_quote = [r for r in rows if 'data-chip="no_quote"' in r]
+    if missing_quote:
+        notes.append(f"rows with no quote at all: {len(missing_quote)} (must read 'kotasyon yok')")
+        check(text.count("kotasyon yok") >= 1, "R-CO1 rows with no quote say kotasyon yok")
+    else:
+        notes.append("every row carries a quote; no 'kotasyon yok' expected")
 
     if "IV-rank" in raw or "iv_rank" in raw:
         check("vol sat" in text, "R-IV1 the vol sentence is present")
