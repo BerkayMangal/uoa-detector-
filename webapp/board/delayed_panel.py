@@ -15,7 +15,13 @@ Honesty rules this module carries (§2):
   actually answered may read ``kayıt yok``.
 - **Every source shows its age.** Each item carries its filing (or as-of) date
   and its delay; each family carries the date of its last check.
-- **Truncation is disclosed**, never silently dropped.
+- **A failed attempt is never dated as a check (Phase 5.2.D-fix1).** The
+  ``kayıt yok`` sentence carries the date the source last *answered*, and a
+  failed newest attempt is disclosed next to it. Rows whose coverage never
+  recorded an answer say the check date is unknown instead of naming the failed
+  attempt as one.
+- **Truncation is disclosed**, never silently dropped — for a family with
+  nothing to list as much as for one with items.
 
 Display volume. A family can hold far more rows than a row should show (FTD
 alone runs 20-40 days per active ticker inside its window), so the newest
@@ -78,6 +84,10 @@ _TEXT: Final[Mapping[str, str]] = MappingProxyType({
     "note.checked": "son kontrol {date}",
     "note.checked_unknown": "son kontrol tarihi bilinmiyor",
     "note.stale": "son deneme ({date}) başarısız; kayıtlar {success} itibarıyla",
+    # Phase 5.2.D-fix1: the same disclosure where there is nothing to list, and
+    # where nothing has ever been confirmed (review FD-01, FD-03).
+    "note.stale_empty": "son deneme ({date}) başarısız; en son {success} tarihinde doğrulandı",
+    "note.failed_attempt": "son deneme ({date}) başarısız",
     "note.truncated": "kaynak, döndürdüğünden fazla kayıt olduğunu bildirdi; liste eksik olabilir",
     "omitted": "en yeni {shown} kayıt gösteriliyor; {omitted} kayıt daha var",
     "summary.ftd": "pencerede {days} FTD günü, toplam ≈ ${usd}; en yenisi {date}",
@@ -223,7 +233,7 @@ def _family_panel(
         state, text = _empty_state(coverage)
         return DelayedFamilyPanel(
             family=family, label=label, state=state, state_text=text, dimmed=True,
-            items=(), omitted=0, omitted_text=None, notes=(),
+            items=(), omitted=0, omitted_text=None, notes=_empty_notes(coverage),
         )
     shown = tuple(items[: settings.max_items_per_family])
     omitted = len(items) - len(shown)
@@ -257,12 +267,39 @@ def _summary(family: DelayedFamily, items: Sequence[DelayedItem]) -> str | None:
 
 
 def _empty_state(coverage: CoverageView | None) -> tuple[PanelState, str]:
-    """No item to show: unknown unless the source actually answered (R-UN1)."""
+    """No item to show: unknown unless the source actually answered (R-UN1).
+
+    ``kayıt yok`` is dated from the last SUCCESS, never from the newest attempt:
+    a rate-limited attempt confirms nothing, and dating the sentence from it
+    would paint an unconfirmed state as a confirmed one (review FD-01).
+    """
     if coverage is None:
         return "never_fetched", _say("state.never_fetched")
-    if not coverage.answered:
+    success = coverage.last_success_at
+    if success is None:
         return "unanswered", _say("state.unanswered", date=_et_day(coverage.last_attempt_at))
-    return "empty", _say("state.empty", date=_et_day(coverage.last_attempt_at))
+    return "empty", _say("state.empty", date=_et_day(success))
+
+
+def _empty_notes(coverage: CoverageView | None) -> tuple[str, ...]:
+    """A family with nothing to list: a failed newest attempt, then truncation (FD-01).
+
+    ``never_fetched`` and ``unanswered`` carry their own date in the state text,
+    so they add nothing here.
+    """
+    success = coverage.last_success_at if coverage is not None else None
+    if coverage is None or success is None:
+        return ()
+    notes: list[str] = []
+    if coverage.last_attempt_failed:
+        notes.append(_say(
+            "note.stale_empty",
+            date=_et_day(coverage.last_attempt_at),
+            success=_et_day(success),
+        ))
+    if coverage.truncated:
+        notes.append(_say("note.truncated"))
+    return tuple(notes)
 
 
 def _notes(coverage: CoverageView | None) -> tuple[str, ...]:
@@ -270,13 +307,19 @@ def _notes(coverage: CoverageView | None) -> tuple[str, ...]:
     if coverage is None:
         # Rows stored before coverage was recorded: say so rather than imply a fresh check.
         return (_say("note.checked_unknown"),)
-    notes = [_say("note.checked", date=_et_day(coverage.last_attempt_at))]
-    if coverage.last_attempt_failed and coverage.last_success_at is not None:
+    success = coverage.last_success_at
+    notes: list[str] = []
+    if not coverage.last_attempt_failed:
+        notes.append(_say("note.checked", date=_et_day(coverage.last_attempt_at)))
+    elif success is not None:
+        notes.append(_say("note.checked", date=_et_day(coverage.last_attempt_at)))
         notes.append(_say(
-            "note.stale",
-            date=_et_day(coverage.last_attempt_at),
-            success=_et_day(coverage.last_success_at),
+            "note.stale", date=_et_day(coverage.last_attempt_at), success=_et_day(success),
         ))
+    else:
+        # Nothing has ever been confirmed, so no date here is a check date (review FD-03).
+        notes.append(_say("note.checked_unknown"))
+        notes.append(_say("note.failed_attempt", date=_et_day(coverage.last_attempt_at)))
     if coverage.truncated:
         notes.append(_say("note.truncated"))
     return tuple(notes)
