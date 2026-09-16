@@ -498,6 +498,21 @@ def _build_board_page(
         profile_hash_source=lambda run_id, event_ids: alfa_page.db_profile_hash_source(_board_reader().engine)(
             run_id, event_ids,
         ),
+        delayed_source=lambda tickers, today: alfa_page.db_delayed_source(
+            _board_reader().engine, settings.delayed,
+        )(tickers, today),
+        atm_source=lambda tickers: alfa_page.db_atm_source(_board_reader().engine)(tickers),
+        flow_since_source=lambda keys: alfa_page.db_flow_since_source(_board_reader().engine)(keys),
+        oi_source=lambda keys: alfa_page.db_oi_source(_board_reader().engine)(keys),
+        catalyst_source=lambda keys, moment: alfa_page.db_catalyst_source(
+            _board_reader().engine, settings,
+        )(keys, moment),
+        regime_source=lambda moment: alfa_page.db_regime_source(_board_reader().engine)(moment),
+        # B6: the open journal, the focused-ETF holdings and the sectors behind the strip.
+        # A failed read is handled inside build_alfa_page, which then claims nothing.
+        trades_source=lambda: _journal().list("open"),
+        holdings_source=lambda: alfa_page.db_holdings_source(_board_reader().engine)(),
+        sector_source=lambda tickers: alfa_page.db_sector_source(_board_reader().engine)(tickers),
         profile_resolver=alfa_page.resolve_writing_profile,
         run_latest_ts=run_latest_ts,
     )

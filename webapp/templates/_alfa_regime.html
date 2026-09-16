@@ -1,0 +1,32 @@
+{# Phase 5.2.B5b (contract §6 B5): the regime band at the top of the board.
+
+   One sentence, then the chips: SPY and QQQ dealer-gamma sign with their one-year
+   percentile and base rate, the nearest strike sign change with its distance from spot,
+   the SPY IV term-structure shape, the out-of-scope VIX futures curve and the derived VIX
+   spot. Each source shows its own age; a stale source reads "bilinmiyor" and renders
+   dashed and dimmed, exactly like an unknown evidence family (R-UN1). The three tripwires
+   under "fikrimi ne değiştirir" carry their current values and profile cutoffs.
+
+   The band is context only: it never enters the evidence counts, the strength label, the
+   clean-candidate rule or the counter-argument choice. Every string comes from
+   webapp/board/regime.py's frozen templates. #}
+{% if page.regime %}
+<section class="rounded-lg border border-gray-800 bg-gray-900/40 px-4 py-3 mb-4" data-regime>
+  <p class="text-sm text-gray-100" data-regime-sentence>{{ page.regime.band.sentence }}</p>
+  <div class="mt-2 flex flex-wrap gap-1.5 text-xs" data-regime-chips>
+    {% for chip in page.regime.band.chips %}
+    <span class="px-2 py-0.5 rounded border {{ 'border-gray-700 text-gray-300' if chip.known else 'border-dashed border-gray-600 text-gray-500 opacity-70' }}"
+          data-regime-chip="{{ chip.key }}" data-regime-state="{{ chip.state }}">{{ chip.text }}{% if page.regime.ages.get(chip.key) %} · <span data-regime-age>{{ page.regime.ages[chip.key] }}</span>{% endif %}</span>
+    {% endfor %}
+  </div>
+  {# R-IV1: the SPY IV term-structure chip shows IV levels, so the unsuppressible
+     sentence renders with it. Removing it is one line. #}
+  <p class="mt-2 text-xs text-amber-200/80" data-regime-iv1>{{ iv_not_sell_vol }}</p>
+  <p class="mt-3 text-xs font-semibold text-gray-400" data-tripwire-head>{{ page.regime.band.tripwire_head }}</p>
+  <ul class="mt-1 space-y-0.5 text-xs text-gray-400" data-tripwires>
+    {% for wire in page.regime.band.tripwires %}
+    <li data-tripwire="{{ wire.key }}" data-tripwire-status="{{ 'unknown' if wire.fired is none else ('fired' if wire.fired else 'not_fired') }}">{{ wire.text }}{{ regime_copy.status_separator }}{{ wire.status_text }}</li>
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}

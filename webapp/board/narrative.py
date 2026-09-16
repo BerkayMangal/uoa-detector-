@@ -25,7 +25,9 @@ R-WD1; §5 A5.
   ``copy_tr.NO_COUNTER_FOUND``, followed by ``Bakılanlar: ...`` listing the
   checks performed. An optional input that was not supplied was not checked,
   so it is not listed. ``kotasyon yok`` is not a cost counter-argument (it is
-  unknown, not İŞLENMEZ), but the checked list shows it as the cost state.
+  unknown, not İŞLENMEZ), but the checked list shows it as the cost state. A
+  check that ran against a source it could not read is named ``bilinmiyor``,
+  never as a measured zero (``CatalystCheck.known``; R-UN1, review FB-H3).
 """
 
 from __future__ import annotations
@@ -105,6 +107,8 @@ CHECK_TEMPLATES: Final[Mapping[str, str]] = MappingProxyType(
         "against": "aleyhte aile ({count})",
         "chase": "kovalama ({verdict})",
         "catalyst": "vade içi katalizör ({count})",
+        # Phase 5.2.B-fix3: the chip could not be read, so its count is not a zero.
+        "catalyst_unknown": "vade içi katalizör (bilinmiyor)",
         "unknown": "bilinmeyen aile ({count})",
         "penalties": "ceza defteri ({count} uygulanan)",
     },
@@ -123,9 +127,15 @@ class ChaseCheck:
 
 @dataclass(frozen=True)
 class CatalystCheck:
-    """B4 input: frozen labels of the catalysts inside the window (empty when none)."""
+    """B4 input: frozen labels of the catalysts inside the window (empty when none).
+
+    ``known`` is False when the chip could not be read (never fetched, or a part
+    that reads ``bilinmiyor``). The checked list then names the check as
+    ``bilinmiyor`` instead of a measured ``(0)`` (R-UN1, review FB-H3/FB-03).
+    """
 
     in_window: tuple[str, ...]
+    known: bool = True
 
 
 @dataclass(frozen=True)
@@ -211,7 +221,11 @@ def build_narrative(
     if chase is not None:
         checks.append(CHECK_TEMPLATES["chase"].format(verdict=chase.verdict))
     if catalyst is not None:
-        checks.append(CHECK_TEMPLATES["catalyst"].format(count=len(catalyst.in_window)))
+        checks.append(
+            CHECK_TEMPLATES["catalyst"].format(count=len(catalyst.in_window))
+            if catalyst.known
+            else CHECK_TEMPLATES["catalyst_unknown"],
+        )
     checks.append(CHECK_TEMPLATES["unknown"].format(count=len(unknown)))
     if penalties is not None:
         checks.append(CHECK_TEMPLATES["penalties"].format(count=len(penalties.applied)))
