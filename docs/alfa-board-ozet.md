@@ -1,6 +1,6 @@
 # Alfa Board — Berkay için özet
 
-**Son güncelleme: 2026-09-16 10:10Z (TRT 13:10).** Bu dosya çalışma sürdükçe tazelenir; en son değil,
+**Son güncelleme: 2026-09-16 10:20Z (TRT 13:20).** Bu dosya çalışma sürdükçe tazelenir; en son değil,
 sürekli yazılır. Doğrulanmamış her şey "DOĞRULANMADI" diye etiketlidir.
 
 ---
@@ -10,8 +10,8 @@ sürekli yazılır. Doğrulanmamış her şey "DOĞRULANMADI" diye etiketlidir.
 - **Durum: ÇALIŞIYOR** (FAZ A canlıda).
 - **URL:** https://uoa-detector-production.up.railway.app/ — kullanıcı adı/şifre masaüstündeki
   `uoa-dashboard-login.txt` dosyasında.
-- **Canlı SHA:** `5431cc8` (FAZ A + raylar + şablon önbelleği + **karar kartları**).
-- **Son doğrulama:** 2026-09-16 10:05Z / 13:05 TRT — sağlık 200 ve ayakta olan commit'i doğru bildiriyor, şifresiz 401, şifreli 200, dürüstlük denetimi 20 satırda PASS, logda hata yok, **sayfa açılma süresi 0,40 saniye** (sabahki 3,8 saniyeden).
+- **Canlı SHA:** `b7abd78` (FAZ A + raylar + şablon önbelleği + **karar kartları** + **FAZ B ve D**).
+- **Son doğrulama:** 2026-09-16 10:17Z / 13:17 TRT — sağlık 200 ve ayakta olan commit'i doğru bildiriyor, şifresiz 401, şifreli 200, dürüstlük denetimi 20 satırda PASS, logda hata yok, **sayfa açılma süresi 0,94 saniye** (sabah 3,8 saniyeydi; sözleşme hedefi 1,5 saniye).
 - **Durma sebebi:** — (çalışma sürüyor).
 - **Sırada:** karar kartları (FAZ C1) ve render hızlandırması; FAZ B+D kodu dalda hazır, hız düzeltmesinden sonra geri gelecek.
 
@@ -48,18 +48,34 @@ FAZ A öncesine (eski dashboard) döner, veri kaybı olmaz.
 
 ## 5. CANLIDA VAR / CANLIDA YOK
 
-| Canlıda VAR | Canlıda YOK (henüz) |
+**Canlıda olanlar** (hepsi 10:17Z'de doğrulandı, tahta 0,94 saniyede açılıyor):
+
+| Ne | Ne işe yarar |
 |---|---|
-| Hisse+yön başına tek satır, tüm baskılar toplanmış | Pozisyon büyüklüğü ($ ve sermaye %'si) |
-| İşlem çipi + maliyet kapısı ("Alabileceklerimi göster") | Başabaş vs ATM straddle karşılaştırması |
-| Alış/satış tarafından yön okuması | Kovalama hükmü ("geç kaldın") |
-| Altı aileli kanıt şeridi, bilinmeyen = taranmış ve sayılmaz | Rejim bandı (piyasa gelgiti, dealer gamma, VIX) |
-| Zorunlu `AMA` karşı-argümanı | Portföy örtüşmesi ("zaten bu bahittesin") |
-| Ceza defteri + skor yalnızca Denetim bloğunda | Gecikmeli kanıt kovası (Kongre / İçeriden / Short-FTD) |
-| | *(yukarıdaki 6 satır PR #11'de hazır ve yeşil, canlıya alınmayı bekliyor)* |
-| "Bugün temiz aday yok" durumu | Pas defteri `/defter` ve dolum kaydı (yazılıyor) |
-| **Karar kartları: `Logla` / `Pas geç`** — bastığın an satırın gördüğün hâli dondurulup kalıcı olarak saklanır | |
-| Vol board + "bu 'vol sat' demek değildir" cümlesi | Pas defteri `/defter` ve dolum kaydı |
+| Hisse + yön başına tek satır | Bir ismin tüm baskıları tek yerde toplanır, dağınık kart yığını yok |
+| İşlem çipi + maliyet kapısı ("Alabileceklerimi göster") | Alış ask'ten, çıkış bid'den, komisyon dahil; kotasyonun yaşı yazılı |
+| Altı aileli kanıt şeridi | Bilinmeyen aile taranmış ve sayılmaz; 3+ bilinmeyende "Güçlü" yasak |
+| Zorunlu `AMA` karşı-argümanı | Her satır kendi aleyhine en güçlü cümleyi de söyler |
+| Ceza defteri + 0–1 skoru **yalnız Denetim bloğunda** | Skor satır yüzünde, çipte veya sıralamada asla görünmez |
+| **Karar kartları: `Logla` / `Pas geç`** | Bastığın an satırın gördüğün hâli dondurulur ve kalıcı saklanır — pas geçtiklerin de |
+| Pozisyon büyüklüğü (1 lot $ ve sermaye %'si, risk kovası) | Sermaye/R değerleri henüz senin onayında: "(varsayılan değer)" yazıyor |
+| Başabaş vs ATM straddle | "Başabaş için %X gerekir · straddle bu vadeye %Y fiyatlıyor" — olasılık iddiası yok |
+| Kovalama hükmü | "hâlâ makul / dikkat / geç kaldın"; "geç kaldın" doğrudan `AMA`ya düşer |
+| Açılış-kapanış (T+1 OI teyidi) + katalizör çipi | Pozisyon açılıyor mu kapanıyor mu; vadeye kadar katalizör var mı |
+| Rejim bandı | Piyasa gelgiti, SPY/QQQ dealer gamma, IV vade yapısı + 3 tetikleyici. Kanıt sayımına **girmez** |
+| Portföy örtüşmesi | "zaten bu bahittesin" rozeti, sermaye başlığı, tek-bahis şeridi |
+| Gecikmeli kanıt kovası (Kongre / İçeriden / Short-FTD) | Bildirim tarihi ve gecikmesiyle; **asla sayılmaz** |
+| Günlük iş saati | Seans öncesi/sonrası işler restart'ta ne atlıyor ne tekrarlıyor |
+| Deploy doğrulama rayları | Her deploy sonrası sağlık + şifre duvarı + **açılma süresi** + dürüstlük denetimi tek komutta |
+
+**Canlıda olmayanlar:**
+
+| Ne yok | Sana maliyeti |
+|---|---|
+| Pas defteri `/defter` ve sonuç işi | Kartlar birikiyor ama karşılaştırmalı tabloyu henüz göremiyorsun (yazılıyor) |
+| Dolum kaydı (gerçek fill vs kartın donmuş kotasyonu) | Maliyet varsayımının canlı testi henüz yok (yazılıyor) |
+| VIX vade yapısı | UW volatilite eklentisi yok; tahtada "kapsam-dışı" yazıyor |
+| ThetaData bağlantısı | Bilinçli: tahta ThetaData'ya bağlı değil (bkz. para kararı) |
 
 ## 6. YOKLUĞUNDA ALDIĞIM KARARLAR
 
