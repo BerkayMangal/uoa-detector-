@@ -28,6 +28,7 @@ UW error policy:
 from __future__ import annotations
 
 import logging
+from bisect import bisect_right
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, time
@@ -107,6 +108,40 @@ def close_on_or_before(closes: Iterable[ClosePoint], day: date) -> ClosePoint | 
     return best
 
 
+@dataclass(frozen=True)
+class CloseIndex:
+    """One ticker's closes, sorted once, for O(log n) lookups (Phase 5.2.D-fix2).
+
+    ``alfa_daily_close`` is append-only, so a linear scan per lookup grows every
+    day for a fixed display. The render builds one index per ticker and reuses
+    it for every delayed item of that ticker (review FD-02).
+    """
+
+    points: tuple[ClosePoint, ...]  # oldest first
+    days: tuple[date, ...]  # the same rows' days, for the bisect
+
+    def on_or_before(self, day: date) -> ClosePoint | None:
+        """The newest close dated on or before ``day``."""
+        position = bisect_right(self.days, day)
+        return self.points[position - 1] if position else None
+
+    def pct_move_between(self, start: date, end: date) -> CloseMove | None:
+        """Percent move between two dates; same contract as the module-level helper."""
+        if end < start:
+            return None
+        first = self.on_or_before(start)
+        last = self.on_or_before(end)
+        if first is None or last is None or first.close <= 0 or last.close <= 0:
+            return None
+        return CloseMove(start=first, end=last, pct=(last.close / first.close - 1.0) * 100.0)
+
+
+def build_close_index(closes: Iterable[ClosePoint]) -> CloseIndex:
+    """Sort ``closes`` once into a lookup index. Input order does not matter."""
+    points = tuple(sorted(closes, key=lambda point: point.day))
+    return CloseIndex(points=points, days=tuple(point.day for point in points))
+
+
 def pct_move_between(closes: Sequence[ClosePoint], start: date, end: date) -> CloseMove | None:
     """Percent move from the close on or before ``start`` to the close on or before ``end``.
 
@@ -114,14 +149,11 @@ def pct_move_between(closes: Sequence[ClosePoint], start: date, end: date) -> Cl
     a close is not positive. When both dates resolve to the same stored row the
     move is 0.0 over zero sessions; callers that need a real session in between
     compare ``end.day`` with ``start.day``.
+
+    A caller that resolves many dates against the same history builds a
+    ``CloseIndex`` once instead of paying this sort per call.
     """
-    if end < start:
-        return None
-    first = close_on_or_before(closes, start)
-    last = close_on_or_before(closes, end)
-    if first is None or last is None or first.close <= 0 or last.close <= 0:
-        return None
-    return CloseMove(start=first, end=last, pct=(last.close / first.close - 1.0) * 100.0)
+    return build_close_index(closes).pct_move_between(start, end)
 
 
 def is_final_close(day: date, now: datetime) -> bool:
@@ -202,6 +234,25 @@ def load_closes(engine: Engine, ticker: str) -> tuple[ClosePoint, ...]:
     with session_factory(engine)() as session:
         rows = session.execute(stmt).all()
     return tuple(ClosePoint(day=day, close=close) for day, close in rows)
+
+
+def load_closes_by_ticker(
+    engine: Engine, tickers: Sequence[str],
+) -> dict[str, tuple[ClosePoint, ...]]:
+    """Stored closes of every requested ticker in ONE query, oldest first per ticker. Read-only."""
+    symbols = list(dict.fromkeys(t.strip().upper() for t in tickers if t.strip()))
+    if not symbols:
+        return {}
+    stmt = (
+        select(AlfaDailyClose.ticker, AlfaDailyClose.day, AlfaDailyClose.close)
+        .where(AlfaDailyClose.ticker.in_(symbols))
+        .order_by(AlfaDailyClose.ticker, AlfaDailyClose.day)
+    )
+    grouped: dict[str, list[ClosePoint]] = {symbol: [] for symbol in symbols}
+    with session_factory(engine)() as session:
+        for ticker, day, close in session.execute(stmt).all():
+            grouped.setdefault(ticker, []).append(ClosePoint(day=day, close=close))
+    return {ticker: tuple(points) for ticker, points in grouped.items()}
 
 
 async def _refresh_ticker(

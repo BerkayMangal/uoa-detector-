@@ -95,8 +95,15 @@ from uoa_detector.sources.unusual_whales.client import (
     UnusualWhalesRateLimitError,
     UnusualWhalesTransientError,
 )
-from webapp.board.daily_close import ClosePoint, FetchStatus, load_closes, pct_move_between
+from webapp.board.daily_close import (
+    CloseIndex,
+    ClosePoint,
+    FetchStatus,
+    build_close_index,
+    load_closes,
+)
 from webapp.board.db import AlfaBase, session_factory
+from webapp.board.delayed_coverage import ensure_delayed_coverage_tables, record_fetch
 from webapp.board.honesty import ensure_clean
 from webapp.board.settings import DelayedSettings
 
@@ -162,6 +169,16 @@ def _say(key: str, **values: object) -> str:
     return ensure_clean(_TEXT[key].format(**values))
 
 
+# The bucket's own strings, so the render side does not re-spell them (Phase 5.2.D1).
+BUCKET_LABEL: Final = _say("bucket")
+EXCLUSION_NOTE: Final = _say("exclusion")
+
+
+def family_label(family: DelayedFamily) -> str:
+    """The frozen Turkish label of one delayed family."""
+    return _say(f"family.{family}")
+
+
 # ---------------------------------------------------------------------------
 # Table
 # ---------------------------------------------------------------------------
@@ -193,8 +210,14 @@ class AlfaDelayed(AlfaBase):
 
 
 def ensure_delayed_tables(engine: Engine) -> None:
-    """Create ``alfa_delayed`` when missing. Never alters or drops anything."""
+    """Create ``alfa_delayed`` and its fetch-coverage table when missing.
+
+    Never alters or drops anything. The coverage table (Phase 5.2.D1) records
+    the attempt itself, so a family that was never fetched reads ``bilinmiyor``
+    instead of "no records" (R-UN1).
+    """
     cast(Table, AlfaDelayed.__table__).create(engine, checkfirst=True)
+    ensure_delayed_coverage_tables(engine)
 
 
 @dataclass(frozen=True)
@@ -585,9 +608,11 @@ async def run_delayed_job(
     results: list[DelayedFamilyResult] = []
     for ticker in _normalized(tickers):
         for job in _FAMILY_JOBS:
-            results.append(
-                await job(client, factory, ticker, today=today, fetched_at=fetched_at, settings=settings),
+            result = await job(
+                client, factory, ticker, today=today, fetched_at=fetched_at, settings=settings,
             )
+            _record_coverage(factory, result, fetched_at)
+            results.append(result)
     return DelayedJobResult(results=tuple(results))
 
 
@@ -650,9 +675,26 @@ async def _refresh_one(
 ) -> DelayedFamilyResult:
     today, fetched_at = _clock(now)
     ensure_delayed_tables(engine)
-    return await job(
-        client, session_factory(engine), ticker.strip().upper(),
+    factory = session_factory(engine)
+    result = await job(
+        client, factory, ticker.strip().upper(),
         today=today, fetched_at=fetched_at, settings=settings,
+    )
+    _record_coverage(factory, result, fetched_at)
+    return result
+
+
+def _record_coverage(
+    factory: sessionmaker[Session], result: DelayedFamilyResult, fetched_at: datetime,
+) -> None:
+    """Record the attempt behind ``result`` so the render can tell "never asked" from "nothing there"."""
+    record_fetch(
+        factory,
+        result.ticker,
+        result.family,
+        status=result.status,
+        at=fetched_at,
+        truncated=result.truncated,
     )
 
 
@@ -883,6 +925,27 @@ def load_delayed_records(engine: Engine, ticker: str) -> tuple[DelayedRecord, ..
         return tuple(record for row in rows if (record := _record(row)) is not None)
 
 
+def load_delayed_records_by_ticker(
+    engine: Engine, tickers: Sequence[str],
+) -> dict[str, tuple[DelayedRecord, ...]]:
+    """Stored delayed rows of every requested ticker in ONE query, grouped by ticker.
+
+    Read-only. The render path uses this instead of one query per row, so the
+    board's render budget does not grow with the number of rows.
+    """
+    symbols = list(dict.fromkeys(t.strip().upper() for t in tickers if t.strip()))
+    if not symbols:
+        return {}
+    stmt = select(AlfaDelayed).where(AlfaDelayed.ticker.in_(symbols))
+    grouped: dict[str, list[DelayedRecord]] = {symbol: [] for symbol in symbols}
+    with session_factory(engine)() as session:
+        for row in session.execute(stmt).scalars().all():
+            record = _record(row)
+            if record is not None:
+                grouped.setdefault(record.ticker, []).append(record)
+    return {ticker: tuple(records) for ticker, records in grouped.items()}
+
+
 def _record(row: AlfaDelayed) -> DelayedRecord | None:
     family = next((f for f in _FAMILY_ORDER if f == row.family), None)
     if family is None:
@@ -944,6 +1007,23 @@ class DelayedItem:
 
 
 @dataclass(frozen=True)
+class DelayedFamilyWindow:
+    """One family's whole lookback window, independent of the display cap (Phase 5.2.D-fix2).
+
+    A row lists only the newest ``delayed.max_items_per_family`` items, so the
+    omitted count and the collapsed summary read from here: capping the work
+    can never understate what the window holds. It is not, and never feeds, an
+    evidence count (R-DL1).
+    """
+
+    family: DelayedFamily
+    total: int  # records inside the window, before the display cap
+    known_size_usd: float  # sum of the records that carry a USD size
+    unknown_sizes: int  # records whose size could not be read; never counted as zero
+    newest_date: date | None
+
+
+@dataclass(frozen=True)
 class DelayedEvidence:
     """A ticker's delayed items for the ``ek kanıt (gecikmeli)`` bucket, newest first."""
 
@@ -951,6 +1031,8 @@ class DelayedEvidence:
     bucket_label: str
     exclusion_note: str
     items: tuple[DelayedItem, ...]
+    # Phase 5.2.D-fix2: the whole window behind the (possibly capped) items.
+    windows: tuple[DelayedFamilyWindow, ...] = ()
 
 
 def build_delayed_evidence(
@@ -960,24 +1042,71 @@ def build_delayed_evidence(
     *,
     today: date,
     settings: DelayedSettings,
+    max_per_family: int | None = None,
 ) -> DelayedEvidence:
-    """Delayed items of ``ticker`` inside their lookback windows as of ``today`` (D9)."""
+    """Delayed items of ``ticker`` inside their lookback windows as of ``today`` (D9).
+
+    ``max_per_family`` builds only the newest N items of each family — the ones
+    the row displays. ``windows`` still describes the whole window, so the
+    omitted count and the collapsed summary stay honest (Phase 5.2.D-fix2,
+    review FD-02). Without it every item is built, as the single-ticker readers
+    expect.
+    """
     symbol = ticker.strip().upper()
     mine = [record for record in records if record.ticker == symbol]
     hidden = _superseded_insider_groups(mine)
-    items = [
-        _item(record, closes, today)
-        for record in mine
-        if record.dedupe_key not in hidden and _in_window(record, today, settings)
-    ]
-    items.sort(key=lambda i: (
-        -i.filed_or_asof_date.toordinal(), _FAMILY_ORDER.index(i.family), i.key,
-    ))
+    in_window = sorted(
+        (
+            record for record in mine
+            if record.dedupe_key not in hidden and _in_window(record, today, settings)
+        ),
+        key=_record_order,
+    )
+    index = build_close_index(closes)  # sorted once per ticker, not scanned per item
     return DelayedEvidence(
         ticker=symbol,
         bucket_label=_say("bucket"),
         exclusion_note=_say("exclusion"),
-        items=tuple(items),
+        items=tuple(_item(record, index, today) for record in _capped(in_window, max_per_family)),
+        windows=tuple(
+            _family_window(family, [r for r in in_window if r.family == family])
+            for family in _FAMILY_ORDER
+        ),
+    )
+
+
+def _record_order(record: DelayedRecord) -> tuple[int, int, str]:
+    """The row's display order: newest first, then the family order, then the key."""
+    return (
+        -record.filed_or_asof_date.toordinal(),
+        _FAMILY_ORDER.index(record.family),
+        record.dedupe_key,
+    )
+
+
+def _capped(records: Sequence[DelayedRecord], max_per_family: int | None) -> list[DelayedRecord]:
+    """The newest ``max_per_family`` records of each family, keeping the input order."""
+    if max_per_family is None:
+        return list(records)
+    seen: dict[DelayedFamily, int] = {}
+    kept: list[DelayedRecord] = []
+    for record in records:
+        count = seen.get(record.family, 0) + 1
+        seen[record.family] = count
+        if count <= max_per_family:
+            kept.append(record)
+    return kept
+
+
+def _family_window(family: DelayedFamily, records: Sequence[DelayedRecord]) -> DelayedFamilyWindow:
+    """Aggregate one family's window from its records, before any display cap."""
+    sizes = [record.size_low for record in records if record.size_low is not None]
+    return DelayedFamilyWindow(
+        family=family,
+        total=len(records),
+        known_size_usd=sum(sizes),
+        unknown_sizes=len(records) - len(sizes),
+        newest_date=max((record.filed_or_asof_date for record in records), default=None),
     )
 
 
@@ -1025,7 +1154,7 @@ def _in_window(record: DelayedRecord, today: date, settings: DelayedSettings) ->
     return dated >= today - timedelta(days=settings.ftd_lookback_days)
 
 
-def _item(record: DelayedRecord, closes: Sequence[ClosePoint], today: date) -> DelayedItem:
+def _item(record: DelayedRecord, closes: CloseIndex, today: date) -> DelayedItem:
     dated = record.filed_or_asof_date
     kind = _DATE_KIND[record.family]
     if kind == "filed":
@@ -1104,8 +1233,8 @@ def _size_text(record: DelayedRecord, payload: Mapping[str, object]) -> str | No
     )
 
 
-def _outcome(closes: Sequence[ClosePoint], base: date, today: date, kind: str) -> DelayedOutcome:
-    move = pct_move_between(closes, base, today)
+def _outcome(closes: CloseIndex, base: date, today: date, kind: str) -> DelayedOutcome:
+    move = closes.pct_move_between(base, today)
     if move is None or move.end.day <= move.start.day:
         return DelayedOutcome(
             known=False, pct=None, base_day=None, through_day=None, text=_say("outcome.unknown"),

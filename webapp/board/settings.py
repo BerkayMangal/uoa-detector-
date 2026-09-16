@@ -142,6 +142,7 @@ class DelayedSettings(_Strict):
     insider_lookback_days: int = Field(ge=1)
     short_interest_lookback_days: int = Field(ge=1)  # Phase 5.2.D3a
     ftd_lookback_days: int = Field(ge=1)  # Phase 5.2.D3a
+    max_items_per_family: int = Field(ge=1)  # Phase 5.2.D1: display cap per family
     job_time_et: str = Field(pattern=_CLOCK)
 
 

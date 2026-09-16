@@ -100,6 +100,9 @@ delayed:
   # Phase 5.2.D3a (keys were missing): as-of windows for the shorts families, in calendar days.
   short_interest_lookback_days: 90   # FINRA settlement as-of dates (twice a month, about 15 days behind)
   ftd_lookback_days: 60              # trailing fails-to-deliver window (SEC publishes 2-6 weeks behind)
+  # Phase 5.2.D1 (key was missing): how many items one delayed family lists in a row.
+  # The rest are disclosed as a count, never deleted; FTD alone runs 20-40 days per ticker.
+  max_items_per_family: 5
   job_time_et: "17:00"
 
 portfolio:
