@@ -36,6 +36,7 @@ from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from decimal import Decimal
 from enum import Enum
+from types import MappingProxyType
 from typing import TYPE_CHECKING, Final, Literal, cast
 
 from pydantic import BaseModel
@@ -66,6 +67,21 @@ DIRECTION_VALUES: Final[tuple[str, ...]] = tuple(DIRECTION_LABELS.values())
 
 _BOARD_VERSION_ENV: Final = "RAILWAY_GIT_COMMIT_SHA"
 UNKNOWN_BOARD_VERSION: Final = "unknown"
+
+# Frozen Turkish copy for the card buttons and their answers (rule R-WD1).
+# These record the owner's own decision; none of them may read as advice, and
+# a test passes every one of them through ``webapp.board.honesty.ensure_clean``.
+CARD_COPY: Final[Mapping[str, str]] = MappingProxyType(
+    {
+        "log_button": "Logla",
+        "pas_button": "Pas geç",
+        "buttons_help": "Bu düğmeler senin kararını kaydeder; tahta tavsiye vermez.",
+        "pas_recorded": "Pas kaydedildi: {ticker} {direction} · kart {card_id}",
+        "forbidden_origin": "Bu istek tahtadan gelmedi; hiçbir şey yazılmadı.",
+        "unknown_decision": "Bilinmeyen karar; hiçbir şey yazılmadı.",
+        "row_not_found": "Satır bu çalışmada bulunamadı; hiçbir şey yazılmadı.",
+    },
+)
 
 # What a value the serializer does not understand is written as: named, never
 # dropped silently, so a reader can see exactly what was not frozen.
@@ -112,6 +128,21 @@ def board_version() -> str:
 def direction_value(direction: Direction) -> str:
     """The stored value for a board direction key (``up`` → ``yukarı``)."""
     return DIRECTION_LABELS[direction]
+
+
+def decision_for(value: str) -> Decision | None:
+    """The decision a form value names, or ``None`` when it names none of them."""
+    for decision in DECISIONS:
+        if value == decision:
+            return decision
+    return None
+
+
+def pas_recorded_text(card: DecisionCard) -> str:
+    """The board's confirmation line for a recorded pass (frozen copy, contract §3)."""
+    return CARD_COPY["pas_recorded"].format(
+        ticker=card.ticker, direction=card.direction, card_id=card.id,
+    )
 
 
 # ---------------------------------------------------------------------------

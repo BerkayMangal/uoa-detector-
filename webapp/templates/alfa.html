@@ -35,6 +35,8 @@
     </form>
   </div>
 
+  {% include "_alfa_card_confirm.html" %}
+
   {% if page.load_failed %}
   <div class="rounded-lg border border-dashed border-amber-700/60 bg-amber-900/10 px-4 py-3 text-sm text-amber-200"
        data-state="load-failed">{{ copy.load_failed }}</div>

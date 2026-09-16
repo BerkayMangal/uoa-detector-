@@ -25,6 +25,7 @@ import secrets
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, TypeVar
+from urllib.parse import urlencode, urlsplit
 
 from fastapi import FastAPI, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -33,8 +34,9 @@ from starlette.datastructures import Headers
 from starlette.responses import PlainTextResponse
 
 from webapp import explanations, gamma, journal, pricing
-from webapp.board import alfa_page
+from webapp.board import alfa_page, cards
 from webapp.board.copy_tr import IV_NOT_SELL_VOL
+from webapp.board.evidence import request_for
 from webapp.board.refresher import board_refresh_loop
 from webapp.board.settings import BoardSettings, load_board_settings
 from webapp.board.signals import BoardSignalReader
@@ -44,7 +46,7 @@ from webapp.vol_board import VolBoardRow, build_vol_board, vol_board_summary
 from webapp.worker import live_config_from_env, run_live_worker
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncIterator, Callable
+    from collections.abc import AsyncIterator, Callable, Mapping, Sequence
 
     from starlette.types import ASGIApp, Receive, Scope, Send
 
@@ -296,7 +298,7 @@ def journal_page(request: Request) -> HTMLResponse:
 
 @app.get("/journal/new", response_class=HTMLResponse)
 def journal_new(
-    request: Request, run: str = "", event: str = "", ticker: str = "",
+    request: Request, run: str = "", event: str = "", ticker: str = "", card_id: str = "",
 ) -> HTMLResponse:
     signal = _safe(lambda: _repo().get_signal(run, event), None) if run and event else None
     # Vol-board "Log to journal" links here with ?ticker=; with no signal, prefill
@@ -315,6 +317,8 @@ def journal_new(
         request, "trade_form.html",
         {"signal": signal, "run": run, "event": event,
          "prefill_ticker": prefill_ticker, "prefill_thesis": prefill_thesis,
+         # Phase 5.2.C1b: set when "Logla" opened this form from a board card.
+         "card_id": card_id,
          **_EXPLAIN},
     )
 
@@ -333,9 +337,10 @@ def journal_create(
     signal_event_id: str = Form(""),
     signal_score: float | None = Form(None),
     signal_label: str = Form(""),
+    card_id: str = Form(""),
 ) -> RedirectResponse:
     underlying, spy = pricing.snapshot(ticker)
-    _journal().add(
+    trade_id = _journal().add(
         entry_ts=datetime.now(UTC),
         ticker=ticker.upper(),
         direction=direction,
@@ -352,6 +357,10 @@ def journal_create(
         signal_label=signal_label or None,
         thesis=thesis,
     )
+    if card_id:
+        # Phase 5.2.C1b: link this trade onto the board card that led to it, once
+        # (decision-cards contract §3). A failed link never costs the trade.
+        _safe(lambda: _card_repo().link_trade(card_id, trade_id), False)
     return RedirectResponse("/journal", status_code=303)
 
 
@@ -454,9 +463,118 @@ def _now() -> datetime:
     return datetime.now(UTC)
 
 
+def _build_board_page(
+    prints: Sequence[BoardPrint] | None,
+    *,
+    gate_on: bool,
+    run_latest_ts: datetime | None,
+) -> alfa_page.AlfaPage:
+    """The board's page model for one run's prints — the only row-view builder.
+
+    ``GET /`` renders these views and ``POST /alfa/card`` freezes the very same
+    object into a decision card (decision-cards contract §3: the server rebuilds
+    the row's view model from the database at that moment). One call site is the
+    point — a second, drifting builder would let a card claim a row the owner
+    never saw, and would quietly stop freezing fields added here later.
+    """
+    settings = _board_settings()
+    return alfa_page.build_alfa_page(
+        prints,
+        settings,
+        gate_on=gate_on,
+        spread_cutoff_pct=_spread_cutoff_pct(),
+        now=_now(),
+        quote_source=lambda symbols: alfa_page.db_quote_source(_board_reader().engine)(symbols),
+        evidence_source=lambda run_id, requests: alfa_page.db_evidence_source(_board_reader().engine)(
+            run_id, requests,
+        ),
+        legacy_scores=_legacy_scores(),
+        profile_hash_source=lambda run_id, event_ids: alfa_page.db_profile_hash_source(_board_reader().engine)(
+            run_id, event_ids,
+        ),
+        profile_resolver=alfa_page.resolve_writing_profile,
+        run_latest_ts=run_latest_ts,
+        delayed_source=lambda tickers, today: alfa_page.db_delayed_source(
+            _board_reader().engine, settings.delayed,
+        )(tickers, today),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Decision cards (Phase 5.2.C1b; docs/phase-5.2-decision-cards-acceptance.md §3)
+# ---------------------------------------------------------------------------
+
+_CARDS: cards.CardRepo | None = None
+
+
+def _card_repo() -> cards.CardRepo:
+    """The append-only decision-card repository, bound to the board reader's engine."""
+    global _CARDS
+    engine = _board_reader().engine
+    if _CARDS is None or _CARDS.engine is not engine:
+        _CARDS = cards.CardRepo(engine)
+    return _CARDS
+
+
+def _same_origin(request: Request) -> bool:
+    """True when the request's ``Origin`` (else its ``Referer``) names its own host.
+
+    A CSRF guard on top of Basic auth (contract §3): a card POST driven from
+    another site's page carries that site's origin and is refused before
+    anything is written. A request carrying neither header is refused too.
+    """
+    host = request.headers.get("host", "")
+    if not host:
+        return False
+    for header in ("origin", "referer"):
+        value = request.headers.get(header)
+        if value:
+            return urlsplit(value).netloc == host
+    return False
+
+
+def _calibration_hash(run_id: str, view: alfa_page.AlfaRowView) -> str | None:
+    """Content hash of the calibration profile that scored the row's source print.
+
+    ``None`` when the row has no readable source print or the read fails: the
+    card then records that the hash is missing instead of claiming one.
+    """
+    event_id = request_for(view.row).event_id
+    if not event_id:
+        return None
+    empty: Mapping[str, str] = {}
+    hashes = _safe(
+        lambda: alfa_page.db_profile_hash_source(_board_reader().engine)(run_id, [event_id]),
+        empty,
+    )
+    return hashes.get(event_id)
+
+
+def _write_decision_card(
+    view: alfa_page.AlfaRowView, *, decision: cards.Decision, run_id: str,
+) -> str:
+    """Freeze one rebuilt row view into an append-only card and return its id."""
+    board_hash = _board_settings().content_hash()
+    calibration_hash = _calibration_hash(run_id, view)
+    return _card_repo().write_card(
+        decision=decision,
+        ticker=view.row.ticker,
+        direction=cards.direction_value(view.row.direction),
+        run_id=run_id,
+        dominant_option_symbol=view.symbol,
+        card=cards.build_card_view(
+            view,
+            board_profile_hash=board_hash,
+            calibration_profile_hash=calibration_hash,
+        ),
+        board_profile_hash=board_hash,
+        calibration_profile_hash=calibration_hash,
+    )
+
+
 @app.get("/", response_class=HTMLResponse)
 @app.get("/alfa", response_class=HTMLResponse)
-def alfa_board(request: Request, run: str = "", gate: str = "") -> HTMLResponse:
+def alfa_board(request: Request, run: str = "", gate: str = "", pas: str = "") -> HTMLResponse:
     """The Alfa Board: one row per (ticker, side-aware direction) over the whole selected run.
 
     Served at ``GET /`` since Phase 5.2.A7; ``GET /alfa`` stays as an alias
@@ -479,21 +597,9 @@ def alfa_board(request: Request, run: str = "", gate: str = "") -> HTMLResponse:
     if active is not None:
         run_id = active
         prints = _safe(lambda: _board_reader().load_run(run_id), None)
-    page = alfa_page.build_alfa_page(
+    page = _build_board_page(
         prints,
-        settings,
         gate_on=gate != alfa_page.GATE_OFF_PARAM,
-        spread_cutoff_pct=_spread_cutoff_pct(),
-        now=_now(),
-        quote_source=lambda symbols: alfa_page.db_quote_source(_board_reader().engine)(symbols),
-        evidence_source=lambda run_id, requests: alfa_page.db_evidence_source(_board_reader().engine)(
-            run_id, requests,
-        ),
-        legacy_scores=_legacy_scores(),
-        profile_hash_source=lambda run_id, event_ids: alfa_page.db_profile_hash_source(_board_reader().engine)(
-            run_id, event_ids,
-        ),
-        profile_resolver=alfa_page.resolve_writing_profile,
         run_latest_ts=current.latest_ts if current is not None else None,
     )
     gamma_ctx: dict[str, gamma.GammaContext] = _safe(lambda: _gamma().latest(), {})
@@ -502,6 +608,9 @@ def alfa_board(request: Request, run: str = "", gate: str = "") -> HTMLResponse:
         earnings={t: c.next_earnings for t, c in gamma_ctx.items()},
         now=datetime.now(UTC).date(),
     ), [])
+    # Phase 5.2.C1b: ``?pas=`` confirms a recorded pass, and only when that card
+    # really exists — a made-up link must never claim something was written.
+    pas_card = _safe(lambda: _card_repo().get_card(pas), None) if pas else None
     return templates.TemplateResponse(
         request,
         "alfa.html",
@@ -519,9 +628,57 @@ def alfa_board(request: Request, run: str = "", gate: str = "") -> HTMLResponse:
             "vol_structure": explanations.vol_structure,
             "vol_read": explanations.vol_read,
             "vol_caveat": explanations.vol_caveat,
+            "pas_card": pas_card,
+            "pas_recorded_text": cards.pas_recorded_text,
             **alfa_page.template_context(),
         },
     )
+
+
+@app.post("/alfa/card", response_model=None)  # the union of two Response types is not a model
+def alfa_card(
+    request: Request,
+    decision: str = Form(...),
+    # The identity fields are namespaced on purpose: the board must never carry a
+    # control named "ticker", "label", "sort" or "min_score" again — those were the
+    # old dashboard's score filters, and test_board_honesty pins that they are gone.
+    card_run_id: str = Form(...),
+    card_ticker: str = Form(...),
+    card_direction: str = Form(...),
+    gate: str = Form(""),
+) -> RedirectResponse | PlainTextResponse:
+    """Record the owner's own decision on one board row (decision-cards contract §3).
+
+    The form carries the row's identity only. The server rebuilds that row's view
+    model from the database at this moment and freezes it into the card, so no
+    client-sent value can change what a card says. The rebuild reads the database
+    only — no Unusual Whales call. Nothing is written when the row cannot be
+    rebuilt: a card describing a row nobody saw would be worse than no card.
+    """
+    if not _same_origin(request):
+        return PlainTextResponse(cards.CARD_COPY["forbidden_origin"], status_code=403)
+    chosen = cards.decision_for(decision)
+    if chosen is None:
+        return PlainTextResponse(cards.CARD_COPY["unknown_decision"], status_code=400)
+    prints = _safe(lambda: _board_reader().load_run(card_run_id), None) if card_run_id else None
+    page = _build_board_page(prints, gate_on=True, run_latest_ts=None)
+    view = next(
+        (
+            v for v in page.views
+            if v.row.ticker == card_ticker and v.row.direction == card_direction
+        ),
+        None,
+    )
+    if view is None:
+        return PlainTextResponse(cards.CARD_COPY["row_not_found"], status_code=404)
+    card_id = _write_decision_card(view, decision=chosen, run_id=card_run_id)
+    if chosen == "log":
+        return RedirectResponse(f"/journal/new?{urlencode({'card_id': card_id})}", status_code=303)
+    params = {"run": card_run_id, "pas": card_id}
+    if gate == alfa_page.GATE_OFF_PARAM:
+        params["gate"] = alfa_page.GATE_OFF_PARAM
+    # The target is built here, never from a client value: no open redirect.
+    return RedirectResponse(f"/?{urlencode(params)}", status_code=303)
 
 
 @app.get("/health")

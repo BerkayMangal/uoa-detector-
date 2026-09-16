@@ -1,0 +1,28 @@
+{# Decision-card buttons on one board row (Phase 5.2.C1b, decision-cards contract §3).
+
+   The form posts the row's IDENTITY only (run, ticker, direction). The server rebuilds
+   that row's view model from the database and freezes it, so nothing rendered here can
+   decide what the card says.
+
+   The identity fields are namespaced (card_run_id, card_ticker, card_direction). The board
+   must never carry a control named "ticker", "label", "sort" or "min_score" again — those
+   were the old dashboard's score filters, and test_board_honesty pins that they are gone.
+
+   These buttons record the owner's own decision. They are not advice and must never read
+   as advice: every string comes from the frozen CARD_COPY dictionary in
+   webapp/board/cards.py, which a test runs through honesty.ensure_clean.
+
+   No <details> and no score value here: the audit block stays the only place the combined
+   score appears (R-EV2). The row template is also rendered on its own in tests, so nothing
+   here may require page-level context. #}
+<form method="post" action="/alfa/card" class="mt-2 flex flex-wrap items-center gap-2" data-card-form>
+  <input type="hidden" name="card_run_id" value="{{ run|default('') }}">
+  <input type="hidden" name="card_ticker" value="{{ row.ticker }}">
+  <input type="hidden" name="card_direction" value="{{ row.direction }}">
+  {% if page is defined and not page.gate_on %}<input type="hidden" name="gate" value="{{ gate_off_param }}">{% endif %}
+  <button type="submit" name="decision" value="log" data-card-decision="log"
+          class="rounded border border-gray-600 px-3 py-1 text-sm font-semibold text-gray-100 hover:bg-gray-800">{{ card_copy.log_button }}</button>
+  <button type="submit" name="decision" value="pas" data-card-decision="pas"
+          class="rounded border border-gray-700 px-3 py-1 text-sm font-semibold text-gray-300 hover:bg-gray-800">{{ card_copy.pas_button }}</button>
+  <span class="text-xs text-gray-500" data-card-help>{{ card_copy.buttons_help }}</span>
+</form>

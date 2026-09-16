@@ -75,6 +75,14 @@
       <textarea name="thesis" rows="2" class="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1.5 text-gray-100">{{ prefill_thesis }}</textarea>
     </label>
 
+    {# Phase 5.2.C1b: set when this form was opened from a board card's "Logla".
+       Saving links this trade's id onto that card, once. #}
+    {% if card_id %}
+    <p class="sm:col-span-2 text-xs text-gray-500" data-card-link="{{ card_id }}">
+      Linked to board decision card {{ card_id }} &mdash; saving stores this trade's id on that card.
+    </p>
+    {% endif %}
+    <input type="hidden" name="card_id" value="{{ card_id }}">
     <input type="hidden" name="signal_run_id" value="{{ run }}">
     <input type="hidden" name="signal_event_id" value="{{ event }}">
     <input type="hidden" name="signal_score" value="{{ signal.combined_score_post_penalty if signal and signal.combined_score_post_penalty is not none else '' }}">
