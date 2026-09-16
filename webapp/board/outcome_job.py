@@ -30,7 +30,10 @@ What the job refuses to do:
 
 - **Never a zero.** A missing close leaves the row ``bekliyor`` (§4); it is
   written so the ledger shows the card is being tracked, and a later run
-  advances it when the close arrives.
+  advances it when the close arrives. That is the case where the horizon HAS
+  passed and the ticker's own closes are missing. When the SPY calendar does not
+  yet reach the card's session, the horizon cannot be shown to have passed at
+  all, so nothing is written until it does.
 - **Never a final row because OUR fetch failed.** A degraded secondary fetch
   leaves the row ``bekliyor`` rather than freezing ``veri yok`` into an
   append-only table. A not-found contract IS data (program rule 9): the primary
@@ -176,7 +179,14 @@ def resolve_outcome(
     """
     start = session_on_or_before(sessions, card_session_day(card.created_at))
     if start is None:
-        return OutcomeResolution(state="pending")
+        # The stored calendar does not reach the card's own session, so nothing
+        # here can tell whether the horizon has passed. Contract §4 computes an
+        # outcome "once the horizon has passed", so the job writes NOTHING until
+        # the calendar reaches the card: a ``bekliyor`` row created for a horizon
+        # that may still be in the future is a permanent row (the table is
+        # append-only) claiming to wait on an event that has not happened. Once
+        # the close job has stored SPY's sessions, the next run resolves it.
+        return OutcomeResolution(state="not_due")
     end = session_after(sessions, start, horizon_days)
     if end is None:
         return OutcomeResolution(state="not_due")
