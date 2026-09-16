@@ -371,11 +371,16 @@ class CardRepo:
             msg = f"unknown direction {direction!r}; expected one of {DIRECTION_VALUES}"
             raise ValueError(msg)
         card_id = uuid.uuid4().hex
+        # One canonical spelling, decided on write. The pass ledger filters cards
+        # by ticker (§4) and vendor tickers are not normalised on their way into a
+        # BoardRow, so a ticker stored verbatim could count in the totals while
+        # being invisible in its own ticker view — the one comparison the ledger
+        # exists to make. The row view under card_json keeps the original text.
         row = AlfaDecisionCard(
             id=card_id,
             created_at=self._clock(),
             decision=decision,
-            ticker=ticker,
+            ticker=ticker.strip().upper(),
             direction=direction,
             run_id=run_id,
             dominant_option_symbol=dominant_option_symbol,
@@ -410,7 +415,7 @@ class CardRepo:
         if decision is not None:
             stmt = stmt.where(AlfaDecisionCard.decision == decision)
         if ticker is not None:
-            stmt = stmt.where(AlfaDecisionCard.ticker == ticker.upper())
+            stmt = stmt.where(AlfaDecisionCard.ticker == ticker.strip().upper())
         with self._sessions() as session:
             rows: Sequence[AlfaDecisionCard] = session.execute(stmt.limit(limit)).scalars().all()
             return tuple(_to_card(row) for row in rows)
