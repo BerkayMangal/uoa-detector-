@@ -1,0 +1,52 @@
+{# One decision card on the ledger (Phase 5.2.C2a, decision-cards contract §4).
+
+   Everything above the outcome row is the FROZEN snapshot: the evidence word, the
+   cost cells, the reason and the mandatory counter-argument as they stood at the
+   press. Nothing is recomputed from today's board, and a field the card never
+   carried reads "bilinmiyor" rather than a fresh value that would rewrite history.
+
+   The outcome row is the counterfactual: identical math for a taken card and a
+   passed one, which is the only reason the two can be compared (§4). A horizon
+   with no stored row reads "henüz hesaplanmadı" — never a zero.
+
+   Context: `row` (a LedgerRow). #}
+<article class="rounded-lg border border-gray-800 bg-gray-900/40 px-4 py-3"
+         data-card="{{ row.card.id }}" data-card-decision="{{ row.card.decision }}"
+         data-card-ticker="{{ row.card.ticker }}">
+  <div class="flex items-baseline gap-2 flex-wrap">
+    <span class="text-base font-bold text-white" data-card-name>{{ row.card.ticker }} {{ row.card.direction }}</span>
+    <span class="text-xs uppercase tracking-wide text-gray-300" data-decision>{{ row.decision_text }}</span>
+    <span class="text-xs text-gray-500" data-created>{{ row.created_text }}</span>
+    <a href="{{ row.href }}" class="text-xs text-gray-400 hover:text-gray-200 ml-auto" data-open-card>{{ defter_copy.open_card }}</a>
+  </div>
+
+  <div class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-400">
+    <span><span class="text-gray-500">{{ defter_copy.evidence }}</span>
+      <span class="text-gray-200 font-semibold" data-strength>{{ defter_shown(row.face.strength) }}</span>
+      <span data-evidence-counts>{{ row.face.evidence_counts_text }}</span></span>
+    <span><span class="text-gray-500">{{ chip_copy.spread }}</span>
+      <span data-spread>{{ defter_shown(row.face.spread) }}</span></span>
+    <span data-round-trip>{{ defter_shown(row.face.round_trip) }}</span>
+    <span data-lot>{{ defter_shown(row.face.lot) }}</span>
+    <span data-exit-depth>{{ defter_shown(row.face.exit_depth) }}</span>
+    <span data-quote-age>{{ defter_shown(row.face.quote_age) }}</span>
+    <span><span class="text-gray-500">{{ defter_copy.contract }}</span>
+      <span class="font-mono" data-symbol>{{ defter_shown(row.face.symbol) }}</span></span>
+  </div>
+
+  <p class="mt-2 text-sm text-gray-200" data-reason>{{ defter_shown(row.face.reason) }}</p>
+  <p class="mt-1 text-sm text-gray-300" data-counter>{{ defter_shown(row.face.counter) }}</p>
+
+  <div class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs" data-outcomes>
+    <span class="text-gray-500">{{ defter_copy.outcomes_title }}</span>
+    {% for cell in row.cells %}
+    <span data-outcome="{{ cell.horizon_days }}">
+      <span class="text-gray-400">{{ cell.horizon_text }}</span>
+      <span class="text-gray-500" data-outcome-status>{{ cell.status_text }}</span>
+      <span class="font-mono text-gray-100" data-outcome-excess>{{ cell.excess_text }}</span>
+      <span class="text-gray-500">{{ outcome_copy.option_bid }}</span>
+      <span class="font-mono text-gray-400" data-outcome-bid>{{ cell.option_bid_text }}</span>
+    </span>
+    {% endfor %}
+  </div>
+</article>

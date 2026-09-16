@@ -156,11 +156,20 @@ class PortfolioSettings(_Strict):
 
 class FillsSettings(_Strict):
     min_n_for_stats: int = Field(ge=1)
+    # Phase 5.2.C32-fix2: how many fills the card page's slippage summary reads.
+    max_fills_per_summary: int = Field(ge=1)
+
+
+class LedgerSettings(_Strict):
+    """Phase 5.2.C2a: the /defter page cap (the ledger itself is never trimmed)."""
+
+    max_cards_per_page: int = Field(ge=1)
 
 
 class OutcomesSettings(_Strict):
     horizons_trading_days: tuple[int, ...] = Field(min_length=1)
     job_time_et: str = Field(pattern=_CLOCK)
+    max_cards_per_run: int = Field(ge=1)  # Phase 5.2.C2b: the daily job's scan bound
 
 
 class TapeSettings(_Strict):
@@ -195,6 +204,7 @@ class BoardSettings(_Strict):
     delayed: DelayedSettings
     portfolio: PortfolioSettings
     fills: FillsSettings
+    ledger: LedgerSettings
     outcomes: OutcomesSettings
 
     def content_hash(self) -> str:

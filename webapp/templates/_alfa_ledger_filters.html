@@ -1,0 +1,28 @@
+{# The ledger's two filters (Phase 5.2.C2a, decision-cards contract §4).
+
+   A plain GET form, like every other board control: no JS framework, and the URL
+   carries the view so it can be linked and reloaded.
+
+   The controls are named `karar` and `hisse`. They are deliberately NOT named
+   "ticker", "label", "sort" or "min_score": those were the old dashboard's score
+   filters, and the board must never carry a control by those names again
+   (test_board_honesty pins that they are gone from the board). #}
+<form method="get" action="/defter" class="flex flex-wrap items-end gap-4 mb-4" data-form="defter-filters">
+  <label class="text-sm">
+    <span class="block text-gray-400 mb-1">{{ defter_copy.filter_decision }}</span>
+    <select name="karar" data-filter-decision onchange="this.form.submit()"
+            class="bg-gray-900 border border-gray-700 rounded px-2 py-1 text-gray-100">
+      <option value="" {% if not page.decision %}selected{% endif %}>{{ defter_copy.filter_all }}</option>
+      {% for decision in defter_decisions %}
+      <option value="{{ decision }}" {% if page.decision == decision %}selected{% endif %}>{{ decision }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label class="text-sm">
+    <span class="block text-gray-400 mb-1">{{ defter_copy.filter_ticker }}</span>
+    <input type="text" name="hisse" value="{{ page.ticker }}" data-filter-ticker autocomplete="off"
+           class="w-28 bg-gray-900 border border-gray-700 rounded px-2 py-1 text-gray-100">
+  </label>
+  <button type="submit"
+          class="rounded border border-gray-600 px-3 py-1 text-sm font-semibold text-gray-100 hover:bg-gray-800">{{ defter_copy.filter_submit }}</button>
+</form>

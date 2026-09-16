@@ -1,0 +1,52 @@
+{# "Dolum gir" on one decision card (Phase 5.2.C3, decision-cards contract §5).
+
+   The form posts the CARD's id and the owner's own three numbers (side, fill price,
+   contracts). It never posts a quote: the assumed bid, ask and mid are read from the
+   card snapshot on the server, so nothing rendered here can decide what the slippage
+   says. The fields are namespaced (fill_card_id, fill_side, fill_price, fill_contracts)
+   for the same reason the card form's are.
+
+   The quote shown is the CARD's, with its age. It is never labelled "NBBO at fill":
+   no source gives the NBBO at the moment of a manual fill (contract §5).
+
+   Every string comes from the frozen FILL_COPY dictionary in webapp/board/fills.py,
+   which a test runs through honesty.ensure_clean. Rendered on the card page and on a
+   journal trade, so nothing here may require page-level context beyond
+   `card` and `assumed`. #}
+<div class="rounded-lg border border-gray-800 bg-gray-900/40 px-4 py-3" data-fill-block data-card="{{ card.id }}">
+  <div class="text-sm font-semibold text-gray-100">{{ fill_copy.form_title }}</div>
+  {% if assumed %}
+  <p class="mt-1 text-xs text-gray-300" data-assumed-quote>
+    <span data-assumed-age>{{ fill_assumed_quote_text(assumed) }}</span> ·
+    <span data-assumed-bid-ask>{{ fill_bid_ask_text(assumed) }}</span> ·
+    <span class="text-gray-400">{{ fill_copy.assumed_spread }}</span>
+    <span data-assumed-spread>{{ fill_pct_text(assumed.spread_pct) }}</span>
+  </p>
+  <p class="mt-1 text-xs text-gray-500" data-not-nbbo>{{ fill_copy.assumed_quote_not_nbbo }}</p>
+  <form method="post" action="/alfa/fill" class="mt-2 flex flex-wrap items-end gap-3" data-fill-form>
+    <input type="hidden" name="fill_card_id" value="{{ card.id }}">
+    <label class="text-xs text-gray-400">{{ fill_copy.side_label }}
+      <select name="fill_side" data-fill-side
+              class="block bg-gray-950 border border-gray-700 rounded px-2 py-1 text-sm text-gray-100">
+        {% for side in fill_sides %}<option value="{{ side }}">{{ side }}</option>{% endfor %}
+      </select>
+    </label>
+    <label class="text-xs text-gray-400">{{ fill_copy.price_label }}
+      <input type="number" step="0.01" min="0" name="fill_price" required data-fill-price
+             class="block w-28 bg-gray-950 border border-gray-700 rounded px-2 py-1 text-sm text-gray-100">
+    </label>
+    <label class="text-xs text-gray-400">{{ fill_copy.contracts_label }}
+      <input type="number" step="1" min="0" name="fill_contracts" required value="1" data-fill-contracts
+             class="block w-24 bg-gray-950 border border-gray-700 rounded px-2 py-1 text-sm text-gray-100">
+    </label>
+    <button type="submit"
+            class="rounded border border-gray-600 px-3 py-1 text-sm font-semibold text-gray-100 hover:bg-gray-800">{{ fill_copy.submit }}</button>
+  </form>
+  <p class="mt-2 text-xs text-gray-500" data-fill-help>{{ fill_copy.form_help }} {{ fill_copy.sign_help }}</p>
+  {% else %}
+  {# A card whose snapshot holds no usable quote pair has no assumption to test, so the
+     form is not offered at all: the POST would refuse it, and an offered form that is
+     always refused would be worse than saying why. #}
+  <p class="mt-1 text-xs text-amber-300/90" data-state="no-assumed-quote">{{ fill_copy.no_assumed_quote }}</p>
+  {% endif %}
+</div>

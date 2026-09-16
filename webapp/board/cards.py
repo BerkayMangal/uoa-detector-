@@ -161,6 +161,32 @@ def is_linkable(card: DecisionCard) -> bool:
     return card.decision == _LINKABLE_DECISION and card.trade_id is None
 
 
+def is_logged(card: DecisionCard) -> bool:
+    """True when the card records a taken decision (``log``).
+
+    A fill belongs only to a taken decision: a pass was never traded, so it has
+    no fill price, and a fill hanging off a ``pas`` card would corrupt the very
+    log-vs-pas comparison the pass ledger exists to make (contract §4).
+    """
+    return card.decision == _LINKABLE_DECISION
+
+
+def cards_for_trades(engine: Engine, trade_ids: Sequence[str]) -> Mapping[str, DecisionCard]:
+    """The card linked onto each of ``trade_ids``, keyed by trade id (read only).
+
+    One query for the whole journal page rather than one per trade. Reads no
+    table it does not find: a caller on a database without the card table sees
+    the read fail, and the journal renders exactly as it did before FAZ C.
+    """
+    wanted = [trade_id for trade_id in trade_ids if trade_id]
+    if not wanted:
+        return {}
+    stmt = select(AlfaDecisionCard).where(AlfaDecisionCard.trade_id.in_(wanted))
+    with session_factory(engine)() as session:
+        rows: Sequence[AlfaDecisionCard] = session.execute(stmt).scalars().all()
+    return {row.trade_id: _to_card(row) for row in rows if row.trade_id}
+
+
 def pas_recorded_text(card: DecisionCard) -> str:
     """The board's confirmation line for a recorded pass (frozen copy, contract §3)."""
     return CARD_COPY["pas_recorded"].format(
