@@ -24,6 +24,7 @@ import os
 import secrets
 from datetime import UTC, datetime
 from pathlib import Path
+from time import perf_counter
 from typing import TYPE_CHECKING, TypeVar
 from urllib.parse import urlencode, urlsplit
 
@@ -614,8 +615,10 @@ def alfa_board(request: Request, run: str = "", gate: str = "", pas: str = "") -
     candidate (R-EM1). The vol-premium board stays as a section, with the
     R-IV1 sentence (§5 A7).
     """
+    _t0 = perf_counter()
     settings = _board_settings()
     runs_read: list[RunInfo] | None = _safe(_repo().runs, None)
+    _t_runs = perf_counter()
     runs = runs_read or []
     run_ids = {r.run_id for r in runs}
     active = run if run in run_ids else (runs[0].run_id if runs else None)
@@ -624,11 +627,13 @@ def alfa_board(request: Request, run: str = "", gate: str = "", pas: str = "") -
     if active is not None:
         run_id = active
         prints = _safe(lambda: _board_reader().load_run(run_id), None)
+    _t_prints = perf_counter()
     page = _build_board_page(
         prints,
         gate_on=gate != alfa_page.GATE_OFF_PARAM,
         run_latest_ts=current.latest_ts if current is not None else None,
     )
+    _t_page = perf_counter()
     gamma_ctx: dict[str, gamma.GammaContext] = _safe(lambda: _gamma().latest(), {})
     vol_rows: list[VolBoardRow] = _safe(lambda: build_vol_board(
         gamma_ctx,
@@ -638,7 +643,8 @@ def alfa_board(request: Request, run: str = "", gate: str = "", pas: str = "") -
     # Phase 5.2.C1b: ``?pas=`` confirms a recorded pass, and only when that card
     # really exists — a made-up link must never claim something was written.
     pas_card = _safe(lambda: _card_repo().get_card(pas), None) if pas else None
-    return templates.TemplateResponse(
+    _t_vol = perf_counter()
+    _response = templates.TemplateResponse(
         request,
         "alfa.html",
         {
@@ -660,6 +666,17 @@ def alfa_board(request: Request, run: str = "", gate: str = "", pas: str = "") -
             **alfa_page.template_context(),
         },
     )
+    # Phase 5.2.PERF2 (temporary): production renders this page in ~3.8 s while the
+    # same render takes 0.024 s locally, and the cost does not follow the number of
+    # prints. One INFO line per render says which stage owns the time, so the next
+    # fix is aimed by measurement instead of by guesswork. Remove once answered.
+    _logger.info(
+        "board timing: runs=%.3f prints=%.3f page=%.3f vol=%.3f render=%.3f total=%.3f "
+        "rows=%d print_count=%d",
+        _t_runs - _t0, _t_prints - _t_runs, _t_page - _t_prints, _t_vol - _t_page,
+        perf_counter() - _t_vol, perf_counter() - _t0, len(page.rows), page.print_count,
+    )
+    return _response
 
 
 @app.post("/alfa/card", response_model=None)  # the union of two Response types is not a model
