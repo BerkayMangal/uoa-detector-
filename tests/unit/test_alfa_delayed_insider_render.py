@@ -152,8 +152,8 @@ def test_both_shipped_families_render_in_order(board: tuple[Engine, TestClient])
     engine, client = board
     _seed_delayed(engine)
     row = _rows_of(client.get("/").text)["AAA"]
-    assert RENDERED_FAMILIES == ("congress", "insider")
-    assert re.findall(r'data-delayed-family="(\w+)"', row) == ["congress", "insider"]
+    assert RENDERED_FAMILIES[:2] == ("congress", "insider")  # later commits append families
+    assert re.findall(r'data-delayed-family="(\w+)"', row)[:2] == ["congress", "insider"]
     assert "İçeriden" in _text(row)
 
 

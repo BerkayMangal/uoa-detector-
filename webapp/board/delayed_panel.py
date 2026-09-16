@@ -57,8 +57,13 @@ if TYPE_CHECKING:
     from webapp.board.delayed_coverage import CoverageView
     from webapp.board.settings import DelayedSettings
 
-# Families with a rendered block. D1 shipped Kongre, D2 İçeriden; D3 appends the shorts.
-RENDERED_FAMILIES: Final[tuple[DelayedFamily, ...]] = ("congress", "insider")
+# Families with a rendered block: Kongre (D1), İçeriden (D2), Short and FTD (D3).
+RENDERED_FAMILIES: Final[tuple[DelayedFamily, ...]] = (
+    "congress", "insider", "short_interest", "ftd",
+)
+
+# FTD is a day-by-day feed, so its family is collapsed into one line over the window.
+COLLAPSED_FAMILIES: Final[tuple[DelayedFamily, ...]] = ("ftd",)
 
 PanelState = Literal["items", "empty", "never_fetched", "unanswered", "unreadable"]
 
@@ -75,6 +80,11 @@ _TEXT: Final[Mapping[str, str]] = MappingProxyType({
     "note.stale": "son deneme ({date}) başarısız; kayıtlar {success} itibarıyla",
     "note.truncated": "kaynak, döndürdüğünden fazla kayıt olduğunu bildirdi; liste eksik olabilir",
     "omitted": "en yeni {shown} kayıt gösteriliyor; {omitted} kayıt daha var",
+    "summary.ftd": "pencerede {days} FTD günü, toplam ≈ ${usd}; en yenisi {date}",
+    "summary.ftd_partial": (
+        "pencerede {days} FTD günü, bilinen tutarların toplamı ≈ ${usd} "
+        "({unknown} günün tutarı bilinmiyor); en yenisi {date}"
+    ),
 })
 
 
@@ -95,6 +105,8 @@ class DelayedFamilyPanel:
     omitted: int  # stored items beyond the display cap
     omitted_text: str | None
     notes: tuple[str, ...]  # freshness, staleness and truncation disclosures
+    # Phase 5.2.D3: the whole window in one line for a collapsed family (FTD).
+    summary_text: str | None = None
 
 
 @dataclass(frozen=True)
@@ -225,7 +237,23 @@ def _family_panel(
         omitted=omitted,
         omitted_text=_say("omitted", shown=len(shown), omitted=omitted) if omitted else None,
         notes=_notes(coverage),
+        summary_text=_summary(family, items),  # over the window, not over the shown items
     )
+
+
+def _summary(family: DelayedFamily, items: Sequence[DelayedItem]) -> str | None:
+    """A collapsed family's one-line total. Unknown amounts are disclosed, never assumed zero."""
+    if family not in COLLAPSED_FAMILIES or not items:
+        return None
+    known = [item.size_low_usd for item in items if item.size_low_usd is not None]
+    newest = max(item.filed_or_asof_date for item in items).isoformat()
+    total = f"{sum(known):,.0f}"
+    unknown = len(items) - len(known)
+    if unknown:
+        return _say(
+            "summary.ftd_partial", days=len(items), usd=total, unknown=unknown, date=newest,
+        )
+    return _say("summary.ftd", days=len(items), usd=total, date=newest)
 
 
 def _empty_state(coverage: CoverageView | None) -> tuple[PanelState, str]:

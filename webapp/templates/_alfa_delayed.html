@@ -19,6 +19,7 @@
          data-delayed-family="{{ fam.family }}" data-delayed-state="{{ fam.state }}">
       <p><span class="font-semibold text-gray-200" data-delayed-label>{{ fam.label }}</span>
         {% if fam.state_text %}<span data-delayed-state-text>{{ fam.state_text }}</span>{% endif %}</p>
+      {% if fam.summary_text %}<p data-delayed-summary>{{ fam.summary_text }}</p>{% endif %}
       {% if fam.items %}
       <ul class="mt-1 space-y-1">
         {% for item in fam.items %}

@@ -244,11 +244,11 @@ def test_panel_types_have_no_count_fields() -> None:
 
 
 def test_only_the_shipped_families_render() -> None:
-    """D1 shipped Kongre, D2 İçeriden; D3 appends the shorts."""
-    assert RENDERED_FAMILIES == ("congress", "insider")
+    """Kongre (D1), İçeriden (D2), Short and FTD (D3)."""
+    assert RENDERED_FAMILIES == ("congress", "insider", "short_interest", "ftd")
     panel = _panel(_rows(1), _coverage())
     assert [f.family for f in panel.families] == list(RENDERED_FAMILIES)
-    assert [f.label for f in panel.families] == ["Kongre", "İçeriden"]
+    assert [f.label for f in panel.families] == ["Kongre", "İçeriden", "Short", "FTD"]
     assert (panel.bucket_label, panel.exclusion_note) == (BUCKET_LABEL, EXCLUSION_NOTE)
     assert panel.bucket_label == "ek kanıt (gecikmeli)"
     assert panel.exclusion_note == (
