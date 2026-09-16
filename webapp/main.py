@@ -706,7 +706,17 @@ def alfa_card(
     )
     if view is None:
         return PlainTextResponse(cards.CARD_COPY["row_not_found"], status_code=404)
-    card_id = _write_decision_card(view, decision=chosen, run_id=card_run_id, page=page)
+    try:
+        card_id = _write_decision_card(view, decision=chosen, run_id=card_run_id, page=page)
+    except Exception:
+        # Deliberately not _safe: a failed write must never look like a recorded
+        # decision. And it must not fall through to the generic error page, whose
+        # "Nothing is lost" is written for read-only views — here the press was not
+        # recorded, and an unrecorded pass cannot be reconstructed tomorrow.
+        _logger.exception(
+            "decision card could not be written for %s %s", card_ticker, card_direction,
+        )
+        return PlainTextResponse(cards.CARD_COPY["write_failed"], status_code=500)
     if chosen == "log":
         return RedirectResponse(f"/journal/new?{urlencode({'card_id': card_id})}", status_code=303)
     params = {"run": card_run_id, "pas": card_id}

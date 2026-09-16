@@ -84,6 +84,10 @@ CARD_COPY: Final[Mapping[str, str]] = MappingProxyType(
         "forbidden_origin": "Bu istek tahtadan gelmedi; hiçbir şey yazılmadı.",
         "unknown_decision": "Bilinmeyen karar; hiçbir şey yazılmadı.",
         "row_not_found": "Satır bu çalışmada bulunamadı; hiçbir şey yazılmadı.",
+        # The one failure the board must never paper over. The app's generic error
+        # page says "Nothing is lost", which is true of a read-only view and false
+        # of a decision: an unrecorded pass is gone. So the press gets this line.
+        "write_failed": "Karar yazılamadı; hiçbir şey kaydedilmedi — tekrar dene.",
     },
 )
 
