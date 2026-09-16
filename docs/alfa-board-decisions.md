@@ -453,3 +453,72 @@ future `git bisect` across that commit knows the failure is the
 machine-dependent threshold, not the board.
 
 **Undo:** nothing to undo; the branch tip and every later commit are green.
+## P28. The contract's render budget is measured in production, not in a test
+
+The contract asks for p95 ≤ 1.5 s at 2,000 signals. That number was only ever
+checked on a developer machine, where the board rendered in 0.6 s — while the
+live board took **3.9 s**, and 9.4 s with FAZ B and FAZ D. Nothing noticed,
+because nothing measured the live render.
+
+**Decision.** The unit test asserts what is hardware-independent (ten times the
+signals may not cost more than twice ten times the time, plus a generous
+ceiling), and the contract's number is measured where it means something:
+`scripts/verify_live_board.sh` times the live render after every deploy and
+prints it next to the honesty audit and the `alfa_*` row counts.
+
+**Undo:** restore the absolute assertion in
+`tests/unit/test_alfa_route.py::test_alfa_render_budget_p95_at_2000_signals`
+and drop the timing line from the rail.
+
+## P29. A slow page is a broken page, and the rule was applied to my own work
+
+FAZ B+D deployed green by every check that existed at the time — 200s
+everywhere, honesty audit passing, tables created, clean logs — and rendered in
+9.4 s.
+
+**Decision.** It was reverted within the owner's 15-minute rule
+(`7728ba0`), measured, fixed, and brought back only once the live number was
+proven: the board now renders in 0.40 s, and the largest run in the database
+(6,300 prints) in 1.03 s.
+
+**What it cost:** about two hours and three extra deploys. **What it bought:**
+the board was never left slow for the owner, and the cause turned out to be one
+line that would otherwise have been buried under FAZ B/D's new row content.
+
+**Undo:** `git revert -m 1 <the re-land merge>`; the FAZ B/D work also still
+exists on `p52-faz-b`, `p52-faz-d` and `p52-int`.
+
+## P30. One builder makes the card and the page, so a card cannot lie
+
+FAZ C1 landed while FAZ B+D was reverted, so its page builder had to drop the
+delayed-evidence source that did not exist on main. Bringing FAZ B+D back
+restored it — and moved **every** FAZ B/D data source (ATM, flow-since,
+open-interest confirmation, catalysts, regime, journal trades, ETF holdings,
+sectors, delayed) from the route into `_build_board_page`.
+
+**Why it matters.** `GET /` renders that builder's output and `POST /alfa/card`
+freezes the very same object. Sources wired in the route would have been in the
+page but not in the card, so a decision card could have described a row the
+owner never saw. With one builder the card freezes size, break-even, chase,
+opening/closing, the catalyst chip, the regime band, portfolio overlap and the
+delayed bucket automatically — the snapshot serializer is generic and needs no
+field list.
+
+**Undo:** move the source arguments back to the route; the card then silently
+stops recording them, which is the failure this prevents.
+
+## P31. Temporary instrumentation that produced nothing is not left behind
+
+`Phase 5.2.PERF2` added one INFO line per render with the per-stage timings, to
+aim the next fix by measurement. The fix landed before those lines were needed,
+and they never appeared in the Railway logs — the app logger's INFO output does
+not reach the deployment log.
+
+**Decision.** The instrumentation stays only until the closeout commit removes
+it, and the logging gap is recorded as **REG-6**: application `INFO` logs are
+invisible in production, so anything worth seeing there must be raised to
+`WARNING` or emitted through the existing structured logger. Anyone debugging
+production later needs to know that before trusting a quiet log.
+
+**Undo:** nothing to undo once removed; to re-enable, re-add the timing block
+and raise its level.
