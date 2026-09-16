@@ -41,6 +41,7 @@ from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from typing import TYPE_CHECKING, Any, Final, Literal, cast
+from weakref import WeakSet
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import Date, DateTime, Float, Integer, String, select, update
@@ -460,8 +461,11 @@ def board_state(view: OiConfirmView | None) -> OIConfirmState | None:
     return None if view is None else BOARD_STATES[view.status]
 
 
-# The engine whose confirmation table is known to exist (the render path checks once).
-_tables_ready_for: list[Engine] = []
+# The engines whose confirmation table is known to exist. A set, not one slot: the web app
+# and the refresher hold different Engine objects for the same database and alternate
+# through this reader, which made the one-slot guard re-issue catalog DDL on every call
+# (review RB-05).
+_tables_ready_for: WeakSet[Engine] = WeakSet()
 
 
 def read_board_oi(
@@ -475,9 +479,9 @@ def read_board_oi(
     wanted = [(symbol.strip().upper(), day) for symbol, day in keys if symbol.strip()]
     if not wanted:
         return {}
-    if not _tables_ready_for or _tables_ready_for[0] is not engine:
+    if engine not in _tables_ready_for:
         ensure_oi_confirm_tables(engine)
-        _tables_ready_for[:] = [engine]
+        _tables_ready_for.add(engine)
     with Session(engine) as session:
         return load_oi_confirms(session, wanted)
 
