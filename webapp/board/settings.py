@@ -103,6 +103,7 @@ class RefreshSettings(_Strict):
     max_symbols_per_request: int = Field(ge=1)
     atm_expiries: int = Field(ge=1, le=5)
     daily_request_soft_cap: int = Field(gt=0)
+    daily_job_max_attempts: int = Field(ge=1)  # Phase 5.2.B-fix1
     closed_market_sleep_seconds: int = Field(ge=60)
     daily_limit_backoff_seconds: int = Field(ge=60)
 

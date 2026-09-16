@@ -1,0 +1,21 @@
+{# Phase 5.2.B6b (contract §6 B6): the "zaten bu bahittesin" badge.
+
+   It renders when an open journal trade has this row's ticker and side-aware direction,
+   with the matching trade beside it; an expired trade carries "(vadesi geçti)". A
+   same-ticker open trade whose direction cannot be read is reported separately and never
+   counted as a match. Every string comes from webapp/board/portfolio.py. #}
+{% if view.overlap and (view.overlap.badge or view.overlap.note) %}
+<div class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm"
+     data-overlap="{{ 'match' if view.overlap.badge else 'unreadable' }}">
+  {% if view.overlap.badge %}
+  <span class="px-2 py-0.5 rounded border border-amber-600 text-amber-300 font-semibold"
+        data-overlap-badge>{{ view.overlap.badge }}</span>
+  {% endif %}
+  {% if view.overlap.details %}
+  <span class="text-xs text-gray-400" data-overlap-detail>{{ copy.overlap_detail_title }}: {{ view.overlap.details|join(copy.detail_separator) }}</span>
+  {% endif %}
+  {% if view.overlap.note %}
+  <span class="text-xs text-gray-500" data-overlap-note>{{ view.overlap.note }}</span>
+  {% endif %}
+</div>
+{% endif %}

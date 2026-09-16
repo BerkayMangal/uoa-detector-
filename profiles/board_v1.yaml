@@ -63,6 +63,10 @@ refresh:
   max_symbols_per_request: 200       # Phase 5.2.A2: option_symbol[] entries per option-contracts call (200 symbols, ~7.8 KB query, live-verified 2026-09-15)
   atm_expiries: 3                    # nearest relevant expiries fetched for the ATM straddle
   daily_request_soft_cap: 24000      # 80% of the 30k/day UW limit; non-critical fetches pause above it
+  # Phase 5.2.B-fix1: added (the key was missing). A failed daily job retries once per
+  # cadence, at most this many attempts per ET day, so one broken job cannot spend the
+  # day's request budget (review FB-H1/FB-02: 84 attempts x 40 requests before this).
+  daily_job_max_attempts: 4
   closed_market_sleep_seconds: 300
   daily_limit_backoff_seconds: 1800
 

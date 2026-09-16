@@ -1,0 +1,20 @@
+{# Phase 5.2.B3 (contract §6 B3): the chase verdict. What the print paid, what an entry would
+   pay now at the ask, and the underlying's move since. Every string comes from
+   webapp/board/chase.py's frozen dictionaries. The flow line is context only: it never moved
+   the verdict and is never counted as evidence. #}
+{% set chase_style = {
+  'reasonable': 'border-emerald-600 text-emerald-300',
+  'caution': 'border-amber-600 text-amber-300',
+  'late': 'border-red-700 text-red-300',
+  'no_quote': 'border-dashed border-gray-600 text-gray-500 opacity-80',
+} %}
+{% if view.chase_text %}
+<div class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm" data-chase="{{ view.chase.verdict }}">
+  <span class="text-gray-400">{{ view.chase_text.title }}</span>
+  <span class="px-2 py-0.5 rounded border font-semibold {{ chase_style[view.chase.verdict] }}"
+        data-chase-verdict>{{ view.chase_text.verdict }}</span>
+  <span class="text-gray-100" data-chase-line>{{ view.chase_text.line }}</span>
+  <span class="text-xs text-gray-500" data-chase-flow>{{ view.chase_text.flow }}</span>
+  {% if view.chase_text.sold_note %}<span class="text-xs text-gray-500" data-chase-sold>{{ view.chase_text.sold_note }}</span>{% endif %}
+</div>
+{% endif %}

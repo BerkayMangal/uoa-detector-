@@ -7,7 +7,9 @@
 - Capital header: open long premium at risk (contracts x entry x multiplier: 100 for
   options, 1 for shares) against ``sizing.capital_usd``, in dollars and percent. While
   ``sizing.values_confirmed_by_owner`` is false the header carries
-  ``(varsayılan değer)``.
+  ``(varsayılan değer)``. An open row whose option has expired carries no premium at
+  risk, so it leaves the sum and is disclosed separately (Phase 5.2.B-fix2, review
+  FB-H2); a row whose expiry cannot be read is unknown, not expired, and stays counted.
 - Single-bet clusters (strong link): board and journal tickers that each weigh at
   least ``portfolio.cluster_min_member_weight_pct`` in the same focused ETF are joined
   (union-find); clusters are the connected components with two or more members.
@@ -47,6 +49,9 @@ DEFAULT_VALUE_MARK: Final = "(varsayılan değer)"
 UNPARSED_DIRECTION_NOTE: Final = "aynı hissede yönü okunamayan açık işlem var (bilinmiyor)"
 CAPITAL_HEADER_TEMPLATE: Final = "Açıktaki prim riski: {usd} · sermayenin %{pct}"
 CAPITAL_UNPARSED_TEMPLATE: Final = "{n} açık işlem okunamadı (bilinmiyor)"
+# Phase 5.2.B-fix2 (review FB-H2): an expired long option carries no premium at risk.
+# It leaves the at-risk sum and is disclosed here, never silently dropped.
+CAPITAL_EXPIRED_TEMPLATE: Final = "{n} işlemin vadesi geçti ({usd} hariç)"
 TRADE_DETAIL_TEMPLATE: Final = "{ticker} {instrument} {strike} {expiry} · {contracts} kontrat @ {entry}"
 EXPIRED_MARK: Final = "(vadesi geçti)"
 EXPIRY_UNKNOWN: Final = "vade bilinmiyor"
@@ -165,12 +170,18 @@ class CapitalHeader:
     unparsed: tuple[str, ...]
     values_confirmed: bool
     text: str
+    # Phase 5.2.B-fix2: open rows whose option has expired, and the entry premium they
+    # would have added. They are disclosed, never counted as premium at risk.
+    expired_trades: int = 0
+    expired_usd: float = 0.0
 
 
 def capital_header(trades: Sequence[TradeRow], *, settings: BoardSettings, today: date) -> CapitalHeader:
     capital = settings.sizing.capital_usd
     at_risk = 0.0
+    expired_usd = 0.0
     open_count = 0
+    expired_count = 0
     unparsed: list[str] = []
     for trade in trades:
         parsed = parse_trade(trade, today=today)
@@ -181,17 +192,30 @@ def capital_header(trades: Sequence[TradeRow], *, settings: BoardSettings, today
             unparsed.append(parsed.trade_id)
             continue
         multiplier = _SHARE_MULTIPLIER if parsed.instrument == "shares" else _OPTION_MULTIPLIER
-        at_risk += parsed.contracts * parsed.entry_price * multiplier
+        premium = parsed.contracts * parsed.entry_price * multiplier
+        if parsed.expired:
+            # An expired option is worth nothing: counting its entry premium would
+            # overstate the board's only account-level number (review FB-H2). An
+            # unreadable expiry is None here, which is unknown, not expired.
+            expired_count += 1
+            expired_usd += premium
+            continue
+        at_risk += premium
     pct = at_risk / capital * _PERCENT
     text = CAPITAL_HEADER_TEMPLATE.format(usd=f"${at_risk:,.0f}", pct=f"{pct:.1f}")
     if not settings.sizing.values_confirmed_by_owner:
         text = f"{text} {DEFAULT_VALUE_MARK}"
+    if expired_count:
+        text = text + _PART_SEPARATOR + CAPITAL_EXPIRED_TEMPLATE.format(
+            n=expired_count, usd=f"${expired_usd:,.0f}",
+        )
     if unparsed:
         text = text + _PART_SEPARATOR + CAPITAL_UNPARSED_TEMPLATE.format(n=len(unparsed))
     return CapitalHeader(
         open_trades=open_count, at_risk_usd=at_risk, capital_usd=capital, at_risk_pct=pct,
         unparsed=tuple(sorted(unparsed)),
         values_confirmed=settings.sizing.values_confirmed_by_owner, text=text,
+        expired_trades=expired_count, expired_usd=expired_usd,
     )
 
 

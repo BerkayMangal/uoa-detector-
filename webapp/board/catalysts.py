@@ -39,7 +39,7 @@ from typing import TYPE_CHECKING, Any, Final, Literal, cast
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import Boolean, DateTime, String, delete, or_, select
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, Session, mapped_column
 
 from uoa_detector.sources.unusual_whales.client import (
     CircuitBreakerOpenError,
@@ -55,10 +55,10 @@ if TYPE_CHECKING:
 
     from sqlalchemy import Table
     from sqlalchemy.engine import Engine
-    from sqlalchemy.orm import Session, sessionmaker
+    from sqlalchemy.orm import sessionmaker
 
-    from uoa_detector.sources.unusual_whales.client import UnusualWhalesClient
     from webapp.board.settings import BoardSettings
+    from webapp.board.uw_errors import JsonClient
 
 EARNINGS_PATH: Final = "/api/earnings/{ticker}"
 FDA_PATH: Final = "/api/market/fda-calendar"
@@ -95,6 +95,11 @@ BEYOND_HORIZON_TEMPLATE: Final = "{date} sonrası bilinmiyor"
 M22_MAY_DIFFER: Final = (
     "Bu çip M22 olay skorundan ayrı okunur; ikisi farklı sonuç verebilir."
 )
+# Phase 5.2.B4b: the dominant contract's expiry has already passed, so the window
+# [now, expiry close] is empty. An empty window is out of scope, never "no catalyst".
+EXPIRED_WINDOW: Final = f"{CHIP_HEAD}: kapsam-dışı (vade geçti)"
+# The chip could not be read at all (no source, or a failed read): unknown, never "none".
+CHIP_UNKNOWN: Final = f"{CHIP_HEAD}: {UNKNOWN}"
 _PART_SEPARATOR: Final = " · "
 _EVENT_SEPARATOR: Final = ", "
 
@@ -223,7 +228,7 @@ class CatalystChip:
 
 
 async def refresh_catalysts(
-    client: UnusualWhalesClient,
+    client: JsonClient,
     sessions: sessionmaker[Session],
     *,
     tickers: Sequence[str],
@@ -246,7 +251,7 @@ async def refresh_catalysts(
 
 
 async def refresh_earnings(
-    client: UnusualWhalesClient,
+    client: JsonClient,
     sessions: sessionmaker[Session],
     *,
     tickers: Sequence[str],
@@ -268,7 +273,7 @@ async def refresh_earnings(
 
 
 async def refresh_fda(
-    client: UnusualWhalesClient,
+    client: JsonClient,
     sessions: sessionmaker[Session],
     *,
     tickers: Sequence[str],
@@ -292,7 +297,7 @@ async def refresh_fda(
 
 
 async def refresh_macro(
-    client: UnusualWhalesClient,
+    client: JsonClient,
     sessions: sessionmaker[Session],
     *,
     settings: BoardSettings,
@@ -338,6 +343,39 @@ def load_catalyst_inputs(
     )
 
 
+def load_catalyst_inputs_many(
+    session: Session, tickers: Sequence[str],
+) -> dict[str, tuple[tuple[CatalystView, ...], tuple[CatalystFetchView, ...]]]:
+    """Stored events and fetch coverage for many tickers, in TWO queries (Phase 5.2.B-fix7).
+
+    The render path asks for one chip per board row, so loading each ticker on
+    its own was two round trips per ticker (review RB-02). The market-wide macro
+    rows are read once and handed to every ticker, exactly as the single-ticker
+    loader does.
+    """
+    symbols = [t.strip().upper() for t in tickers if t.strip()]
+    if not symbols:
+        return {}
+    lookup = {*symbols, MACRO_TICKER}
+    events = session.scalars(
+        select(AlfaCatalyst)
+        .where(AlfaCatalyst.ticker.in_(lookup))
+        .order_by(AlfaCatalyst.starts_at, AlfaCatalyst.kind, AlfaCatalyst.title),
+    ).all()
+    fetches = session.scalars(
+        select(AlfaCatalystFetch).where(AlfaCatalystFetch.ticker.in_(lookup)),
+    ).all()
+    views = [_event_view(e) for e in events if e.kind in _KINDS]
+    fetch_views = [_fetch_view(f) for f in fetches if f.source in _KINDS]
+    return {
+        symbol: (
+            tuple(v for v in views if v.ticker in (symbol, MACRO_TICKER)),
+            tuple(f for f in fetch_views if f.ticker in (symbol, MACRO_TICKER)),
+        )
+        for symbol in dict.fromkeys(symbols)
+    }
+
+
 def read_catalyst_chip(
     session: Session,
     *,
@@ -351,6 +389,43 @@ def read_catalyst_chip(
         events, fetches, ticker=ticker, window_start=window_start, window_end=window_end,
         settings=settings,
     )
+
+
+# The engine whose catalyst tables are known to exist (the render path checks once).
+_tables_ready_for: list[Engine] = []
+
+
+def read_board_catalysts(
+    engine: Engine,
+    windows: Sequence[tuple[str, datetime]],
+    *,
+    settings: BoardSettings,
+    now: datetime,
+) -> dict[tuple[str, datetime], CatalystChip]:
+    """One chip per (ticker, window end) for the render path: database reads only.
+
+    Stored events and fetch coverage are loaded once per ticker, however many
+    rows share it. The tables are created once per engine, so a fresh database
+    reads ``bilinmiyor`` instead of failing.
+    """
+    wanted = [
+        (ticker.strip().upper(), _as_utc(end)) for ticker, end in windows if ticker.strip()
+    ]
+    if not wanted:
+        return {}
+    if not _tables_ready_for or _tables_ready_for[0] is not engine:
+        ensure_catalyst_tables(engine)
+        _tables_ready_for[:] = [engine]
+    out: dict[tuple[str, datetime], CatalystChip] = {}
+    with Session(engine) as session:
+        loaded = load_catalyst_inputs_many(session, [ticker for ticker, _end in wanted])
+    for ticker, end in dict.fromkeys(wanted):
+        events, fetches = loaded.get(ticker, ((), ()))
+        out[(ticker, end)] = catalyst_chip(
+            events, fetches, ticker=ticker, window_start=now, window_end=end,
+            settings=settings,
+        )
+    return out
 
 
 def catalyst_chip(
@@ -418,7 +493,7 @@ class _Accumulator:
 
 
 async def _fetch(
-    client: UnusualWhalesClient, path: str, params: dict[str, Any] | None,
+    client: JsonClient, path: str, params: dict[str, Any] | None,
 ) -> tuple[FetchStatus, dict[str, Any] | None]:
     try:
         return "ok", await client.request_json(path, params=params)

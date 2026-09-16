@@ -89,7 +89,6 @@ from sqlalchemy.orm import Mapped, Session, mapped_column, sessionmaker
 
 from uoa_detector.sources.unusual_whales.client import (
     CircuitBreakerOpenError,
-    UnusualWhalesClient,
     UnusualWhalesDailyLimitError,
     UnusualWhalesNotFoundError,
     UnusualWhalesRateLimitError,
@@ -106,6 +105,7 @@ from webapp.board.db import AlfaBase, session_factory
 from webapp.board.delayed_coverage import ensure_delayed_coverage_tables, record_fetch
 from webapp.board.honesty import ensure_clean
 from webapp.board.settings import DelayedSettings
+from webapp.board.uw_errors import JsonClient
 
 _logger = logging.getLogger(__name__)
 
@@ -577,7 +577,7 @@ class DelayedJobResult:
 class _FamilyJob(Protocol):
     async def __call__(
         self,
-        client: UnusualWhalesClient,
+        client: JsonClient,
         factory: sessionmaker[Session],
         ticker: str,
         *,
@@ -588,7 +588,7 @@ class _FamilyJob(Protocol):
 
 
 async def run_delayed_job(
-    client: UnusualWhalesClient,
+    client: JsonClient,
     engine: Engine,
     tickers: Iterable[str],
     *,
@@ -617,7 +617,7 @@ async def run_delayed_job(
 
 
 async def refresh_congress(
-    client: UnusualWhalesClient,
+    client: JsonClient,
     engine: Engine,
     ticker: str,
     *,
@@ -629,7 +629,7 @@ async def refresh_congress(
 
 
 async def refresh_insider(
-    client: UnusualWhalesClient,
+    client: JsonClient,
     engine: Engine,
     ticker: str,
     *,
@@ -641,7 +641,7 @@ async def refresh_insider(
 
 
 async def refresh_short_interest(
-    client: UnusualWhalesClient,
+    client: JsonClient,
     engine: Engine,
     ticker: str,
     *,
@@ -653,7 +653,7 @@ async def refresh_short_interest(
 
 
 async def refresh_ftds(
-    client: UnusualWhalesClient,
+    client: JsonClient,
     engine: Engine,
     ticker: str,
     *,
@@ -666,7 +666,7 @@ async def refresh_ftds(
 
 async def _refresh_one(
     job: _FamilyJob,
-    client: UnusualWhalesClient,
+    client: JsonClient,
     engine: Engine,
     ticker: str,
     *,
@@ -715,7 +715,7 @@ def _normalized(tickers: Iterable[str]) -> tuple[str, ...]:
 
 
 async def _get(
-    client: UnusualWhalesClient,
+    client: JsonClient,
     path: str,
     params: dict[str, Any] | None,
     *,
@@ -770,7 +770,7 @@ def _finish(
 
 
 async def _congress(
-    client: UnusualWhalesClient,
+    client: JsonClient,
     factory: sessionmaker[Session],
     ticker: str,
     *,
@@ -792,7 +792,7 @@ async def _congress(
 
 
 async def _insider(
-    client: UnusualWhalesClient,
+    client: JsonClient,
     factory: sessionmaker[Session],
     ticker: str,
     *,
@@ -819,7 +819,7 @@ async def _insider(
 
 
 async def _short_interest(
-    client: UnusualWhalesClient,
+    client: JsonClient,
     factory: sessionmaker[Session],
     ticker: str,
     *,
@@ -838,7 +838,7 @@ async def _short_interest(
 
 
 async def _ftds(
-    client: UnusualWhalesClient,
+    client: JsonClient,
     factory: sessionmaker[Session],
     ticker: str,
     *,

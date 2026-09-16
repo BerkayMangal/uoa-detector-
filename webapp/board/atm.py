@@ -32,11 +32,11 @@ import re
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from decimal import Decimal, InvalidOperation
-from typing import TYPE_CHECKING, Any, Final, Literal, cast
+from typing import TYPE_CHECKING, Any, Final, Literal, Protocol, cast
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import Date, DateTime, Float, Integer, String, delete, select
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy import Date, DateTime, Float, Integer, String, delete, func, select
+from sqlalchemy.orm import Mapped, Session, mapped_column
 
 from uoa_detector.sources.unusual_whales.client import (
     CircuitBreakerOpenError,
@@ -48,13 +48,12 @@ from uoa_detector.sources.unusual_whales.client import (
 from webapp.board.db import AlfaBase
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping, Sequence
+    from collections.abc import Iterable, Mapping, Sequence
 
     from sqlalchemy import Table
     from sqlalchemy.engine import Engine
-    from sqlalchemy.orm import Session, sessionmaker
+    from sqlalchemy.orm import sessionmaker
 
-    from uoa_detector.sources.unusual_whales.client import UnusualWhalesClient
     from webapp.board.settings import BoardSettings
 
 EXPIRY_BREAKDOWN_PATH: Final = "/api/stock/{ticker}/expiry-breakdown"
@@ -72,6 +71,14 @@ _OSI: Final = re.compile(
 )
 _OSI_STRIKE_SCALE: Final = 1000
 _OSI_CENTURY: Final = 2000
+
+
+class _JsonClient(Protocol):
+    """What the ATM jobs need from ``UnusualWhalesClient`` (the refresher passes its own client)."""
+
+    async def request_json(
+        self, path: str, *, params: dict[str, Any] | None = ..., method: str = ...,
+    ) -> dict[str, Any]: ...
 
 
 # ---------------------------------------------------------------------------
@@ -169,7 +176,7 @@ class AtmView:
 
 
 async def refresh_expiry_breakdown(
-    client: UnusualWhalesClient,
+    client: _JsonClient,
     sessions: sessionmaker[Session],
     *,
     tickers: Sequence[str],
@@ -218,7 +225,7 @@ async def refresh_expiry_breakdown(
 
 
 async def refresh_atm_chains(
-    client: UnusualWhalesClient,
+    client: _JsonClient,
     sessions: sessionmaker[Session],
     *,
     wanted: Mapping[str, Sequence[date]],
@@ -340,15 +347,66 @@ def load_atm(session: Session, ticker: str) -> tuple[AtmView, ...]:
     rows = session.scalars(
         select(AlfaAtm).where(AlfaAtm.ticker == ticker.upper()).order_by(AlfaAtm.expiry),
     )
-    return tuple(
-        AtmView(
-            ticker=r.ticker, expiry=r.expiry, strike=r.strike, stock_price=r.stock_price,
-            call_bid=r.call_bid, call_ask=r.call_ask, call_iv=r.call_iv,
-            put_bid=r.put_bid, put_ask=r.put_ask, put_iv=r.put_iv,
-            trade_date=r.trade_date, fetched_at=_as_utc(r.fetched_at),
-        )
-        for r in rows
+    return tuple(_view(r) for r in rows)
+
+
+def _view(row: AlfaAtm) -> AtmView:
+    return AtmView(
+        ticker=row.ticker, expiry=row.expiry, strike=row.strike, stock_price=row.stock_price,
+        call_bid=row.call_bid, call_ask=row.call_ask, call_iv=row.call_iv,
+        put_bid=row.put_bid, put_ask=row.put_ask, put_iv=row.put_iv,
+        trade_date=row.trade_date, fetched_at=_as_utc(row.fetched_at),
     )
+
+
+def tickers_needing_expiries(engine: Engine, tickers: Iterable[str], *, today: date) -> list[str]:
+    """Tickers, in the given order, whose listed expiries were not fetched on ``today`` (ET).
+
+    The daily ``expiry-breakdown`` call is driven by the stored rows rather than
+    by an in-process flag, so a refresher restart does not re-fetch the list and
+    a missed day is picked up on the next cycle.
+    """
+    ordered = _unique_upper(list(tickers))
+    if not ordered:
+        return []
+    with Session(engine) as session:
+        rows = session.execute(
+            select(AlfaAtmExpiry.ticker, func.max(AlfaAtmExpiry.fetched_at))
+            .where(AlfaAtmExpiry.ticker.in_(ordered))
+            .group_by(AlfaAtmExpiry.ticker),
+        )
+        fetched = {
+            ticker: _as_utc(stamp).astimezone(_ET).date()
+            for ticker, stamp in rows
+            if isinstance(stamp, datetime)
+        }
+    return [t for t in ordered if fetched.get(t) != today]
+
+
+# The engine whose ATM tables are known to exist (the render path checks once).
+_tables_ready_for: list[Engine] = []
+
+
+def read_board_atm(engine: Engine, tickers: Sequence[str]) -> dict[str, tuple[AtmView, ...]]:
+    """Stored ATM rows per ticker for the render path: one query, and no UW call.
+
+    Creates the tables once per engine, so a fresh database renders
+    ``bilinmiyor`` instead of failing.
+    """
+    wanted = _unique_upper(list(tickers))
+    if not wanted:
+        return {}
+    if not _tables_ready_for or _tables_ready_for[0] is not engine:
+        ensure_atm_tables(engine)
+        _tables_ready_for[:] = [engine]
+    out: dict[str, list[AtmView]] = {}
+    with Session(engine) as session:
+        rows = session.scalars(
+            select(AlfaAtm).where(AlfaAtm.ticker.in_(wanted)).order_by(AlfaAtm.ticker, AlfaAtm.expiry),
+        )
+        for row in rows:
+            out.setdefault(row.ticker, []).append(_view(row))
+    return {ticker: tuple(views) for ticker, views in out.items()}
 
 
 # ---------------------------------------------------------------------------

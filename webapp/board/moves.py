@@ -51,6 +51,9 @@ EXPECTED_UNKNOWN: Final = "ATM straddle: bilinmiyor"
 NEAREST_EXPIRY_TEMPLATE: Final = "en yakın ATM vadesi {expiry} (bu vade yok)"
 STRIKE_OFFSET_TEMPLATE: Final = "ATM strike {strike}, spot {spot}, fark %{offset}"
 SEPARATOR: Final = " · "
+# B2b: every quote carries its age (R-CO2). The ATM row is fetched by the board
+# refresher, so this is our fetch time, not an exchange quote time (decision P16).
+ATM_AGE_TEMPLATE: Final = "ATM satırı {age} önce alındı"
 
 ExpectedSource = Literal["straddle", "iv_estimate"]
 
