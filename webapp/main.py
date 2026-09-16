@@ -938,7 +938,9 @@ def alfa_fill(
     side = fills.side_for(fill_side)
     if side is None:
         return PlainTextResponse(fills.FILL_COPY["unknown_side"], status_code=400)
-    if fill_price <= 0 or fill_contracts <= 0:
+    if not fills.usable_numbers(fill_price, fill_contracts):
+        # Finite AND positive: a form field typed ``float`` accepts ``inf``,
+        # ``1e400`` and ``nan``, none of which a fill table can ever unrecord.
         return PlainTextResponse(fills.FILL_COPY["bad_numbers"], status_code=400)
     card = _safe(lambda: _card_repo().get_card(fill_card_id), None) if fill_card_id else None
     if card is None:

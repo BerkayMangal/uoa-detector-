@@ -34,6 +34,7 @@ is money lost against the assumption.
 
 from __future__ import annotations
 
+import math
 import statistics
 import uuid
 from dataclasses import dataclass
@@ -163,6 +164,20 @@ def ensure_fill_tables(engine: Engine) -> None:
     cast("Table", AlfaFill.__table__).create(engine, checkfirst=True)
 
 
+def usable_numbers(*values: float) -> bool:
+    """True when every value is a finite, positive number.
+
+    ``inf`` and ``nan`` pass a bare ``<= 0`` check (``inf <= 0`` and
+    ``nan <= 0`` are both ``False``), and a form field typed ``float`` accepts
+    ``inf``, ``1e400`` and ``nan`` — so without this a non-finite price would be
+    frozen into the APPEND-ONLY fill table, render as ``+$inf``, and poison that
+    side's median and interquartile range forever, with no repair path. The
+    route asks here before writing, and :meth:`FillRepo.write_fill` refuses the
+    same numbers as the last line of defence.
+    """
+    return all(math.isfinite(value) and value > 0 for value in values)
+
+
 def side_for(value: str) -> Side | None:
     """The side a form value names, or ``None`` when it names neither."""
     for side in SIDES:
@@ -196,10 +211,15 @@ def _dec(value: float) -> Decimal:
 
 
 def _number(value: Json) -> float | None:
-    """A JSON value as a float, or ``None``; ``True``/``False`` are not numbers."""
+    """A JSON value as a finite float, or ``None``; ``True``/``False`` are not numbers.
+
+    ``json.loads`` accepts ``Infinity`` and ``NaN``, so a snapshot written by a
+    broken quote read could carry one. A non-finite bid or ask is not a quote,
+    and slippage measured against it would be ``inf`` in an append-only table.
+    """
     if isinstance(value, bool):
         return None
-    if isinstance(value, int | float):
+    if isinstance(value, int | float) and math.isfinite(value):
         return float(value)
     return None
 
@@ -366,6 +386,10 @@ class FillRepo:
             raise ValueError(msg)
         if not card_id:
             msg = "a fill must name the card it was measured against"
+            raise ValueError(msg)
+        if not math.isfinite(fill_price) or not math.isfinite(contracts):
+            # Checked before the sign test: ``inf`` and ``nan`` pass ``<= 0``.
+            msg = "fill_price and contracts must both be finite numbers"
             raise ValueError(msg)
         if fill_price <= 0 or contracts <= 0:
             msg = "fill_price and contracts must both be positive"
