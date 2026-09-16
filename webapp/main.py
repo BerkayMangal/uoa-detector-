@@ -321,12 +321,21 @@ def journal_new(
                 f"Vol-premium board: {prefill_ticker} — "
                 f"{explanations.vol_structure(regime=g.regime)}"
             )
+    # Phase 5.2.C1-fix6: claim a link only when saving could really make one. An id
+    # naming no card, a passed card, or a card already linked must not render a
+    # sentence that is not true — the board's ?pas= confirmation works the same way.
+    # Clearing the field also stops the save from quoting an id it cannot use.
+    card = _safe(lambda: _card_repo().get_card(card_id), None) if card_id else None
+    linkable_id = card.id if card is not None and cards.is_linkable(card) else ""
     return templates.TemplateResponse(
         request, "trade_form.html",
         {"signal": signal, "run": run, "event": event,
          "prefill_ticker": prefill_ticker, "prefill_thesis": prefill_thesis,
          # Phase 5.2.C1b: set when "Logla" opened this form from a board card.
-         "card_id": card_id,
+         "card_id": linkable_id,
+         "card_link_text": (
+             cards.CARD_COPY["journal_link"].format(card_id=linkable_id) if linkable_id else ""
+         ),
          **_EXPLAIN},
     )
 

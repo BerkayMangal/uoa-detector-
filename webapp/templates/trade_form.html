@@ -76,11 +76,14 @@
     </label>
 
     {# Phase 5.2.C1b: set when this form was opened from a board card's "Logla".
-       Saving links this trade's id onto that card, once. #}
+       Saving links this trade's id onto that card, once.
+
+       Phase 5.2.C1-fix6: the server clears card_id unless that card can really
+       take the link (it exists, it is a log card, and it has none yet), and the
+       sentence is frozen copy — CARD_COPY["journal_link"] — not prose written
+       here. Nothing may claim a link the save would refuse to make. #}
     {% if card_id %}
-    <p class="sm:col-span-2 text-xs text-gray-500" data-card-link="{{ card_id }}">
-      Linked to board decision card {{ card_id }} &mdash; saving stores this trade's id on that card.
-    </p>
+    <p class="sm:col-span-2 text-xs text-gray-500" data-card-link="{{ card_id }}">{{ card_link_text }}</p>
     {% endif %}
     <input type="hidden" name="card_id" value="{{ card_id }}">
     <input type="hidden" name="signal_run_id" value="{{ run }}">
