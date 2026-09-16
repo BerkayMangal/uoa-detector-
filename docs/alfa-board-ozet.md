@@ -1,6 +1,6 @@
 # Alfa Board — Berkay için özet
 
-**Son güncelleme: 2026-09-16 09:35Z (TRT 12:35).** Bu dosya çalışma sürdükçe tazelenir; en son değil,
+**Son güncelleme: 2026-09-16 09:55Z (TRT 12:55).** Bu dosya çalışma sürdükçe tazelenir; en son değil,
 sürekli yazılır. Doğrulanmamış her şey "DOĞRULANMADI" diye etiketlidir.
 
 ---
@@ -10,14 +10,14 @@ sürekli yazılır. Doğrulanmamış her şey "DOĞRULANMADI" diye etiketlidir.
 - **Durum: ÇALIŞIYOR** (FAZ A canlıda).
 - **URL:** https://uoa-detector-production.up.railway.app/ — kullanıcı adı/şifre masaüstündeki
   `uoa-dashboard-login.txt` dosyasında.
-- **Canlı SHA:** `2632298` (FAZ A + doğrulama rayları; FAZ B+D geri alındı — aşağıda sebebi).
-- **Son doğrulama:** 2026-09-16 09:33Z / 12:33 TRT — sağlık 200 ve **ayakta olan commit'i doğru bildiriyor**, şifresiz 401, şifreli 200, dürüstlük denetimi 20 satırda PASS, logda hata yok, **sayfa açılma süresi 3,9 saniye**.
+- **Canlı SHA:** `234e528` (FAZ A + doğrulama rayları + şablon önbelleği; FAZ B+D geri alındı — aşağıda sebebi).
+- **Son doğrulama:** 2026-09-16 09:45Z / 12:45 TRT — sağlık 200 ve ayakta olan commit'i doğru bildiriyor, şifresiz 401, şifreli 200, dürüstlük denetimi 20 satırda PASS, logda hata yok, **sayfa açılma süresi 3,8 saniye**.
 - **Durma sebebi:** — (çalışma sürüyor).
 - **Sırada:** karar kartları (FAZ C1) ve render hızlandırması; FAZ B+D kodu dalda hazır, hız düzeltmesinden sonra geri gelecek.
 
 ## 2. GERİ ALMA KARTI
 
-**Son bilinen iyi SHA: `2632298`.**
+**Son bilinen iyi SHA: `234e528`.**
 
 Tahta bozuksa, sadece şunu yapıştır:
 
@@ -99,10 +99,15 @@ yapılmadı, indirme başlatılmadı. Ayrıntı: `docs/thetadata-decision.md`.
   tahta FAZ A+B+D ile **9,4 saniyede** açılıyordu; geri aldıktan sonra **3,9 saniye**; sözleşmedeki hedef
   1,5 saniye. Kod kaybolmadı (`p52-faz-b`, `p52-faz-d`, `p52-int` dallarında duruyor), hız düzeltmesinden
   sonra geri gelecek.
-- **Asıl mesele bundan büyük (REG-5):** yavaşlık FAZ B/D'nin icadı değil. Profil, render süresinin
-  **%95'inin şablon işi** olduğunu gösteriyor (tüm veri okuması, kanıt ve ceza defteri render başına
-  0,04 saniye). Yani **FAZ A tek başına da 3,9 saniye** — hedefin iki katından fazla. Bunu şimdiye kadar
-  kimse görmedi çünkü canlı render süresi hiç ölçülmüyordu; artık her deploy'da ölçülüyor.
+- **Asıl mesele bundan büyük (REG-5):** yavaşlık FAZ B/D'nin icadı değil; **FAZ A tek başına da 3,8-3,9
+  saniye** ve hedef 1,5 saniye. Bunu şimdiye kadar kimse görmedi çünkü canlı render süresi hiç ölçülmüyordu.
+- **Bir sebep bulundu ve düzeltildi, ama üretimde işe yaramadı — dürüstçe söylüyorum.** Satır şablonu her
+  satır için yeniden derleniyormuş; düzeltince **yerelde 27 kat** hızlandı (0,64 s → 0,024 s) ve bu canlıya
+  da alındı, ama **canlı süre 3,9'dan 3,8 saniyeye indi, o kadar**. Demek ki üretimdeki asıl maliyet başka
+  bir yerde: koşu büyüklüğünden bağımsız, sabit ~3,7 saniyelik bir taban var (39 baskılık koşu da, 1001
+  baskılık koşu da aynı). Sıradaki adımım bunu tahmin etmek değil, canlıda aşama aşama ölçmek.
+- **FAZ B+D bu yüzden hâlâ beklemede:** kodu hazır ve testleri yeşil (PR #14), ama sabit maliyet çözülmeden
+  geri getirmek tahtayı yine 9 saniyeye çıkarır.
 - **Doğrulama rayları canlıda (PR #12):** `/health` artık hangi commit'in ayakta olduğunu söylüyor;
   `scripts/verify_live_board.sh` tek komutla deploy sonrası her şeyi kontrol ediyor (sağlık + SHA, şifre
   duvarı, **sayfa açılma süresi**, dürüstlük denetimi, `alfa_` satır sayıları); `scripts/audit_board_html.py`
