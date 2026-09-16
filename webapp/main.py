@@ -785,7 +785,10 @@ def _journal_fill_context(trades: Sequence[journal.TradeRow]) -> dict[str, objec
     if not linked:
         return {"fill_cards": empty, "fill_quotes": {}, "fill_rows": {}}
     rows: dict[str, list[fills.Fill]] = {card.id: [] for card in linked.values()}
-    for fill in _safe(lambda: _fill_repo().list_fills(), _NO_FILLS):
+    # Filtered in SQL, not in Python: a global read spends its row budget on the
+    # whole table, so a linked trade's own records would vanish from this page
+    # once other cards had filled it up.
+    for fill in _safe(lambda: _fill_repo().list_fills(card_ids=list(rows)), _NO_FILLS):
         if fill.card_id in rows:
             rows[fill.card_id].append(fill)
     return {

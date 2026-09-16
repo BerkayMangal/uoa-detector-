@@ -425,13 +425,26 @@ class FillRepo:
         self,
         *,
         card_id: str | None = None,
+        card_ids: Sequence[str] | None = None,
         trade_id: str | None = None,
         limit: int = _DEFAULT_LIST_LIMIT,
     ) -> tuple[Fill, ...]:
-        """Fills newest first, optionally for one card or one trade."""
+        """Fills newest first, optionally for one card, a set of cards, or one trade.
+
+        ``card_ids`` filters in SQL so a page that shows several cards' fills
+        spends its row budget on those cards only: filtering a global read in
+        Python instead would drop a card's own records as soon as the rest of
+        the table outgrew ``limit``. An empty set selects nothing, never
+        everything.
+        """
         stmt = select(AlfaFill).order_by(AlfaFill.created_at.desc(), AlfaFill.id.desc())
         if card_id is not None:
             stmt = stmt.where(AlfaFill.card_id == card_id)
+        if card_ids is not None:
+            wanted = [found for found in card_ids if found]
+            if not wanted:
+                return ()
+            stmt = stmt.where(AlfaFill.card_id.in_(wanted))
         if trade_id is not None:
             stmt = stmt.where(AlfaFill.trade_id == trade_id)
         with self._sessions() as session:
