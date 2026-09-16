@@ -204,6 +204,25 @@ def load_closes(engine: Engine, ticker: str) -> tuple[ClosePoint, ...]:
     return tuple(ClosePoint(day=day, close=close) for day, close in rows)
 
 
+def load_closes_by_ticker(
+    engine: Engine, tickers: Sequence[str],
+) -> dict[str, tuple[ClosePoint, ...]]:
+    """Stored closes of every requested ticker in ONE query, oldest first per ticker. Read-only."""
+    symbols = list(dict.fromkeys(t.strip().upper() for t in tickers if t.strip()))
+    if not symbols:
+        return {}
+    stmt = (
+        select(AlfaDailyClose.ticker, AlfaDailyClose.day, AlfaDailyClose.close)
+        .where(AlfaDailyClose.ticker.in_(symbols))
+        .order_by(AlfaDailyClose.ticker, AlfaDailyClose.day)
+    )
+    grouped: dict[str, list[ClosePoint]] = {symbol: [] for symbol in symbols}
+    with session_factory(engine)() as session:
+        for ticker, day, close in session.execute(stmt).all():
+            grouped.setdefault(ticker, []).append(ClosePoint(day=day, close=close))
+    return {ticker: tuple(points) for ticker, points in grouped.items()}
+
+
 async def _refresh_ticker(
     client: UnusualWhalesClient,
     factory: sessionmaker[Session],

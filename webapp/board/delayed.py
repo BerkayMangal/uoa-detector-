@@ -97,6 +97,7 @@ from uoa_detector.sources.unusual_whales.client import (
 )
 from webapp.board.daily_close import ClosePoint, FetchStatus, load_closes, pct_move_between
 from webapp.board.db import AlfaBase, session_factory
+from webapp.board.delayed_coverage import ensure_delayed_coverage_tables, record_fetch
 from webapp.board.honesty import ensure_clean
 from webapp.board.settings import DelayedSettings
 
@@ -162,6 +163,16 @@ def _say(key: str, **values: object) -> str:
     return ensure_clean(_TEXT[key].format(**values))
 
 
+# The bucket's own strings, so the render side does not re-spell them (Phase 5.2.D1).
+BUCKET_LABEL: Final = _say("bucket")
+EXCLUSION_NOTE: Final = _say("exclusion")
+
+
+def family_label(family: DelayedFamily) -> str:
+    """The frozen Turkish label of one delayed family."""
+    return _say(f"family.{family}")
+
+
 # ---------------------------------------------------------------------------
 # Table
 # ---------------------------------------------------------------------------
@@ -193,8 +204,14 @@ class AlfaDelayed(AlfaBase):
 
 
 def ensure_delayed_tables(engine: Engine) -> None:
-    """Create ``alfa_delayed`` when missing. Never alters or drops anything."""
+    """Create ``alfa_delayed`` and its fetch-coverage table when missing.
+
+    Never alters or drops anything. The coverage table (Phase 5.2.D1) records
+    the attempt itself, so a family that was never fetched reads ``bilinmiyor``
+    instead of "no records" (R-UN1).
+    """
     cast(Table, AlfaDelayed.__table__).create(engine, checkfirst=True)
+    ensure_delayed_coverage_tables(engine)
 
 
 @dataclass(frozen=True)
@@ -585,9 +602,11 @@ async def run_delayed_job(
     results: list[DelayedFamilyResult] = []
     for ticker in _normalized(tickers):
         for job in _FAMILY_JOBS:
-            results.append(
-                await job(client, factory, ticker, today=today, fetched_at=fetched_at, settings=settings),
+            result = await job(
+                client, factory, ticker, today=today, fetched_at=fetched_at, settings=settings,
             )
+            _record_coverage(factory, result, fetched_at)
+            results.append(result)
     return DelayedJobResult(results=tuple(results))
 
 
@@ -650,9 +669,26 @@ async def _refresh_one(
 ) -> DelayedFamilyResult:
     today, fetched_at = _clock(now)
     ensure_delayed_tables(engine)
-    return await job(
-        client, session_factory(engine), ticker.strip().upper(),
+    factory = session_factory(engine)
+    result = await job(
+        client, factory, ticker.strip().upper(),
         today=today, fetched_at=fetched_at, settings=settings,
+    )
+    _record_coverage(factory, result, fetched_at)
+    return result
+
+
+def _record_coverage(
+    factory: sessionmaker[Session], result: DelayedFamilyResult, fetched_at: datetime,
+) -> None:
+    """Record the attempt behind ``result`` so the render can tell "never asked" from "nothing there"."""
+    record_fetch(
+        factory,
+        result.ticker,
+        result.family,
+        status=result.status,
+        at=fetched_at,
+        truncated=result.truncated,
     )
 
 
@@ -881,6 +917,27 @@ def load_delayed_records(engine: Engine, ticker: str) -> tuple[DelayedRecord, ..
     with session_factory(engine)() as session:
         rows = session.execute(stmt).scalars().all()
         return tuple(record for row in rows if (record := _record(row)) is not None)
+
+
+def load_delayed_records_by_ticker(
+    engine: Engine, tickers: Sequence[str],
+) -> dict[str, tuple[DelayedRecord, ...]]:
+    """Stored delayed rows of every requested ticker in ONE query, grouped by ticker.
+
+    Read-only. The render path uses this instead of one query per row, so the
+    board's render budget does not grow with the number of rows.
+    """
+    symbols = list(dict.fromkeys(t.strip().upper() for t in tickers if t.strip()))
+    if not symbols:
+        return {}
+    stmt = select(AlfaDelayed).where(AlfaDelayed.ticker.in_(symbols))
+    grouped: dict[str, list[DelayedRecord]] = {symbol: [] for symbol in symbols}
+    with session_factory(engine)() as session:
+        for row in session.execute(stmt).scalars().all():
+            record = _record(row)
+            if record is not None:
+                grouped.setdefault(record.ticker, []).append(record)
+    return {ticker: tuple(records) for ticker, records in grouped.items()}
 
 
 def _record(row: AlfaDelayed) -> DelayedRecord | None:

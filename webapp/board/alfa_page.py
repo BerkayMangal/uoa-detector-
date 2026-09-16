@@ -68,6 +68,7 @@ from webapp.board.copy_tr import (
     NO_CLEAN_CANDIDATE,
     UNKNOWN_NOT_CLEAN,
 )
+from webapp.board.delayed_panel import DelayedPanel, load_delayed_panels, unreadable_panel
 from webapp.board.direction import DIRECTION_LABELS, FALLBACK_MARKER
 from webapp.board.evidence import (
     EMPTY_INPUTS,
@@ -108,7 +109,7 @@ if TYPE_CHECKING:
     from uoa_detector.backtest.store import StoredSignal
     from uoa_detector.calibration.profile import CalibrationProfile
     from webapp.board.evidence import EvidenceCounts, EvidenceInputs, EvidenceRequest, StrengthKey
-    from webapp.board.settings import BoardSettings, CleanCandidateSettings
+    from webapp.board.settings import BoardSettings, CleanCandidateSettings, DelayedSettings
     from webapp.board.signals import BoardPrint
     from webapp.board.tradability import DepthView, QuoteView
 
@@ -118,6 +119,8 @@ if TYPE_CHECKING:
     EvidenceSource = Callable[[str, Sequence[EvidenceRequest]], EvidenceInputs]
     ProfileHashSource = Callable[[str, Sequence[str]], Mapping[str, str]]
     ProfileResolver = Callable[[str], CalibrationProfile | None]
+    # Phase 5.2.D1: (row tickers, the page's ET date) → each ticker's delayed bucket.
+    DelayedSource = Callable[[Sequence[str], date], Mapping[str, DelayedPanel]]
 
 _logger = logging.getLogger(__name__)
 
@@ -273,6 +276,8 @@ class AlfaRowView:
     narrative: RowNarrative
     ledger: PenaltyLedger
     clean_candidate: bool  # R-EM1
+    # Phase 5.2.D1 (R-DL1): the delayed bucket. Never counted, never part of any score.
+    delayed: DelayedPanel | None = None
 
 
 @dataclass(frozen=True)
@@ -297,6 +302,7 @@ class AlfaPage:
     today: date | None = None  # ET date of the page's clock
     newest_print_at: datetime | None = None  # the run's newest print (or signal) time
     rendered_at: datetime | None = None  # the page's clock
+    delayed_failed: bool = False  # Phase 5.2.D1: the delayed bucket could not be read
 
     @property
     def no_clean_candidate(self) -> bool:
@@ -509,6 +515,7 @@ def build_alfa_page(
     profile_hash_source: ProfileHashSource | None = None,
     profile_resolver: ProfileResolver | None = None,
     run_latest_ts: datetime | None = None,
+    delayed_source: DelayedSource | None = None,
 ) -> AlfaPage:
     """The page model; ``prints=None`` means the database read failed.
 
@@ -556,6 +563,14 @@ def build_alfa_page(
             hashes = profile_hash_source(prints[0].run_id, [r.event_id for r in requests])
         except Exception:
             _logger.exception("alfa board: profile hash read failed; ledgers show no profile numbers")
+    panels: Mapping[str, DelayedPanel] = {}
+    delayed_failed = False
+    if delayed_source is not None and rows:
+        try:
+            panels = delayed_source([r.ticker for r in rows], _et_date(moment))
+        except Exception:
+            _logger.exception("alfa board: delayed read failed; the bucket reads bilinmiyor")
+            delayed_failed = True
     signals = {p.event_id: p.signal for p in prints}
     views: list[AlfaRowView] = []
     for row, symbol, request in zip(rows, symbols, requests, strict=True):
@@ -610,6 +625,7 @@ def build_alfa_page(
                     chip, evidence.counts, settings.clean_candidate,
                     non_directional_supporting=len(evidence.non_directional_supporting_labels()),
                 ),
+                delayed=_row_panel(row.ticker, panels, wired=delayed_source is not None),
             ),
         )
     ordered = tuple(sorted(views, key=_view_order))
@@ -628,7 +644,17 @@ def build_alfa_page(
         today=_et_date(moment),
         newest_print_at=newest,
         rendered_at=moment,
+        delayed_failed=delayed_failed,
     )
+
+
+def _row_panel(
+    ticker: str, panels: Mapping[str, DelayedPanel], *, wired: bool,
+) -> DelayedPanel | None:
+    """A row's delayed bucket; a missing or failed read renders unknown, never an empty block."""
+    if not wired:
+        return None
+    return panels.get(ticker.upper()) or unreadable_panel(ticker)
 
 
 def db_quote_source(engine: Engine) -> QuoteSource:
@@ -645,6 +671,15 @@ def db_evidence_source(engine: Engine) -> EvidenceSource:
 
     def _source(run_id: str, requests: Sequence[EvidenceRequest]) -> EvidenceInputs:
         return read_evidence_inputs(engine, run_id, requests)
+
+    return _source
+
+
+def db_delayed_source(engine: Engine, settings: DelayedSettings) -> DelayedSource:
+    """A delayed source reading ``alfa_delayed``, its fetch coverage and ``alfa_daily_close`` only."""
+
+    def _source(tickers: Sequence[str], today: date) -> Mapping[str, DelayedPanel]:
+        return load_delayed_panels(engine, tickers, today=today, settings=settings)
 
     return _source
 
