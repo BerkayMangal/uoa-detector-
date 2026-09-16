@@ -53,7 +53,7 @@ if TYPE_CHECKING:
     from sqlalchemy.engine import Engine
     from sqlalchemy.orm import Session, sessionmaker
 
-    from webapp.board.alfa_page import AlfaRowView
+    from webapp.board.alfa_page import AlfaPage, AlfaRowView
     from webapp.board.direction import Direction
 
 # A JSON document, as it is written to ``card_json`` and read back.
@@ -224,17 +224,47 @@ def snapshot_json(value: object) -> str:
     return json.dumps(snapshot(value), ensure_ascii=False)
 
 
+# The row containers are the only thing a frozen page context leaves out: the row
+# this card is about is already frozen under ``row_view``, and the board's other
+# rows are not this decision. Everything else the page model holds is frozen
+# generically, with no field list — the cost-gate state, the session date, the
+# freshness line, the regime sentence and whatever else a later branch hangs off
+# the page, captured the day it lands rather than the day someone remembers to
+# extend a list here.
+_PAGE_ROW_FIELDS: Final[frozenset[str]] = frozenset({"rows", "views", "sections"})
+
+
+def page_context(page: AlfaPage) -> Json:
+    """Everything the page model carries around the row, frozen (contract §3).
+
+    This names no field: the names come from the dataclass itself and
+    :func:`snapshot` walks whatever each value turns out to be.
+    """
+    return {
+        field.name: snapshot(getattr(page, field.name))
+        for field in dataclasses.fields(page)
+        if field.name not in _PAGE_ROW_FIELDS
+    }
+
+
 def build_card_view(
     row_view: AlfaRowView,
     *,
     board_profile_hash: str,
     calibration_profile_hash: str | None,
+    page: AlfaPage,
 ) -> Json:
-    """The frozen view of one board row (contract §3).
+    """The frozen view of one board row and the page it sat on (contract §3).
 
     Everything the row view model carries — evidence, tradability, narrative,
     ledger and whatever a later branch adds — plus the constituent
-    ``(run_id, event_id)`` list and both profile hashes.
+    ``(run_id, event_id)`` list, both profile hashes, and the page context the
+    row was read in.
+
+    ``page`` is required rather than optional on purpose: §3 asks the frozen
+    view for things that live on the page and not on the row, so a call site
+    that quietly omitted it would write a card missing half of what the owner
+    was looking at — and a card can never be repaired afterwards.
     """
     return {
         "row_view": snapshot(row_view),
@@ -243,6 +273,7 @@ def build_card_view(
         ),
         "board_profile_hash": board_profile_hash,
         "calibration_profile_hash": calibration_profile_hash,
+        "page_context": page_context(page),
     }
 
 

@@ -580,8 +580,9 @@ def _calibration_hash(run_id: str, view: alfa_page.AlfaRowView) -> str | None:
 
 def _write_decision_card(
     view: alfa_page.AlfaRowView, *, decision: cards.Decision, run_id: str,
+    page: alfa_page.AlfaPage,
 ) -> str:
-    """Freeze one rebuilt row view into an append-only card and return its id."""
+    """Freeze one rebuilt row view, and the page it sat on, into a card; return its id."""
     board_hash = _board_settings().content_hash()
     calibration_hash = _calibration_hash(run_id, view)
     return _card_repo().write_card(
@@ -594,6 +595,7 @@ def _write_decision_card(
             view,
             board_profile_hash=board_hash,
             calibration_profile_hash=calibration_hash,
+            page=page,
         ),
         board_profile_hash=board_hash,
         calibration_profile_hash=calibration_hash,
@@ -689,7 +691,12 @@ def alfa_card(
     if chosen is None:
         return PlainTextResponse(cards.CARD_COPY["unknown_decision"], status_code=400)
     prints = _safe(lambda: _board_reader().load_run(card_run_id), None) if card_run_id else None
-    page = _build_board_page(prints, gate_on=True, run_latest_ts=None)
+    # The press carries the owner's cost-gate state, so the page frozen into the
+    # card is the board as it actually was. The gate only groups rows into
+    # sections — it never filters ``page.views`` — so the row is found either way.
+    page = _build_board_page(
+        prints, gate_on=gate != alfa_page.GATE_OFF_PARAM, run_latest_ts=None,
+    )
     view = next(
         (
             v for v in page.views
@@ -699,7 +706,7 @@ def alfa_card(
     )
     if view is None:
         return PlainTextResponse(cards.CARD_COPY["row_not_found"], status_code=404)
-    card_id = _write_decision_card(view, decision=chosen, run_id=card_run_id)
+    card_id = _write_decision_card(view, decision=chosen, run_id=card_run_id, page=page)
     if chosen == "log":
         return RedirectResponse(f"/journal/new?{urlencode({'card_id': card_id})}", status_code=303)
     params = {"run": card_run_id, "pas": card_id}
