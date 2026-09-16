@@ -517,5 +517,12 @@ def alfa_board(request: Request, run: str = "", gate: str = "") -> HTMLResponse:
 
 
 @app.get("/health")
-def health() -> dict[str, bool]:
-    return {"ok": True}
+def health() -> dict[str, str | bool]:
+    """Liveness, plus the commit this instance is running.
+
+    Phase 5.2.RAIL2: a deploy check must be able to prove WHICH build answered,
+    not only that something answered. Railway sets RAILWAY_GIT_COMMIT_SHA; the
+    value is a public commit id, never a secret.
+    """
+    sha = os.environ.get("RAILWAY_GIT_COMMIT_SHA", "")
+    return {"ok": True, "sha": sha[:7] if sha else "unknown"}
