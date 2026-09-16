@@ -198,9 +198,17 @@ app.add_middleware(_BasicAuthGate)
 
 
 templates = Jinja2Templates(directory=str(_BASE / "templates"))
-# Disable Jinja's template cache: its LRU cache key path errors on Python
-# 3.14. Templates are tiny, so re-parsing per request is negligible.
-templates.env.cache = None
+# Phase 5.2.PERF1: compiled templates are kept in a plain dict.
+# The cache used to be off (``env.cache = None``) because Jinja's default
+# LRUCache key path errors on Python 3.14. Re-parsing is NOT negligible: the
+# board's ``{% include "_alfa_row.html" %}`` sits inside the row loop, so an
+# uncached environment lexed, parsed and compiled that template once PER ROW —
+# ~95% of the board render at 50 rows.
+# A dict is Jinja's own "unlimited cache" shape (``create_cache`` returns ``{}``
+# for a negative cache size) and never touches the LRUCache path, so the 3.14
+# concern stays addressed. The template set is seven files; it cannot grow
+# unbounded. ``auto_reload`` stays on, so editing a template still takes effect.
+templates.env.cache = {}
 
 
 @app.exception_handler(Exception)
