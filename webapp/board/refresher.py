@@ -22,9 +22,15 @@ One cycle runs every ``refresh.cadence_seconds`` during regular trading hours:
    the dominant contracts of the top ``refresh.exit_depth_top_k`` rows in the
    board's order (A4: lehte desc, aleyhte asc, bilinmiyor asc, total premium
    desc). If the evidence tables cannot be read, total premium order is used.
-4. A3: the net-premium tape, one ``/api/stock/{ticker}/net-prem-ticks`` call per
+4. B2: the ATM straddle (``webapp/board/atm.py``).
+   ``/api/stock/{ticker}/expiry-breakdown`` runs once per ET day per board
+   ticker, before that day's first ATM cycle; the stored ``alfa_atm_expiry``
+   rows decide whether it is due, so a restart does not spend the call twice.
+   ``/api/stock/{ticker}/atm-chains`` then runs every cycle, asking for each
+   row's dominant-contract expiry in board order.
+5. A3: the net-premium tape, one ``/api/stock/{ticker}/net-prem-ticks`` call per
    board ticker (``webapp/board/netprem.py``).
-5. A3: ticker info, one ``/api/stock/{ticker}/info`` call per board ticker with
+6. A3: ticker info, one ``/api/stock/{ticker}/info`` call per board ticker with
    no row fetched on the current UTC day (``webapp/board/ticker_info.py``).
    This is the daily job. It runs inside the RTH loop, so each ticker is
    fetched on its first cycle of the day.
@@ -37,7 +43,7 @@ and each upsert is one statement per batch (review RT-1).
 Error containment (review RT-3):
 
 - Loading the board run is the only step whose failure ends the cycle.
-- Quotes, depth, tape and ticker info are isolated steps. A failure in one is
+- Quotes, depth, ATM, tape and ticker info are isolated steps. A failure in one is
   logged (``board refresher cycle failed at step ...``) and the next step
   still runs.
 - A 4xx other than 401/403 on one call (``UnusualWhalesAuthError`` that is not
@@ -54,7 +60,8 @@ Guards (the ``flow_poll`` pattern; decision P17):
 - ``UnusualWhalesDailyLimitError``: sleep ``refresh.daily_limit_backoff_seconds``.
 - Soft cap: once the client's last seen ``x-uw-daily-req-count`` reaches
   ``refresh.daily_request_soft_cap`` on the same UTC day, non-critical fetches
-  pause: signal-contract quotes, every depth call, the tape and ticker info.
+  pause: signal-contract quotes, every depth call, the ATM straddle, the tape
+  and ticker info.
   Journal-leg quotes continue.
 - A key failure (HTTP 401/403, or an auth error without a status) is logged
   at ERROR and the loop waits a full cadence rather than restarting, so a bad
@@ -70,7 +77,7 @@ import contextlib
 import logging
 import math
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, date, datetime
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
@@ -89,7 +96,13 @@ from uoa_detector.sources.unusual_whales.client import (
     UnusualWhalesDailyLimitError,
 )
 from webapp.board.aggregate import build_board_rows
-from webapp.board.db import make_engine
+from webapp.board.atm import (
+    ensure_atm_tables,
+    refresh_atm_chains,
+    refresh_expiry_breakdown,
+    tickers_needing_expiries,
+)
+from webapp.board.db import make_engine, session_factory
 from webapp.board.evidence import (
     LegacyScores,
     build_row_evidence,
@@ -123,7 +136,7 @@ from webapp.board.ticker_info import (
 from webapp.journal import JournalRepo
 
 if TYPE_CHECKING:
-    from collections.abc import Awaitable, Callable, Coroutine, Iterable, Sequence
+    from collections.abc import Awaitable, Callable, Coroutine, Iterable, Mapping, Sequence
 
     from sqlalchemy.engine import Engine
 
@@ -210,11 +223,13 @@ class CycleReport:
     skipped_non_critical: bool
     tickers: tuple[str, ...] = ()  # the board's tickers in row order (A3: tape and ticker info)
     failed_steps: tuple[str, ...] = ()  # isolated steps that raised (review RT-3)
+    # B2: (ticker, dominant contract expiry) in board order, for the ATM step.
+    wanted_expiries: tuple[tuple[str, date], ...] = ()
 
 
 @dataclass(frozen=True)
 class StepReport:
-    """One A3 step: the net-premium tape or the ticker-info job."""
+    """One isolated step: the ATM straddle (B2), the net-premium tape or the ticker-info job."""
 
     requests: int
     written: int
@@ -243,6 +258,7 @@ class _Tally:
     depths_written: int = 0
     degraded: int = 0
     skipped: bool = False
+    ranked: list[BoardRow] = field(default_factory=list)  # board (evidence) order, for B2
 
 
 def is_key_failure(error: UnusualWhalesAuthError) -> bool:
@@ -474,6 +490,9 @@ async def run_quotes_cycle(
         skipped_non_critical=tally.skipped,
         tickers=tuple(dict.fromkeys(row.ticker for row in board.rows)),
         failed_steps=tuple(failed),
+        wanted_expiries=tuple(
+            (row.ticker, row.dominant.key.expiry) for row in (tally.ranked or board.rows)
+        ),
     )
 
 
@@ -537,6 +556,7 @@ async def _depth_step(
         board_order, engine, settings, board.run_id, board.rows, board.prints,
         legacy_scores=legacy_scores, now=now,
     )
+    tally.ranked = ranked  # B2 asks for the dominant expiries in this same order
     top_symbols = list(
         dict.fromkeys(
             symbol
@@ -564,6 +584,81 @@ async def _depth_step(
         if depth.depth is not None:
             tally.depths_written += await _off_loop(upsert_depths, engine, [depth.depth], fetched_at=clock())
     return True
+
+
+def grouped_expiries(pairs: Sequence[tuple[str, date]]) -> dict[str, list[date]]:
+    """``(ticker, expiry)`` pairs in board order → ``{ticker: [expiries]}``, order kept, no repeats."""
+    out: dict[str, list[date]] = {}
+    for ticker, expiry in pairs:
+        expiries = out.setdefault(ticker, [])
+        if expiry not in expiries:
+            expiries.append(expiry)
+    return out
+
+
+async def run_atm_cycle(
+    client: BoardClient,
+    engine: Engine,
+    settings: BoardSettings,
+    *,
+    wanted: Mapping[str, Sequence[date]],
+    soft_cap: SoftCap,
+    clock: Callable[[], datetime],
+) -> StepReport:
+    """B2: the daily expiry list, then one ``atm-chains`` call per board ticker.
+
+    ``expiry-breakdown`` runs once per ET day per ticker, before that day's first
+    ``atm-chains`` call; the stored ``alfa_atm_expiry`` rows decide whether it is
+    due, so a refresher restart does not spend the call again.
+
+    Both fetches are non-critical: the step pauses at the soft cap before the
+    breakdown and again before the chains. ``UnusualWhalesDailyLimitError`` and a
+    key failure (401/403) propagate; any other 4xx marks the step degraded and
+    the cycle continues (review RT-3).
+    """
+    if not wanted:
+        return StepReport(requests=0, written=0, degraded_fetches=0, skipped_non_critical=False)
+    now = clock()
+    if soft_cap.reached(now):
+        _warn_soft_cap(soft_cap, None, "the ATM straddle")
+        return StepReport(requests=0, written=0, degraded_fetches=0, skipped_non_critical=True)
+    sessions = session_factory(engine)
+    requests = written = degraded = 0
+    due = await _off_loop(tickers_needing_expiries, engine, list(wanted), today=trade_date_et(now))
+    if due:
+        try:
+            expiries = await refresh_expiry_breakdown(
+                client, sessions, tickers=due, settings=settings, now=now,
+            )
+        except UnusualWhalesAuthError as exc:
+            if is_key_failure(exc):
+                raise
+            _warn_degraded_4xx("expiry-breakdown", exc)
+            degraded += 1
+        else:
+            requests += expiries.requests
+            degraded += len(expiries.degraded)
+        soft_cap.observe(client.last_daily_request_count, clock())
+    if soft_cap.reached(clock()):
+        _warn_soft_cap(soft_cap, None, "the ATM straddle")
+        return StepReport(
+            requests=requests, written=written, degraded_fetches=degraded, skipped_non_critical=True,
+        )
+    try:
+        chains = await refresh_atm_chains(client, sessions, wanted=wanted, settings=settings, now=now)
+    except UnusualWhalesAuthError as exc:
+        if is_key_failure(exc):
+            raise
+        _warn_degraded_4xx("atm-chains", exc)
+        degraded += 1
+    else:
+        requests += chains.requests
+        written += chains.stored_rows
+        degraded += len(chains.degraded)
+    soft_cap.observe(client.last_daily_request_count, clock())
+    return StepReport(
+        requests=requests, written=written, degraded_fetches=degraded, skipped_non_critical=False,
+    )
 
 
 async def run_tape_cycle(
@@ -644,7 +739,7 @@ async def board_refresh_loop(
     clock: Callable[[], datetime] | None = None,
     sleep: Callable[[float], Awaitable[None]] | None = None,
 ) -> None:
-    """Refresh quotes, exit depth, the tape and ticker info until cancelled. Runs under ``_supervise``."""
+    """Refresh quotes, depth, ATM, the tape and ticker info until cancelled. Runs under ``_supervise``."""
     profile = load_profile(profile_path)
     settings = load_board_settings(board_profile_path)
     legacy_scores = LegacyScores.from_profile(profile)
@@ -657,6 +752,7 @@ async def board_refresh_loop(
         ensure_quotes_tables(engine)
         ensure_netprem_tables(engine)
         ensure_ticker_info_tables(engine)
+        ensure_atm_tables(engine)
         reader = BoardSignalReader(engine=engine)
         journal: OpenTrades = (
             journal_factory(database_url) if journal_factory is not None else JournalRepo(database_url)
@@ -684,6 +780,15 @@ async def board_refresh_loop(
                     client, engine, settings,
                     reader=reader, journal=journal, soft_cap=soft_cap, clock=now_fn,
                     legacy_scores=legacy_scores,
+                )
+                atm_report = await _isolated(
+                    "atm",
+                    run_atm_cycle(
+                        client, engine, settings,
+                        wanted=grouped_expiries(report.wanted_expiries),
+                        soft_cap=soft_cap, clock=now_fn,
+                    ),
+                    refresh.cadence_seconds,
                 )
                 tape = await _isolated(
                     "tape",
@@ -714,7 +819,7 @@ async def board_refresh_loop(
                     report.run_id, report.requests, report.quotes_written, report.depths_written,
                     report.degraded_fetches, report.skipped_non_critical,
                 )
-                for step, step_report in (("tape", tape), ("ticker info", info)):
+                for step, step_report in (("atm", atm_report), ("tape", tape), ("ticker info", info)):
                     if step_report is not None:
                         _logger.info(
                             "board refresher %s: %s %d requests, %d written, %d degraded",

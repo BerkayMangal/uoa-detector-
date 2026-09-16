@@ -75,6 +75,11 @@ _INFO: dict[str, dict[str, Any]] = {
     "SPY": {"symbol": "SPY", "sector": None, "issue_type": "ETF"},
     "SMCI": {"symbol": "SMCI", "sector": "Technology", "issue_type": "Common Stock"},
 }
+# Phase 5.2.B2b: the loop also runs the ATM straddle step.
+_EXPIRIES: list[dict[str, Any]] = [
+    {"expires": "2026-09-18", "open_interest": 531720, "volume": 25428, "chains": 150},
+    {"expires": "2026-09-25", "open_interest": 42125, "volume": 6353, "chains": 124},
+]
 
 
 class _FakeClient:
@@ -101,8 +106,10 @@ class _FakeClient:
         for suffix, error in self._errors.items():
             if path.endswith(suffix):
                 raise error
-        if path.endswith(("/option-contracts", "/flow")):
+        if path.endswith(("/option-contracts", "/flow", "/atm-chains")):
             return {"data": []}
+        if path.endswith("/expiry-breakdown"):
+            return {"data": list(_EXPIRIES)}
         if path.endswith("/net-prem-ticks"):
             return {"data": list(_TAPE)}
         if path.endswith("/info"):
@@ -310,15 +317,24 @@ async def test_loop_runs_quotes_depth_tape_then_ticker_info_on_one_client(url: s
             clock=lambda: _NOW, sleep=_sleep,
         )
 
+    # Phase 5.2.B2b (D10): the ATM straddle step runs between depth and the tape, and the
+    # expiry list is fetched once per ET day, just before that day's first atm-chains call.
     cycle = [
         "/api/stock/SPY/option-contracts",
         "/api/stock/SMCI/option-contracts",
         "/api/option-contract/SPY260918C00760000/flow",
         "/api/option-contract/SMCI260918C00037000/flow",
+        "/api/stock/SPY/atm-chains",
+        "/api/stock/SMCI/atm-chains",
         "/api/stock/SPY/net-prem-ticks",
         "/api/stock/SMCI/net-prem-ticks",
     ]
-    assert client.calls == [*cycle, "/api/stock/SPY/info", "/api/stock/SMCI/info", *cycle]
+    expiry_list = ["/api/stock/SPY/expiry-breakdown", "/api/stock/SMCI/expiry-breakdown"]
+    assert client.calls == [
+        *cycle[:4], *expiry_list, *cycle[4:],
+        "/api/stock/SPY/info", "/api/stock/SMCI/info",
+        *cycle,
+    ]
     assert len(made) == 1
     assert client.closed is True
     engine = make_engine(url)

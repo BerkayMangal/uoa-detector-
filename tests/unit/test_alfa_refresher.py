@@ -117,6 +117,11 @@ _INFO_ROWS: dict[str, dict[str, Any]] = {
     "SPY": {"symbol": "SPY", "sector": None, "issue_type": "ETF"},
     "SMCI": {"symbol": "SMCI", "sector": "Technology", "issue_type": "Common Stock"},
 }
+# Phase 5.2.B2b: the loop also fetches the ATM straddle (expiry list once per ET day).
+_EXPIRY_ROWS: list[dict[str, Any]] = [
+    {"expires": "2026-09-18", "open_interest": 531720, "volume": 25428, "chains": 150},
+    {"expires": "2026-09-25", "open_interest": 42125, "volume": 6353, "chains": 124},
+]
 
 # (event_id, ticker, type, strike, dte, premium, fill_side, recorded chain)
 _SPECS = [
@@ -195,6 +200,10 @@ class _FakeClient:
         if path.endswith("/flow"):
             symbol = path.split("/")[3]
             return {"data": [_FLOW_ROWS[symbol]] if symbol in _FLOW_ROWS else [], "date": "2026-09-15"}
+        if path.endswith("/expiry-breakdown"):
+            return {"data": list(_EXPIRY_ROWS)}
+        if path.endswith("/atm-chains"):
+            return {"data": []}
         if path.endswith("/net-prem-ticks"):
             return {"data": list(_TAPE_ROWS)}
         if path.endswith("/info"):
@@ -529,9 +538,9 @@ async def test_loop_keeps_one_client_across_cycles_and_closes_it(url: str) -> No
     slept, made = await _run_loop(url, client, max_sleeps=3)
     assert slept == [_SETTINGS.refresh.cadence_seconds] * 3
     assert len(made) == 1
-    # Per cycle: SPY and SMCI quotes, three depth calls and (A3) two net-premium tapes;
-    # ticker info for SPY and SMCI on the first cycle of the day only.
-    assert len(client.calls) == 3 * 5 + 3 * 2 + 2
+    # Per cycle: SPY and SMCI quotes, three depth calls, (B2b) two atm-chains and (A3) two
+    # net-premium tapes; the expiry list and ticker info on the first cycle of the day only.
+    assert len(client.calls) == 3 * 5 + 3 * 2 + 3 * 2 + 2 + 2
     assert client.closed is True
 
 

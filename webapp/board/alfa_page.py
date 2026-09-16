@@ -30,6 +30,9 @@ Contract: ``docs/phase-5.2-alfa-board-acceptance.md`` §4.1 ("Render"), §5 A1,
 - B1: each row carries its position-size cell (``webapp/board/sizing.py``): one
   lot in dollars and as a share of capital, and the profile risk bucket's lot
   count. The ``max_r`` disclosure goes in the audit block only (R-EV2).
+- B2: each row carries the break-even move its dominant contract needs against
+  the move the ATM straddle prices in (``webapp/board/moves.py``), read from
+  ``alfa_atm`` through an injected source. Missing rows read ``bilinmiyor``.
 - A7: the page counts clean candidates (R-EM1): İŞLENİR rows whose evidence is
   within ``clean_candidate``. ``min_supporting`` counts only families that
   point the row's way: a non-directional lehte family (dealer gamma, decision
@@ -64,6 +67,7 @@ from zoneinfo import ZoneInfo
 
 from uoa_detector.calibration import load_profile
 from webapp.board.aggregate import POSITION_READ_LABELS, BoardRow, build_board_rows
+from webapp.board.atm import read_board_atm
 from webapp.board.copy_tr import (
     EVIDENCE_HOVER,
     GATE_LABEL,
@@ -84,6 +88,7 @@ from webapp.board.evidence import (
     request_for,
     strength_label,
 )
+from webapp.board.moves import ATM_AGE_TEMPLATE, compare_moves
 from webapp.board.narrative import NARRATIVE_COPY, PenaltyCheck, RowNarrative, build_narrative
 from webapp.board.penalty_ledger import (
     LEDGER_COPY,
@@ -100,6 +105,7 @@ from webapp.board.tradability import (
     STATE_LABELS,
     TradabilityRead,
     assess_tradability,
+    executable_ask,
     format_pct,
 )
 
@@ -111,6 +117,7 @@ if TYPE_CHECKING:
 
     from uoa_detector.backtest.store import StoredSignal
     from uoa_detector.calibration.profile import CalibrationProfile
+    from webapp.board.atm import AtmView
     from webapp.board.evidence import EvidenceCounts, EvidenceInputs, EvidenceRequest, StrengthKey
     from webapp.board.settings import BoardSettings, CleanCandidateSettings
     from webapp.board.signals import BoardPrint
@@ -119,6 +126,7 @@ if TYPE_CHECKING:
     QuoteSource = Callable[
         [Sequence[str]], tuple[Mapping[str, QuoteView], Mapping[str, DepthView]]
     ]
+    AtmSource = Callable[[Sequence[str]], Mapping[str, tuple[AtmView, ...]]]
     EvidenceSource = Callable[[str, Sequence[EvidenceRequest]], EvidenceInputs]
     ProfileHashSource = Callable[[str, Sequence[str]], Mapping[str, str]]
     ProfileResolver = Callable[[str], CalibrationProfile | None]
@@ -255,6 +263,17 @@ class ChipText:
 
 
 @dataclass(frozen=True)
+class MoveView:
+    """B2: the break-even move against the move the ATM straddle prices in."""
+
+    text: str
+    disclosure: str
+    age: str | None  # when the ATM row the comparison used was fetched (R-CO2)
+    fallback: bool  # the labelled IV estimate was used instead of a straddle
+    known: bool  # False: both halves read bilinmiyor
+
+
+@dataclass(frozen=True)
 class AuditView:
     """The ``Denetim`` block: the only place the combined score is shown (R-EV2)."""
 
@@ -280,6 +299,7 @@ class AlfaRowView:
     # FAZ B fields are appended with defaults, so every earlier construction stays valid.
     size: SizeRead | None = None  # B1
     size_text: SizeText | None = None  # B1
+    move: MoveView | None = None  # B2
 
 
 @dataclass(frozen=True)
@@ -457,6 +477,47 @@ def build_audit(event_id: str | None, signal: StoredSignal | None) -> AuditView:
     )
 
 
+def build_move_view(
+    row: BoardRow,
+    chip: TradabilityRead,
+    atm_rows: Sequence[AtmView],
+    now: datetime,
+) -> MoveView:
+    """B2: the dominant contract's break-even move vs the ATM straddle for that expiry.
+
+    The entry price is the executable ask (B1's rule), so an unexecutable or
+    stale quote reads ``bilinmiyor`` rather than pricing a break-even nobody
+    could pay. The ATM row that was actually used carries its own age.
+    """
+    key = row.dominant.key
+    option_type: Literal["call", "put"] = "call" if key.option_type == "call" else "put"
+    comparison = compare_moves(
+        option_type=option_type,
+        strike=float(key.strike),
+        expiry=key.expiry,
+        ask=executable_ask(chip),
+        atm_rows=atm_rows,
+        now=now,
+    )
+    expected = comparison.expected
+    used = (
+        next((r for r in atm_rows if r.expiry == expected.atm_expiry), None)
+        if expected is not None and expected.atm_expiry is not None
+        else None
+    )
+    return MoveView(
+        text=comparison.text,
+        disclosure=comparison.disclosure,
+        age=(
+            ATM_AGE_TEMPLATE.format(age=age_text(_aware(now) - _aware(used.fetched_at)))
+            if used is not None
+            else None
+        ),
+        fallback=expected is not None and expected.source == "iv_estimate",
+        known=comparison.required_move_pct is not None or expected is not None,
+    )
+
+
 def is_clean_candidate(
     chip: TradabilityRead,
     counts: EvidenceCounts,
@@ -516,6 +577,7 @@ def build_alfa_page(
     profile_hash_source: ProfileHashSource | None = None,
     profile_resolver: ProfileResolver | None = None,
     run_latest_ts: datetime | None = None,
+    atm_source: AtmSource | None = None,
 ) -> AlfaPage:
     """The page model; ``prints=None`` means the database read failed.
 
@@ -563,6 +625,12 @@ def build_alfa_page(
             hashes = profile_hash_source(prints[0].run_id, [r.event_id for r in requests])
         except Exception:
             _logger.exception("alfa board: profile hash read failed; ledgers show no profile numbers")
+    atm_rows: Mapping[str, tuple[AtmView, ...]] = {}
+    if atm_source is not None and rows:
+        try:
+            atm_rows = atm_source([r.ticker for r in rows])
+        except Exception:
+            _logger.exception("alfa board: ATM read failed; the move comparison reads bilinmiyor")
     signals = {p.event_id: p.signal for p in prints}
     views: list[AlfaRowView] = []
     for row, symbol, request in zip(rows, symbols, requests, strict=True):
@@ -622,6 +690,7 @@ def build_alfa_page(
                 ),
                 size=row_size,
                 size_text=size_text(row_size),
+                move=build_move_view(row, chip, atm_rows.get(row.ticker, ()), moment),
             ),
         )
     ordered = tuple(sorted(views, key=_view_order))
@@ -648,6 +717,15 @@ def db_quote_source(engine: Engine) -> QuoteSource:
 
     def _source(symbols: Sequence[str]) -> tuple[Mapping[str, QuoteView], Mapping[str, DepthView]]:
         return read_board_quotes(engine, symbols)
+
+    return _source
+
+
+def db_atm_source(engine: Engine) -> AtmSource:
+    """An ATM source reading ``alfa_atm`` only (B2; no Unusual Whales call)."""
+
+    def _source(tickers: Sequence[str]) -> Mapping[str, tuple[AtmView, ...]]:
+        return read_board_atm(engine, tickers)
 
     return _source
 
