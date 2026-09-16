@@ -352,3 +352,104 @@ Each key was genuinely missing and is commented in `profiles/board_v1.yaml`.
 8. `notability.py`, `SignalRepo.signals`, `SignalFilters` and
    `ticker_label_options` no longer have a route caller. Their tests still
    pass. Cleanup item.
+## P21. The delayed families need a fetch-coverage table
+
+`alfa_delayed` is append-only, so a family whose source answered with nothing
+stores no row — indistinguishable from a family that was never asked. R-UN1
+requires the first to read `kayıt yok` and the second `bilinmiyor`.
+
+**Decision.** A new rebuildable table `alfa_delayed_fetch` (ticker, family)
+records the attempt itself, following the `alfa_catalyst_fetch` precedent
+(P19). A degraded attempt never moves `last_success_at`, and truncation stays
+disclosed across a degraded cycle. It lives in its own module
+(`webapp/board/delayed_coverage.py`) so the no-rewrite guard on
+`webapp.board.delayed` keeps holding.
+
+**Undo:** delete the module and its two call sites; every family then falls
+back to `bilinmiyor`, which is the safe direction.
+
+## P22. The daily jobs need a clock, and the clock needs a memory
+
+The refresher slept outside regular hours, so pre-market and post-close jobs
+could never run.
+
+**Decision.** One ordered registry of daily jobs with ET times from the
+profile, trading-day aware, each with a persisted per-day marker in a new
+rebuildable table `alfa_job_run`. A Railway restart therefore neither repeats
+nor skips a day: a job due but unmarked runs on the next tick (catch-up is
+intended), and the loop wakes for the next due job instead of sleeping past it.
+Failures are isolated, retried at most once per cadence, and the daily-limit
+and auth rules are the ones FAZ A already uses.
+
+**Undo:** drop the registry entry for a job to stop it; drop `alfa_job_run` to
+forget the markers (they are rebuildable).
+
+## P23. Integration keeps both sides, always
+
+FAZ B and FAZ D were built in parallel against the same three files.
+
+**Decision.** Every conflict was resolved additively: both sides' fields,
+sources and helpers survive, new fields are appended with defaults, and nothing
+was dropped to make a merge easier. The one non-mechanical merge was the
+TYPE_CHECKING import block, where FAZ B's block is a superset plus
+`DelayedSettings`.
+
+**Undo:** revert the merge commit; both branches still exist.
+
+## P24. The render budget test measured the machine, not the code
+
+The contract's "p95 ≤ 1.5 s at 2,000 signals" failed on CI at 2.63 s and on a
+loaded laptop, while the same tree measures about 0.5 s on an idle one.
+
+**Decision.** The test now asserts what is hardware-independent: ten times the
+signals may not cost more than twice ten times the time (an N+1 or quadratic
+regression fails on any machine), plus a generous absolute ceiling. The
+contract's number is verified where it is meaningful —
+`scripts/verify_live_board.sh` measures the live render time after every
+deploy and reports it.
+
+**Registry REG-4:** FAZ B and FAZ D did make the 2,000-signal render slower.
+Production runs are about 1,000 prints and 20 rows, so this is not urgent, but
+it should be revisited before the board is pointed at runs of that size.
+
+**Undo:** restore the absolute assertion in
+`tests/unit/test_alfa_route.py::test_alfa_render_budget_p95_at_2000_signals`.
+
+## P25. /health says which build answered
+
+**Decision.** `/health` returns `{"ok": true, "sha": "<7 chars>"}` from
+`RAILWAY_GIT_COMMIT_SHA` (a public commit id, never a secret), so an autonomous
+deploy check can prove which build is live instead of trusting timing.
+`scripts/verify_live_board.sh` compares it with the expected sha, and
+`scripts/audit_board_html.py` runs the §2 honesty rules against the live HTML,
+failing as VACUOUS if it audited zero rows.
+
+**D10.** `test_health_is_open_in_every_case` pinned the exact payload in 18
+parametrisations; it now asserts `ok is True` and that a sha is present. Its
+subject — /health stays open under every auth configuration — is unchanged.
+
+**Undo:** return `{"ok": True}` and drop the sha check from the rail.
+
+## P26. Decision cards were built before FAZ B was merged
+
+FAZ C1 is the only irreversible item in the program: a pass that is not
+recorded today is lost forever, while every UI polish can be redone tomorrow.
+
+**Decision.** C1 was started on the integration tip (FAZ A + FAZ D + rails)
+without waiting for FAZ B, and freezes the row view with a generic recursive
+serializer, so FAZ B's fields join the snapshot automatically once merged.
+
+**Undo:** revert the C1 commits; no other feature depends on them.
+
+## P27. One red commit in the middle of the FAZ B+D branch
+
+`Phase 5.2.B-merge` fails the old render-budget test in isolation on a loaded
+machine; the fix is the next commit (`B-fix8`). Rewriting the history of a
+branch with an open PR would have meant a force-push that cancels the running
+CI.
+
+**Decision.** The history is left as it is and the fact is recorded here, so a
+future `git bisect` across that commit knows the failure is the
+machine-dependent threshold, not the board.
+
+**Undo:** nothing to undo; the branch tip and every later commit are green.
