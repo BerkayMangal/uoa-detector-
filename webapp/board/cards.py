@@ -62,6 +62,10 @@ Json = str | int | float | bool | None | dict[str, "Json"] | list["Json"]
 Decision = Literal["log", "pas"]
 DECISIONS: Final[tuple[Decision, ...]] = ("log", "pas")
 
+# The only decision a journal trade may be linked onto: contract §3 places the
+# ``trade_id`` link in the Log flow. A passed card never takes one.
+_LINKABLE_DECISION: Final[Decision] = "log"
+
 # Contract §2: the stored direction values are the board's own labels.
 DIRECTION_VALUES: Final[tuple[str, ...]] = tuple(DIRECTION_LABELS.values())
 
@@ -136,6 +140,21 @@ def decision_for(value: str) -> Decision | None:
         if value == decision:
             return decision
     return None
+
+
+def is_linkable(card: DecisionCard) -> bool:
+    """True when a saved journal trade may still be linked onto ``card``.
+
+    Contract §3 puts the ``trade_id`` link inside the **Log flow**: it is set
+    once, on a card that has none. So a ``pas`` card is never linkable — a pass
+    that acquired a trade id would read as a taken trade forever (the table is
+    append-only; there is no repair path) and would corrupt the log-vs-pas
+    comparison the pass ledger exists to make (§4).
+
+    :meth:`CardRepo.link_trade` acts on exactly this answer, so nothing can
+    promise the owner a link that the write would then refuse.
+    """
+    return card.decision == _LINKABLE_DECISION and card.trade_id is None
 
 
 def pas_recorded_text(card: DecisionCard) -> str:
@@ -362,18 +381,20 @@ class CardRepo:
             return tuple(_to_card(row) for row in rows)
 
     def link_trade(self, card_id: str, trade_id: str) -> bool:
-        """Set ``trade_id`` on a card that has none; ``True`` when this call linked it.
+        """Set ``trade_id`` on a ``log`` card that has none; ``True`` when this call linked it.
 
         The only write to an existing card the contract allows (§3, "the
-        ``trade_id`` link is set once, on a card that has none"). The snapshot
-        is not touched: a card already linked, or not found, returns ``False``
-        and nothing changes.
+        ``trade_id`` link is set once, on a card that has none"), and the
+        contract places it inside the Log flow: :func:`is_linkable` is the rule,
+        so a ``pas`` card is refused as firmly as a missing one. The snapshot is
+        not touched: a card already linked, passed, or not found, returns
+        ``False`` and nothing changes.
         """
         if not card_id or not trade_id:
             return False
         with self._sessions() as session:
             row = session.get(AlfaDecisionCard, card_id)
-            if row is None or row.trade_id is not None:
+            if row is None or not is_linkable(_to_card(row)):
                 return False
             row.trade_id = trade_id
             session.commit()
