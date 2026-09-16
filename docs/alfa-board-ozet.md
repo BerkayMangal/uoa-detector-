@@ -67,13 +67,13 @@ FAZ A öncesine (eski dashboard) döner, veri kaybı olmaz.
 | Gecikmeli kanıt kovası (Kongre / İçeriden / Short-FTD) | Bildirim tarihi ve gecikmesiyle; **asla sayılmaz** |
 | Günlük iş saati | Seans öncesi/sonrası işler restart'ta ne atlıyor ne tekrarlıyor |
 | Deploy doğrulama rayları | Her deploy sonrası sağlık + şifre duvarı + **açılma süresi** + dürüstlük denetimi tek komutta |
+| **Pas defteri `/defter`** | Logladıkların ve pas geçtiklerin aynı tabloda; her karta 1 ve 5 işlem günü sonra **piyasadan arındırılmış** sonuç yazılır (SPY'a göre fark). Örnek sayısı 20'nin altındayken sadece adet gösterilir, oran/ortalama yok |
+| **Dolum kaydı (`Dolum gir`)** | Gerçek dolum fiyatını kartın donmuş kotasyonuyla karşılaştırır: giriş ask'e, çıkış bid'e göre kayma, $ ve mid'e oran olarak. Maliyet varsayımının canlı testi |
 
 **Canlıda olmayanlar:**
 
 | Ne yok | Sana maliyeti |
 |---|---|
-| Pas defteri `/defter` ve sonuç işi | Kartlar birikiyor ama karşılaştırmalı tabloyu henüz göremiyorsun (yazılıyor) |
-| Dolum kaydı (gerçek fill vs kartın donmuş kotasyonu) | Maliyet varsayımının canlı testi henüz yok (yazılıyor) |
 | VIX vade yapısı | UW volatilite eklentisi yok; tahtada "kapsam-dışı" yazıyor |
 | ThetaData bağlantısı | Bilinçli: tahta ThetaData'ya bağlı değil (bkz. para kararı) |
 
