@@ -75,6 +75,7 @@
   {% include "_alfa_size.html" %}
   {% include "_alfa_moves.html" %}
   {% include "_alfa_chase.html" %}
+  {% include "_alfa_opening.html" %}
 
   <div class="grid gap-x-5 gap-y-1 md:grid-cols-4 mt-2 text-sm">
     <div><span class="text-gray-400">{{ copy.col_dominant }}</span>
@@ -137,6 +138,7 @@
       <p class="text-gray-200" data-audit-score>{{ view.audit.score_text }}</p>
       <p data-audit-pre>{{ view.audit.pre_text }}</p>
       {% if view.size_text %}<p data-size-audit>{{ view.size_text.audit_note }}</p>{% endif %}
+      {% if view.opening %}<p data-catalyst-audit>{{ catalyst_note }}</p>{% endif %}
       {% if view.audit.inputs %}
       <p class="text-gray-500">{{ copy.audit_inputs }}</p>
       <ul class="flex flex-wrap gap-x-4 gap-y-0.5" data-audit-inputs>

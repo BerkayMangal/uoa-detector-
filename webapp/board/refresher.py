@@ -123,7 +123,7 @@ from webapp.board.evidence import (
     trade_date_et,
 )
 from webapp.board.netprem import TapeFetch, ensure_netprem_tables, fetch_net_prem_ticks, upsert_tape
-from webapp.board.oi_confirm import ensure_oi_confirm_tables
+from webapp.board.oi_confirm import board_state, ensure_oi_confirm_tables, read_board_oi
 from webapp.board.quotes import (
     DepthFetch,
     QuoteFetch,
@@ -424,6 +424,23 @@ def board_order(
             exc_info=True,
         )
         return list(rows)
+    symbols = [dominant_symbol(row) for row in rows]
+    try:
+        # B4: the page reads the same T+1 confirmations, so the depth order matches it.
+        oi_rows = read_board_oi(
+            engine,
+            [
+                (symbol, request.trade_date)
+                for symbol, request in zip(symbols, requests, strict=True)
+                if symbol is not None
+            ],
+        )
+    except Exception:
+        _logger.warning(
+            "board refresher: T+1 confirmations unreadable; Açık pozisyon reads bilinmiyor",
+            exc_info=True,
+        )
+        oi_rows = {}
     signals = {p.event_id: p.signal for p in prints}
     keys = [
         evidence_sort_key(
@@ -435,11 +452,16 @@ def board_order(
                 telemetry=inputs.telemetry.get(request.event_id),
                 tape=inputs.tapes.get((request.ticker, request.trade_date)),
                 ticker_info=inputs.infos.get(request.ticker),
+                oi_state=(
+                    board_state(oi_rows.get((symbol, request.trade_date)))
+                    if symbol is not None
+                    else None
+                ),
                 legacy_scores=legacy_scores,
             ).counts,
             row.total_premium,
         )
-        for row, request in zip(rows, requests, strict=True)
+        for row, request, symbol in zip(rows, requests, symbols, strict=True)
     ]
     order = sorted(range(len(rows)), key=lambda i: (keys[i], rows[i].ticker, rows[i].direction))
     return [rows[i] for i in order]

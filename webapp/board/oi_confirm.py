@@ -39,7 +39,7 @@ from typing import TYPE_CHECKING, Any, Final, Literal, cast
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import Date, DateTime, Float, Integer, String, select, update
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, Session, mapped_column
 
 from uoa_detector.sources.unusual_whales.client import (
     CircuitBreakerOpenError,
@@ -55,8 +55,9 @@ if TYPE_CHECKING:
 
     from sqlalchemy import Table
     from sqlalchemy.engine import CursorResult, Engine
-    from sqlalchemy.orm import Session, sessionmaker
+    from sqlalchemy.orm import sessionmaker
 
+    from webapp.board.evidence import OIConfirmState
     from webapp.board.settings import BoardSettings
     from webapp.board.uw_errors import JsonClient
 
@@ -369,6 +370,44 @@ def oi_label(view: OiConfirmView | None) -> str:
 def oi_evidence_state(view: OiConfirmView | None) -> EvidenceState:
     """Açık pozisyon family state (contract §9); no row is ``bilinmiyor``."""
     return "bilinmiyor" if view is None else view.evidence_state
+
+
+# Phase 5.2.B4b: the stored status as the evidence layer's four-state reading
+# (``webapp/board/evidence.py``). ``arada`` and ``bekliyor`` both read "not confirmed yet".
+BOARD_STATES: Final[Mapping[OiStatus, OIConfirmState]] = {
+    "acilis": "opening",
+    "kapanis": "closing",
+    "bekliyor": "unconfirmed",
+    "arada": "unconfirmed",
+    "kapsam_disi": "expires_before_t1",
+}
+
+
+def board_state(view: OiConfirmView | None) -> OIConfirmState | None:
+    """What the Açık pozisyon family reads; ``None`` (no row) is ``bilinmiyor (T+1 bekleniyor)``."""
+    return None if view is None else BOARD_STATES[view.status]
+
+
+# The engine whose confirmation table is known to exist (the render path checks once).
+_tables_ready_for: list[Engine] = []
+
+
+def read_board_oi(
+    engine: Engine, keys: Iterable[tuple[str, date]],
+) -> dict[tuple[str, date], OiConfirmView]:
+    """Stored confirmations for the given (option symbol, trade date) keys. Reads only.
+
+    Creates the table once per engine, so a fresh database renders
+    ``henüz doğrulanmadı`` instead of failing.
+    """
+    wanted = [(symbol.strip().upper(), day) for symbol, day in keys if symbol.strip()]
+    if not wanted:
+        return {}
+    if not _tables_ready_for or _tables_ready_for[0] is not engine:
+        ensure_oi_confirm_tables(engine)
+        _tables_ready_for[:] = [engine]
+    with Session(engine) as session:
+        return load_oi_confirms(session, wanted)
 
 
 # ---------------------------------------------------------------------------

@@ -63,7 +63,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, date, datetime, time, timedelta
 from pathlib import Path
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Final, Literal
@@ -72,6 +72,13 @@ from zoneinfo import ZoneInfo
 from uoa_detector.calibration import load_profile
 from webapp.board.aggregate import POSITION_READ_LABELS, BoardRow, build_board_rows
 from webapp.board.atm import read_board_atm
+from webapp.board.catalysts import (
+    CHIP_UNKNOWN,
+    EXPIRED_WINDOW,
+    KIND_LABELS,
+    M22_MAY_DIFFER,
+    read_board_catalysts,
+)
 from webapp.board.chase import ChaseRead, ChaseText, build_chase, chase_text
 from webapp.board.copy_tr import (
     EVIDENCE_HOVER,
@@ -98,12 +105,14 @@ from webapp.board.evidence import (
 from webapp.board.moves import ATM_AGE_TEMPLATE, compare_moves
 from webapp.board.narrative import (
     NARRATIVE_COPY,
+    CatalystCheck,
     ChaseCheck,
     PenaltyCheck,
     RowNarrative,
     build_narrative,
 )
 from webapp.board.netprem import read_net_premium_since_many
+from webapp.board.oi_confirm import board_state, oi_label, read_board_oi
 from webapp.board.penalty_ledger import (
     LEDGER_COPY,
     M24_STAGE,
@@ -132,8 +141,16 @@ if TYPE_CHECKING:
     from uoa_detector.backtest.store import StoredSignal
     from uoa_detector.calibration.profile import CalibrationProfile
     from webapp.board.atm import AtmView
-    from webapp.board.evidence import EvidenceCounts, EvidenceInputs, EvidenceRequest, StrengthKey
+    from webapp.board.catalysts import CatalystChip
+    from webapp.board.evidence import (
+        EvidenceCounts,
+        EvidenceInputs,
+        EvidenceRequest,
+        OIConfirmState,
+        StrengthKey,
+    )
     from webapp.board.netprem import TapeSummary
+    from webapp.board.oi_confirm import OiConfirmView
     from webapp.board.settings import BoardSettings, CleanCandidateSettings
     from webapp.board.signals import BoardPrint
     from webapp.board.tradability import DepthView, QuoteView
@@ -142,6 +159,14 @@ if TYPE_CHECKING:
         [Sequence[str]], tuple[Mapping[str, QuoteView], Mapping[str, DepthView]]
     ]
     AtmSource = Callable[[Sequence[str]], Mapping[str, tuple[AtmView, ...]]]
+    # B4: (dominant contract symbol, the source print's ET trade date) → its T+1 confirmation.
+    OiKey = tuple[str, date]
+    OiSource = Callable[[Sequence[OiKey]], Mapping[OiKey, OiConfirmView]]
+    # B4: (ticker, the dominant contract's expiry close) plus the page clock → its chip.
+    CatalystKey = tuple[str, datetime]
+    CatalystSource = Callable[
+        [Sequence[CatalystKey], datetime], Mapping[CatalystKey, CatalystChip]
+    ]
     # B3: (ticker, trade date, the source print's time) → the tape summed since that print.
     FlowSinceKey = tuple[str, date, datetime]
     FlowSinceSource = Callable[[Sequence[FlowSinceKey]], Mapping[FlowSinceKey, TapeSummary]]
@@ -219,6 +244,8 @@ ALFA_COPY: Final[Mapping[str, str]] = MappingProxyType(
         "audit_pre": "Ceza öncesi birleşik skor: {score}",
         "audit_inputs": "Skorun girdileri",
         "audit_record_missing": "kayıt okunamadı",
+        # B4: the T+1 opening/closing reading of the dominant contract.
+        "opening_title": "Açılış mı kapanış mı",
         # R-EM1 banner variants (review FA-04); "Bugün temiz aday yok" stays copy_tr.NO_CLEAN_CANDIDATE.
         "no_clean_candidate_dated": "{date} seansında temiz aday yok",
         "no_clean_candidate_undated": "Bu çalışmada temiz aday yok",
@@ -262,6 +289,12 @@ FILL_SIDE_LABELS: Final[Mapping[str, str]] = MappingProxyType(
 
 _MAIN_STATES: Final = frozenset({"tradable", "narrow"})
 _ET: Final = ZoneInfo("America/New_York")
+# Market structure, not a cutoff: the regular session closes at 16:00 ET, which is where
+# the catalyst window of a contract expiring that day ends (contract §6 B4).
+_EXPIRY_CLOSE_ET: Final = time(16, 0)
+# The Açık pozisyon states that are a reading rather than an absence (R-UN1 dimming).
+_OI_KNOWN_STATES: Final = frozenset({"opening", "closing"})
+_NO_OI_ROW: Final = "yok"
 
 
 @dataclass(frozen=True)
@@ -289,6 +322,19 @@ class MoveView:
     age: str | None  # when the ATM row the comparison used was fetched (R-CO2)
     fallback: bool  # the labelled IV estimate was used instead of a straddle
     known: bool  # False: both halves read bilinmiyor
+
+
+@dataclass(frozen=True)
+class OpeningView:
+    """B4: the dominant contract's T+1 opening/closing reading and its catalyst chip."""
+
+    label: str  # oi_confirm.STATUS_LABELS, or "henüz doğrulanmadı" with no confirmation row
+    status: str  # the stored status, or "yok" when there is no row yet
+    state: OIConfirmState | None  # what the Açık pozisyon family read (None: T+1 awaited)
+    dimmed: bool  # unknown or out of scope: dashed and dimmed, never clean (R-UN1)
+    catalyst_text: str  # the chip, or the out-of-scope line of an expired contract
+    catalyst_in_window: tuple[str, ...]  # frozen kind labels; feeds the counter-argument (A5)
+    catalyst_dimmed: bool
 
 
 @dataclass(frozen=True)
@@ -320,6 +366,7 @@ class AlfaRowView:
     move: MoveView | None = None  # B2
     chase: ChaseRead | None = None  # B3
     chase_text: ChaseText | None = None  # B3
+    opening: OpeningView | None = None  # B4
 
 
 @dataclass(frozen=True)
@@ -538,6 +585,43 @@ def build_move_view(
     )
 
 
+def expiry_close(expiry: date) -> datetime:
+    """The end of a row's catalyst window: its dominant contract's expiry, 16:00 ET (§6 B4)."""
+    return datetime.combine(expiry, _EXPIRY_CLOSE_ET, tzinfo=_ET)
+
+
+def build_opening_view(
+    oi: OiConfirmView | None, chip: CatalystChip | None, *, expired: bool,
+) -> OpeningView:
+    """B4: the row's opening/closing line and catalyst chip, from frozen labels only.
+
+    No confirmation row reads ``henüz doğrulanmadı`` — the T+1 job has not
+    answered for this contract yet, which is not the same as "not opening".
+    A chip that could not be read reads ``bilinmiyor``; a contract whose expiry
+    has passed has an empty window and reads out of scope, never "no catalyst".
+    """
+    state = board_state(oi)
+    if chip is not None:
+        catalyst_text = chip.text
+    elif expired:
+        catalyst_text = EXPIRED_WINDOW
+    else:
+        catalyst_text = CHIP_UNKNOWN
+    return OpeningView(
+        label=oi_label(oi),
+        status=oi.status if oi is not None else _NO_OI_ROW,
+        state=state,
+        dimmed=state not in _OI_KNOWN_STATES,
+        catalyst_text=catalyst_text,
+        catalyst_in_window=(
+            tuple(KIND_LABELS[part.kind] for part in chip.parts if part.state == "var")
+            if chip is not None
+            else ()
+        ),
+        catalyst_dimmed=chip is None or any(part.state == "bilinmiyor" for part in chip.parts),
+    )
+
+
 def is_clean_candidate(
     chip: TradabilityRead,
     counts: EvidenceCounts,
@@ -599,6 +683,8 @@ def build_alfa_page(
     run_latest_ts: datetime | None = None,
     atm_source: AtmSource | None = None,
     flow_since_source: FlowSinceSource | None = None,
+    oi_source: OiSource | None = None,
+    catalyst_source: CatalystSource | None = None,
 ) -> AlfaPage:
     """The page model; ``prints=None`` means the database read failed.
 
@@ -652,6 +738,29 @@ def build_alfa_page(
             atm_rows = atm_source([r.ticker for r in rows])
         except Exception:
             _logger.exception("alfa board: ATM read failed; the move comparison reads bilinmiyor")
+    oi_rows: Mapping[OiKey, OiConfirmView] = {}
+    if oi_source is not None and requests:
+        try:
+            oi_rows = oi_source([
+                (symbol, request.trade_date)
+                for symbol, request in zip(symbols, requests, strict=True)
+                if symbol is not None
+            ])
+        except Exception:
+            _logger.exception("alfa board: T+1 confirmation read failed; Açık pozisyon reads bilinmiyor")
+    chips: Mapping[CatalystKey, CatalystChip] = {}
+    if catalyst_source is not None and rows:
+        try:
+            chips = catalyst_source(
+                [
+                    (row.ticker.upper(), expiry_close(row.dominant.key.expiry))
+                    for row in rows
+                    if expiry_close(row.dominant.key.expiry) > moment
+                ],
+                moment,
+            )
+        except Exception:
+            _logger.exception("alfa board: catalyst read failed; the chip reads bilinmiyor")
     signals = {p.event_id: p.signal for p in prints}
     flow_since: Mapping[FlowSinceKey, TapeSummary] = {}
     if flow_since_source is not None and requests:
@@ -678,6 +787,12 @@ def build_alfa_page(
             now=moment,
         )
         signal = signals.get(request.event_id)
+        window_end = expiry_close(row.dominant.key.expiry)
+        opening = build_opening_view(
+            oi_rows.get((symbol, request.trade_date)) if symbol is not None else None,
+            chips.get((row.ticker.upper(), window_end)),
+            expired=window_end <= moment,
+        )
         evidence = build_row_evidence(
             row,
             settings=settings,
@@ -686,6 +801,7 @@ def build_alfa_page(
             telemetry=inputs.telemetry.get(request.event_id),
             tape=inputs.tapes.get((request.ticker, request.trade_date)),
             ticker_info=inputs.infos.get(request.ticker),
+            oi_state=opening.state,
             legacy_scores=legacy_scores,
             unread=evidence_failed,
         )
@@ -730,6 +846,12 @@ def build_alfa_page(
                     row, evidence, chip,
                     settings=settings.narrative,
                     chase=ChaseCheck(verdict=row_chase.label, late=row_chase.late),
+                    # The catalyst check only ran when a source supplied the chip (§5 A5).
+                    catalyst=(
+                        CatalystCheck(in_window=opening.catalyst_in_window)
+                        if catalyst_source is not None
+                        else None
+                    ),
                     penalties=PenaltyCheck(applied=ledger.applied_names),
                 ),
                 ledger=ledger,
@@ -742,6 +864,7 @@ def build_alfa_page(
                 move=build_move_view(row, chip, atm_rows.get(row.ticker, ()), moment),
                 chase=row_chase,
                 chase_text=chase_text(row_chase),
+                opening=opening,
             ),
         )
     ordered = tuple(sorted(views, key=_view_order))
@@ -786,6 +909,24 @@ def db_flow_since_source(engine: Engine) -> FlowSinceSource:
 
     def _source(keys: Sequence[FlowSinceKey]) -> Mapping[FlowSinceKey, TapeSummary]:
         return read_net_premium_since_many(engine, keys)
+
+    return _source
+
+
+def db_oi_source(engine: Engine) -> OiSource:
+    """A T+1 confirmation source reading ``alfa_oi_confirm`` only (B4; no UW call)."""
+
+    def _source(keys: Sequence[OiKey]) -> Mapping[OiKey, OiConfirmView]:
+        return read_board_oi(engine, keys)
+
+    return _source
+
+
+def db_catalyst_source(engine: Engine, settings: BoardSettings) -> CatalystSource:
+    """A catalyst source reading ``alfa_catalyst`` and its fetch coverage only (B4; no UW call)."""
+
+    def _source(keys: Sequence[CatalystKey], now: datetime) -> Mapping[CatalystKey, CatalystChip]:
+        return read_board_catalysts(engine, keys, settings=settings, now=now)
 
     return _source
 
@@ -848,4 +989,6 @@ def template_context() -> dict[str, object]:
         "size_copy": SIZE_COPY,
         "no_clean_candidate_label": NO_CLEAN_CANDIDATE,
         "iv_not_sell_vol": IV_NOT_SELL_VOL,
+        # B4: the audit block discloses that the chip and M22's event score can disagree.
+        "catalyst_note": M22_MAY_DIFFER,
     }
