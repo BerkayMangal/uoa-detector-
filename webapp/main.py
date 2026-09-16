@@ -325,6 +325,7 @@ def journal_new(
 
 @app.post("/journal")
 def journal_create(
+    request: Request,
     ticker: str = Form(...),
     direction: str = Form(...),
     instrument: str = Form(...),
@@ -357,9 +358,13 @@ def journal_create(
         signal_label=signal_label or None,
         thesis=thesis,
     )
-    if card_id:
+    if card_id and not _foreign_origin(request):
         # Phase 5.2.C1b: link this trade onto the board card that led to it, once
         # (decision-cards contract §3). A failed link never costs the trade.
+        # Phase 5.2.C1-fix2: and never from another site's page. This is the only
+        # write to an append-only card outside the guarded card POST; the trade
+        # itself is saved either way, so the guard costs a cross-site client
+        # nothing but the link it had no business making.
         _safe(lambda: _card_repo().link_trade(card_id, trade_id), False)
     return RedirectResponse("/journal", status_code=303)
 
@@ -530,6 +535,29 @@ def _same_origin(request: Request) -> bool:
         value = request.headers.get(header)
         if value:
             return urlsplit(value).netloc == host
+    return False
+
+
+def _foreign_origin(request: Request) -> bool:
+    """True when the request declares an ``Origin`` (else a ``Referer``) of another host.
+
+    ``POST /journal`` is the app's older route, and the contract keeps its shape
+    ("the journal route and ``TradeRow`` are unchanged, apart from an optional
+    hidden ``card_id`` form field"): it does not require the header the card POST
+    requires, so a client sending neither still saves its trade and links its
+    card. But it is the second route that writes to an append-only card, so a
+    request declaring another host never gets to touch one — a cross-site form
+    POST from a browser always carries that site's ``Origin``, and that is
+    exactly the request this refuses.
+
+    Deliberately not the complement of :func:`_same_origin`: a missing header is
+    refused there and allowed here. Each rule states what its own route needs.
+    """
+    host = request.headers.get("host", "")
+    for header in ("origin", "referer"):
+        value = request.headers.get(header)
+        if value:
+            return urlsplit(value).netloc != host
     return False
 
 
