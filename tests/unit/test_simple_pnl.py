@@ -259,6 +259,54 @@ def test_signal_inside_dte_floor_stays_open_no_lookahead() -> None:
     assert out.exit_reason == "holding_window_open"
 
 
+def test_lookahead_guard_rejects_a_reachable_pre_entry_quote() -> None:
+    """The guard's real failure mode, with the trap actually armed.
+
+    ``test_signal_inside_dte_floor_stays_open_no_lookahead`` above places its
+    stale bid a day before entry but 15.5 hours AFTER the floor exit, so
+    ``get_bid`` (which only walks back to quotes at-or-before ``exit_ts``)
+    returns None and the trade stays open whether the guard exists or not.
+    Deleting the guard in ``simple_pnl.py`` leaves that test green — verified
+    by mutation — so it does not pin the leak it names.
+
+    Here the stale bid sits at-or-before the floor exit, so it IS reachable.
+    Without the guard this signal closes against a quote from before its own
+    entry and books a fabricated +8R winner. The first assertion proves the
+    trap is armed; the rest assert the guard springs it.
+    """
+    entry_ts = datetime(2025, 6, 11, 15, 30, tzinfo=UTC)
+    expiry_d = date(2025, 6, 12)
+    # exit_on_dte_lte=2 → floor exit = expiry(00:00) - 2d = 2025-06-10 00:00,
+    # which is 1.65 days BEFORE entry: no forward holding window exists.
+    floor_exit = datetime(2025, 6, 10, 0, 0, tzinfo=UTC)
+    assert floor_exit < entry_ts
+
+    sig = _build_signal(
+        entry_ts=entry_ts, expiry_d=expiry_d, option_price=Decimal("1.00"), max_r=1.0,
+    )
+    quotes = _quotes_with_one_exit(
+        exit_ts=floor_exit - timedelta(hours=12),  # at-or-before the floor exit
+        bid=Decimal("9.99"),
+        expiry_d=expiry_d,
+    )
+
+    # The trap is armed: that pre-entry bid really is reachable at the exit the
+    # planner would have used. Without this assertion the test passes for the
+    # wrong reason (a missing quote) and stops guarding anything.
+    assert quotes.get_bid(
+        ticker=sig.ticker,
+        strike=sig.strike,
+        expiry=datetime.combine(expiry_d, datetime.min.time()),
+        option_type=sig.option_type,
+        at=floor_exit,
+    ) == Decimal("9.99")
+
+    out = SimplePnLProvider(_config(exit_on_dte_lte=2), quotes).provide(sig)
+    assert out.realized_r is None, "priced an exit off a pre-entry quote (look-ahead)"
+    assert out.exit_ts is None
+    assert out.exit_reason == "holding_window_open"
+
+
 def test_fixed_window_normal_exit_uses_window_days() -> None:
     """With expiry far away, the window decides — 5 days from entry."""
     entry_ts = datetime(2025, 6, 11, 15, 30, tzinfo=UTC)

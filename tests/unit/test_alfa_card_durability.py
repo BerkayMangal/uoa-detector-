@@ -53,12 +53,120 @@ _KNOWN_EXCEPTIONS: Final = {
     ("webapp/gamma_live.py", "reset("),   # the one call, at gamma-refresh startup
 }
 
-# Append-only tables: rows are evidence and are never deleted in bulk.
+# Phase 5.2.PERF8 / decision P37: EVERY alfa_ table is classified here, not
+# just the three the card work touched. The contract (§4.2) states the rule in
+# prose — "append-only tables hold forward evidence and are never dropped or
+# rewritten" — but prose binds nothing, and a twenty-first table could be added
+# tomorrow with no classification and no test to notice.
+#
+# Append-only: rows are forward evidence. If they are lost they cannot be
+# recreated, because the moment that produced them is gone. A pass the owner
+# recorded, a telemetry branch that was taken, the OI that confirmed an
+# opening — nobody can re-derive these from the vendor tomorrow.
+_APPEND_ONLY_TABLES: Final = {
+    "alfa_decision_card",    # the owner's recorded decision
+    "alfa_fill",             # what he actually paid
+    "alfa_outcome",          # how it resolved
+    "alfa_stage_telemetry",  # which branch each module took, per event
+    "alfa_print_meta",       # the print as it arrived
+    "alfa_regime",           # regime history; tripwire persistence is counted over it
+    "alfa_oi_confirm",       # OI status advances bekliyor -> final exactly once
+    "alfa_delayed",          # disclosed filings, keyed by dedupe_key
+    "alfa_daily_close",      # the close that scores an outcome
+}
+
+# Rebuildable: refreshed market data or fetch bookkeeping. A row lost here is
+# re-fetched from the vendor on the next cycle and costs nothing. Adding a name
+# here is a deliberate act and says: this table holds no evidence.
+_REBUILDABLE_TABLES: Final = {
+    "alfa_quote",           # refresher upsert
+    "alfa_contract_depth",  # refresher upsert, top-K contracts
+    "alfa_atm",             # refresher upsert
+    "alfa_atm_expiry",      # listed expiries, daily breakdown call
+    "alfa_net_prem",        # cumulative day totals, refetchable
+    "alfa_ticker_info",     # issue_type, sector
+    "alfa_catalyst",        # rebuilt per day
+    "alfa_catalyst_fetch",  # fetch coverage bookkeeping
+    "alfa_delayed_fetch",   # fetch coverage bookkeeping
+    "alfa_etf_holding",     # rebuilt per snapshot
+    "alfa_job_run",         # records what ran, not what was observed
+}
+
+# The subset carried as model classes, for the identity checks below.
 _APPEND_ONLY: Final = (AlfaDecisionCard, AlfaStageTelemetry, AlfaPrintMeta)
 
 # Rebuildable caches: their rows are re-fetched from the vendor, so a row
 # delete there costs nothing. Adding a name here is a deliberate act.
 _REBUILDABLE_CACHES: Final = {"AlfaCatalyst", "AlfaAtm", "AlfaAtmExpiry", "AlfaEtfHolding"}
+
+
+def _alfa_models() -> dict[str, str]:
+    """{model name -> table name} for every mapped alfa_ table.
+
+    Imports every module of ``webapp.board`` first: a model class that no test
+    happens to import is exactly the one that would slip through unclassified.
+    """
+    import importlib
+    import pkgutil
+
+    import webapp.board as board
+
+    for module in pkgutil.iter_modules(board.__path__):
+        importlib.import_module(f"webapp.board.{module.name}")
+    return {
+        mapper.class_.__name__: str(mapper.class_.__tablename__)
+        for mapper in AlfaBase.registry.mappers
+    }
+
+
+def test_every_alfa_table_is_classified_append_only_or_rebuildable() -> None:
+    """The binding form of contract §4.2. A new alfa_ table fails this test
+    until a human decides, in writing, whether losing its rows costs evidence."""
+    tables = set(_alfa_models().values())
+    classified = _APPEND_ONLY_TABLES | _REBUILDABLE_TABLES
+
+    assert tables - classified == set(), (
+        "a new alfa_ table is unclassified. Decide whether its rows are forward "
+        "evidence (append-only: losing them loses something nobody can recreate) "
+        "or refreshed vendor data (rebuildable), then add it to the matching set "
+        f"in this file: {sorted(tables - classified)}"
+    )
+    assert classified - tables == set(), (
+        f"classified table no longer exists: {sorted(classified - tables)}"
+    )
+    assert not (_APPEND_ONLY_TABLES & _REBUILDABLE_TABLES), "a table cannot be both"
+    # Every classified name really carries the prefix the contract requires.
+    for name in classified:
+        assert name.startswith(TABLE_PREFIX), name
+
+
+def test_the_classification_covers_the_append_only_models_by_identity() -> None:
+    """The three model classes this file holds directly must agree with the
+    table-name classification, so the two lists cannot drift apart."""
+    for model in _APPEND_ONLY:
+        assert str(model.__tablename__) in _APPEND_ONLY_TABLES, model.__name__
+    names = _alfa_models()
+    for model_name in _REBUILDABLE_CACHES:
+        assert names[model_name] in _REBUILDABLE_TABLES, model_name
+
+
+def test_no_bulk_delete_touches_any_append_only_table() -> None:
+    """The wider form of the delete scan: keyed on all nine append-only tables,
+    not just the three whose model classes this file imports."""
+    names = _alfa_models()
+    append_only_models = {
+        model for model, table in names.items() if table in _APPEND_ONLY_TABLES
+    }
+    deleted = {
+        match.group(1)
+        for _name, source in _sources()
+        for match in _DELETE_CALL.finditer(source)
+    }
+    offenders = deleted & append_only_models
+    assert not offenders, (
+        "bulk delete against an append-only table — these rows are forward "
+        f"evidence and cannot be re-fetched: {sorted(offenders)}"
+    )
 
 _DELETE_CALL: Final = re.compile(r"\bdelete\s*\(\s*([A-Za-z_][A-Za-z0-9_]*)")
 _MODULE_DESTRUCTIVE: Final = re.compile(r"\b(?:delete|update|drop|truncate|reset)\s*\(")

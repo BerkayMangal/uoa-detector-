@@ -659,3 +659,106 @@ Recommended: do 2 regardless, and 1 as well if the board must stay fast while th
 neighbour is busy.
 
 **Undo:** nothing to undo; this entry records a measurement and two open options.
+
+## P37. The run inventory is cached; the freshness line is not
+
+P36 left two options and recommended taking the one inside our control. This is
+that one, in the cheaper of its two forms: a time-boxed cache in front of
+`SignalRepo.runs()` (`webapp/repo.py`, `RunListCache`), not a summary table the
+worker maintains. A summary table would need a writer, a backfill and a
+correctness story about what happens when the writer is behind; the cache needs
+none of that, because a stale run *inventory* costs nothing — the ids and counts
+in the dropdown are the same five minutes from now.
+
+**What must not be cached, and why this is the whole design.** `RunInfo.latest_ts`
+feeds the page's `Son baskı … önce` line. Serving that from a 60-second cache
+would have the board state an age it no longer knows to be true, which is the
+first binding honesty rule of the contract (§2). So the route re-reads the active
+run's `max(ts)` on every request through the new `SignalRepo.latest_ts(run_id)` —
+one indexed lookup on `ix_signal_run_ts`, not a table-wide GROUP BY. The board
+serves a cached inventory and a live clock.
+
+Two further limits are pinned by test:
+
+- **Failures are not cached.** If the read raises, it propagates and the route's
+  `veriyi okuyamadım` state renders. A stale list served through a real outage
+  would be the board lying about data it cannot reach.
+- **The cache is bound to the repo it wraps.** Eight test helpers reset the app
+  with `main._REPO = None`; a cache surviving that would serve one test's run
+  list against a database that no longer exists. `_run_cache()` rebuilds when the
+  repo singleton is replaced, so no reset helper needed changing (D10).
+
+TTL lives in `profiles/board_v1.yaml` as `refresh.run_list_cache_seconds: 60`
+(D8; `0` disables the cache). This treats the symptom. The cause — a 128 MB
+`shared_buffers` shared with an application doing 1.6 billion block reads — is
+still the owner's call under P36 option 1.
+
+## P38. The append-only rule now binds twenty tables, not three
+
+Contract §4.2 states the rule in prose: append-only tables hold forward evidence
+and are never dropped or rewritten. `test_alfa_card_durability.py` enforced it
+for three models — `AlfaDecisionCard`, `AlfaStageTelemetry`, `AlfaPrintMeta` —
+while twenty `alfa_` tables exist. `alfa_outcome`, `alfa_fill`, `alfa_oi_confirm`,
+`alfa_delayed`, `alfa_daily_close` and `alfa_regime` all hold records nobody can
+re-derive, and none of them were covered.
+
+Every `alfa_` table is now classified, by table name, as append-only (9) or
+rebuildable (11), and the scan imports every `webapp.board` module first — a
+model class no test happens to import is exactly the one that would slip through.
+A twenty-first table fails the suite until someone writes down which kind it is.
+Both halves are mutation-proven: adding an unclassified model fails the
+classification test, and a `delete(AlfaOutcome)` fails the bulk-delete scan.
+
+The frozen contract was **not** edited. Per D1 an acceptance document does not
+change after its phase starts; the rule it already states in prose is made
+binding here and in the test, which is where binding belongs.
+
+`GammaRepo.reset()` stays the single pinned exception (P34). `gamma_regime`
+carries no `alfa_` prefix and is rebuilt in full every refresh cycle.
+
+## P39. A regression test that could not fail the bug it named
+
+`test_signal_inside_dte_floor_stays_open_no_lookahead` was written for the
+Phase 3.6 look-ahead leak — a signal already inside the DTE floor whose scheduled
+exit lands *before* its own entry, priced off a pre-entry quote. Deleting the
+guard from `simple_pnl.py` leaves that test green. Verified by mutation.
+
+The reason: the test places its stale bid at `entry_ts − 1 day = 2025-06-10 15:30`,
+but the floor exit is `expiry(00:00) − 2 days = 2025-06-10 00:00`. `get_bid` only
+walks back to quotes at-or-before `exit_ts`, so that bid is 15.5 hours too late to
+be reachable and `None` comes back. The trade stays open with or without the
+guard. The trap was never armed.
+
+`test_lookahead_guard_rejects_a_reachable_pre_entry_quote` arms it: the stale bid
+sits twelve hours *before* the floor exit, and the test first asserts that the
+quote really is reachable at that exit, so it can never again pass for the wrong
+reason. With the guard removed the provider books `realized_r = +8.97` with
+`exit_ts` 1.65 days before `entry_ts` — a fabricated winner out of a quote from
+before the position existed.
+
+This matters beyond one test. The owner has asked for module weights fitted from
+backtests. A backtest that can see the future manufactures edge, which is the
+same failure `docs/edge_to_money.md` exists to catch. The guard is in `main` and
+correct; what was missing was proof it stays there. The older test is kept — it
+covers the unreachable-quote path — but it is not the one holding the line.
+
+## P40. A test that only passed because another directory ran first
+
+Found while proving each commit of the P37–P39 branch green on its own (D2).
+`pytest tests/unit` failed one test on `main` — and so did running that file
+alone — while the full `pytest -q` gate stayed green, which is why nobody saw it.
+
+`test_warning_logged_for_commonly_tuned_missing` reads the warning through
+`caplog`, which only sees a structlog message when structlog is wired to the
+stdlib logger. Nothing in that file wires it. Something under `tests/integration`
+does, and `tests/integration` collects before `tests/unit`, so in a full run the
+test inherited a configuration it never established. Alone, structlog used its
+default logger, no stdlib record existed, and the assertion failed.
+
+The test now wires structlog itself and restores the prior configuration
+afterwards. Same class of defect as P39: a test asserting against a state it does
+not set up is not testing what its name says. Neither was a production bug, and
+both were only visible under a run the normal gate does not perform.
+
+Worth keeping: the project gate is `pytest -q`, which hides order dependence by
+construction. Running a subdirectory alone is a cheap way to surface it.
