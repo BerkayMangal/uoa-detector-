@@ -79,6 +79,7 @@ regime:
   iv_curve_deadband_vol_pts: 0.5
   exclude_event_hump_max_dte: 3      # expiries with dte <= this are ignored for the curve
   max_source_age_seconds: 900        # an older source reads "bilinmiyor"
+  vol_rich_iv_pct: 0.75              # vol board: IV-rank at or above this reads rich-vol
 
 opening_closing:
   confirm_open_min_ratio: 0.5        # delta OI >= ratio x flagged size: açılış

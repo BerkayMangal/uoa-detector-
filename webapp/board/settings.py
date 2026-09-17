@@ -117,6 +117,10 @@ class RegimeSettings(_Strict):
     iv_curve_deadband_vol_pts: float = Field(ge=0)
     exclude_event_hump_max_dte: int = Field(ge=0)
     max_source_age_seconds: int = Field(gt=0)
+    # The vol board's IV-richness cutoff, as a fraction of the 1y range. It used to be
+    # a function default in webapp/vol_board.py while the sentence the page prints
+    # spelled the same number again, so the two could drift apart (registry REG-3).
+    vol_rich_iv_pct: float = Field(gt=0, le=1)
 
     @model_validator(mode="after")
     def _ordered(self) -> RegimeSettings:

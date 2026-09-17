@@ -114,6 +114,21 @@ def test_vol_board_summary_counts() -> None:
     assert vol_board_summary([]) == ""
 
 
+def test_the_summary_states_the_cutoff_it_ranked_with() -> None:
+    # REG-3: the sentence spelled "IV-rank ≥75" as its own literal while the ranking
+    # read a separate default, so moving one would have made the page state a cutoff
+    # it did not use. Both now read the same number.
+    rows = build_vol_board(
+        {"A": _ctx("A", 0.65)}, earnings={}, now=date(2026, 6, 26), rich_threshold=0.60,
+    )
+    summary = vol_board_summary(rows, rich_threshold=0.60)
+    assert "(IV-rank ≥60)" in summary
+    assert "1 rich-vol clean" in summary
+    # The same rows under the default cutoff are not rich, and the sentence says so.
+    plain = build_vol_board({"A": _ctx("A", 0.65)}, earnings={}, now=date(2026, 6, 26))
+    assert "0 rich-vol clean (IV-rank ≥75)" in vol_board_summary(plain)
+
+
 def test_row_carries_regime_and_walls() -> None:
     rows = build_vol_board({"X": _ctx("X", 0.60, net_gex=-2.0)}, earnings={},
                            now=date(2026, 6, 26))

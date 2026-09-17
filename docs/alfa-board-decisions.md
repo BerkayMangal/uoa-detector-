@@ -569,3 +569,43 @@ The strings are read from the frozen copy, never spelled out in the script.
 
 **Undo:** restore the single `"AMA" in row` test; the auditor then fails honest
 pages whenever a row has no counter-evidence.
+
+## P34. The gamma reset is load-bearing, so it stays until someone decides otherwise
+
+The registry carried **REG-1** as a small cleanup: `webapp/gamma_live.py` drops and
+recreates `gamma_regime` on every startup, which leaves the vol board empty until
+the first refresh after the open. Reading the code shows why it is there: it
+absorbs the Phase 4.34 `next_earnings` column without a migration, because
+`create_all` never adds a column to an existing table. Removing it would make the
+first upsert fail against the old production table and stall the gamma refresh.
+
+**Decision.** No code change. The honest options are a real migration or an
+accepted rebuild, and that is the owner's call, not a cleanup. Recorded here so
+the next session does not "tidy" it away. `gamma_regime` is not an `alfa_` table,
+so the never-drop invariant is not involved either way.
+
+**Undo:** nothing to undo; to act, pick one of the two options above.
+
+## P35. One cutoff that lived in three places
+
+**REG-3** described the vol board's IV-richness cutoff as a literal that should be
+read from the profile. It was worse than recorded: the number existed three
+times — as the default of `build_vol_board`, as the text `IV-rank ≥75` in the
+summary sentence, and again as `IV-rank 75` in the template's threshold divider.
+Two of the three were display. Moving the cutoff would have left the page stating
+a number it had not ranked with, and nothing would have failed.
+
+**Decision.** `webapp/vol_board.py` holds one `DEFAULT_RICH_THRESHOLD`, which both
+the ranking and the sentence read, so the module stays testable without a profile.
+Production reads `regime.vol_rich_iv_pct` from `profiles/board_v1.yaml` and hands
+that one value to the ranking, the sentence and the divider. Three tests pin it:
+the sentence follows the cutoff it ranked with, the rendered divider states the
+profile value, and the profile and the module default may not disagree.
+
+**Note, not fixed:** the vol board still carries English UI text beyond the empty
+state that REG-2 fixed — the section heading, `ranked by IV-rank · context only`
+and the divider sentence. Owner decision K3 makes the UI Turkish, so this is a
+real gap; it is a wider change than this one and is recorded rather than smuggled
+in. Two empty states are now Turkish (`_vol_board.html`, `gamma.html`).
+
+**Undo:** restore the literals; the page then states a cutoff nothing guarantees.

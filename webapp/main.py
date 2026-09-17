@@ -657,6 +657,7 @@ def alfa_board(request: Request, run: str = "", gate: str = "", pas: str = "") -
         gamma_ctx,
         earnings={t: c.next_earnings for t, c in gamma_ctx.items()},
         now=datetime.now(UTC).date(),
+        rich_threshold=settings.regime.vol_rich_iv_pct,
     ), [])
     # Phase 5.2.C1b: ``?pas=`` confirms a recorded pass, and only when that card
     # really exists — a made-up link must never claim something was written.
@@ -675,7 +676,12 @@ def alfa_board(request: Request, run: str = "", gate: str = "", pas: str = "") -
                 settings.refresh.cadence_seconds if current is not None and current.is_live else None
             ),
             "vol_board": vol_rows,
-            "vol_summary": vol_board_summary(vol_rows),
+            # The same cutoff the ranking used, as the page states it. It was spelled
+            # out a third time in the template divider (registry REG-3).
+            "vol_rich_iv_rank": round(settings.regime.vol_rich_iv_pct * 100),
+            "vol_summary": vol_board_summary(
+                vol_rows, rich_threshold=settings.regime.vol_rich_iv_pct,
+            ),
             "vol_structure": explanations.vol_structure,
             "vol_read": explanations.vol_read,
             "vol_caveat": explanations.vol_caveat,

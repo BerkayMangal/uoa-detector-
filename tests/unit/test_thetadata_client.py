@@ -61,8 +61,14 @@ def test_token_bucket_refills_over_time() -> None:
 
 
 def test_token_bucket_capacity_caps_refill() -> None:
-    b = TokenBucket(capacity=5, refill_per_second=1000)
-    time_module.sleep(0.1)  # Would refill 100, but capped at 5
+    # The refill rate is deliberately slow enough that the six acquires below cannot
+    # race it. At 1000 tokens/s (the rate this test used until 2026-09-17) one token
+    # refills every MILLISECOND, so under load a token arrived between the fifth and
+    # sixth acquire and the last assertion failed honestly. At 50 tokens/s even a
+    # 10 ms pause adds only half a token, while 0.2 s of idle still asks for 10
+    # tokens against a capacity of 5 — which is the cap this test exists to prove.
+    b = TokenBucket(capacity=5, refill_per_second=50)
+    time_module.sleep(0.2)  # Would refill 10, but capped at 5
     for _ in range(5):
         assert b.try_acquire() is True
     assert b.try_acquire() is False
