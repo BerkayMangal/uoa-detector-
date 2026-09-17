@@ -124,6 +124,7 @@ from webapp.board.evidence import (
 )
 from webapp.board.netprem import TapeFetch, ensure_netprem_tables, fetch_net_prem_ticks, upsert_tape
 from webapp.board.oi_confirm import board_state, ensure_oi_confirm_tables, read_board_oi
+from webapp.board.outcomes import ensure_outcome_tables
 from webapp.board.quotes import (
     DepthFetch,
     QuoteFetch,
@@ -940,6 +941,9 @@ async def board_refresh_loop(
         ensure_daily_close_tables(engine)
         ensure_delayed_tables(engine)
         ensure_job_run_tables(engine)
+        # FAZ C's outcome job is one of the daily jobs, so its append-only table is
+        # created with theirs instead of waiting for the first card to be scored.
+        ensure_outcome_tables(engine)
         reader = BoardSignalReader(engine=engine)
         journal: OpenTrades = (
             journal_factory(database_url) if journal_factory is not None else JournalRepo(database_url)

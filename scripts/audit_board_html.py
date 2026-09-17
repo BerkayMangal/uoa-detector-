@@ -8,7 +8,8 @@ that checked nothing must never read as a pass.
 
 Checks:
   R-WD1  no forbidden word in generated copy (vendor fields excluded)
-  R-CA1  every row carries an "AMA" counter-argument
+  R-CA1  every row carries an "AMA" counter-argument, or the contract's
+         no-counter fallback together with the list of what was checked
   R-EV2  the 0-1 combined score appears only inside the audit block
   R-UN1  unknown families say "bilgi yok, temiz demek değil"
   R-CO1  a quoted row states its quote age; an unquoted row says "kotasyon yok"
@@ -25,7 +26,12 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from webapp.board.copy_tr import COUNTER_LEAD, NO_COUNTER_FOUND
 from webapp.board.honesty import forbidden_words
+from webapp.board.narrative import CHECK_TEMPLATES
+
+# "Bakılanlar:" — read from the frozen copy, never spelled out here.
+CHECKED_LEAD = CHECK_TEMPLATES["lead"].split("{")[0].strip()
 
 # Vendor data (politician and insider names, filed amounts, catalyst titles) is
 # quoted from the source, never generated, so the word guard does not apply.
@@ -67,8 +73,20 @@ def main(path: str) -> int:
     hits = forbidden_words(text)
     check(not hits, "R-WD1 forbidden words", str(hits))
 
-    missing_ama = [i for i, row in enumerate(rows) if "AMA" not in visible_text(row)]
-    check(not missing_ama, "R-CA1 AMA on every row", f"rows without AMA: {missing_ama}")
+    # R-CA1 has two legal shapes. A row either carries an "AMA" clause, or — when no
+    # counter-argument was found — the exact fallback FOLLOWED BY the list of what was
+    # checked. Demanding the literal "AMA" everywhere failed a correct page on
+    # 2026-09-17: four rows with zero counter-evidence rendered the fallback, as the
+    # contract requires. A row with neither shape still fails.
+    def has_counter(row: str) -> bool:
+        body = visible_text(row)
+        if COUNTER_LEAD in body:
+            return True
+        return NO_COUNTER_FOUND in body and CHECKED_LEAD in body
+
+    missing_ama = [i for i, row in enumerate(rows) if not has_counter(row)]
+    check(not missing_ama, "R-CA1 counter-argument on every row",
+          f"rows with neither AMA nor the no-counter fallback: {missing_ama}")
 
     outside = AUDIT_RE.sub(" ", raw)
     check(not SCORE_RE.search(outside), "R-EV2 score only in the audit block",

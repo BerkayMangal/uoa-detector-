@@ -20,8 +20,12 @@ tick, RTH or not.
 4. ``etf_holdings`` — post-close at ``delayed.job_time_et``: the focused list.
 5. ``daily_close`` — same time: ``ohlc/1d`` per ticker plus SPY.
 6. ``delayed`` — same time: congress, insider, short interest and FTDs.
+7. ``outcomes`` — post-close at ``outcomes.job_time_et``: FAZ C scores every
+   decision card against its horizons (``webapp/board/outcome_job.py``).
 
-FAZ C appends its outcome job as one more entry.
+Entry 7 is appended by ``build_registry`` itself, not by its caller. The
+refresher runs exactly the tuple this function returns, so a job left out of it
+never runs at all — which is what happened to ``outcomes`` until 2026-09-17.
 
 **Due rule**, checked on every tick. A job is due when all of these hold:
 
@@ -82,6 +86,7 @@ from webapp.board.db import AlfaBase, session_factory
 from webapp.board.delayed import run_delayed_job
 from webapp.board.etf_holdings import refresh_etf_holdings
 from webapp.board.oi_confirm import FlaggedContract, confirm_open_interest
+from webapp.board.outcome_job import outcome_jobs
 from webapp.board.quotes import dominant_symbol
 from webapp.board.regime import refresh_gamma_history
 from webapp.board.signals import live_run_tips
@@ -95,6 +100,7 @@ if TYPE_CHECKING:
     from sqlalchemy.orm import sessionmaker
 
     from webapp.board.aggregate import BoardRow
+    from webapp.board.outcome_job import OutcomeJob
     from webapp.board.settings import BoardSettings
     from webapp.board.signals import BoardPrint
     from webapp.journal import TradeRow
@@ -289,8 +295,24 @@ async def run_delayed_families(ctx: JobContext) -> str:
     )
 
 
+def _as_daily_job(job: OutcomeJob) -> DailyJob:
+    """FAZ C's own entry shape as a registry entry.
+
+    ``outcome_job.py`` types its body against a Protocol instead of importing
+    ``JobContext`` from here, which would be a cycle. This adapter is where
+    ``JobContext`` is checked against that Protocol under ``mypy --strict``.
+    """
+
+    async def run(ctx: JobContext) -> str:
+        return await job.run(ctx)
+
+    return DailyJob(
+        name=job.name, et_time=job.et_time, run=run, trading_day_only=job.trading_day_only,
+    )
+
+
 def build_registry(settings: BoardSettings) -> tuple[DailyJob, ...]:
-    """The ordered daily-job list. FAZ C appends its outcome job as one more entry."""
+    """The ordered daily-job list, FAZ C's outcome job included as the last entry."""
     pre_market = time.fromisoformat(settings.opening_closing.job_time_et)
     post_close = time.fromisoformat(settings.delayed.job_time_et)
     return (
@@ -300,6 +322,9 @@ def build_registry(settings: BoardSettings) -> tuple[DailyJob, ...]:
         DailyJob(name="etf_holdings", et_time=post_close, run=run_etf_holdings),
         DailyJob(name="daily_close", et_time=post_close, run=run_daily_closes),
         DailyJob(name="delayed", et_time=post_close, run=run_delayed_families),
+        # FAZ C's entry, built by the module that owns it so the time and the body
+        # have one source. Appended here because the refresher runs this tuple.
+        *(_as_daily_job(j) for j in outcome_jobs(settings)),
     )
 
 
