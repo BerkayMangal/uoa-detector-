@@ -22,7 +22,6 @@ import contextlib
 import logging
 import os
 import secrets
-from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
 from time import perf_counter
@@ -43,7 +42,7 @@ from webapp.board.refresher import board_refresh_loop
 from webapp.board.settings import BoardSettings, load_board_settings
 from webapp.board.signals import BoardSignalReader
 from webapp.gamma_live import gamma_refresh_loop
-from webapp.repo import RunInfo, RunListCache, SignalRepo
+from webapp.repo import RunInfo, SignalRepo
 from webapp.vol_board import VolBoardRow, build_vol_board, vol_board_summary
 from webapp.worker import live_config_from_env, run_live_worker
 
@@ -246,27 +245,6 @@ def _repo() -> SignalRepo:
     if _REPO is None:
         _REPO = SignalRepo()
     return _REPO
-
-
-_RUN_CACHE: RunListCache | None = None
-
-
-def _run_cache() -> RunListCache:
-    """The board's run inventory, time-boxed (Phase 5.2.PERF8, decision P37).
-
-    The cache is rebuilt whenever the repo singleton is replaced. Tests reset
-    the app by assigning ``main._REPO = None``; a cache still holding the
-    previous repo would then serve one test's run list to the next, against a
-    database that no longer exists. Binding the cache's identity to the repo it
-    wraps makes that impossible without touching the eight reset helpers.
-    """
-    global _RUN_CACHE
-    repo = _repo()
-    if _RUN_CACHE is None or _RUN_CACHE.repo is not repo:
-        _RUN_CACHE = RunListCache(
-            repo, _board_settings().refresh.run_list_cache_seconds,
-        )
-    return _RUN_CACHE
 
 
 def _journal() -> journal.JournalRepo:
@@ -657,22 +635,12 @@ def alfa_board(request: Request, run: str = "", gate: str = "", pas: str = "") -
     """
     _t0 = perf_counter()
     settings = _board_settings()
-    # Phase 5.2.PERF8 (decision P37): the run inventory is a GROUP BY over the
-    # whole ``signal`` table and is served from a TTL cache; the active run's
-    # newest timestamp is re-read live below, so the freshness line never ages.
-    runs_read: list[RunInfo] | None = _safe(_run_cache().runs, None)
+    runs_read: list[RunInfo] | None = _safe(_repo().runs, None)
     _t_runs = perf_counter()
     runs = runs_read or []
     run_ids = {r.run_id for r in runs}
     active = run if run in run_ids else (runs[0].run_id if runs else None)
     current = next((r for r in runs if r.run_id == active), None)
-    if current is not None:
-        # One indexed max(ts) on ix_signal_run_ts. A read failure here must not
-        # invent a time: fall back to the cached value rather than to "now".
-        active_run_id = current.run_id
-        fresh = _safe(lambda: _repo().latest_ts(active_run_id), current.latest_ts)
-        if fresh != current.latest_ts:
-            current = replace(current, latest_ts=fresh)
     prints: list[BoardPrint] | None = None if runs_read is None else []
     if active is not None:
         run_id = active

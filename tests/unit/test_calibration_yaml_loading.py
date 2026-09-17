@@ -8,12 +8,9 @@ The worked example required by the user:
 from __future__ import annotations
 
 import shutil
-from collections.abc import Iterator
-from contextlib import contextmanager
 from pathlib import Path
 
 import pytest
-import structlog
 
 from uoa_detector.calibration import (
     CalibrationProfile,
@@ -22,31 +19,6 @@ from uoa_detector.calibration import (
     profile_hash,
 )
 from uoa_detector.errors import ConfigurationError
-
-
-@contextmanager
-def _structlog_to_stdlib() -> Iterator[None]:
-    """Route structlog through the stdlib logger, then restore the prior config.
-
-    ``caplog`` reads stdlib ``logging`` records. structlog only produces them
-    under ``stdlib.LoggerFactory``; with a PrintLogger the message goes to a
-    stream and caplog sees nothing. Caching is off so a module-level
-    ``get_logger`` bound at import time picks this configuration up.
-    """
-    saved = structlog.get_config()
-    structlog.configure(
-        processors=[
-            structlog.processors.add_log_level,
-            structlog.processors.KeyValueRenderer(drop_missing=True),
-        ],
-        logger_factory=structlog.stdlib.LoggerFactory(),
-        wrapper_class=structlog.stdlib.BoundLogger,
-        cache_logger_on_first_use=False,
-    )
-    try:
-        yield
-    finally:
-        structlog.configure(**saved)
 
 
 @pytest.fixture
@@ -175,19 +147,16 @@ def test_warning_logged_for_commonly_tuned_missing(
 ) -> None:
     """Non-default profile that doesn't override a 'commonly tuned' field warns.
 
-    The test wires structlog to the stdlib logger itself (``_structlog_to_stdlib``)
-    instead of assuming it is already wired. It was not: ``caplog`` only sees the
-    record when structlog routes through stdlib, which happened by accident
-    because ``tests/integration`` collects before ``tests/unit`` and something
-    there configured it. Run this file alone — or ``pytest tests/unit`` — and it
-    failed on ``main``, while the full suite stayed green. A test that depends on
-    a state it does not establish is not testing what it claims.
+    Uses ``caplog`` rather than ``capsys`` because structlog may be wired to
+    Python's stdlib logger (in which case the message goes through caplog)
+    or directly to a stream (capsys territory). caplog captures the message
+    regardless of structlog's processor configuration.
     """
     child = profiles_root / "tickers" / "NOTUNE.yaml"
     child.write_text(
         "profile_id: notune\ndescription: x\ninherits_from: v5_default\n"
     )
-    with _structlog_to_stdlib(), caplog.at_level("WARNING"):
+    with caplog.at_level("WARNING"):
         load_profile(child, profiles_dir=profiles_root)
 
     messages = [rec.getMessage() for rec in caplog.records]
