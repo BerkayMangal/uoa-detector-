@@ -660,7 +660,7 @@ neighbour is busy.
 
 **Undo:** nothing to undo; this entry records a measurement and two open options.
 
-## P40. The deploy rail only ran on one laptop
+## P42. The deploy rail only ran on one laptop
 
 `scripts/verify_live_board.sh` is the only thing that checks a deploy end to end,
 and it read every input it needs — the basic-auth pair and `DATABASE_URL` — from
@@ -695,7 +695,7 @@ runs — a session whose egress policy denies it cannot check it at all.
 stub board on localhost: the skip path, the env-credential path, the sha
 mismatch, the refused database, and that the password never reaches the output.
 
-(The entry is P40 because P37–P39 belong to the run-inventory work that `7dcd873`
-reverted off `main`; re-landing it should not collide with this.)
+(The entry is P42, not the next free number on `main`: PR #39 restores P37–P39 and
+takes P40, and PR #38 takes P41. Verified against both branches, not assumed.)
 
 **Undo:** restore the Railway-only `auth_curl_cfg` and the single `exit "$fail"`.
