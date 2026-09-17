@@ -118,21 +118,30 @@ def test_the_registry_is_one_ordered_list_built_from_the_profile() -> None:
     jobs = dj.build_registry(_SETTINGS)
     assert [j.name for j in jobs] == [
         "oi_confirm", "catalysts", "gamma_history", "etf_holdings", "daily_close", "delayed",
+        "outcomes",
     ]
     pre_market = time.fromisoformat(_SETTINGS.opening_closing.job_time_et)
     post_close = time.fromisoformat(_SETTINGS.delayed.job_time_et)
+    outcomes = time.fromisoformat(_SETTINGS.outcomes.job_time_et)
     assert [j.et_time for j in jobs] == [
-        pre_market, pre_market, dj.SESSION_OPEN_ET, post_close, post_close, post_close,
+        pre_market, pre_market, dj.SESSION_OPEN_ET, post_close, post_close, post_close, outcomes,
     ]
     assert all(j.trading_day_only for j in jobs)
     assert len({j.name for j in jobs}) == len(jobs)
 
 
 def test_faz_c_appends_its_outcome_job_with_one_entry() -> None:
-    outcomes = _job("outcomes", time.fromisoformat(_SETTINGS.outcomes.job_time_et))
-    extended = (*dj.build_registry(_SETTINGS), outcomes)
-    assert [j.name for j in extended][-1] == "outcomes"
-    assert extended[-1].et_time == time(17, 30)
+    # This test used to build the extension itself — `(*build_registry(...), outcomes)` —
+    # and then assert its own tuple, so it passed while `build_registry` did NOT contain
+    # the job. The job therefore never ran: production held no `outcomes` marker in
+    # alfa_job_run on 2026-09-17, the day it was found. It now asserts what the refresher
+    # actually receives, which is the only thing that decides whether the job runs.
+    jobs = dj.build_registry(_SETTINGS)
+    outcomes = [j for j in jobs if j.name == "outcomes"]
+    assert len(outcomes) == 1
+    assert outcomes[0] is jobs[-1]
+    assert outcomes[0].et_time == time.fromisoformat(_SETTINGS.outcomes.job_time_et)
+    assert outcomes[0].trading_day_only is True
 
 
 # ---------------------------------------------------------------------------
@@ -191,8 +200,8 @@ def test_a_failed_or_crashed_attempt_retries_once_per_cadence(status: dj.JobStat
 
 def test_due_jobs_keeps_registry_order() -> None:
     jobs = dj.build_registry(_SETTINGS)
-    # 17:05 ET on a Tuesday: every job's time has passed.
-    evening = datetime(2026, 9, 15, 21, 5, tzinfo=UTC)
+    # 17:35 ET on a Tuesday: every job's time has passed, the 17:30 outcome job included.
+    evening = datetime(2026, 9, 15, 21, 35, tzinfo=UTC)
     assert [j.name for j in dj.due_jobs(jobs, now=evening, states={}, cadence_seconds=_CADENCE)] == [
         j.name for j in jobs
     ]
