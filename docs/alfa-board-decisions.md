@@ -659,3 +659,36 @@ Recommended: do 2 regardless, and 1 as well if the board must stay fast while th
 neighbour is busy.
 
 **Undo:** nothing to undo; this entry records a measurement and two open options.
+
+## P41. The page stage now says which read cost the time
+
+`board timing:` has reported one number for the whole page model since
+2026-09-16. That number has been 0.70 s and 23.5 s on identical code inside the
+same hour, and it could not say which of the twelve reads inside
+`build_alfa_page` was responsible — quotes, evidence, profile hashes, the
+delayed bucket, ATM, the since-print tape, T+1 open interest, catalysts, the
+regime band, open journal trades, ETF holdings or sectors.
+
+Three explanations were offered for that swing over two days, and each was
+killed by a measurement: connection setup (pre-ping made it worse, twice), data
+volume (the fast renders carried *more* prints than the slow ones), and a
+repeated-scan pattern inferred from `pg_stat_database` counters (refuted by its
+own control — the co-tenant alone produced more traffic in five seconds than the
+render was credited with). What every one of those attempts had in common is
+that none of them could see inside the page stage.
+
+**Decision.** `_build_board_page` wraps each source with `_timed` and logs one
+`board sources:` line per render from `webapp.main` — the only logger that
+reaches the Railway deployment log (REG-9). The page model itself is untouched,
+so nothing about what the board *says* changes.
+
+**What makes it worth a card rather than a comment:** the test pins that no
+source escapes the line. A thirteenth source added later and passed unwrapped
+would read from the database on every render and be invisible, which is the hole
+this exists to close. `tests/unit/test_board_source_timing.py` carries its own
+negative control — it drives the builder with one source deliberately unwrapped
+and asserts the check fails — because two guards in this project were found
+this week that could not fail.
+
+**Undo:** remove `_timed`, its call sites and the log line; the board renders
+identically either way.

@@ -25,7 +25,7 @@ import secrets
 from datetime import UTC, datetime
 from pathlib import Path
 from time import perf_counter
-from typing import TYPE_CHECKING, TypeVar
+from typing import TYPE_CHECKING, ParamSpec, TypeVar
 from urllib.parse import urlencode, urlsplit
 
 from fastapi import FastAPI, Form, Request
@@ -472,6 +472,33 @@ def _now() -> datetime:
     return datetime.now(UTC)
 
 
+_P = ParamSpec("_P")
+_R = TypeVar("_R")
+
+
+def _timed(
+    marks: dict[str, float], name: str, fn: Callable[_P, _R],
+) -> Callable[_P, _R]:
+    """Wrap one board data source so its wall time lands in ``marks``.
+
+    Phase 5.2.PERF9. The page stage has measured anywhere from 0.7 s to 23 s on
+    identical code, and nothing said WHICH read cost it: ``build_alfa_page`` runs
+    a dozen independent sources and reports one number. Timing them here rather
+    than inside the page model is deliberate — only ``webapp.main``'s logger
+    reaches the Railway deployment log (REG-9), and a source that is added later
+    but not wrapped is caught by a test rather than silently going unmeasured.
+    """
+
+    def wrapper(*args: _P.args, **kwargs: _P.kwargs) -> _R:
+        start = perf_counter()
+        try:
+            return fn(*args, **kwargs)
+        finally:
+            marks[name] = marks.get(name, 0.0) + (perf_counter() - start)
+
+    return wrapper
+
+
 def _build_board_page(
     prints: Sequence[BoardPrint] | None,
     *,
@@ -487,38 +514,82 @@ def _build_board_page(
     never saw, and would quietly stop freezing fields added here later.
     """
     settings = _board_settings()
-    return alfa_page.build_alfa_page(
+    marks: dict[str, float] = {}
+    page = alfa_page.build_alfa_page(
         prints,
         settings,
         gate_on=gate_on,
         spread_cutoff_pct=_spread_cutoff_pct(),
         now=_now(),
-        quote_source=lambda symbols: alfa_page.db_quote_source(_board_reader().engine)(symbols),
-        evidence_source=lambda run_id, requests: alfa_page.db_evidence_source(_board_reader().engine)(
-            run_id, requests,
+        # Every source stays lazy: with prints=None build_alfa_page returns before
+        # calling any of them, and the reader is never touched (a failed run read
+        # must still render "veriyi okuyamadım", not raise).
+        quote_source=_timed(
+            marks, "quote",
+            lambda symbols: alfa_page.db_quote_source(_board_reader().engine)(symbols),
+        ),
+        evidence_source=_timed(
+            marks, "evidence",
+            lambda run_id, requests: alfa_page.db_evidence_source(_board_reader().engine)(
+                run_id, requests,
+            ),
         ),
         legacy_scores=_legacy_scores(),
-        profile_hash_source=lambda run_id, event_ids: alfa_page.db_profile_hash_source(_board_reader().engine)(
-            run_id, event_ids,
+        profile_hash_source=_timed(
+            marks, "profile_hash",
+            lambda run_id, event_ids: alfa_page.db_profile_hash_source(_board_reader().engine)(
+                run_id, event_ids,
+            ),
         ),
-        delayed_source=lambda tickers, today: alfa_page.db_delayed_source(
-            _board_reader().engine, settings.delayed,
-        )(tickers, today),
-        atm_source=lambda tickers: alfa_page.db_atm_source(_board_reader().engine)(tickers),
-        flow_since_source=lambda keys: alfa_page.db_flow_since_source(_board_reader().engine)(keys),
-        oi_source=lambda keys: alfa_page.db_oi_source(_board_reader().engine)(keys),
-        catalyst_source=lambda keys, moment: alfa_page.db_catalyst_source(
-            _board_reader().engine, settings,
-        )(keys, moment),
-        regime_source=lambda moment: alfa_page.db_regime_source(_board_reader().engine)(moment),
+        delayed_source=_timed(
+            marks, "delayed",
+            lambda tickers, today: alfa_page.db_delayed_source(
+                _board_reader().engine, settings.delayed,
+            )(tickers, today),
+        ),
+        atm_source=_timed(
+            marks, "atm",
+            lambda tickers: alfa_page.db_atm_source(_board_reader().engine)(tickers),
+        ),
+        flow_since_source=_timed(
+            marks, "flow_since",
+            lambda keys: alfa_page.db_flow_since_source(_board_reader().engine)(keys),
+        ),
+        oi_source=_timed(
+            marks, "oi",
+            lambda keys: alfa_page.db_oi_source(_board_reader().engine)(keys),
+        ),
+        catalyst_source=_timed(
+            marks, "catalyst",
+            lambda keys, moment: alfa_page.db_catalyst_source(
+                _board_reader().engine, settings,
+            )(keys, moment),
+        ),
+        regime_source=_timed(
+            marks, "regime",
+            lambda moment: alfa_page.db_regime_source(_board_reader().engine)(moment),
+        ),
         # B6: the open journal, the focused-ETF holdings and the sectors behind the strip.
         # A failed read is handled inside build_alfa_page, which then claims nothing.
-        trades_source=lambda: _journal().list("open"),
-        holdings_source=lambda: alfa_page.db_holdings_source(_board_reader().engine)(),
-        sector_source=lambda tickers: alfa_page.db_sector_source(_board_reader().engine)(tickers),
+        trades_source=_timed(marks, "trades", lambda: _journal().list("open")),
+        holdings_source=_timed(
+            marks, "holdings",
+            lambda: alfa_page.db_holdings_source(_board_reader().engine)(),
+        ),
+        sector_source=_timed(
+            marks, "sector",
+            lambda tickers: alfa_page.db_sector_source(_board_reader().engine)(tickers),
+        ),
         profile_resolver=alfa_page.resolve_writing_profile,
         run_latest_ts=run_latest_ts,
     )
+    # Phase 5.2.PERF9: one line per render naming which source cost what. The page
+    # stage has measured 0.7 s and 23 s on identical code; this is what tells them apart.
+    _logger.warning(
+        "board sources: %s",
+        " ".join(f"{key}={value:.3f}" for key, value in sorted(marks.items())),
+    )
+    return page
 
 
 # ---------------------------------------------------------------------------
