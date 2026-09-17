@@ -10,8 +10,8 @@ sürekli yazılır. Doğrulanmamış her şey "DOĞRULANMADI" diye etiketlidir.
 - **Durum: ÇALIŞIYOR** — FAZ A, B, C ve D canlıda.
 - **URL:** https://uoa-detector-production.up.railway.app/ — kullanıcı adı/şifre masaüstündeki
   `uoa-dashboard-login.txt` dosyasında.
-- **Canlı SHA:** `957143d` — tahta, raylar, karar kartları, FAZ B/D, pas defteri, dolum kaydı, günlük sonuç işi.
-- **Son doğrulama:** 2026-09-17 12:33Z / 15:33 TRT, deploy'dan 7 dakika sonra (soğuk pencere dışında) — sağlık 200 ve ayakta olan commit'i doğru bildiriyor, şifresiz 401, dürüstlük denetimi **PASS** (20 satır), **tahta 0,74-0,92 saniyede**, sunucu tarafı 0,46-0,60 s, `/defter` 0,23 saniyede açılıyor (hedef 1,5 s). Bu ölçüm açılıştan önce alındı, o yüzden her satır "kotasyon yok" okuyor; gerçek kotasyonlu kontrol açılıştan sonra yapılacak.
+- **Canlı SHA:** `0f71140` — tahta, raylar, karar kartları, FAZ B/D, pas defteri, dolum kaydı, günlük sonuç işi, kayıt defteri temizlikleri.
+- **Son doğrulama:** 2026-09-17 13:37-13:38Z / 16:37 TRT, **piyasa açıkken ve gerçek kotasyonlarla** — dürüstlük denetimi **PASS** (17 satır: 6 İŞLENİR, 4 DAR, kalanı kotasyon yok; boş sayfaya değil dolu sayfaya karşı), sağlık 200 ve doğru commit'i bildiriyor, şifresiz 401. Tahta uçtan uca **1,41-1,62 saniye** (bunun ~0,2 saniyesi benim buradan ölçtüğüm ağ gecikmesi), sunucu tarafı 1,16-1,35 s, `/defter` 0,19-0,21 s. Hedef 1,5 s. Gün içinde 2,6-4,5 saniyeye çıkan anlık sıçramalar da gördüm; aşama dökümlerini yakalayamadım, sebebini kanıtlamadım.
 - **Durma sebebi:** — (çalışma sürüyor).
 - **Sırada:** tahtanın yavaşlığında suçlu kaynağı isimlendiren ölçüm (canlıya alınıyor), sonra düzeltme; ardından 13:30Z açılışında canlı veriyle doğrulama.
 
@@ -113,6 +113,7 @@ Hepsi `docs/alfa-board-decisions.md` P21–P33'te, gerekçesi ve nasıl geri al�
 | — | FAZ B+D gün içinde 9,4 s render yüzünden geri alındı, sebebi bulundu (satır şablonu her satırda derleniyordu), düzeltildi ve **geri getirildi; şu an canlıda** | "Claude: FAZ B/D'yi tekrar geri al" |
 | P32 | FAZ C'nin günlük sonuç işi kayıt defterine eklendi — yazılmıştı ama **hiç çalışmamıştı** | "Claude: P32'yi geri al" |
 | P33 | Canlı dürüstlük denetçisi, karşı argüman bulunamayan satırları artık haksız yere düşürmüyor | "Claude: P33'ü geri al" |
+| P36 | Render dalgalanmasının sebebi ölçüldü: veritabanı büyük bir uygulamayla paylaşılıyor | geri alınacak bir şey yok, karar senin |
 
 ## 7. PARA KARARI — THETADATA
 
@@ -144,17 +145,33 @@ yapılmadı, indirme başlatılmadı. Ayrıntı: `docs/thetadata-decision.md`.
 - **Hız: şu an sorun yok, ama tam açıklayamadığım bir dalgalanma var.** Son ölçüm (deploy'dan 5 dk sonra,
   seans içinde): tahta **0,56-0,80 saniye**, sunucu tarafı 0,30 saniye, `/defter` 0,22 saniye — hedefin
   belirgin altında.
-- **Gün içinde iki kez 9-10 saniye gördüm ve sebebini bulamadım.** Elediklerim ölçümle kanıtlı:
-  - **veritabanı değil** (canlı sorgu 1,2 ms, tüm `alfa_` tabloları indeksli),
-  - **şablon değil** (o hata bulundu, düzeltildi ve canlıda; render aşaması 0,02 s),
-  - **bağlantı havuzu değil** (`pre_ping` iki kez denendi, ikisinde de 12 saniyeye çıkardı, ikisinde de
-    ölçülüp geri alındı),
-  - **veri hacmi de değil** — yavaş ölçümlerde 269 baskı vardı, şimdiki hızlı ölçümde 367; yani "veri
-    büyüdükçe yavaşlıyor" tezim de yanlış çıktı.
-  Geriye üretim ortamına özgü, tekrarlanabilir olmayan bir dalgalanma kalıyor. Her render'ın aşama süreleri
-  artık loglanıyor (`board timing:` satırı), yani bir daha olursa hangi aşamada olduğu anında görülecek.
-- **Senin için pratik anlamı:** tahta hızlı. Bir gün yavaş bulursan birkaç dakika sonra tekrar bak; hâlâ
-  yavaşsa loglardaki `board timing:` satırı hangi aşamanın yediğini söyler ve düzeltme oradan başlar.
+- **Dün "sebebini bulamadım" dediğim yavaşlamanın sebebi bulundu ve bizde değil.**
+  17 Eylül 13:10Z'de üretimde ölçtüm: tahtanın her açılışta koştuğu run-listesi sorgusu
+  **20,8 milisaniye** sürüyor, ama o aşama **440 milisaniye** ölçüyor. Aradaki fark disk.
+  Sorgu planı sebebini söylüyor: 31 MB'lık tablo önbellekte değil, her seferinde diskten
+  okunuyor.
+  **Neden önbellekte değil:** tahtanın veritabanı 18 GB ve **başka, çok daha büyük bir
+  uygulamayla paylaşılıyor** (at soyağacı tabloları: `registry_pedigree_edges` 7,46 milyon
+  satır, `match_score_flags` 6,31 milyon, `candidate_prediction` 4,65 milyon). Onların okuma
+  hacmi başka bir ölçekte — tek bir tabloda 1,62 **milyar** disk bloğu okuması. Postgres'in
+  önbelleği 128 MB; o iş yükü çalıştıkça tahtanın küçük tabloları önbellekten atılıyor.
+  Tahtanın `signal` tablosunun önbellek isabeti %63,5.
+  **Bu tek mekanizma açıkta kalan her şeyi açıklıyor:** aynı kodun dakikalar arayla 0,014 s
+  ve 0,44 s ölçülmesi, yerelde hiç tekrarlanamaması, bağlantı havuzu denemelerinin işi
+  **kötüleştirmesi** (maliyet bağlantı değil disk), `/defter`'in hızlı kalması ve dünkü iki
+  epizot. Dün elediklerim (veritabanı sorgusu, şablon, havuz, veri hacmi) doğruydu; eksik
+  olan, sorunun bizim kodumuzda değil komşuda olmasıydı.
+- **Senin için pratik anlamı ve KARAR GEREKTİREN KISIM:** tahta seans içinde 1,4-1,6
+  saniyede açılıyor (hedef 1,5 s; bunun ~0,2 saniyesi benim buradan ölçtüğüm ağ gecikmesi).
+  Gün içinde 2,6-4,5 saniyeye çıkan anlık sıçramalar da ölçtüm; o anların aşama dökümünü
+  yakalayamadım, yani sebebi aynı mekanizma olabilir ama kanıtlamadım. Sebep bizde değil
+  ama çözümü seçmek sende, çünkü biri para:
+  **(1)** tahtaya kendi Postgres'ini al — temiz ve anında çözer, ikinci bir Railway
+  veritabanı kadar tutar; **(2)** sıcak okumayı ortadan kaldır — tahtanın run listesinden
+  ihtiyacı olan tek şey `run_id`, sayı ve son zaman; bunu worker'ın güncellediği küçük bir
+  `alfa_` tablosunda tutmak her sayfa yüklemesinden 31 MB'lık taramayı siler. (2) bizim
+  elimizde, eşik veya sözleşme değişikliği değil. Tavsiyem: (2)'yi her hâlükârda yap,
+  komşu yoğunken de hızlı kalması gerekiyorsa (1)'i de.
 - **Ölçüm kuralı (bugünün en pahalı dersi):** her deploy'dan sonra 3-5 dakika bekle; aynı sürüm o aralıkta
   5-13 saniye ölçülebiliyor. Bugün bir kez erken ölçüp doğru bir şeyi geri aldım, bir kez de erken ölçümü
   "soğuk" sayıp yanlış bir şeyi tuttum.

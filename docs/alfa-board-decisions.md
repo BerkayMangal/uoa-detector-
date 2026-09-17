@@ -609,3 +609,53 @@ real gap; it is a wider change than this one and is recorded rather than smuggle
 in. Two empty states are now Turkish (`_vol_board.html`, `gamma.html`).
 
 **Undo:** restore the literals; the page then states a cutoff nothing guarantees.
+
+## P36. The render variance was never ours: the board shares a database with a much larger application
+
+Yesterday this was closed as "production-side variance I could not reproduce". It
+is reproducible, and it was never our variance.
+
+**Measured on production, 2026-09-17 13:10Z.** The run-list query the board runs on
+every page load — `SELECT run_id, count(*), max(ts) FROM signal GROUP BY run_id` —
+has an execution time of **20.774 ms** over 17,900 rows. The stage that contains it
+measured **440 ms**, steady across eight renders eleven minutes after a deploy, so
+it is not the cold window and it does not warm away. The plan says why:
+`Buffers: shared read=3590` against `shared hit=117`. The 31 MB table is not in the
+buffer cache, so every render reads it off disk.
+
+**Why it is not in the cache.** `shared_buffers` is 128 MB; the database is 18 GB and
+is shared with a large unrelated application — `registry_pedigree_edges` 7.46M rows,
+`match_score_flags` 6.31M, `candidate_prediction` 4.65M, plus dozens of
+`ar_*` / `horse_*` / `pedigree_*` tables. Its read volume is on another scale:
+`tjk_horse_registry` alone has 1,619,956,388 disk block reads. That workload sweeps
+hundreds of gigabytes through a 128 MB cache, and the board's small tables are
+evicted as collateral. `signal` sits at a 63.5% cache hit ratio.
+
+**This one mechanism explains everything that was open:**
+
+- the same build measuring 0.014 s and 0.44 s minutes apart (cache hit vs miss);
+- no local reproduction (sqlite, warm, single tenant);
+- `pool_pre_ping` measuring *worse* twice — the cost is disk I/O, not connection setup,
+  and pre-ping adds a round trip on every checkout;
+- `/defter` staying fast throughout (tiny reads);
+- the two 9–10 s episodes of 2026-09-16.
+
+**Decision.** No code change on this commit, and PR #35 is cleared: the stages that
+grew (`runs`, `page`) are ones it does not touch, `_board_settings()` is a cached
+module global, and the same fingerprint is recorded as REG-7 on builds that predate
+it. Reverting three correct fixes on a correlation the evidence contradicts would
+have been the wrong call.
+
+**What to do about it is the owner's, because one option costs money:**
+
+1. Give the board its own Postgres instance. Clean and immediate; costs a second
+   Railway database.
+2. Keep hot reads off the shared disk: the board needs only `run_id`, `count` and
+   `latest_ts`, which is a summary a tiny `alfa_` table can carry and the worker can
+   maintain, instead of a 31 MB scan on every page load. Inside our control, no
+   threshold and no contract change.
+
+Recommended: do 2 regardless, and 1 as well if the board must stay fast while the
+neighbour is busy.
+
+**Undo:** nothing to undo; this entry records a measurement and two open options.
