@@ -12,8 +12,16 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 from datetime import date
+from typing import Final
 
 from webapp.gamma import GammaContext
+
+# IV richness cutoff, as a fraction of the name's own 1y range. Production passes
+# ``regime.vol_rich_iv_pct`` from the board profile (D8); this default keeps the
+# module independently testable, which its docstring promises. The ranking and the
+# summary sentence both read it, so the number the page prints can never disagree
+# with the number that decided the ranking (registry REG-3).
+DEFAULT_RICH_THRESHOLD: Final = 0.75
 
 
 @dataclass(frozen=True)
@@ -48,7 +56,7 @@ def build_vol_board(
     earnings: dict[str, date | None],
     now: date,
     window_days: int = 30,
-    rich_threshold: float = 0.75,
+    rich_threshold: float = DEFAULT_RICH_THRESHOLD,
 ) -> list[VolBoardRow]:
     """Order names for the board: clean (no earnings in window) first, then
     earnings names; within each group, IV-rank descending (None last)."""
@@ -90,8 +98,15 @@ def build_vol_board(
     return rows
 
 
-def vol_board_summary(rows: list[VolBoardRow]) -> str:
-    """One-line descriptive triage of the board (NOT a call). Empty for no rows."""
+def vol_board_summary(
+    rows: list[VolBoardRow], *, rich_threshold: float = DEFAULT_RICH_THRESHOLD,
+) -> str:
+    """One-line descriptive triage of the board (NOT a call). Empty for no rows.
+
+    ``rich_threshold`` is only what the sentence states: the counts come from
+    ``below_threshold``, which ``build_vol_board`` already decided. Production reads
+    one profile value and hands it to both, so the stated cutoff is the used cutoff.
+    """
     if not rows:
         return ""
     total = len(rows)
@@ -103,7 +118,7 @@ def vol_board_summary(rows: list[VolBoardRow]) -> str:
     longs = sum(1 for r in rows if r.regime == "long")
     parts = [
         f"{total} name{'s' if total != 1 else ''}",
-        f"{rich_clean} rich-vol clean (IV-rank ≥75)",
+        f"{rich_clean} rich-vol clean (IV-rank ≥{round(rich_threshold * 100)})",
     ]
     if earnings_n:
         parts.append(f"{earnings_n} with earnings in window")

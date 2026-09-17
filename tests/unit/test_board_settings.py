@@ -9,6 +9,7 @@ from pydantic import ValidationError
 from ruamel.yaml import YAML
 from webapp.board.db import TABLE_PREFIX, AlfaBase, normalize_database_url
 from webapp.board.settings import BoardSettings, load_board_settings
+from webapp.vol_board import DEFAULT_RICH_THRESHOLD
 
 from uoa_detector.calibration import load_default_profile
 from uoa_detector.calibration.profile import CalibrationProfile
@@ -47,6 +48,18 @@ def test_untradable_cutoff_is_read_not_duplicated() -> None:
     assert load_default_profile().penalty_triggers.spread_pct_threshold == 15.0
     s = load_board_settings(_BOARD)
     assert s.tradability.max_tradable_spread_pct < 15.0
+
+
+def test_vol_board_cutoff_is_read_not_duplicated() -> None:
+    # REG-3: the cutoff lived as a function default in webapp/vol_board.py while the
+    # sentence the page prints spelled the same number again, so the two could drift.
+    # Production now reads this profile value and hands it to both.
+    s = load_board_settings(_BOARD)
+    assert 0 < s.regime.vol_rich_iv_pct <= 1
+    # The module keeps a default so it stays testable without a profile. If that
+    # default and the profile ever disagreed, the unit tests and production would be
+    # measuring different boards, which is exactly the failure this key removes.
+    assert s.regime.vol_rich_iv_pct == DEFAULT_RICH_THRESHOLD
 
 
 def test_content_hash_is_stable_and_sensitive() -> None:

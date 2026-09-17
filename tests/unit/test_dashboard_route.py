@@ -51,7 +51,11 @@ def test_empty_vol_board_shows_market_hours_message(monkeypatch) -> None:
     # header + an honest "populates during market hours" empty-state.
     body = _body(monkeypatch, {})
     assert "Vol-premium board" in body
-    assert "populates during US market hours" in body
+    # The empty state says the same honest thing in Turkish (owner decision K3: the
+    # UI is Turkish). The pinned intent is unchanged: the section is not hidden, and
+    # it states WHY it is empty rather than looking broken.
+    assert "ABD seansı boyunca" in body
+    assert "21:00 UTC) doluyor" in body
 
 
 def test_threshold_divider_between_rich_and_thin(monkeypatch) -> None:
@@ -59,6 +63,17 @@ def test_threshold_divider_between_rich_and_thin(monkeypatch) -> None:
     # threshold divider is rendered once between them.
     body = _body(monkeypatch, {"RICH": _ctx("RICH", 0.9), "THIN": _ctx("THIN", 0.5)})
     assert "rich-vol threshold" in body
+
+
+def test_the_divider_states_the_profile_cutoff_not_a_literal(monkeypatch) -> None:
+    # REG-3: the cutoff was spelled out three times — the ranking default, the summary
+    # sentence and this divider — so moving it in one place would have left the page
+    # stating a number it did not rank with. The divider renders the profile value.
+    from webapp.board.settings import load_board_settings
+
+    expected = round(load_board_settings().regime.vol_rich_iv_pct * 100)
+    body = _body(monkeypatch, {"RICH": _ctx("RICH", 0.9), "THIN": _ctx("THIN", 0.5)})
+    assert f"rich-vol threshold · IV-rank {expected}" in body
 
 
 def test_journal_new_prefills_from_vol_board_ticker(monkeypatch) -> None:

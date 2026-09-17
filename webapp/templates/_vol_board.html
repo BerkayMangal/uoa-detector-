@@ -19,7 +19,7 @@
     {% if row.below_threshold and not ns.crossed %}
     <div class="xl:col-span-2 flex items-center gap-3 text-xs text-gray-600 my-1">
       <span class="flex-1 h-px bg-gray-800"></span>
-      <span class="shrink-0">rich-vol threshold · IV-rank 75 — below here IV is less rich in its own 1y range</span>
+      <span class="shrink-0">rich-vol threshold · IV-rank {{ vol_rich_iv_rank }} — below here IV is less rich in its own 1y range</span>
       <span class="flex-1 h-px bg-gray-800"></span>
     </div>
     {% set ns.crossed = true %}
@@ -112,8 +112,8 @@
   <h2 class="text-lg font-bold text-white mb-2">Vol-premium board <span class="text-sm font-normal text-gray-500">· ranked by IV-rank · context only</span></h2>
   <p class="rounded-lg border border-amber-800/40 bg-amber-900/15 px-3 py-2 mb-3 text-sm text-amber-100" lang="tr" data-iv-not-sell-vol>{{ iv_not_sell_vol }}</p>
   <div class="rounded-xl border border-gray-800 bg-gray-900/40 p-4 text-sm text-gray-400">
-    No live vol data right now — the board is built from live dealer-gamma and
-    populates during US market hours (13:30–21:00 UTC). Check back after the open.
+    Şu anda canlı vol verisi yok — bu tahta canlı dealer gamma'sından kuruluyor ve
+    ABD seansı boyunca (13:30–21:00 UTC) doluyor. Açılıştan sonra tekrar bak.
   </div>
 </section>
 {% endif %}
