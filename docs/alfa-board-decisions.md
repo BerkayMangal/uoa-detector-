@@ -693,6 +693,15 @@ TTL lives in `profiles/board_v1.yaml` as `refresh.run_list_cache_seconds: 60`
 `shared_buffers` shared with an application doing 1.6 billion block reads — is
 still the owner's call under P36 option 1.
 
+**Status note added 2026-09-17 on re-land.** The cache this card describes is NOT
+in `main`. It merged as part of #37, the live board measured 19-29 s past the cold
+window (`page=16-23 s`) against 1.18-1.45 s on the reverted build in the same
+session, and the merge was reverted under the fifteen-minute rule. The four
+commits of #37 that touch no production code were brought back separately; the
+cache commit (`11b7968`) is held out until the page stage can name its own cost
+(P41). What this card records about the design still stands; what it implies
+about the deployed state does not, yet.
+
 ## P38. The append-only rule now binds twenty tables, not three
 
 Contract §4.2 states the rule in prose: append-only tables hold forward evidence
