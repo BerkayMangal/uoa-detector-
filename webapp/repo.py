@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import logging
 import os
+import time
 from dataclasses import dataclass
 from datetime import datetime
 from typing import TYPE_CHECKING
@@ -21,7 +22,7 @@ from uoa_detector.backtest.sqlite_models import SignalRow
 from uoa_detector.backtest.store import StoredSignal
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Callable, Sequence
 
 _logger = logging.getLogger(__name__)
 _DEFAULT_URL = "sqlite:///webapp/seed.db"
@@ -160,3 +161,75 @@ class SignalRepo:
         infos = [RunInfo(run_id=r[0], count=int(r[1]), latest_ts=r[2]) for r in rows]
         infos.sort(key=lambda i: (i.latest_ts is not None, i.latest_ts), reverse=True)
         return infos
+
+    def latest_ts(self, run_id: str) -> datetime | None:
+        """Newest event time in ONE run — the freshness line's only input.
+
+        Phase 5.2.PERF8: ``runs()`` is a GROUP BY over the whole ``signal``
+        table and is cached (see ``RunListCache``); this is not. It is a
+        single-run ``max(ts)`` served by ``ix_signal_run_ts``, so the page can
+        show a cached run list and still state the true age of the last print.
+        Caching this too would let "Son baskı 3 dk önce" keep saying 3 dk for
+        as long as the cache lives, which is the one thing the board may never
+        do.
+        """
+        stmt = select(func.max(SignalRow.ts)).where(SignalRow.run_id == run_id)
+        with self._session() as session:
+            value = session.execute(stmt).scalar_one_or_none()
+        return value
+
+
+class RunListCache:
+    """A time-boxed cache in front of ``SignalRepo.runs()``.
+
+    Why: ``runs()`` groups the whole ``signal`` table. On the production
+    Postgres that table is evicted from a 128 MB ``shared_buffers`` by a much
+    larger co-tenant application (decision P36), so every board render read
+    ~28 MB from disk. The query itself is ~20 ms warm; the cost is the cold
+    read, and the fix is to stop paying it on every request.
+
+    Two deliberate limits:
+
+    * **Errors are not cached.** A failing read propagates, so the route's
+      "veriyi okuyamadım" state still appears during a real outage instead of
+      a stale list pretending nothing is wrong.
+    * **``latest_ts`` is not served from here.** The route re-reads the active
+      run's newest timestamp through ``SignalRepo.latest_ts`` on every
+      request. Only the run inventory (ids and counts) ages.
+    """
+
+    def __init__(
+        self,
+        repo: SignalRepo,
+        ttl_seconds: float,
+        *,
+        clock: Callable[[], float] = time.monotonic,
+    ) -> None:
+        self._repo = repo
+        self._ttl = float(ttl_seconds)
+        self._clock = clock
+        self._value: list[RunInfo] | None = None
+        self._fetched_at: float | None = None
+
+    @property
+    def repo(self) -> SignalRepo:
+        """The repo this cache is bound to; callers compare identity to detect
+        a replaced singleton (see ``webapp.main._run_cache``)."""
+        return self._repo
+
+    def runs(self) -> list[RunInfo]:
+        now = self._clock()
+        if (
+            self._value is not None
+            and self._fetched_at is not None
+            and now - self._fetched_at < self._ttl
+        ):
+            return self._value
+        value = self._repo.runs()  # a raised error is NOT cached (see docstring)
+        self._value = value
+        self._fetched_at = now
+        return value
+
+    def invalidate(self) -> None:
+        self._value = None
+        self._fetched_at = None

@@ -68,6 +68,10 @@ refresh:
   # day's request budget (review FB-H1/FB-02: 84 attempts x 40 requests before this).
   daily_job_max_attempts: 4
   closed_market_sleep_seconds: 300
+  # Phase 5.2.PERF8 (key was missing): how long the board may serve a cached run
+  # inventory. Only ids and counts age; the freshness line re-reads the active
+  # run's max(ts) every request, so "Son baskı ... önce" is never cached.
+  run_list_cache_seconds: 60
   daily_limit_backoff_seconds: 1800
 
 regime:
