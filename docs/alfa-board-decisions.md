@@ -741,3 +741,24 @@ backtests. A backtest that can see the future manufactures edge, which is the
 same failure `docs/edge_to_money.md` exists to catch. The guard is in `main` and
 correct; what was missing was proof it stays there. The older test is kept — it
 covers the unreachable-quote path — but it is not the one holding the line.
+
+## P40. A test that only passed because another directory ran first
+
+Found while proving each commit of the P37–P39 branch green on its own (D2).
+`pytest tests/unit` failed one test on `main` — and so did running that file
+alone — while the full `pytest -q` gate stayed green, which is why nobody saw it.
+
+`test_warning_logged_for_commonly_tuned_missing` reads the warning through
+`caplog`, which only sees a structlog message when structlog is wired to the
+stdlib logger. Nothing in that file wires it. Something under `tests/integration`
+does, and `tests/integration` collects before `tests/unit`, so in a full run the
+test inherited a configuration it never established. Alone, structlog used its
+default logger, no stdlib record existed, and the assertion failed.
+
+The test now wires structlog itself and restores the prior configuration
+afterwards. Same class of defect as P39: a test asserting against a state it does
+not set up is not testing what its name says. Neither was a production bug, and
+both were only visible under a run the normal gate does not perform.
+
+Worth keeping: the project gate is `pytest -q`, which hides order dependence by
+construction. Running a subdirectory alone is a cheap way to surface it.
