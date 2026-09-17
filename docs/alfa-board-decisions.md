@@ -522,3 +522,50 @@ production later needs to know that before trusting a quiet log.
 
 **Undo:** nothing to undo once removed; to re-enable, re-add the timing block
 and raise its level.
+
+## P32. A job that no registry holds never runs, and the test that covered it asserted its own construction
+
+FAZ C2's daily outcome job — the counterfactual scoring that gives the pass
+ledger its entire point — was written, reviewed, tested and shipped, and then
+never ran. `build_registry` returned six jobs and never appended it. Production
+proved it on 2026-09-17: `alfa_job_run` held `oi_confirm`, `catalysts`,
+`gamma_history`, `etf_holdings`, `daily_close` and `delayed` for two dates, and
+no `outcomes` marker for any date. `alfa_outcome` did not exist in the database.
+
+The test named `test_faz_c_appends_its_outcome_job_with_one_entry` built the
+extension itself — `extended = (*build_registry(settings), outcomes)` — and then
+asserted that `extended` ended with the outcome job. It asserted its own
+construction, so it could not fail, and 4,000 green tests said nothing about
+whether the job was wired.
+
+**Decision.** `build_registry` appends the entry through `outcome_jobs()`, so the
+job's time and body have one owner; `_as_daily_job` is where `JobContext` is
+checked against the job's Protocol under `mypy --strict`, keeping
+`outcome_job.py` free of an import cycle; the refresher creates `alfa_outcome`
+alongside the other daily-job tables. The test now asserts what the refresher
+receives.
+
+**The general rule this earns:** a test whose subject is *wiring* must read the
+value the production caller reads. If the test constructs the composition it is
+checking, it is testing the test.
+
+**Undo:** drop the appended entry from `build_registry`; the job stops running
+and nothing else changes — `alfa_outcome` is append-only and survives.
+
+## P33. The live auditor failed a correct page for the second time
+
+`scripts/audit_board_html.py` decides whether a deploy is trusted, so a false
+positive in it costs what a regression costs. On 2026-09-16 it read DAR rows as
+unquoted; on 2026-09-17 it demanded the literal `AMA` on every row and failed
+four rows that rendered R-CA1's other legal shape — the contract's
+`Bariz bir karşı argüman bulunamadı — bu bir onay değildir` followed by
+`Bakılanlar: ...`, which is exactly what the contract requires when nothing
+counts against a row.
+
+**Decision.** The check accepts either shape and still fails a row that carries
+neither, and still fails the fallback without its checked list.
+`tests/unit/test_audit_script.py` pins both directions and the vacuity guard.
+The strings are read from the frozen copy, never spelled out in the script.
+
+**Undo:** restore the single `"AMA" in row` test; the auditor then fails honest
+pages whenever a row has no counter-evidence.
