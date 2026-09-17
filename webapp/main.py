@@ -22,15 +22,18 @@ import contextlib
 import logging
 import os
 import secrets
+from contextvars import ContextVar
 from datetime import UTC, datetime
 from pathlib import Path
 from time import perf_counter
-from typing import TYPE_CHECKING, ParamSpec, TypeVar
+from typing import TYPE_CHECKING, Any, ParamSpec, TypeVar
 from urllib.parse import urlencode, urlsplit
 
 from fastapi import FastAPI, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
+from sqlalchemy import event
+from sqlalchemy.engine import Engine
 from starlette.datastructures import Headers
 from starlette.responses import PlainTextResponse
 
@@ -472,6 +475,49 @@ def _now() -> datetime:
     return datetime.now(UTC)
 
 
+# Phase 5.2.PERF9b: which half of a source's time is SQL and which is everything
+# else. The four web engines are created with no pool arguments at all, so
+# SQLAlchemy's defaults apply (pool_size=5, max_overflow=10, pool_timeout=30) and
+# the 19-29 s renders sit just under that timeout. A source can be slow because
+# its query is slow or because it waited for a connection; those are different
+# bugs with different fixes, and one number cannot tell them apart. The listeners
+# below are registered on the Engine CLASS, so every engine is covered without
+# touching any repository constructor.
+_SOURCE_MARKS: ContextVar[dict[str, float] | None] = ContextVar("_source_marks", default=None)
+_SOURCE_NAME: ContextVar[str] = ContextVar("_source_name", default="")
+
+
+@event.listens_for(Engine, "before_cursor_execute")
+def _sql_started(
+    conn: Any, cursor: Any, statement: Any, parameters: Any, context: Any, executemany: Any,
+) -> None:
+    del cursor, statement, parameters, context, executemany
+    conn.info["_sql_t0"] = perf_counter()
+
+
+@event.listens_for(Engine, "after_cursor_execute")
+def _sql_finished(
+    conn: Any, cursor: Any, statement: Any, parameters: Any, context: Any, executemany: Any,
+) -> None:
+    del cursor, statement, parameters, context, executemany
+    marks = _SOURCE_MARKS.get()
+    started = conn.info.pop("_sql_t0", None)
+    if marks is None or started is None:
+        return
+    key = f"{_SOURCE_NAME.get()}.sql"
+    marks[key] = marks.get(key, 0.0) + (perf_counter() - started)
+
+
+@event.listens_for(Engine, "engine_connect")
+def _connection_checked_out(conn: Any) -> None:
+    del conn
+    marks = _SOURCE_MARKS.get()
+    if marks is None:
+        return
+    key = f"{_SOURCE_NAME.get()}.conns"
+    marks[key] = marks.get(key, 0.0) + 1.0
+
+
 _P = ParamSpec("_P")
 _R = TypeVar("_R")
 
@@ -491,9 +537,20 @@ def _timed(
 
     def wrapper(*args: _P.args, **kwargs: _P.kwargs) -> _R:
         start = perf_counter()
+        # Restore by assignment rather than with a ContextVar token. The durability
+        # scan in test_alfa_card_durability rejects any new destructive-looking call
+        # in webapp/, and it is right to: that guard exists so a table-destroying
+        # path cannot slip in unnoticed, and a textual scan cannot read intent.
+        # Sources never nest, so putting the previous values back is equivalent.
+        previous_marks = _SOURCE_MARKS.get()
+        previous_name = _SOURCE_NAME.get()
+        _SOURCE_MARKS.set(marks)
+        _SOURCE_NAME.set(name)
         try:
             return fn(*args, **kwargs)
         finally:
+            _SOURCE_NAME.set(previous_name)
+            _SOURCE_MARKS.set(previous_marks)
             marks[name] = marks.get(name, 0.0) + (perf_counter() - start)
 
     return wrapper

@@ -122,3 +122,50 @@ def test_the_assertion_can_fail_when_a_source_goes_unmeasured(
     names = _logged_names(caplog)
     assert "catalyst" not in names
     assert names != set(_EXPECTED)
+
+
+def test_the_split_records_real_sql_and_real_connections() -> None:
+    """Non-vacuity for the SQL/connection split (Phase 5.2.PERF9b).
+
+    The point of splitting a source's time is to tell "the query is slow" from
+    "it waited for a connection". A split that records nothing would look
+    identical to a source with no SQL in it, so this drives a real engine and
+    asserts both halves land. The four web engines carry no pool arguments, so
+    SQLAlchemy's defaults apply and a checkout wait is a real possibility; this
+    is the instrument that would show it.
+    """
+    import webapp.main as m
+    from sqlalchemy import create_engine, text
+
+    engine = create_engine("sqlite://")
+    marks: dict[str, float] = {}
+
+    def probe() -> int:
+        with engine.connect() as conn:
+            return int(conn.execute(text("SELECT 1")).scalar_one())
+
+    assert m._timed(marks, "probe", probe)() == 1
+    assert marks["probe"] > 0.0
+    assert marks.get("probe.sql", 0.0) > 0.0, "SQL time was not recorded"
+    assert marks.get("probe.conns", 0.0) >= 1.0, "the connection was not counted"
+    # And the split is bounded by the whole: SQL cannot exceed the source's time.
+    assert marks["probe.sql"] <= marks["probe"]
+
+
+def test_marks_outside_a_source_are_not_attributed() -> None:
+    """A query issued outside any wrapped source must not land on another name.
+
+    The listeners are registered on the Engine class, so every engine in the
+    process fires them — including the refresher's and the worker's. Without the
+    context guard those would be charged to whichever source ran last.
+    """
+    from sqlalchemy import create_engine, text
+
+    engine = create_engine("sqlite://")
+    with engine.connect() as conn:
+        conn.execute(text("SELECT 1"))  # no _timed wrapper is active here
+    # Nothing to assert on a dict that was never created: the guard is that this
+    # does not raise, and that no mark dict exists to be polluted.
+    import webapp.main as m
+
+    assert m._SOURCE_MARKS.get() is None
