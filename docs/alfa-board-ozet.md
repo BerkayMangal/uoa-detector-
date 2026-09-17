@@ -10,8 +10,8 @@ sürekli yazılır. Doğrulanmamış her şey "DOĞRULANMADI" diye etiketlidir.
 - **Durum: ÇALIŞIYOR** — FAZ A, B, C ve D canlıda.
 - **URL:** https://uoa-detector-production.up.railway.app/ — kullanıcı adı/şifre masaüstündeki
   `uoa-dashboard-login.txt` dosyasında.
-- **Canlı SHA:** `3c9368f` — tahta, raylar, karar kartları, FAZ B/D, pas defteri, dolum kaydı.
-- **Son doğrulama:** 2026-09-16 14:41Z / 17:41 TRT, seans içinde ve deploy'dan 5 dakika sonra — sağlık 200, şifresiz 401, dürüstlük denetimi **PASS** (20 satır: 16 İŞLENİR, 4 DAR), **tahta 0,56-0,80 saniyede**, `/defter` 0,22 saniyede açılıyor (hedef 1,5 s).
+- **Canlı SHA:** `957143d` — tahta, raylar, karar kartları, FAZ B/D, pas defteri, dolum kaydı, günlük sonuç işi.
+- **Son doğrulama:** 2026-09-17 12:33Z / 15:33 TRT, deploy'dan 7 dakika sonra (soğuk pencere dışında) — sağlık 200 ve ayakta olan commit'i doğru bildiriyor, şifresiz 401, dürüstlük denetimi **PASS** (20 satır), **tahta 0,74-0,92 saniyede**, sunucu tarafı 0,46-0,60 s, `/defter` 0,23 saniyede açılıyor (hedef 1,5 s). Bu ölçüm açılıştan önce alındı, o yüzden her satır "kotasyon yok" okuyor; gerçek kotasyonlu kontrol açılıştan sonra yapılacak.
 - **Durma sebebi:** — (çalışma sürüyor).
 - **Sırada:** tahtanın yavaşlığında suçlu kaynağı isimlendiren ölçüm (canlıya alınıyor), sonra düzeltme; ardından 13:30Z açılışında canlı veriyle doğrulama.
 
@@ -101,7 +101,7 @@ değerlerini söylediğin anda bu hücre anlamlı sayıya döner (aşağıda 1. 
 
 ## 6. YOKLUĞUNDA ALDIĞIM KARARLAR
 
-Hepsi `docs/alfa-board-decisions.md` P21–P27'de, gerekçesi ve nasıl geri alınacağıyla.
+Hepsi `docs/alfa-board-decisions.md` P21–P33'te, gerekçesi ve nasıl geri alınacağıyla.
 
 | # | Karar | Geri almak için |
 |---|---|---|
@@ -110,7 +110,9 @@ Hepsi `docs/alfa-board-decisions.md` P21–P27'de, gerekçesi ve nasıl geri al�
 | P22 | Günlük işler için saat + kalıcı gün işareti (restart'ta ne atlıyor ne tekrarlıyor) | "Claude: P22'yi geri al" |
 | P21 | Gecikmeli ailelerde "hiç sorulmadı" ile "soruldu, kayıt yok" ayrımı için ek tablo | "Claude: P21'i geri al" |
 | P26 | Karar kartları FAZ B beklenmeden yazıldı (tek geri dönüşsüz madde o) | "Claude: P26'yı geri al" |
-| — | **FAZ B+D canlıdan geri alındı** (9,4 s render); kod dalda duruyor | zaten geri alındı; geri getirmek için hız düzeltmesi şart |
+| — | FAZ B+D gün içinde 9,4 s render yüzünden geri alındı, sebebi bulundu (satır şablonu her satırda derleniyordu), düzeltildi ve **geri getirildi; şu an canlıda** | "Claude: FAZ B/D'yi tekrar geri al" |
+| P32 | FAZ C'nin günlük sonuç işi kayıt defterine eklendi — yazılmıştı ama **hiç çalışmamıştı** | "Claude: P32'yi geri al" |
+| P33 | Canlı dürüstlük denetçisi, karşı argüman bulunamayan satırları artık haksız yere düşürmüyor | "Claude: P33'ü geri al" |
 
 ## 7. PARA KARARI — THETADATA
 
@@ -131,6 +133,11 @@ yapılmadı, indirme başlatılmadı. Ayrıntı: `docs/thetadata-decision.md`.
 | 5 | UW volatilite eklentisi alınsın mı? (VIX vade yapısı) | Alınmaz; VIX vade yapısı "kapsam-dışı" yazar |
 
 ## 9. OLMAYANLAR / BOZULANLAR
+
+- **17 Eylül'de üretimde bulunan ve düzeltilen iki şey:**
+  1. **Pas defterinin günlük sonuç işi hiç çalışmamıştı.** İş yazılmış, test edilmiş ve canlıya çıkmıştı, ama günlük iş listesine hiç eklenmemişti; `alfa_job_run` tablosunda tek bir `outcomes` kaydı yoktu ve `alfa_outcome` tablosu veritabanında hiç oluşmamıştı. Bunu yakalaması gereken test, kontrol ettiği listeyi **kendi kuruyordu**, yani hiçbir zaman kırılamazdı. Düzeltildi; kanıtı bu akşam 17:30 ET'de `alfa_job_run`'da `outcomes` satırının düşmesi.
+  2. **Canlı denetçi doğru bir sayfayı düşürdü** (bu ikinci kez): karşı argüman bulunamayan satırlar sözleşmenin ikinci biçimini basıyor, denetçi onu tanımıyordu. Düzeltildi ve teste bağlandı.
+- **Dünkü akşam işleri çalıştı** (16 Eylül 21:02Z): günlük kapanışlar 2.520 satır, gecikmeli aileler 857 satır, ETF içerikleri 216 satır. Sabah işleri de çalıştı (17 Eylül 11:15Z).
 
 - **Eksik özellik yok.** Karar kartları, pas defteri `/defter`, dolum kaydı, FAZ B ve FAZ D'nin tamamı
   canlıda ve dürüstlük denetiminden geçiyor.
@@ -154,7 +161,7 @@ yapılmadı, indirme başlatılmadı. Ayrıntı: `docs/thetadata-decision.md`.
 - **Doğrulama rayları canlıda:** `/health` hangi commit'in ayakta olduğunu söylüyor;
   `scripts/verify_live_board.sh` deploy sonrası sağlık + şifre duvarı + açılma süresi + dürüstlük denetimi +
   `alfa_` satır sayılarını tek komutta koşuyor; `scripts/audit_board_html.py` kuralları canlı HTML üzerinde
-  denetliyor (bugün bir yanlış alarmı da düzeltildi).
+  denetliyor (şimdiye kadar iki yanlış alarmı düzeltildi; ikisi de artık teste bağlandı).
 
 ## 10. YAPMADIKLARIM (negatif teyit)
 
@@ -169,12 +176,25 @@ yapılmadı, indirme başlatılmadı. Ayrıntı: `docs/thetadata-decision.md`.
 ## 11. SIRADAKİ OTURUMA YAPIŞTIR
 
 ```
-Alfa Board (Phase 5.2) devam. Oku: docs/alfa-board-ozet.md, docs/alfa-board-decisions.md,
-docs/phase-5.2-alfa-board-acceptance.md (donmuş), docs/phase-5.2-decision-cards-acceptance.md (donmuş).
-Canlı: https://uoa-detector-production.up.railway.app/ · main = a01406c (FAZ A).
-Sıradaki iş: FAZ C1 karar kartları (Logla/Pas geç), sonra FAZ B/D arayüzü, sonra C3 dolum, C2 /defter.
-Kurallar: eşik değiştirme, donmuş sözleşmeyi düzenleme, alfa_ tablolarını düşürme, tek seferde tek PR,
-her merge'den sonra canlıyı doğrula, bozuksa geri al.
+Alfa Board (Phase 5.2) devam. Oku, bu sırayla: docs/alfa-board-ozet.md,
+docs/alfa-board-decisions.md (P1-P33), CLAUDE.md (D1-D12).
+Donmuş, asla düzenleme: docs/phase-5.2-alfa-board-acceptance.md,
+docs/phase-5.2-decision-cards-acceptance.md.
+Canlı: https://uoa-detector-production.up.railway.app/ · main = 957143d
+İlk iş: RAILWAY_DIR=<railway dizini> bash scripts/verify_live_board.sh 957143d
+
+Açık işler, sırayla:
+1. alfa_job_run'da `outcomes` kaydı var mı (17:30 ET). Yoksa: iş çalıştı mı, hata mı verdi?
+2. Render dalgalanması: gün içinde iki kez 9-10 s görüldü, sebebi isimlenmedi.
+   Elenenler (TEKRAR DENEME): veritabanı (1,2 ms, indeksli), şablon (düzeltildi, 0,02 s),
+   pool_pre_ping (iki kez denendi, iki kez 12 s, iki kez geri alındı), veri hacmi (çürütüldü).
+   Sıradaki adım: build_alfa_page içinde kaynak-başına süre, webapp.main'den loglanır.
+3. Berkay cevapladıysa: sermaye/R/komisyon (profiles/board_v1.yaml sizing.*).
+
+Kurallar: eşik değiştirme, donmuş sözleşmeyi düzenleme, alfa_ tablolarını düşürme,
+aynı anda tek PR, her merge'den sonra canlıyı doğrula, bozuksa 15 dk içinde geri al.
+Ölçümü deploy'dan EN AZ 5 dakika sonra al (soğuk pencere aynı sürümü 5-13 s gösterebiliyor).
+Yama uyguladıysan grep ile doğrula; sessizce uygulanmayan yama bu projede üç kez oldu.
 ```
 
 ## 12. EK — mühendislik detayı (okumana gerek yok)
