@@ -803,3 +803,44 @@ this week that could not fail.
 
 **Undo:** remove `_timed`, its call sites and the log line; the board renders
 identically either way.
+
+## P42. The deploy rail only ran on one laptop
+
+`scripts/verify_live_board.sh` is the only thing that checks a deploy end to end,
+and it read every input it needs — the basic-auth pair and `DATABASE_URL` — from
+`railway variables --json` in a linked project directory. That is one laptop with
+the Railway CLI installed and logged in. Anywhere else (a cloud session, CI, a
+second machine) the credential lookup returned nothing, the board fetch got a
+401, and the run reported `VERIFY: FAIL` — a failure of the runner, described as
+a failure of the board.
+
+**Decision.** Each input is resolved from the environment first and from the
+Railway CLI second: `WEB_AUTH_USER`, `WEB_AUTH_PASSWORD`, `DATABASE_URL`,
+plus the `BOARD_URL` that was already overridable. Nothing about the laptop path
+changes; when the CLI is there it still answers, and no credential is printed.
+
+**A skipped check is not a passed check.** A check whose input is absent now
+reports `SKIP` and the run ends `VERIFY: PARTIAL` with **exit code 2**, distinct
+from PASS (0) and FAIL (1). A rail that reported a pass over checks it never ran
+would be the same vacuous-audit mistake the honesty auditor already refuses to
+make (P25).
+
+**One bug found on the way.** The `alfa_` row-count check pipes `psql` through
+two `sed` filters, so the pipeline reported `sed`'s status: a database that
+refused the connection read as a pass. It is now `PIPESTATUS[0]`, captured on the
+line after the pipeline, and a refused connection is a `FAIL`.
+
+**What this does not fix.** Check 4 needs a direct Postgres connection, which an
+HTTPS-only sandbox does not have; there, `DATABASE_URL` is left unset and the
+check reports SKIP. The board host must also be reachable from wherever the rail
+runs — a session whose egress policy denies it cannot check it at all.
+
+**Tests.** `tests/unit/test_verify_live_board_script.py` runs the rail against a
+stub board on localhost: the skip path, the env-credential path, the sha
+mismatch, the refused database, and that the password never reaches the output.
+
+(The entry is P42, not the next number after P40: PR #38 takes P41. P37–P40 landed
+with #39 in `400cdf0`; the number was read off the open branches before either
+merged, so the two appends did not collide.)
+
+**Undo:** restore the Railway-only `auth_curl_cfg` and the single `exit "$fail"`.

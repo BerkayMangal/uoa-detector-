@@ -199,6 +199,8 @@ Donmuş, asla düzenleme: docs/phase-5.2-alfa-board-acceptance.md,
 docs/phase-5.2-decision-cards-acceptance.md.
 Canlı: https://uoa-detector-production.up.railway.app/ · main = 957143d
 İlk iş: RAILWAY_DIR=<railway dizini> bash scripts/verify_live_board.sh 957143d
+(Railway CLI yoksa: WEB_AUTH_USER / WEB_AUTH_PASSWORD / DATABASE_URL ortam
+değişkenlerinden okunur; eksik olan kontrol SKIP der ve çıkış kodu 2 = PARTIAL.)
 
 Açık işler, sırayla:
 1. alfa_job_run'da `outcomes` kaydı var mı (17:30 ET). Yoksa: iş çalıştı mı, hata mı verdi?
