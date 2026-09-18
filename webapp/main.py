@@ -22,15 +22,18 @@ import contextlib
 import logging
 import os
 import secrets
+from contextvars import ContextVar
 from datetime import UTC, datetime
 from pathlib import Path
 from time import perf_counter
-from typing import TYPE_CHECKING, TypeVar
+from typing import TYPE_CHECKING, Any, ParamSpec, TypeVar
 from urllib.parse import urlencode, urlsplit
 
 from fastapi import FastAPI, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
+from sqlalchemy import event
+from sqlalchemy.engine import Engine
 from starlette.datastructures import Headers
 from starlette.responses import PlainTextResponse
 
@@ -472,6 +475,87 @@ def _now() -> datetime:
     return datetime.now(UTC)
 
 
+# Phase 5.2.PERF9b: which half of a source's time is SQL and which is everything
+# else. The four web engines are created with no pool arguments at all, so
+# SQLAlchemy's defaults apply (pool_size=5, max_overflow=10, pool_timeout=30) and
+# the 19-29 s renders sit just under that timeout. A source can be slow because
+# its query is slow or because it waited for a connection; those are different
+# bugs with different fixes, and one number cannot tell them apart. The listeners
+# below are registered on the Engine CLASS, so every engine is covered without
+# touching any repository constructor.
+_SOURCE_MARKS: ContextVar[dict[str, float] | None] = ContextVar("_source_marks", default=None)
+_SOURCE_NAME: ContextVar[str] = ContextVar("_source_name", default="")
+
+
+@event.listens_for(Engine, "before_cursor_execute")
+def _sql_started(
+    conn: Any, cursor: Any, statement: Any, parameters: Any, context: Any, executemany: Any,
+) -> None:
+    del cursor, statement, parameters, context, executemany
+    conn.info["_sql_t0"] = perf_counter()
+
+
+@event.listens_for(Engine, "after_cursor_execute")
+def _sql_finished(
+    conn: Any, cursor: Any, statement: Any, parameters: Any, context: Any, executemany: Any,
+) -> None:
+    del cursor, statement, parameters, context, executemany
+    marks = _SOURCE_MARKS.get()
+    started = conn.info.pop("_sql_t0", None)
+    if marks is None or started is None:
+        return
+    key = f"{_SOURCE_NAME.get()}.sql"
+    marks[key] = marks.get(key, 0.0) + (perf_counter() - started)
+
+
+@event.listens_for(Engine, "engine_connect")
+def _connection_checked_out(conn: Any) -> None:
+    del conn
+    marks = _SOURCE_MARKS.get()
+    if marks is None:
+        return
+    key = f"{_SOURCE_NAME.get()}.conns"
+    marks[key] = marks.get(key, 0.0) + 1.0
+
+
+_P = ParamSpec("_P")
+_R = TypeVar("_R")
+
+
+def _timed(
+    marks: dict[str, float], name: str, fn: Callable[_P, _R],
+) -> Callable[_P, _R]:
+    """Wrap one board data source so its wall time lands in ``marks``.
+
+    Phase 5.2.PERF9. The page stage has measured anywhere from 0.7 s to 23 s on
+    identical code, and nothing said WHICH read cost it: ``build_alfa_page`` runs
+    a dozen independent sources and reports one number. Timing them here rather
+    than inside the page model is deliberate — only ``webapp.main``'s logger
+    reaches the Railway deployment log (REG-9), and a source that is added later
+    but not wrapped is caught by a test rather than silently going unmeasured.
+    """
+
+    def wrapper(*args: _P.args, **kwargs: _P.kwargs) -> _R:
+        start = perf_counter()
+        # Restore by assignment rather than with a ContextVar token. The durability
+        # scan in test_alfa_card_durability rejects any new destructive-looking call
+        # in webapp/, and it is right to: that guard exists so a table-destroying
+        # path cannot slip in unnoticed, and a textual scan cannot read intent.
+        # Sources never nest, so putting the previous values back is equivalent.
+        previous_marks = _SOURCE_MARKS.get()
+        previous_name = _SOURCE_NAME.get()
+        _SOURCE_MARKS.set(marks)
+        _SOURCE_NAME.set(name)
+        try:
+            return fn(*args, **kwargs)
+        finally:
+            _SOURCE_NAME.set(previous_name)
+            _SOURCE_MARKS.set(previous_marks)
+            marks[name] = marks.get(name, 0.0) + (perf_counter() - start)
+
+    return wrapper
+
+
 def _build_board_page(
     prints: Sequence[BoardPrint] | None,
     *,
@@ -487,38 +571,82 @@ def _build_board_page(
     never saw, and would quietly stop freezing fields added here later.
     """
     settings = _board_settings()
-    return alfa_page.build_alfa_page(
+    marks: dict[str, float] = {}
+    page = alfa_page.build_alfa_page(
         prints,
         settings,
         gate_on=gate_on,
         spread_cutoff_pct=_spread_cutoff_pct(),
         now=_now(),
-        quote_source=lambda symbols: alfa_page.db_quote_source(_board_reader().engine)(symbols),
-        evidence_source=lambda run_id, requests: alfa_page.db_evidence_source(_board_reader().engine)(
-            run_id, requests,
+        # Every source stays lazy: with prints=None build_alfa_page returns before
+        # calling any of them, and the reader is never touched (a failed run read
+        # must still render "veriyi okuyamadım", not raise).
+        quote_source=_timed(
+            marks, "quote",
+            lambda symbols: alfa_page.db_quote_source(_board_reader().engine)(symbols),
+        ),
+        evidence_source=_timed(
+            marks, "evidence",
+            lambda run_id, requests: alfa_page.db_evidence_source(_board_reader().engine)(
+                run_id, requests,
+            ),
         ),
         legacy_scores=_legacy_scores(),
-        profile_hash_source=lambda run_id, event_ids: alfa_page.db_profile_hash_source(_board_reader().engine)(
-            run_id, event_ids,
+        profile_hash_source=_timed(
+            marks, "profile_hash",
+            lambda run_id, event_ids: alfa_page.db_profile_hash_source(_board_reader().engine)(
+                run_id, event_ids,
+            ),
         ),
-        delayed_source=lambda tickers, today: alfa_page.db_delayed_source(
-            _board_reader().engine, settings.delayed,
-        )(tickers, today),
-        atm_source=lambda tickers: alfa_page.db_atm_source(_board_reader().engine)(tickers),
-        flow_since_source=lambda keys: alfa_page.db_flow_since_source(_board_reader().engine)(keys),
-        oi_source=lambda keys: alfa_page.db_oi_source(_board_reader().engine)(keys),
-        catalyst_source=lambda keys, moment: alfa_page.db_catalyst_source(
-            _board_reader().engine, settings,
-        )(keys, moment),
-        regime_source=lambda moment: alfa_page.db_regime_source(_board_reader().engine)(moment),
+        delayed_source=_timed(
+            marks, "delayed",
+            lambda tickers, today: alfa_page.db_delayed_source(
+                _board_reader().engine, settings.delayed,
+            )(tickers, today),
+        ),
+        atm_source=_timed(
+            marks, "atm",
+            lambda tickers: alfa_page.db_atm_source(_board_reader().engine)(tickers),
+        ),
+        flow_since_source=_timed(
+            marks, "flow_since",
+            lambda keys: alfa_page.db_flow_since_source(_board_reader().engine)(keys),
+        ),
+        oi_source=_timed(
+            marks, "oi",
+            lambda keys: alfa_page.db_oi_source(_board_reader().engine)(keys),
+        ),
+        catalyst_source=_timed(
+            marks, "catalyst",
+            lambda keys, moment: alfa_page.db_catalyst_source(
+                _board_reader().engine, settings,
+            )(keys, moment),
+        ),
+        regime_source=_timed(
+            marks, "regime",
+            lambda moment: alfa_page.db_regime_source(_board_reader().engine)(moment),
+        ),
         # B6: the open journal, the focused-ETF holdings and the sectors behind the strip.
         # A failed read is handled inside build_alfa_page, which then claims nothing.
-        trades_source=lambda: _journal().list("open"),
-        holdings_source=lambda: alfa_page.db_holdings_source(_board_reader().engine)(),
-        sector_source=lambda tickers: alfa_page.db_sector_source(_board_reader().engine)(tickers),
+        trades_source=_timed(marks, "trades", lambda: _journal().list("open")),
+        holdings_source=_timed(
+            marks, "holdings",
+            lambda: alfa_page.db_holdings_source(_board_reader().engine)(),
+        ),
+        sector_source=_timed(
+            marks, "sector",
+            lambda tickers: alfa_page.db_sector_source(_board_reader().engine)(tickers),
+        ),
         profile_resolver=alfa_page.resolve_writing_profile,
         run_latest_ts=run_latest_ts,
     )
+    # Phase 5.2.PERF9: one line per render naming which source cost what. The page
+    # stage has measured 0.7 s and 23 s on identical code; this is what tells them apart.
+    _logger.warning(
+        "board sources: %s",
+        " ".join(f"{key}={value:.3f}" for key, value in sorted(marks.items())),
+    )
+    return page
 
 
 # ---------------------------------------------------------------------------
