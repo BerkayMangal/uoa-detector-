@@ -149,8 +149,14 @@ def score_breakdown(
 ) -> dict[str, float]:
     """Return per-component weighted contributions for the decision record.
 
-    Components sum to ``combined_score_pre_penalty``. Penalty totals are
-    returned separately as ``penalty_<name>`` keys (negative).
+    The components sum to ``combined_score_pre_penalty`` — an identity the tests
+    now assert instead of the docstring merely claiming it. Before the 2026-09-19
+    audit this function left out the cross-module adjustments aimed at the
+    combined score, so any event carrying M24's post-earnings IV penalty produced
+    a breakdown that did not add up to the number it was breaking down, and the
+    decision record, the digest and the CSV export all showed it.
+
+    Penalty totals are returned separately as ``penalty_<name>`` keys (negative).
     """
     p = profile or load_default_profile()
     w = p.scoring
@@ -177,6 +183,17 @@ def score_breakdown(
         "sector_confirmation": w.sector_confirmation * sector,
         "time_of_day": w.time_of_day * tod,
     }
+    # Phase 3.4.4's cross-module rail: adjustments aimed at the combined score
+    # itself rather than at a sub-score. ``compute_combined_score`` adds BOTH
+    # target spellings to ``pre``, so a breakdown that omits them cannot equal
+    # the score it explains. Only emitted when non-zero, so the usual event's
+    # breakdown keeps exactly the seven component keys it has always had.
+    combined_adjustment = (
+        _adjustments_for(event, "combined_score_pre")
+        + _adjustments_for(event, "combined_score_pre_penalty")
+    )
+    if combined_adjustment:
+        breakdown["adjustment_combined"] = combined_adjustment
     for pen in event.applied_penalties:
         breakdown[f"penalty_{pen.name}"] = pen.value
     return breakdown
