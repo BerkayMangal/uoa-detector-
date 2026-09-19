@@ -86,8 +86,15 @@ def _panel() -> pd.DataFrame:
                          "implied": iv, "realised": rv, "vrp": iv - rv})
     df = pd.DataFrame(rows)
     df["regime"] = np.where(df["net_gex"] < 0, "short", "long")
-    # IV percentile within each ticker's own history
-    df["iv_pct"] = df.groupby("ticker")["implied"].rank(pct=True)
+    # IV percentile within each ticker's own history UP TO AND INCLUDING that row.
+    # The comment always said "own history"; rank(pct=True) ranked over the whole
+    # panel, so a row's percentile depended on IVs recorded after it, and that
+    # percentile is what selected the trades behind the non-overlap t = 2.64 —
+    # the repo's one surviving statistical claim (audit 2026-09-19).
+    df = df.sort_values(["ticker", "date"])
+    df["iv_pct"] = df.groupby("ticker")["implied"].transform(
+        lambda s: s.expanding().apply(lambda w: float((w <= w.iloc[-1]).mean()), raw=False),
+    )
     return df
 
 
