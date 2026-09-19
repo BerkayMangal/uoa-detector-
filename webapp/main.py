@@ -37,6 +37,7 @@ from sqlalchemy.engine import Engine
 from starlette.datastructures import Headers
 from starlette.responses import PlainTextResponse
 
+from uoa_detector.sources.market_hours import is_market_open
 from webapp import explanations, gamma, journal, pricing
 from webapp.board import alfa_page, cards, decision_ledger, fills, outcomes
 from webapp.board.copy_tr import IV_NOT_SELL_VOL
@@ -639,6 +640,10 @@ def _build_board_page(
         ),
         profile_resolver=alfa_page.resolve_writing_profile,
         run_latest_ts=run_latest_ts,
+        # Phase 5.3: the page model stays pure, so the route tells it whether the
+        # market is shut. A closed market and a stale feed look identical on the
+        # page otherwise, and only one of them is a fault.
+        market_closed=not is_market_open(_now()),
     )
     # Phase 5.2.PERF9: one line per render naming which source cost what. The page
     # stage has measured 0.7 s and 23 s on identical code; this is what tells them apart.
