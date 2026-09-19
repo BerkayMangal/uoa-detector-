@@ -254,27 +254,28 @@ def test_the_bull_and_bear_cases_stay_outside_the_fold(client: TestClient) -> No
 # ---------------------------------------------------------------------------
 
 
-def test_the_default_marker_is_on_the_spot_cell_until_the_owner_confirms(
+def test_the_spot_cell_marks_a_default_only_while_the_owner_has_not_confirmed(
     client: TestClient, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """P15: the share count rests on capital_usd and r_usd, unconfirmed as of 5.3.3.
+    """P15: the share count rests on capital_usd and r_usd.
 
-    The option size cell already discloses this. A spot cell that sized shares off
-    the same two numbers in silence would be the more misleading of the two, since
-    shares are what the owner actually buys.
+    5.3.5 recorded O3's confirmation in the profile, so the marker is gone by
+    default and this test was inverted rather than dropped: the direction worth
+    keeping is that an UNCONFIRMED capital figure still says so on a cell that
+    sizes shares, which is the more misleading of the two places it could hide.
     """
     row = _board(client)["SPT"]
-    assert _cell(row, "data-spot-default") == "(varsayılan değer)"
+    assert _cell(row, "data-spot-shares") is not None, "the frame must render for this to mean anything"
+    assert _cell(row, "data-spot-default") is None
 
     import webapp.main as m
 
-    confirmed = _SETTINGS.model_copy(
-        update={"sizing": _SETTINGS.sizing.model_copy(update={"values_confirmed_by_owner": True})},
+    unconfirmed = _SETTINGS.model_copy(
+        update={"sizing": _SETTINGS.sizing.model_copy(update={"values_confirmed_by_owner": False})},
     )
-    monkeypatch.setattr(m, "_board_settings", lambda: confirmed)
-    body = client.get("/", params={"gate": "off"}).text
-    assert "data-spot-entry" in body
-    assert "data-spot-default" not in body
+    monkeypatch.setattr(m, "_board_settings", lambda: unconfirmed)
+    row = _board(client)["SPT"]
+    assert _cell(row, "data-spot-default") == "(varsayılan değer)"
 
 
 def test_the_spot_frame_adds_no_forbidden_words(client: TestClient) -> None:

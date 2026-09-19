@@ -63,8 +63,9 @@ def test_an_expired_leg_is_left_out_of_the_at_risk_sum(settings: BoardSettings) 
     assert header.expired_trades == 1
     assert header.expired_usd == pytest.approx(200.0)
     assert header.at_risk_pct == pytest.approx(820.0 / settings.sizing.capital_usd * 100)
+    # 5.3.5: O3 is confirmed in the profile, so the header no longer marks a default.
     assert header.text == (
-        "Açıktaki prim riski: $820 · sermayenin %8.2 (varsayılan değer)"
+        "Açıktaki prim riski: $820 · sermayenin %8.2"
         " · 1 işlemin vadesi geçti ($200 hariç)"
     )
 
@@ -73,7 +74,7 @@ def test_without_an_expired_leg_the_header_is_unchanged(settings: BoardSettings)
     header = pf.capital_header([_trade("a")], settings=settings, today=_TODAY)
     assert header.expired_trades == 0
     assert header.expired_usd == pytest.approx(0.0)
-    assert header.text == "Açıktaki prim riski: $820 · sermayenin %8.2 (varsayılan değer)"
+    assert header.text == "Açıktaki prim riski: $820 · sermayenin %8.2"
 
 
 def test_shares_never_expire_and_an_unreadable_expiry_stays_counted(

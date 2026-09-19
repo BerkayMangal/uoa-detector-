@@ -223,11 +223,17 @@ def test_an_unreadable_source_print_has_no_bucket() -> None:
 
 
 def test_default_marker_follows_the_owner_confirmation() -> None:
-    assert size_text(_size()).default_marker == "(varsayılan değer)"
-    confirmed = _SETTINGS.model_copy(
-        update={"sizing": _SETTINGS.sizing.model_copy(update={"values_confirmed_by_owner": True})},
+    """5.3.5: the profile now carries O3's confirmation, so the marker is absent by default.
+
+    Inverted rather than halved. Asserting only the confirmed side would leave the
+    disclosure itself untested, and the disclosure is what stops an invented capital
+    figure from being read as the owner's own.
+    """
+    assert size_text(_size()).default_marker is None
+    unconfirmed = _SETTINGS.model_copy(
+        update={"sizing": _SETTINGS.sizing.model_copy(update={"values_confirmed_by_owner": False})},
     )
-    assert size_text(_size(settings=confirmed)).default_marker is None
+    assert size_text(_size(settings=unconfirmed)).default_marker == "(varsayılan değer)"
 
 
 def test_audit_note_discloses_where_max_r_comes_from() -> None:

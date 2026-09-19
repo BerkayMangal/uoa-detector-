@@ -109,21 +109,27 @@ def test_a_priced_row_keeps_its_quote_age_on_the_size_cell(client: TestClient) -
     assert re.fullmatch(r"kotasyon \d+ sn önce alındı", age)
 
 
-def test_the_default_marker_is_on_the_cell_until_the_owner_confirms(
+def test_the_size_cell_marks_a_default_only_while_the_owner_has_not_confirmed(
     client: TestClient, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """5.3.5 recorded O3 in the profile, so this test was inverted, not dropped.
+
+    Confirmation is now the profile's own state, so asserting it here would prove
+    nothing. What still needs pinning is the disclosure: an unconfirmed capital
+    figure must say so on the cell that spends it.
+    """
     rows = _rows(client.get("/", params={"gate": "off"}).text)
-    assert _cell(rows["CHP"], "data-size-default") == "(varsayılan değer)"
+    assert _cell(rows["CHP"], "data-size-lot") is not None
+    assert _cell(rows["CHP"], "data-size-default") is None
 
     import webapp.main as m
 
-    confirmed = _SETTINGS.model_copy(
-        update={"sizing": _SETTINGS.sizing.model_copy(update={"values_confirmed_by_owner": True})},
+    unconfirmed = _SETTINGS.model_copy(
+        update={"sizing": _SETTINGS.sizing.model_copy(update={"values_confirmed_by_owner": False})},
     )
-    monkeypatch.setattr(m, "_board_settings", lambda: confirmed)
-    body = client.get("/", params={"gate": "off"}).text
-    assert "data-size-lot" in body
-    assert "(varsayılan değer)" not in body
+    monkeypatch.setattr(m, "_board_settings", lambda: unconfirmed)
+    rows = _rows(client.get("/", params={"gate": "off"}).text)
+    assert _cell(rows["CHP"], "data-size-default") == "(varsayılan değer)"
 
 
 def test_the_max_r_disclosure_lives_only_in_the_audit_block(client: TestClient) -> None:
