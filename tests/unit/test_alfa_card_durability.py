@@ -249,14 +249,25 @@ def test_the_scan_catches_the_lines_it_exists_to_catch() -> None:
         assert not any(pattern.search(innocent) for _label, pattern in _DESTRUCTIVE), innocent
 
 
-def test_the_card_module_itself_has_no_destructive_call() -> None:
+# The one write to an existing card the contract allows: CardRepo.link_trade sets
+# trade_id once, on a log card that has none (§3). It became VISIBLE to this scan on
+# 2026-09-19, when the audit replaced a read-then-write — `row.trade_id = trade_id`
+# after an is_linkable check — that two concurrent journal POSTs could both pass,
+# the second silently re-pointing a card already linked. The write did not appear
+# that day; only the scan's ability to see it did, and a guarded one-statement
+# UPDATE is the shape oi_confirm and outcomes already use for the same reason.
+_PINNED_CARD_WRITE: Final = "sa.update(AlfaDecisionCard)"
+
+
+def test_the_card_module_makes_exactly_one_guarded_write() -> None:
+    """Not "no writes": one, pinned by its text, so a second cannot hide behind it."""
     source = (_WEBAPP / "board" / "cards.py").read_text(encoding="utf-8")
     hits = [
         line.strip()
         for line in source.splitlines()
         if _MODULE_DESTRUCTIVE.search(line) and not line.strip().startswith("#")
     ]
-    assert hits == [], hits
+    assert hits == [_PINNED_CARD_WRITE], hits
 
 
 def test_the_card_table_is_registered_for_creation_only() -> None:

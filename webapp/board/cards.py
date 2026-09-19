@@ -39,6 +39,7 @@ from enum import Enum
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Final, Literal, cast
 
+import sqlalchemy as sa
 from pydantic import BaseModel
 from sqlalchemy import DateTime, String, Text, select
 from sqlalchemy.orm import Mapped, mapped_column
@@ -459,9 +460,29 @@ class CardRepo:
         if not card_id or not trade_id:
             return False
         with self._sessions() as session:
-            row = session.get(AlfaDecisionCard, card_id)
-            if row is None or not is_linkable(_to_card(row)):
-                return False
-            row.trade_id = trade_id
+            # One guarded statement, the shape oi_confirm and outcomes already use
+            # for their append-only transitions. The read-then-write it replaces
+            # let two concurrent journal POSTs both pass is_linkable and both write,
+            # so the second silently re-pointed a card that was already linked —
+            # on a table with no repair path (audit 2026-09-19). The WHERE carries
+            # is_linkable's own condition, so the loser gets False, as the contract
+            # promises, instead of overwriting the winner.
+            statement = (
+                # ``sa.update`` rather than a bare ``update`` import: no public name
+                # in this module may read as a way to rewrite an append-only table,
+                # and test_repo_exposes_no_update_or_delete_path pins exactly that.
+                # outcomes.py made the same choice for the same reason.
+                sa.update(AlfaDecisionCard)
+                .where(
+                    AlfaDecisionCard.id == card_id,
+                    AlfaDecisionCard.trade_id.is_(None),
+                    AlfaDecisionCard.decision == _LINKABLE_DECISION,
+                )
+                .values(trade_id=trade_id)
+            )
+            # ``session.connection()`` rather than ``session.execute``: the Core
+            # result carries ``rowcount``, which is how "exactly once" is read off
+            # the guarded UPDATE instead of being trusted.
+            result = session.connection().execute(statement)
             session.commit()
-            return True
+            return result.rowcount == 1
