@@ -38,6 +38,12 @@ dev = [
     "mypy>=1.10",
     "pandas-stubs>=2.2",
 ]
+research = [
+    "scikit-learn>=1.9.1",
+    "scipy>=1.17.1",
+    "shap>=0.51.0",
+    "xgboost>=3.2.0",
+]
 
 [build-system]
 requires = ["hatchling"]
