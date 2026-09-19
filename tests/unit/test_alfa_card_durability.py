@@ -73,6 +73,7 @@ _APPEND_ONLY_TABLES: Final = {
     "alfa_oi_confirm",       # OI status advances bekliyor -> final exactly once
     "alfa_delayed",          # disclosed filings, keyed by dedupe_key
     "alfa_daily_close",      # the close that scores an outcome
+    "alfa_daily_bar",        # the session OHLC behind ATR; a lost bar breaks the window
 }
 
 # Rebuildable: refreshed market data or fetch bookkeeping. A row lost here is

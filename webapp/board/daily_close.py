@@ -49,7 +49,7 @@ from uoa_detector.sources.unusual_whales.client import (
 )
 from webapp.board.db import AlfaBase, session_factory
 from webapp.board.uw_errors import JsonClient
-from webapp.ohlc import RegularClose, regular_session_closes
+from webapp.ohlc import RegularBar, RegularClose, regular_session_bars, regular_session_closes
 
 _logger = logging.getLogger(__name__)
 
@@ -72,6 +72,35 @@ class AlfaDailyClose(AlfaBase):
     day: Mapped[date] = mapped_column(Date, primary_key=True)
     close: Mapped[float] = mapped_column(Float)
     fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class AlfaDailyBar(AlfaBase):
+    """One regular session's OHLC per (ticker, day). Append-only (Phase 5.3.1).
+
+    Costs no additional UW request: the daily-close job already fetches
+    ``ohlc/1d`` for these tickers and this table is written from the same
+    payload (contract phase-5.3 §3.1). ``alfa_daily_close`` is not touched —
+    it is append-only and load-bearing for the outcome job (P38, D10).
+
+    open/high/low/close are nullable on purpose: a row whose high or low will
+    not parse is stored with nulls rather than skipped or guessed. The ATR
+    window that reads these breaks on a gap instead of spanning it (§3.2).
+    """
+
+    __tablename__ = "alfa_daily_bar"
+
+    ticker: Mapped[str] = mapped_column(String, primary_key=True)
+    day: Mapped[date] = mapped_column(Date, primary_key=True)
+    open: Mapped[float | None] = mapped_column(Float, nullable=True)
+    high: Mapped[float | None] = mapped_column(Float, nullable=True)
+    low: Mapped[float | None] = mapped_column(Float, nullable=True)
+    close: Mapped[float | None] = mapped_column(Float, nullable=True)
+    fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+def ensure_daily_bar_tables(engine: Engine) -> None:
+    """Create ``alfa_daily_bar`` when missing. Never alters or drops anything."""
+    cast(Table, AlfaDailyBar.__table__).create(engine, checkfirst=True)
 
 
 def ensure_daily_close_tables(engine: Engine) -> None:
@@ -217,6 +246,7 @@ async def run_daily_close_job(
         msg = "now must be timezone-aware"
         raise ValueError(msg)
     ensure_daily_close_tables(engine)
+    ensure_daily_bar_tables(engine)
     factory = session_factory(engine)
     results = [
         await _refresh_ticker(client, factory, ticker, now=now) for ticker in job_tickers(tickers)
@@ -272,6 +302,8 @@ async def _refresh_ticker(
         _logger.warning("daily close fetch degraded for %s: %s", ticker, exc)
         return DailyCloseTickerResult(ticker=ticker, status="degraded")
 
+    # Phase 5.3.1: the bars come from the SAME payload — no second request.
+    _store_bars(factory, ticker, regular_session_bars(payload.get("data")), fetched_at=now.astimezone(UTC))
     closes, ambiguous = _unique_positive_closes(regular_session_closes(payload.get("data")))
     if not closes:
         return DailyCloseTickerResult(ticker=ticker, status="no_data", ambiguous_days=ambiguous)
@@ -300,6 +332,69 @@ def _unique_positive_closes(bars: Sequence[RegularClose]) -> tuple[list[ClosePoi
         if len(values) == 1
     ]
     return unique, sum(1 for values in by_day.values() if len(values) > 1)
+
+
+def _unique_bars(bars: Sequence[RegularBar]) -> list[RegularBar]:
+    """One bar per day, oldest first; a day whose regular rows disagree is dropped.
+
+    The payload sometimes carries two regular-session rows for one date. The
+    close reader already refuses to choose between them
+    (``_unique_positive_closes`` counts the day as ambiguous); the bars follow
+    the same rule, because picking one arbitrarily would put a high the vendor
+    never settled under an ATR stop. Identical duplicates are not a conflict.
+    """
+    by_day: dict[date, set[tuple[float | None, float | None, float | None, float | None]]] = {}
+    for bar in bars:
+        by_day.setdefault(bar.day, set()).add((bar.open, bar.high, bar.low, bar.close))
+    out: list[RegularBar] = []
+    for day, values in sorted(by_day.items()):
+        if len(values) != 1:
+            continue
+        open_, high, low, close = next(iter(values))
+        out.append(RegularBar(day=day, open=open_, high=high, low=low, close=close))
+    return out
+
+
+def _store_bars(
+    factory: sessionmaker[Session],
+    ticker: str,
+    bars: Sequence[RegularBar],
+    *,
+    fetched_at: datetime,
+) -> int:
+    """Append the bars whose (ticker, day) is not stored yet. Existing rows are untouched."""
+    bars = _unique_bars(bars)
+    if not bars:
+        return 0
+    try:
+        return _insert_missing_bars(factory, ticker, bars, fetched_at)
+    except IntegrityError:
+        _logger.warning("concurrent write on alfa_daily_bar for %s; re-reading once", ticker)
+        return _insert_missing_bars(factory, ticker, bars, fetched_at)
+
+
+def _insert_missing_bars(
+    factory: sessionmaker[Session],
+    ticker: str,
+    bars: Sequence[RegularBar],
+    fetched_at: datetime,
+) -> int:
+    with factory() as session:
+        stored = set(
+            session.execute(
+                select(AlfaDailyBar.day).where(AlfaDailyBar.ticker == ticker),
+            ).scalars(),
+        )
+        fresh = [bar for bar in bars if bar.day not in stored]
+        session.add_all(
+            AlfaDailyBar(
+                ticker=ticker, day=bar.day, open=bar.open, high=bar.high,
+                low=bar.low, close=bar.close, fetched_at=fetched_at,
+            )
+            for bar in fresh
+        )
+        session.commit()
+    return len(fresh)
 
 
 def _store(
