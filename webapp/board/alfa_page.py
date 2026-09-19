@@ -697,6 +697,10 @@ SPOT_COPY: Final[Mapping[str, str]] = MappingProxyType(
         # the vol board's "IV-implied 1σ" stays the only reading of an implied move.
         "target": "hedef {price} (ATM straddle) · {r}R",
         "target_unknown": "hedef bilinmiyor (ATM straddle okunamadı)",
+        # A fallback estimate is not a straddle price, and another expiry's straddle
+        # is the wrong number rather than a mislabelled one (audit 2026-09-19).
+        "target_iv_fallback": "hedef bilinmiyor (straddle fiyatlanmadı; IV tahmini hedef değildir)",
+        "target_other_expiry": "hedef bilinmiyor (ATM satırı bu vadeye ait değil)",
         "atr": "ATR({period}) {atr} · {sessions} seans",
         "atr_unknown": "ATR bilinmiyor · {sessions} seans",
         "capped": "pozisyon üst sınırı bağladı: sermayenin en çok %{pct} kadarı",
@@ -719,6 +723,17 @@ _SPOT_REASONS: Final[Mapping[str, str]] = MappingProxyType(
         REASON_NOT_ENOUGH_BARS: SPOT_COPY["not_enough_bars"],
         REASON_NO_STOP_DISTANCE: SPOT_COPY["no_stop_distance"],
         REASON_STALE_SPOT: SPOT_COPY["stale_spot"],
+    },
+)
+
+# Why a target was refused. The frame never invents one; this page decides whether
+# the straddle it holds is entitled to be a target at all.
+REASON_TARGET_IV_FALLBACK: Final = "target_iv_fallback"
+REASON_TARGET_OTHER_EXPIRY: Final = "target_other_expiry"
+_SPOT_TARGET_REASONS: Final[Mapping[str, str]] = MappingProxyType(
+    {
+        REASON_TARGET_IV_FALLBACK: SPOT_COPY["target_iv_fallback"],
+        REASON_TARGET_OTHER_EXPIRY: SPOT_COPY["target_other_expiry"],
     },
 )
 
@@ -788,7 +803,9 @@ def spot_text(frame: SpotFrame, *, settings: BoardSettings) -> SpotText:
                 price=_dollars(frame.target), r=f"{frame.r_to_target:.1f}",
             )
             if frame.target is not None and frame.r_to_target is not None
-            else SPOT_COPY["target_unknown"]
+            else _SPOT_TARGET_REASONS.get(
+                frame.target_reason or "", SPOT_COPY["target_unknown"],
+            )
         ),
         atr=(
             SPOT_COPY["atr"].format(
@@ -859,10 +876,23 @@ def build_row_spot_frame(
         if fresh
         else None
     )
+    # A target is only a target when it is THIS row's expiry, priced by a real
+    # straddle. moves.expected_move falls back to an IV estimate when the ATM row
+    # has no two-sided quotes, and substitutes the nearest stored expiry when this
+    # one is missing — and a ten-day straddle's move applied to a thirty-one-day row
+    # is a wrong number, not merely a wrong label. B2 discloses both substitutions,
+    # but only inside the collapsed option fold, while this cell renders outside it.
+    # So the row refuses the target and says which of the two happened.
     target: float | None = None
+    target_reason: str | None = None
     if entry is not None and expected is not None:
-        move = entry * expected.expected_move_pct / 100.0
-        target = entry + move if row.direction == "up" else entry - move
+        if expected.source != "straddle":
+            target_reason = REASON_TARGET_IV_FALLBACK
+        elif not expected.same_expiry:
+            target_reason = REASON_TARGET_OTHER_EXPIRY
+        else:
+            move = entry * expected.expected_move_pct / 100.0
+            target = entry + move if row.direction == "up" else entry - move
     return build_spot_frame(
         [Bar(high=bar.high, low=bar.low, close=bar.close) for bar in bars],
         entry=entry,
@@ -873,6 +903,7 @@ def build_row_spot_frame(
         entry_is_stale=entry is None,
         entry_as_of=entry_as_of,
         entry_is_close=entry_is_close,
+        target_reason=target_reason,
     )
 
 

@@ -60,6 +60,8 @@ _ROWS = (
     _Row("s3", "FEW", "call", "at_ask", "300000", 0.8319, _CONFIRMING, quote=_QUOTE),
     _Row("s4", "STL", "call", "at_ask", "200000", 0.9412, _CONFIRMING, quote=_QUOTE),
     _Row("s5", "UNT", "call", "at_ask", "100000", 0.5126, _CONFIRMING, quote=_WIDE),
+    _Row("s6", "IVF", "call", "at_ask", "90000", 0.5231, _CONFIRMING, quote=_QUOTE),
+    _Row("s7", "NXT", "call", "at_ask", "80000", 0.5342, _CONFIRMING, quote=_QUOTE),
 )
 
 # One short of the declared minimum, so R-SP1 is refused for the DECLARED reason and
@@ -108,6 +110,14 @@ def _seed_spot(url: str) -> None:
             *_bars("STL", enough, high=105.0, low=95.0, close=100.0),
             # İŞLENMEZ on the option gate, with a perfectly good spot frame.
             _atm("UNT", 99.0), *_bars("UNT", enough, high=105.0, low=95.0, close=100.0),
+            # No two-sided ATM quote: moves.expected_move falls back to the IV
+            # estimate, which is not a straddle price and may not become a target.
+            _atm("IVF", 99.0, call_bid=None, put_ask=None),
+            *_bars("IVF", enough, high=105.0, low=95.0, close=100.0),
+            # An ATM row for a different expiry than this row's dominant contract:
+            # substituting it would scale one expiry's move onto another's row.
+            _atm("NXT", 99.0, expiry=date(2026, 9, 25)),
+            *_bars("NXT", enough, high=105.0, low=95.0, close=100.0),
         ]
         with Session(engine) as session:
             session.add_all(rows)
@@ -175,6 +185,35 @@ def test_the_target_is_the_straddles_own_pricing_and_never_a_forecast(client: Te
     # signed-distance defect ship unnoticed.
     assert re.fullmatch(r"hedef \$\d+\.\d{2} \(ATM straddle\) · \d+\.\dR", target), target
     assert _cell(row, "data-spot-disclosure") == SPOT_COPY["disclosure"]
+
+
+def test_an_iv_estimate_is_refused_as_a_target_and_says_so(client: TestClient) -> None:
+    """R-SP4 via the audit: a fallback estimate is not the straddle's pricing.
+
+    moves.expected_move returns source='iv_estimate' when the ATM row has no
+    two-sided quote. The old cell still rendered "(ATM straddle)" over it, outside
+    the collapsed option fold, while B2's honest "IV tahmini (straddle değil)"
+    line sat inside the fold — the estimate was presented as a measured price and
+    the correction was behind a click.
+    """
+    row = _board(client)["IVF"]
+    assert _cell(row, "data-spot-target") == SPOT_COPY["target_iv_fallback"]
+    # Only the TARGET is refused: the rest of the frame is still a measurement.
+    assert _cell(row, "data-spot-entry") == "giriş $99.00"
+    assert _cell(row, "data-spot-shares") == "6 hisse · riske edilen $90.00 / $100.00"
+    assert _cell(row, "data-spot-reason") is None
+
+
+def test_another_expirys_straddle_is_refused_as_a_target(client: TestClient) -> None:
+    """The cross-expiry case is a wrong NUMBER, not merely a wrong label.
+
+    A ten-day straddle's move applied unscaled to a thirty-one-day row would put a
+    false target and a false R on the page. moves.py discloses the substitution,
+    but only inside the fold; the spot cell refuses it outright.
+    """
+    row = _board(client)["NXT"]
+    assert _cell(row, "data-spot-target") == SPOT_COPY["target_other_expiry"]
+    assert _cell(row, "data-spot-shares") == "6 hisse · riske edilen $90.00 / $100.00"
 
 
 def test_the_atr_cell_names_its_window_and_session_count(client: TestClient) -> None:

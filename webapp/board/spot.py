@@ -65,6 +65,10 @@ class SpotFrame:
     # reader cannot tell a current price from Friday's (5.3.7).
     entry_as_of: date | None = None
     entry_is_close: bool = False
+    # Why there is no target, when the caller refused to derive one. The frame's
+    # arithmetic never invents a target; the caller decides whether the straddle it
+    # holds is entitled to be one (audit 2026-09-19).
+    target_reason: str | None = None
 
 
 def true_ranges(bars: Sequence[Bar]) -> list[float | None]:
@@ -136,6 +140,7 @@ def build_spot_frame(
     entry_is_stale: bool = False,
     entry_as_of: date | None = None,
     entry_is_close: bool = False,
+    target_reason: str | None = None,
 ) -> SpotFrame:
     """The frame for one row. ``direction`` is ``"up"`` (long) or anything else (short).
 
@@ -218,6 +223,7 @@ def build_spot_frame(
         reason=None,
         entry_as_of=entry_as_of,
         entry_is_close=entry_is_close,
+        target_reason=target_reason,
     )
 
 
