@@ -21,6 +21,7 @@ from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING
 
 import pytest
+from sqlalchemy import event
 from sqlalchemy.orm import Session
 from webapp.board.signals import BoardSignalReader
 from webapp.board.telemetry import AlfaPrintMeta, ensure_telemetry_tables
@@ -117,6 +118,47 @@ def test_print_meta_is_joined_and_late_meta_is_picked_up(url: str) -> None:
         assert second["c"].meta is None
         assert reader.parse_attempts == parsed  # meta join re-parses nothing
     finally:
+        reader.close()
+
+
+def test_the_meta_join_costs_one_query_per_render_not_two(url: str) -> None:
+    """The print-meta join asks the table once per render.
+
+    A probe used to run first, selecting EVERY event_id of the run to decide which
+    of the missing ids were worth asking for — narrowing an IN list that narrows
+    nothing, since an id with no row returns no row either way. Nothing pinned the
+    query count, so an extra full scan of the run's print-meta sat in the render
+    path unnoticed until the 2026-09-19 audit. This counts the SELECTs so it cannot
+    come back silently.
+    """
+    _seed(url, _RUN, ["a", "b", "c"])
+    reader = BoardSignalReader(url)
+    selects: list[str] = []
+
+    def record(
+        _conn: object, _cursor: object, statement: str, _parameters: object,
+        _context: object, _executemany: bool,
+    ) -> None:
+        text = statement.lstrip().lower()
+        if text.startswith("select") and "alfa_print_meta" in text:
+            selects.append(statement)
+
+    try:
+        _add_meta(reader, _RUN, ["a"])
+        event.listen(reader.engine, "before_cursor_execute", record)
+
+        reader.load_run(_RUN)
+        assert len(selects) == 1, f"first render issued {len(selects)} meta selects"
+
+        selects.clear()
+        _add_meta(reader, _RUN, ["b"], side="at_ask")
+        loaded = {p.event_id: p for p in reader.load_run(_RUN)}
+        assert len(selects) == 1, f"second render issued {len(selects)} meta selects"
+        # And the one query still did its job, or counting queries proves nothing.
+        assert loaded["b"].meta is not None
+        assert loaded["b"].meta.fill_side == "at_ask"
+    finally:
+        event.remove(reader.engine, "before_cursor_execute", record)
         reader.close()
 
 
