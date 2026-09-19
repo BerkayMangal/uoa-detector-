@@ -185,25 +185,38 @@ M22 and M24 share one instance (`live_stages.py`).
 
 ```yaml
 m22:
-  pre_event_window_days: 3               # days before catalyst that score
-  post_event_blackout_days: 1            # days after = score 0
-  high_score_threshold_days: 1           # within 1 day = peak
-  high_score: 1.0
-  medium_score: 0.7                      # 2-3 days out
-  low_score: 0.3                         # 4-7 days out, ramping back
-  no_event_score: 0.5                    # no catalyst in window
-  provider_timeout_s: 3.0
-  provider_cache_ttl_s: 3600             # calendar updates daily
+  post_event_blackout_days: 1            # 1 day after catalyst = blackout
+  pre_event_window_days: 14              # look-ahead horizon for upcoming
+  no_catalyst_neutral_score: 0.3         # absence != zero edge
+  dte_survives_score: 1.0                # option lives past catalyst
+  dte_expires_before_score: 0.5          # option dies before catalyst
+  post_event_score: 0.0
+  provider_timeout_s: 2.0
+  provider_cache_ttl_s: 3600             # calendars change infrequently
 ```
 
-`pre_event_window_days = 3` matches institutional pre-positioning
-behaviour (most catalyst-driven flow appears 1-3 days before the
-event). `post_event_blackout_days = 1` captures the noise window
-where realized vol contaminates flow signals.
+The score turns on **whether the option survives its catalyst**, not on how many
+days away the catalyst is. A contract that expires before the event cannot express
+a view on it, so it scores 0.5 rather than 1.0; one that lives past the event
+scores 1.0; a ticker with no catalyst inside the window scores 0.3, because absence
+of a known catalyst is weak evidence rather than zero. The day after a catalyst is
+a blackout at 0.0, which is the noise window where realised vol contaminates flow.
 
-`high_score = 1.0` only within `high_score_threshold_days` because
-the closer to the event, the lower the noise floor for catalyst-
-driven positioning.
+`pre_event_window_days = 14` is a look-ahead **horizon** — how far forward the
+calendar is read — not a pre-positioning band. Fourteen days covers the earnings
+cycle a monthly option is usually written around.
+
+> **Corrected 2026-09-20 (audit).** Until this commit the block above documented a
+> different module: `pre_event_window_days: 3` with `high_score` / `medium_score` /
+> `low_score` / `high_score_threshold_days` / `no_event_score` bands, none of which
+> exist in `profiles/v5_default.yaml`, and a rationale paragraph defending the 3-day
+> window as matching "institutional pre-positioning behaviour". The live setting is
+> 14, the live scheme is survives-vs-expires rather than distance bands, and
+> `provider_timeout_s` is 2.0 not 3.0. It documented the Phase 3.4.2 design sketch;
+> the implementation went another way and the page was never updated, so an operator
+> reading it was told the wrong thresholds and given a reason to believe them.
+> `tests/unit/test_modules_doc_matches_profile.py` now fails the gate when any block
+> here disagrees with the profile.
 
 ### Judgment-call ledger (Phase 3.4.2)
 
@@ -265,25 +278,36 @@ event but printed after it (look-ahead). The cache key is (ticker, ET date).
 
 ```yaml
 m23:
-  confirmation_window_minutes: 5         # post-event window
-  confirmation_threshold_pct: 0.005      # 0.5% directional move
-  full_score: 1.0
-  partial_score: 0.5                     # half the threshold
-  no_confirmation_score: 0.0
-  no_data_score: 0.5                     # provider returned None
-  provider_timeout_s: 3.0
-  provider_cache_ttl_s: 60               # 1-min OHLC bars
+  lookback_minutes: 30                   # spot-move window
+  confirmation_pct: 0.005                # 0.5% spot move threshold
+  confirmed_score: 1.0
+  contrarian_score: 0.3                  # opposite-direction move > threshold
+  neutral_score: 0.5                     # default when no signal either way
+  session_open_utc_hour: 14              # 09:30 ET during DST = 14:30 UTC
+  session_open_utc_minute: 30
+  provider_timeout_s: 2.0
+  provider_cache_ttl_s: 60               # intraday — changes by the second
 ```
 
-`confirmation_threshold_pct = 0.005` (0.5%) captures the magnitude
-of move that distinguishes "actual directional flow" from "drift".
-Equity options on liquid names see > 0.5% moves regularly within
-5 minutes; institutional-driven flow specifically tends to be
-followed by precisely this kind of move.
+`confirmation_pct = 0.005` (0.5%) is the magnitude that distinguishes actual
+directional flow from drift. Liquid names see moves that size regularly, which is
+why the window matters as much as the threshold.
 
-`confirmation_window_minutes = 5` is short enough to attribute the
-move to the flow itself (not unrelated catalysts) but long enough
-for slow-quote fills to materialize.
+The window is a **30-minute lookback**, not a 5-minute forward check: M23 asks
+whether spot already moved in the flow's direction before the print, because a
+print that follows a move is confirmation and a print that precedes one would be
+prediction. The three outcomes are symmetric — a move past the threshold in the
+flow's direction scores 1.0, one against it scores 0.3 rather than 0.0 (a
+contrarian print is information, not absence of information), and anything inside
+the threshold scores the 0.5 neutral. `session_open_utc_*` clips the lookback at
+the open so a 09:35 print is not scored against the prior session's close.
+
+> **Corrected 2026-09-20 (audit).** The block above previously documented
+> `confirmation_window_minutes: 5`, `confirmation_threshold_pct`, and a
+> `full_score` / `partial_score` / `no_confirmation_score` / `no_data_score`
+> scheme — none of which exist in the profile — with a rationale defending the
+> 5-minute window. The live module reads a 30-minute lookback and scores
+> confirmed / contrarian / neutral.
 
 ### Judgment-call ledger (Phase 3.4.3, amended Phase 3.3.8)
 
@@ -351,20 +375,41 @@ on the COMBINED score across all weights.
 
 ```yaml
 m24:
-  exhaustion_percentile: 0.80            # top 20% of 30-day IV
-  penalty_amount: 0.20                   # subtracted from combined_pre
-  provider_timeout_s: 3.0
-  provider_cache_ttl_s: 1800             # 30-min cache (IV updates slowly)
+  low_iv_threshold: 30.0                 # IV rank < 30 = cheap
+  mid_iv_threshold: 60.0                 # 30-60 = moderate
+  high_iv_threshold: 80.0                # >= 80 = expensive (zero score)
+  cheap_iv_score: 1.0
+  moderate_iv_score: 0.7
+  elevated_iv_score: 0.3
+  expensive_iv_score: 0.0
+  no_iv_history_score: 0.5               # new listing fallback
+  post_earnings_iv_penalty: -0.4         # cross-module ScoreAdjustment
+  post_earnings_iv_penalty_threshold: 80.0
+  post_earnings_session_days: 1          # "within 1 session"
+  provider_timeout_s: 2.0
+  provider_cache_ttl_s: 600              # IV rank changes slowly
 ```
 
-`exhaustion_percentile = 0.80` is the institutional-significance
-threshold for "IV is high enough that options buying has poor
-expected value". Above 80th percentile, mean-reversion to lower
-IV typically dominates directional gains.
+M24 does two things, and the page previously described only one of them.
 
-`penalty_amount = 0.20` is calibrated to reduce a 0.7 combined
-score (mid-WATCH band) to 0.5 (border of consideration), which is
-the right strength: not a hard rejection, but a clear demotion.
+**A score, on IV rank bands.** Cheap IV (rank below 30) scores 1.0 because buying
+convexity is cheap; 30-60 scores 0.7; 60-80 scores 0.3; at or above 80 the score
+is 0.0, because above that mean-reversion in IV typically dominates the
+directional gain. A name with no IV history scores the 0.5 neutral rather than
+being penalised for being newly listed.
+
+**A penalty, on the cross-module rail.** Separately, an IV rank at or above 80
+**within one session of earnings** emits a `ScoreAdjustment` of −0.4 against
+`combined_score_pre`. That is the post-earnings IV spike: the vol crush is already
+underway and the option is being bought into it. −0.4 is a demotion, not a
+rejection — it takes a 0.7 combined score to 0.3.
+
+> **Corrected 2026-09-20 (audit).** The block above previously documented
+> `exhaustion_percentile: 0.80` and `penalty_amount: 0.20`, neither of which
+> exists in the profile, and omitted all eleven settings that do — including the
+> entire IV-rank scoring scheme. The live penalty is −0.4, not 0.20, and
+> `provider_cache_ttl_s` is 600 rather than 1800. An operator reading the old page
+> would have expected a 0.7 score to be demoted to 0.5; it is demoted to 0.3.
 
 ### Judgment-call ledger (Phase 3.4.4)
 
@@ -425,23 +470,39 @@ for historical replay without a date-aware source.
 
 ```yaml
 m25:
-  confirmation_window_minutes: 60        # peer flow lookback
-  high_peer_count: 5                     # 5+ tickers = full score
-  medium_peer_count: 3
-  low_peer_count: 1
-  high_score: 1.0
-  medium_score: 0.7
-  low_score: 0.3
-  no_peers_score: 0.0
-  no_membership_score: 0.5               # ticker → sector lookup failed
-  provider_timeout_s: 3.0
-  provider_cache_ttl_s: 300
+  peer_window_minutes: 30                # lookback for peer flow events
+  peer_count: 5                          # top N peers to query
+  strong_alignment_threshold: 0.6        # >60% same-direction = full
+  moderate_alignment_threshold: 0.4      # 40-60%
+  weak_alignment_threshold: 0.2          # 20-40%; below = contrarian
+  strong_alignment_score: 1.0
+  moderate_alignment_score: 0.7
+  weak_alignment_score: 0.3
+  contrarian_score: 0.0
+  no_sector_score: 0.5                   # ETFs / illiquid / missing data
+  empty_peer_flow_score: 0.5             # small sector / quiet period
+  timeout_score: 0.5
+  provider_timeout_s: 3.0                # higher: multi-ticker fetch
+  provider_cache_ttl_s: 60
 ```
 
-`high_peer_count = 5` reflects "broad sector positioning" (most
-liquid sectors have 50-200 tickers; 5 with simultaneous UOA is
-genuinely distinctive). `low_peer_count = 1` is the "two ducks
-spotted" threshold (single peer = light confirmation, not noise).
+The score turns on **what fraction of peer flow points the same way**, not on how
+many peers printed. `peer_count = 5` is how many peers are queried — the top five
+by sector market cap — and the thresholds are then alignment ratios over whatever
+flow those five produced: above 60% same-direction scores 1.0, 40-60% scores 0.7,
+20-40% scores 0.3, and below 20% is contrarian at 0.0. Counting prints would reward
+a sector where five peers printed in five different directions; a ratio does not.
+
+Three separate 0.5 neutrals distinguish the ways this can be uninformative rather
+than negative: `no_sector_score` when the ticker has no sector (ETFs, thin names),
+`empty_peer_flow_score` when the sector was quiet, `timeout_score` when the
+multi-ticker fetch did not return in time. Telemetry reads them apart.
+
+> **Corrected 2026-09-20 (audit).** The block above previously documented a
+> `high_peer_count` / `medium_peer_count` / `low_peer_count` counting scheme with a
+> 60-minute window, none of which exists in the profile, along with a rationale
+> defending peer counts. The live window is 30 minutes and the live scheme is
+> alignment ratios; `provider_cache_ttl_s` is 60 rather than 300.
 
 ### Judgment-call ledger (Phase 3.4.5)
 
@@ -498,20 +559,37 @@ contingent/QCT, so M26 on SPY mostly lands in `direction_unclear`.
 
 ```yaml
 m26:
-  confirmation_window_minutes: 30        # event ± 30 minutes
-  min_print_volume: 100_000              # shares
-  provider_timeout_s: 3.0
-  provider_cache_ttl_s: 300
+  dark_pool_lookback_minutes: 60         # look back 1 hour
+  min_print_size_usd: 5_000_000          # $5M institutional threshold
+  confirmed_match_score: 1.0             # DP direction matches option
+  direction_unclear_score: 0.5           # midpoint/unknown side
+  no_qualifying_prints_score: 0.2        # low fallback (NOT zero)
+  timeout_score: 0.5
+  delay_warning_minutes: 5               # log if latest print > 5m old
+  provider_timeout_s: 2.0
+  provider_cache_ttl_s: 30               # short TTL — DP intraday-fast
 ```
 
-`confirmation_window_minutes = 30` (event ± 30 min) captures
-"institutional buyer working an order across venues simultaneously".
-Wider windows admit unrelated prints; narrower miss the
-typical work-the-order pattern.
+The size threshold is **$5M of notional, not 100,000 shares**. A share count means
+a different thing on a $15 name than on a $500 one, and the flow this module is
+looking for is sized in dollars; on SPY, 100,000 shares is routine and $5M is not
+even unusual, which is the live note above.
 
-`min_print_volume = 100_000` shares is the institutional-significance
-threshold for dark-pool prints — most dark-pool prints below this
-size are routine, not informative.
+The window is a **60-minute lookback**, not a symmetric ±30 minutes: prints before
+the option flow are corroboration, prints after it are not yet observable at
+decision time.
+
+`no_qualifying_prints_score = 0.2` rather than 0.0 because no qualifying dark-pool
+print is weak evidence against, not proof of absence — the venue may simply not
+have printed. `direction_unclear_score = 0.5` covers the midpoint and QCT prints
+that carry no side, which is where most SPY prints land.
+
+> **Corrected 2026-09-20 (audit).** The block above previously documented
+> `confirmation_window_minutes: 30` and `min_print_volume: 100_000` shares, neither
+> of which exists in the profile, and omitted the four scores and the delay
+> warning that do. The threshold changed unit — shares to dollars — and the page
+> still described the boolean-only design of Phase 3.4.6 after the module gained a
+> score. `provider_timeout_s` is 2.0 and `provider_cache_ttl_s` is 30.
 
 ### Judgment-call ledger (Phase 3.4.6)
 
