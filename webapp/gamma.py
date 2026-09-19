@@ -7,9 +7,13 @@ pinning (study_gamma_pinning — corr ~0, sign-flips across halves). The vol
 effect (H1, "extreme-gamma names move more") looks significant full-sample
 (t=2.60) but does NOT survive the same non-overlap gauntlet that killed the
 others (t=1.08) — so it is NOT robustly established either. The ONE thing that
-survived that robustness check is a separate, different claim: the
+appeared to survive that robustness check is a separate, different claim: the
 vol-RISK-premium (implied above later realized in long-gamma + high-IV names,
-study_vol_premium, non-overlap t=2.64). As a trade it did not survive costs,
+study_vol_premium, non-overlap t=2.64). **That t was computed on trades selected
+by a full-sample IV percentile — a row's rank depended on IVs recorded after it
+(audit 2026-09-19).** The selection is fixed in the script, but the figure has not
+been recomputed, because the panel it needs is not in the repository. Treat 2.64
+as unsupported until a causal re-run replaces it. As a trade it did not survive costs,
 tail stress and walk-forward (docs/edge_to_money.md), and the conditioning is
 WEAK out of sample (docs/study_D_result.md). So this map is purely
 SpotGamma-style structural context (regime, flip, walls, IV rank) to inform a

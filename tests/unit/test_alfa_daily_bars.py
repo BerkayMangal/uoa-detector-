@@ -77,6 +77,19 @@ class _CountingClient:
         return _PAYLOAD
 
 
+class _FixedClient:
+    """Serves one caller-supplied payload, so a run can be given an open session."""
+
+    def __init__(self, payload: dict[str, object]) -> None:
+        self._payload = payload
+
+    async def request_json(
+        self, path: str, *, params: dict[str, Any] | None = None, method: str = "GET",
+    ) -> dict[str, object]:
+        del path, params, method
+        return self._payload
+
+
 @pytest.fixture
 def engine(tmp_path: Path) -> Engine:
     return make_engine(f"sqlite:///{tmp_path / 'bars.db'}")
@@ -143,6 +156,40 @@ async def test_the_job_stores_a_bar_per_regular_session_for_every_ticker(
             760.00, 766.20, 759.10, 764.10,
         )
         assert newest.fetched_at is not None
+
+
+async def test_an_open_session_is_never_frozen_into_the_append_only_bar_table(
+    engine: Engine,
+) -> None:
+    """A bar written mid-session can never be corrected, because the table is append-only.
+
+    Found by audit. The closes path has always filtered on ``is_final_close``; the
+    bars path did not, so a run before 16:00 ET stored the in-progress OHLC and the
+    post-close run skipped that ``(ticker, day)`` as already present. The frozen
+    bar's true range was a fraction of the settled one, which understates the ATR,
+    understates the stop distance and OVERSTATES the share count by the same factor.
+    """
+    intraday = datetime(2026, 9, 16, 18, 0, tzinfo=UTC)  # 14:00 ET: the session is open
+    in_progress = {
+        "data": [
+            _row("2026-09-16", "r", "760.50", open="760.00", high="761.00", low="759.50"),
+            _row("2026-09-15", "r", "762.04", open="757.00", high="763.30", low="756.40"),
+            _row("2026-09-14", "r", "757.30", open="750.10", high="758.00", low="749.55"),
+        ],
+    }
+    await run_daily_close_job(_FixedClient(in_progress), engine, ["NVDA"], now=intraday)
+
+    stored = [b.day for b in _stored(engine, "NVDA")]
+    assert date(2026, 9, 16) not in stored, "an unfinished session must not be stored"
+    assert stored == [date(2026, 9, 14), date(2026, 9, 15)]
+
+    # After the close the settled bar lands, with the day's real high and low.
+    await run_daily_close_job(_CountingClient(), engine, ["NVDA"], now=_NOW)
+    newest = _stored(engine, "NVDA")[-1]
+    assert newest.day == date(2026, 9, 16)
+    assert (newest.open, newest.high, newest.low, newest.close) == (
+        760.00, 766.20, 759.10, 764.10,
+    )
 
 
 async def test_the_bar_write_costs_no_additional_request(engine: Engine) -> None:

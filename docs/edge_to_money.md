@@ -11,6 +11,21 @@ This is not hedging. The gross statistical signal is real-ish (VRP in vol points
 non-overlap t=2.64). But money is net of costs, robust out-of-sample, and
 survivable in the tail — and on every one of those three axes the edge fails.
 
+> **Correction, 2026-09-19 (audit).** Every figure below that depends on the SELL
+> selection — the `t=2.64`, the `+0.77 Sharpe` spread in §5, and the walk-forward
+> "out-of-sample" row of the verdict table — was produced with an IV percentile
+> ranked over the **whole panel**, so a row's rank depended on IVs recorded after
+> it and then decided whether that row traded. The walk-forward split inherited the
+> same ranks, which is why its held-out window was out-of-sample in everything
+> except which days were selected. `scripts/edge_validation.py` now uses the
+> expanding trailing percentile that `study_D` already carried as `_causal_iv_pct`,
+> and `study_D` measured the size of the bias this removes (Welch +2.07 leaked vs
+> +1.47 causal). **The numbers here have not been recomputed**: the panel
+> (`data/chain_snapshots`, `data/spot_series`) is not in the repository, so a
+> causal re-run is owed. The verdict — not tradeable — rests on costs, FDR, DSR and
+> the tail, none of which depend on the selection, and is not in question. The two
+> positive-sounding figures are.
+
 Reproduce: `PYTHONPATH=src:. .venv/bin/python scripts/edge_validation.py`
 (local data only — `data/chain_snapshots` + `data/spot_series`, no live API).
 

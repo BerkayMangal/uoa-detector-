@@ -336,7 +336,15 @@ async def _refresh_ticker(
         return DailyCloseTickerResult(ticker=ticker, status="degraded")
 
     # Phase 5.3.1: the bars come from the SAME payload — no second request.
-    _store_bars(factory, ticker, regular_session_bars(payload.get("data")), fetched_at=now.astimezone(UTC))
+    # Settled sessions only. alfa_daily_bar is append-only, so a bar stored while
+    # the session is still open freezes permanently and every later ATR sizes its
+    # stop from it. The closes path below has always filtered this way; the bars
+    # path did not, and the job already knew the session was open (not_final).
+    bars = [
+        bar for bar in regular_session_bars(payload.get("data"))
+        if is_final_close(bar.day, now)
+    ]
+    _store_bars(factory, ticker, bars, fetched_at=now.astimezone(UTC))
     closes, ambiguous = _unique_positive_closes(regular_session_closes(payload.get("data")))
     if not closes:
         return DailyCloseTickerResult(ticker=ticker, status="no_data", ambiguous_days=ambiguous)

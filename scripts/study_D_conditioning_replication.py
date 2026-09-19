@@ -138,14 +138,25 @@ def main() -> int:
     print("=" * 78)
 
     panel = _vrp(ev._build_panel())
+    # edge_validation._build_panel became look-ahead-free on 2026-09-19, so the
+    # full-window rank this study's PRIMARY arm is ABOUT no longer exists upstream.
+    # It is reproduced here, deliberately leaked, because §3's whole point is the
+    # contrast between the two: inheriting the fixed panel would have made both
+    # arms causal and left the "inherited" label describing something that was no
+    # longer happening.
+    panel["sell_signal_leaked"] = (
+        (panel["regime"] == "long")
+        & (panel.groupby("ticker")["iv"].rank(pct=True) >= ev._IV_HI)
+    )
     panel["sell_signal_causal"] = (
         (panel["regime"] == "long") & (_causal_iv_pct(panel) >= ev._IV_HI)
     )
     print(f"panel: {len(panel)} valid ticker-days · "
-          f"SELL(primary) {int(panel['sell_signal'].sum())} · "
+          f"SELL(leaked) {int(panel['sell_signal_leaked'].sum())} · "
           f"SELL(causal) {int(panel['sell_signal_causal'].sum())}")
 
-    _run_one(panel, "sell_signal", "PRIMARY (inherited iv_pct, full-window rank)")
+    _run_one(panel, "sell_signal_leaked",
+             "PRIMARY (full-window rank, reproduced here; look-ahead by construction)")
     _run_one(panel, "sell_signal_causal", "SECONDARY (causal trailing iv_pct, look-ahead-free)")
 
     if args.mode == "instrument-check":

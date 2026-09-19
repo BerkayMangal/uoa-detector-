@@ -54,6 +54,35 @@ def visible_text(fragment: str) -> str:
     return html.unescape(body + " " + titles)
 
 
+def element(fragment: str, marker: str) -> str:
+    """The whole element whose opening tag carries ``marker``, matched by depth.
+
+    A non-greedy ``<div ...>.*?</...>`` stops at the FIRST closing tag, which for a
+    container is its first child. That is how the R-DL1 check below came to inspect
+    only the first chip of the evidence strip and miss a delayed item placed after
+    it (audit 2026-09-19).
+    """
+    start = fragment.find(marker)
+    if start < 0:
+        return ""
+    open_tag = fragment.rfind("<", 0, start)
+    depth, i = 0, open_tag
+    while i < len(fragment):
+        nxt_open = fragment.find("<div", i)
+        nxt_close = fragment.find("</div>", i)
+        if nxt_close < 0:
+            return fragment[open_tag:]
+        if 0 <= nxt_open < nxt_close:
+            depth += 1
+            i = nxt_open + 4
+        else:
+            depth -= 1
+            i = nxt_close + 6
+            if depth == 0:
+                return fragment[open_tag:i]
+    return fragment[open_tag:]
+
+
 def main(path: str) -> int:
     raw = Path(path).read_text(encoding="utf-8")
     rows = ROW_RE.findall(raw)
@@ -79,9 +108,13 @@ def main(path: str) -> int:
     # 2026-09-17: four rows with zero counter-evidence rendered the fallback, as the
     # contract requires. A row with neither shape still fails.
     def has_counter(row: str) -> bool:
-        body = visible_text(row)
-        if COUNTER_LEAD in body:
+        # Anchored on the counter element. COUNTER_LEAD is "AMA", so reading it out
+        # of the row's whole visible text passed any row whose TICKER contained
+        # those letters, counter-argument or not (audit 2026-09-19).
+        counter = re.search(r"data-counter[^>]*>(.*?)</", row, re.S)
+        if counter is not None and COUNTER_LEAD in visible_text(counter.group(1)):
             return True
+        body = visible_text(row)
         return NO_COUNTER_FOUND in body and CHECKED_LEAD in body
 
     missing_ama = [i for i, row in enumerate(rows) if not has_counter(row)]
@@ -102,7 +135,9 @@ def main(path: str) -> int:
     # only a no_quote row must say "kotasyon yok". Reading "wide" here counted every DAR
     # row as unquoted and failed a page that was correct (2026-09-16).
     quoted = [r for r in rows if 'data-chip="tradable"' in r or 'data-chip="narrow"' in r]
-    aged = [r for r in quoted if "sn önce" in visible_text(r) or "dk önce" in visible_text(r)]
+    # The quote-age cell itself. "son işlem 4 dk önce" is the LAST-TRADE line, and
+    # matching any "... önce" let a quoted row with no quote age at all pass.
+    aged = [r for r in quoted if re.search(r"data-quote-age[^>]*>[^<]*kotasyon[^<]*önce", r)]
     check(len(aged) == len(quoted), "R-CO1 every quoted row states its quote age",
           f"{len(quoted) - len(aged)} of {len(quoted)} quoted rows have no age")
     missing_quote = [r for r in rows if 'data-chip="no_quote"' in r]
@@ -121,7 +156,7 @@ def main(path: str) -> int:
     if delayed:
         undated = [i for i, d in enumerate(delayed) if not DATE_RE.search(visible_text(d))]
         check(not undated, "R-DL1 delayed items carry a date", f"undated: {undated}")
-        strips = re.findall(r"<[^>]*data-evidence-strip[^>]*>.*?</[^>]+>", raw, re.S)
+        strips = [element(row, "data-evidence-strip") for row in rows]
         check(not any("data-delayed-item" in s for s in strips),
               "R-DL1 delayed items stay out of the evidence strip")
     else:

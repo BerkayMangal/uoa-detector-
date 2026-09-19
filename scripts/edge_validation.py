@@ -104,7 +104,18 @@ def _build_panel() -> pd.DataFrame:
                          "move": abs(s_out - s_in)})
     df = pd.DataFrame(rows)
     df["regime"] = np.where(df["net_gex"] < 0, "short", "long")
-    df["iv_pct"] = df.groupby("ticker")["iv"].rank(pct=True)
+    # Expanding trailing percentile: a row's rank uses only its own ticker's prior
+    # and current observations. The full-panel rank(pct=True) this replaces let a
+    # 2025 row know where its IV sat in a distribution that had not happened yet,
+    # and then used that to decide whether the row traded — so the walk-forward
+    # "OOS" split below was out-of-sample in everything except which days were
+    # selected. study_D already carried this fix as _causal_iv_pct and measured the
+    # bias it removes (Welch +2.07 leaked vs +1.47 causal); edge_validation, which
+    # produced the edge_to_money verdict, never received it (audit 2026-09-19).
+    df = df.sort_values(["ticker", "date"])
+    df["iv_pct"] = df.groupby("ticker")["iv"].transform(
+        lambda s: s.expanding().apply(lambda w: float((w <= w.iloc[-1]).mean()), raw=False),
+    )
     df["sell_signal"] = (df["regime"] == "long") & (df["iv_pct"] >= _IV_HI)
     return df
 

@@ -65,6 +65,10 @@ class SpotFrame:
     # reader cannot tell a current price from Friday's (5.3.7).
     entry_as_of: date | None = None
     entry_is_close: bool = False
+    # Why there is no target, when the caller refused to derive one. The frame's
+    # arithmetic never invents a target; the caller decides whether the straddle it
+    # holds is entitled to be one (audit 2026-09-19).
+    target_reason: str | None = None
 
 
 def true_ranges(bars: Sequence[Bar]) -> list[float | None]:
@@ -88,28 +92,39 @@ def true_ranges(bars: Sequence[Bar]) -> list[float | None]:
     return out
 
 
-def wilder_atr(ranges: Sequence[float | None], period: int) -> float | None:
-    """Wilder's smoothing over the most recent unbroken run of ``period`` ranges.
+def trailing_run(ranges: Sequence[float | None]) -> list[float]:
+    """The unbroken run of usable ranges that ENDS at the newest session.
 
-    A ``None`` anywhere resets the run: the average must not span a session whose
-    range could not be computed. Returns ``None`` when no unbroken run is long
-    enough.
+    An earlier, longer run is not a substitute. A window that stopped weeks ago
+    describes weeks-old volatility, and a stop sized from it would be sized
+    against a market that is no longer there — the same reason R-SP8 refuses a
+    stale spot price rather than using the last one it has.
     """
-    if period <= 0:
-        return None
     run: list[float] = []
-    best: list[float] | None = None
     for value in ranges:
         if value is None or not math.isfinite(value):
             run = []
             continue
         run.append(value)
-        if len(run) >= period:
-            best = list(run)
-    if best is None:
+    return run
+
+
+def wilder_atr(ranges: Sequence[float | None], period: int) -> float | None:
+    """Wilder's smoothing over the unbroken run of ranges ending at the newest session.
+
+    A ``None`` anywhere resets the run: the average must not span a session whose
+    range could not be computed, and it must not fall back to an older run that
+    happened to be long enough. Returns ``None`` when the trailing run is shorter
+    than ``period`` — an ATR that cannot be computed from current sessions is
+    unknown, not approximated by an earlier window.
+    """
+    if period <= 0:
         return None
-    atr = sum(best[:period]) / period
-    for value in best[period:]:
+    run = trailing_run(ranges)
+    if len(run) < period:
+        return None
+    atr = sum(run[:period]) / period
+    for value in run[period:]:
         atr = (atr * (period - 1) + value) / period
     return atr
 
@@ -125,13 +140,17 @@ def build_spot_frame(
     entry_is_stale: bool = False,
     entry_as_of: date | None = None,
     entry_is_close: bool = False,
+    target_reason: str | None = None,
 ) -> SpotFrame:
     """The frame for one row. ``direction`` is ``"up"`` (long) or anything else (short).
 
     R-SP8 first: a stale entry kills the whole frame, because sizing a real
     position off a price that no longer exists is worse than showing nothing.
     """
-    usable = [r for r in true_ranges(bars) if r is not None]
+    # The sessions the ATR would actually average, not every usable range in the
+    # table: `atr_min_sessions` is a statement about the window in use, so a run
+    # broken by a null bar must not be counted as if it were current.
+    usable = trailing_run(true_ranges(bars))
     empty = SpotFrame(
         entry=None, atr=None, stop=None, stop_distance=None, stop_pct=None,
         shares=None, risked_usd=None, risk_usd=None, target=None, r_to_target=None,
@@ -178,7 +197,16 @@ def build_spot_frame(
         shares = int(limit // entry)
         capped = True  # R-SP6: disclosed by the row, never silent
 
-    r_to_target = (target - entry) / distance if target is not None else None
+    # The contract's formula is (target - entry) / (entry - stop). That denominator
+    # is NEGATIVE on a short, which is what makes a target in the owner's favour
+    # read as a positive R. Dividing by the unsigned distance flipped the sign on
+    # every short row and rendered a +2R target as -2R.
+    signed_distance = entry - stop
+    r_to_target = (
+        (target - entry) / signed_distance
+        if target is not None and signed_distance != 0.0
+        else None
+    )
     return SpotFrame(
         entry=entry,
         atr=atr,
@@ -195,6 +223,7 @@ def build_spot_frame(
         reason=None,
         entry_as_of=entry_as_of,
         entry_is_close=entry_is_close,
+        target_reason=target_reason,
     )
 
 

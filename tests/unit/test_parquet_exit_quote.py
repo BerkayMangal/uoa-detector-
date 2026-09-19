@@ -64,14 +64,21 @@ def test_is_exit_quote_provider(tmp_path: Path) -> None:
     assert isinstance(provider, ExitQuoteProvider)
 
 
-def test_latest_bid_at_or_before_within_month(tmp_path: Path) -> None:
+def test_latest_bid_at_or_before_within_the_session(tmp_path: Path) -> None:
+    """The latest quote at-or-before the exit, chosen from the exit's own session.
+
+    The fixture used to span three days (07-07, 07-09, 07-11) against an exit on
+    07-10, so it asserted that a bid from the day BEFORE could price the exit —
+    the defect the 2026-09-19 audit found. Moved onto one session so it pins the
+    at-or-before rule, which is what its name is about.
+    """
     k100 = Decimal("100")
     _write(
         tmp_path, "AMD", "2025-07",
         [
-            _print(ts=datetime(2025, 7, 7, 14, tzinfo=UTC), strike=k100, bid=Decimal("2.00")),
-            _print(ts=datetime(2025, 7, 9, 15, tzinfo=UTC), strike=k100, bid=Decimal("2.50")),
-            _print(ts=datetime(2025, 7, 11, 16, tzinfo=UTC), strike=k100, bid=Decimal("3.00")),
+            _print(ts=datetime(2025, 7, 10, 13, tzinfo=UTC), strike=k100, bid=Decimal("2.00")),
+            _print(ts=datetime(2025, 7, 10, 15, tzinfo=UTC), strike=k100, bid=Decimal("2.50")),
+            _print(ts=datetime(2025, 7, 10, 19, tzinfo=UTC), strike=k100, bid=Decimal("3.00")),
         ],
     )
     provider = ParquetExitQuoteProvider(tmp_path)
@@ -79,13 +86,22 @@ def test_latest_bid_at_or_before_within_month(tmp_path: Path) -> None:
         ticker="AMD", strike=k100,
         expiry=datetime(2025, 8, 15, tzinfo=UTC),
         option_type="call",
-        at=datetime(2025, 7, 10, tzinfo=UTC),
+        at=datetime(2025, 7, 10, 16, tzinfo=UTC),
     )
-    # Latest at-or-before 2025-07-10 is the 07-09 print.
+    # The 15:00 print, never the 19:00 one that comes after the exit.
     assert bid == Decimal("2.50")
 
 
-def test_walk_back_to_previous_month(tmp_path: Path) -> None:
+def test_a_quote_from_another_session_is_refused_not_walked_back(tmp_path: Path) -> None:
+    """Inverted by the 2026-09-19 audit. This test used to pin the leak as correct.
+
+    It asserted that an exit on 2025-07-10 could be priced by a bid recorded on
+    2025-06-20 — three weeks earlier, and in the real failure case BEFORE the
+    position was opened, which booked a fabricated winner. Pinned decision #2 of
+    ``docs/phase-3.5.0-acceptance.md`` says a missing bid leaves the trade open and
+    is never fabricated; the guarded provider in ``simple_pnl.py`` has enforced
+    that since 3.5.0.1, and this one now does too.
+    """
     k100 = Decimal("100")
     _write(
         tmp_path, "AMD", "2025-06",
@@ -103,8 +119,31 @@ def test_walk_back_to_previous_month(tmp_path: Path) -> None:
         option_type="call",
         at=datetime(2025, 7, 10, tzinfo=UTC),
     )
-    # Nothing in July at-or-before the 10th → walk back to June's last bid.
-    assert bid == Decimal("1.75")
+    assert bid is None, "a bid from another day may not price this exit"
+
+
+def test_an_earlier_day_in_the_same_month_is_refused(tmp_path: Path) -> None:
+    """The same-day guard, pinned on its own.
+
+    Written after noticing that neither of this file's other cases could fail if
+    the guard were deleted: one uses only same-day prints, and the other's stale
+    quote lives in a different month file, which the lookup no longer opens at
+    all. A guard nothing can fail is the defect this whole change is about, so
+    the quote here sits one day before the exit inside the SAME month.
+    """
+    k100 = Decimal("100")
+    _write(
+        tmp_path, "AMD", "2025-07",
+        [_print(ts=datetime(2025, 7, 9, 15, tzinfo=UTC), strike=k100, bid=Decimal("2.50"))],
+    )
+    provider = ParquetExitQuoteProvider(tmp_path)
+    bid = provider.get_bid(
+        ticker="AMD", strike=k100,
+        expiry=datetime(2025, 8, 15, tzinfo=UTC),
+        option_type="call",
+        at=datetime(2025, 7, 10, 16, tzinfo=UTC),
+    )
+    assert bid is None, "yesterday's bid may not price today's exit"
 
 
 def test_missing_contract_returns_none(tmp_path: Path) -> None:
@@ -155,8 +194,11 @@ def test_option_type_and_strike_disambiguate(tmp_path: Path) -> None:
     _write(
         tmp_path, "AMD", "2025-07",
         [
-            _print(ts=datetime(2025, 7, 9, tzinfo=UTC), strike=Decimal("100"), bid=Decimal("2.50"), option_type="call"),
-            _print(ts=datetime(2025, 7, 9, tzinfo=UTC), strike=Decimal("100"), bid=Decimal("5.50"), option_type="put"),
+            # On the exit's own session: this test is about option_type and strike
+            # disambiguation, not about staleness, so the dates must not make it
+            # depend on the walk-back the audit removed.
+            _print(ts=datetime(2025, 7, 20, tzinfo=UTC), strike=Decimal("100"), bid=Decimal("2.50"), option_type="call"),
+            _print(ts=datetime(2025, 7, 20, tzinfo=UTC), strike=Decimal("100"), bid=Decimal("5.50"), option_type="put"),
         ],
     )
     provider = ParquetExitQuoteProvider(tmp_path)
