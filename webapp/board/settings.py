@@ -66,6 +66,22 @@ class SizingSettings(_Strict):
     values_confirmed_by_owner: bool
 
 
+class SpotSettings(_Strict):
+    """Phase 5.3 §3.3: the spot frame's cutoffs. Owner decision O1 fixes the multiple."""
+
+    atr_period: int = Field(ge=2)
+    atr_stop_multiple: float = Field(gt=0)
+    atr_min_sessions: int = Field(ge=2)
+    max_position_pct_of_capital: float = Field(gt=0, le=100)
+
+    @model_validator(mode="after")
+    def _enough_sessions_for_the_window(self) -> SpotSettings:
+        if self.atr_min_sessions < self.atr_period:
+            msg = "spot: atr_min_sessions must be at least atr_period"
+            raise ValueError(msg)
+        return self
+
+
 class AggregationSettings(_Strict):
     intentional_min_top_strike_share_pct: float = Field(gt=0, le=100)
     scattered_max_top_strike_share_pct: float = Field(gt=0, le=100)
@@ -203,6 +219,7 @@ class BoardSettings(_Strict):
     chase: ChaseSettings
     refresh: RefreshSettings
     regime: RegimeSettings
+    spot: SpotSettings
     opening_closing: OpeningClosingSettings
     catalyst: CatalystSettings
     delayed: DelayedSettings
