@@ -278,6 +278,55 @@ def test_the_spot_cell_marks_a_default_only_while_the_owner_has_not_confirmed(
     assert _cell(row, "data-spot-default") == "(varsayılan değer)"
 
 
+def test_a_closed_session_enters_at_the_last_close_and_says_so(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """5.3.7: with the market closed, the frame is built from the last regular close.
+
+    R-SP8 exists because a stale quote in a MOVING market prices a position off a
+    number that no longer exists. A closed session is the other case: its last
+    close is the definitive price of the session the page is already labelled
+    with. The cell carries the date so it can never read as a live price.
+    """
+    import webapp.main as m
+
+    monkeypatch.setattr(m, "_now", lambda: datetime(2026, 9, 19, 15, 0, tzinfo=UTC))  # Saturday
+    row = _board(client)["SPT"]
+
+    last_bar_day = date(2026, 8, 1) + timedelta(days=_SETTINGS.spot.atr_min_sessions + 4)
+    assert _cell(row, "data-spot-entry") == f"giriş $100.00 ({last_bar_day.isoformat()} kapanışı)"
+    assert 'data-spot="known"' in row
+    assert _cell(row, "data-spot-reason") is None
+    stop = _cell(row, "data-spot-stop")
+    assert stop is not None
+    assert stop.startswith("stop $85.00 · mesafe $15.00")  # 100 - 1.5 x ATR 10
+    assert _cell(row, "data-spot-shares") == "6 hisse · riske edilen $90.00 / $100.00"
+
+
+def test_too_few_bars_still_refuses_on_a_closed_session(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The close supplies an entry, not an ATR: R-SP1 is untouched by 5.3.7."""
+    import webapp.main as m
+
+    monkeypatch.setattr(m, "_now", lambda: datetime(2026, 9, 19, 15, 0, tzinfo=UTC))
+    row = _board(client)["FEW"]
+    assert _cell(row, "data-spot-reason") == SPOT_COPY["not_enough_bars"]
+    assert _cell(row, "data-spot-stop") == SPOT_COPY["stop_unknown"]
+    # The entry is known now — from the close — which is why the reason changed
+    # from "stale spot" to the honest one: there are not enough sessions.
+    entry = _cell(row, "data-spot-entry")
+    assert entry is not None
+    assert entry.startswith("giriş $50.00 (")
+
+
+def test_an_open_market_still_refuses_a_stale_quote(client: TestClient) -> None:
+    """The guard 5.3.7 narrows, not removes: STL is refused under the open clock."""
+    row = _board(client)["STL"]
+    assert _cell(row, "data-spot-reason") == SPOT_COPY["stale_spot"]
+    assert _cell(row, "data-spot-entry") == SPOT_COPY["entry_unknown"]
+
+
 def test_the_spot_frame_adds_no_forbidden_words(client: TestClient) -> None:
     for gate in ({}, {"gate": "off"}):
         body = client.get("/", params=gate).text

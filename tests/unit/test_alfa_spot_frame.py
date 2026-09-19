@@ -17,6 +17,7 @@ The rules under test, in the contract's words:
 
 from __future__ import annotations
 
+from datetime import date
 from pathlib import Path
 
 import pytest
@@ -232,3 +233,77 @@ def test_a_window_shorter_than_the_atr_period_is_rejected() -> None:
             atr_period=14, atr_stop_multiple=1.5,
             atr_min_sessions=10, max_position_pct_of_capital=25.0,
         )
+
+
+# ---------------------------------------------------------------------------
+# 5.3.7: where the entry came from
+# ---------------------------------------------------------------------------
+
+
+def test_a_close_based_entry_carries_its_date_and_changes_no_arithmetic() -> None:
+    """The provenance travels with the frame; the stop and the count do not move.
+
+    A close is a different kind of fact from a live quote, so the row has to be
+    able to say which it used. But it is still a price, so the arithmetic on top
+    of it must be identical — otherwise the closed-session frame would quietly be
+    a second, differently-computed thing.
+    """
+    bars = _flat(6, high=105.0, low=95.0, close=100.0)  # ATR 10 -> distance 15
+    quoted = build_spot_frame(
+        bars, entry=100.0, direction="up", spot=_spot(), sizing=_SIZING,
+    )
+    closed = build_spot_frame(
+        bars, entry=100.0, direction="up", spot=_spot(), sizing=_SIZING,
+        entry_as_of=date(2026, 9, 18), entry_is_close=True,
+    )
+    assert (closed.entry, closed.stop, closed.shares, closed.risked_usd) == (
+        quoted.entry, quoted.stop, quoted.shares, quoted.risked_usd
+    )
+    assert closed.entry_is_close is True
+    assert closed.entry_as_of == date(2026, 9, 18)
+    # A quoted entry claims nothing extra, so nothing extra is rendered for it.
+    assert quoted.entry_is_close is False
+    assert quoted.entry_as_of is None
+
+
+def test_a_refused_frame_states_no_entry_provenance() -> None:
+    """R-SP8 still refuses: a frame with no entry must not carry a date either."""
+    frame = build_spot_frame(
+        _flat(30), entry=None, direction="up", spot=_spot(), sizing=_SIZING,
+        entry_as_of=date(2026, 9, 18), entry_is_close=True,
+    )
+    assert frame.reason == REASON_STALE_SPOT
+    assert frame.entry is None
+    assert frame.entry_as_of is None, "a refused frame carries no provenance"
+    assert frame.entry_is_close is False
+
+
+def test_a_row_refused_for_bars_still_says_where_its_entry_came_from() -> None:
+    """The entry survives R-SP1, so its provenance has to survive with it.
+
+    Found by the render test, not by review: on a closed session every too-few-bars
+    row rendered a bare ``giriş $50.00``, which reads as a live price. An entry the
+    row displays must carry its date whenever it came from a close.
+    """
+    frame = build_spot_frame(
+        _flat(4), entry=50.0, direction="up",
+        spot=_spot(atr_period=3, atr_min_sessions=20), sizing=_SIZING,
+        entry_as_of=date(2026, 9, 18), entry_is_close=True,
+    )
+    assert frame.reason == REASON_NOT_ENOUGH_BARS
+    assert frame.entry == 50.0
+    assert frame.entry_is_close is True
+    assert frame.entry_as_of == date(2026, 9, 18)
+
+
+def test_a_zero_stop_distance_keeps_the_entry_provenance_too() -> None:
+    """R-SP2 also renders an entry, so it is the second place a bare price could hide."""
+    frame = build_spot_frame(
+        _flat(6, high=100.0, low=100.0, close=100.0),
+        entry=100.0, direction="up", spot=_spot(), sizing=_SIZING,
+        entry_as_of=date(2026, 9, 18), entry_is_close=True,
+    )
+    assert frame.reason == REASON_NO_STOP_DISTANCE
+    assert frame.entry == 100.0
+    assert frame.entry_is_close is True
+    assert frame.entry_as_of == date(2026, 9, 18)

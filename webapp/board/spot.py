@@ -24,6 +24,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
+    from datetime import date
 
     from webapp.board.settings import SizingSettings, SpotSettings
 
@@ -59,6 +60,11 @@ class SpotFrame:
     sessions_used: int              # usable True Ranges behind the ATR
     capped_by_position_limit: bool  # R-SP6: disclosed, never silent
     reason: str | None              # why a cell is unknown (R-SP1, R-SP8)
+    # Where the entry came from. A live quote states nothing extra; a completed
+    # session's close is a different kind of fact and the row has to say so, or the
+    # reader cannot tell a current price from Friday's (5.3.7).
+    entry_as_of: date | None = None
+    entry_is_close: bool = False
 
 
 def true_ranges(bars: Sequence[Bar]) -> list[float | None]:
@@ -117,6 +123,8 @@ def build_spot_frame(
     sizing: SizingSettings,
     target: float | None = None,
     entry_is_stale: bool = False,
+    entry_as_of: date | None = None,
+    entry_is_close: bool = False,
 ) -> SpotFrame:
     """The frame for one row. ``direction`` is ``"up"`` (long) or anything else (short).
 
@@ -136,7 +144,12 @@ def build_spot_frame(
     atr = wilder_atr(true_ranges(bars), spot.atr_period)
     if atr is None or len(usable) < spot.atr_min_sessions:
         # R-SP1: no bars, no stop — and the row says which of the two it is.
-        return SpotFrame(**{**empty.__dict__, "entry": entry, "reason": REASON_NOT_ENOUGH_BARS})
+        # The entry survives this refusal, so its provenance must survive with it:
+        # a bare price with no date reads as a live quote (5.3.7).
+        return SpotFrame(**{
+            **empty.__dict__, "entry": entry, "reason": REASON_NOT_ENOUGH_BARS,
+            "entry_as_of": entry_as_of, "entry_is_close": entry_is_close,
+        })
 
     distance = spot.atr_stop_multiple * atr
     stop = entry - distance if direction == "up" else entry + distance
@@ -151,6 +164,7 @@ def build_spot_frame(
         # option gate already makes and O2 exists to stop.
         return SpotFrame(**{
             **empty.__dict__, "entry": entry, "atr": atr, "reason": REASON_NO_STOP_DISTANCE,
+            "entry_as_of": entry_as_of, "entry_is_close": entry_is_close,
         })
 
     # The intended dollar risk is sizing.r_usd itself — the owner's R. Writing it
@@ -179,6 +193,8 @@ def build_spot_frame(
         sessions_used=len(usable),
         capped_by_position_limit=capped,
         reason=None,
+        entry_as_of=entry_as_of,
+        entry_is_close=entry_is_close,
     )
 
 

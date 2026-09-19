@@ -684,6 +684,9 @@ SPOT_COPY: Final[Mapping[str, str]] = MappingProxyType(
         "title": "Hisse çerçevesi",
         "option_detail": "Opsiyon detayı",
         "entry": "giriş {price}",
+        # 5.3.7: a closed session's entry is the last completed close, and it says so.
+        # Without the date a reader could take Friday's price for a live one.
+        "entry_close": "giriş {price} ({date} kapanışı)",
         "entry_unknown": "giriş bilinmiyor",
         "stop": "stop {price} · mesafe {distance} (%{pct})",
         "stop_unknown": "stop bilinmiyor",
@@ -759,7 +762,13 @@ def spot_text(frame: SpotFrame, *, settings: BoardSettings) -> SpotText:
     return SpotText(
         title=SPOT_COPY["title"],
         entry=(
-            SPOT_COPY["entry"].format(price=_dollars(frame.entry))
+            SPOT_COPY["entry_close"].format(
+                price=_dollars(frame.entry), date=frame.entry_as_of.isoformat(),
+            )
+            if frame.entry is not None
+            and frame.entry_is_close
+            and frame.entry_as_of is not None
+            else SPOT_COPY["entry"].format(price=_dollars(frame.entry))
             if frame.entry is not None
             else SPOT_COPY["entry_unknown"]
         ),
@@ -813,6 +822,7 @@ def build_row_spot_frame(
     now: datetime,
     *,
     settings: BoardSettings,
+    market_closed: bool = False,
 ) -> SpotFrame:
     """The row's frame, entered at the same price B2 prices its comparison from.
 
@@ -832,6 +842,18 @@ def build_row_spot_frame(
         if (moment - _aware(r.fetched_at)).total_seconds() <= max_age
     )
     entry = next((r.stock_price for r in fresh if r.stock_price is not None), None)
+    entry_as_of: date | None = None
+    entry_is_close = False
+    if entry is None and market_closed:
+        # 5.3.7. R-SP8 exists because a stale quote in a moving market prices a
+        # position off a number that no longer exists. A CLOSED session is the other
+        # case: its last regular close is the definitive price of the session the
+        # whole page is already labelled with, so the frame is built from it and the
+        # cell carries the date. While the market is open this branch never runs and
+        # a stale quote is still refused.
+        last = next((b for b in reversed(bars) if b.close is not None), None)
+        if last is not None:
+            entry, entry_as_of, entry_is_close = last.close, last.day, True
     expected = (
         expected_move(atm_rows=fresh, expiry=row.dominant.key.expiry, now=moment)
         if fresh
@@ -849,6 +871,8 @@ def build_row_spot_frame(
         sizing=settings.sizing,
         target=target,
         entry_is_stale=entry is None,
+        entry_as_of=entry_as_of,
+        entry_is_close=entry_is_close,
     )
 
 
@@ -1234,7 +1258,7 @@ def build_alfa_page(
         )
         row_spot = build_row_spot_frame(
             row, bars.get(row.ticker, ()), atm_rows.get(row.ticker, ()), moment,
-            settings=settings,
+            settings=settings, market_closed=market_closed,
         )
         views.append(
             AlfaRowView(
