@@ -170,7 +170,10 @@ def test_the_target_is_the_straddles_own_pricing_and_never_a_forecast(client: Te
     row = _board(client)["SPT"]
     target = _cell(row, "data-spot-target")
     assert target is not None
-    assert re.fullmatch(r"hedef \$\d+\.\d{2} \(ATM straddle\) · -?\d+\.\dR", target), target
+    # No `-?`: the sign is the assertion. A short row whose target sits in the
+    # owner's favour must read +R, and tolerating a minus here is what let the
+    # signed-distance defect ship unnoticed.
+    assert re.fullmatch(r"hedef \$\d+\.\d{2} \(ATM straddle\) · \d+\.\dR", target), target
     assert _cell(row, "data-spot-disclosure") == SPOT_COPY["disclosure"]
 
 

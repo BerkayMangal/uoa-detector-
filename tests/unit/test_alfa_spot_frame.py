@@ -28,6 +28,7 @@ from webapp.board.spot import (
     REASON_STALE_SPOT,
     Bar,
     build_spot_frame,
+    trailing_run,
     true_ranges,
     wilder_atr,
 )
@@ -294,6 +295,67 @@ def test_a_row_refused_for_bars_still_says_where_its_entry_came_from() -> None:
     assert frame.entry == 50.0
     assert frame.entry_is_close is True
     assert frame.entry_as_of == date(2026, 9, 18)
+
+
+def test_the_atr_window_must_end_at_the_newest_session() -> None:
+    """A run that stopped weeks ago is not the current volatility.
+
+    Found by audit: the old implementation kept the LONGEST run that ever reached
+    the period, so a calm stretch followed by a null bar and then a violent one
+    returned the calm figure and labelled it ATR(14). Sixteen quiet sessions, one
+    unparseable bar, six violent ones gave a $1.50 stop where $9.00 was right —
+    and the share count was overstated by the same factor.
+    """
+    # Trailing run of two is shorter than the period: unknown, not the older run.
+    assert wilder_atr([2.0, 2.0, 2.0, None, 8.0, 8.0], 3) is None
+    # Once the trailing run is long enough, it is the one that counts.
+    assert wilder_atr([2.0, 2.0, 2.0, None, 8.0, 8.0, 8.0], 3) == pytest.approx(8.0)
+    assert trailing_run([1.0, None, 5.0, 6.0]) == [5.0, 6.0]
+    assert trailing_run([1.0, 2.0, None]) == []
+
+
+def test_the_session_count_measures_the_window_the_atr_used() -> None:
+    """``atr_min_sessions`` is a claim about the window in use, not about the table.
+
+    Eleven usable ranges exist here, but only three of them are current. The row
+    must be refused and must say it had three, not ten.
+    """
+    settings = _spot(atr_period=3, atr_min_sessions=5)
+    bars = [*_flat(8), Bar(high=None, low=99.0, close=100.0), *_flat(3)]
+    assert len([r for r in true_ranges(bars) if r is not None]) > settings.atr_min_sessions, (
+        "the fixture must have plenty of usable ranges, or it cannot isolate the run"
+    )
+
+    frame = build_spot_frame(bars, entry=100.0, direction="up", spot=settings, sizing=_SIZING)
+    assert frame.reason == REASON_NOT_ENOUGH_BARS
+    assert frame.sessions_used == 3
+    assert frame.atr is None
+
+
+def test_r_to_target_is_positive_when_a_short_moves_the_owners_way() -> None:
+    """§3.2: R = (target - entry) / (entry - stop). That denominator is negative on a short.
+
+    Dividing by the unsigned distance rendered a target two R in the owner's
+    favour as -2.0R, which reads as a target on the losing side of the stop. No
+    fixture caught it: every rendered row was a call, and the render regex
+    tolerated a leading minus.
+    """
+    bars = _flat(6, high=105.0, low=95.0, close=100.0)  # ATR 10 -> distance 15
+    short = build_spot_frame(
+        bars, entry=100.0, direction="down", spot=_spot(), sizing=_SIZING, target=70.0,
+    )
+    assert short.stop == pytest.approx(115.0)
+    assert short.r_to_target == pytest.approx(2.0)
+
+    long_side = build_spot_frame(
+        bars, entry=100.0, direction="up", spot=_spot(), sizing=_SIZING, target=130.0,
+    )
+    assert long_side.r_to_target == pytest.approx(2.0)
+    # A target on the wrong side of the entry is negative for both directions.
+    against = build_spot_frame(
+        bars, entry=100.0, direction="down", spot=_spot(), sizing=_SIZING, target=130.0,
+    )
+    assert against.r_to_target == pytest.approx(-2.0)
 
 
 def test_a_zero_stop_distance_keeps_the_entry_provenance_too() -> None:
