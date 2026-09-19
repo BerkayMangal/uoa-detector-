@@ -178,15 +178,28 @@ def test_section_5_stability_table_recomputes_from_prefixes_of_the_raw_file() ->
 
 
 def test_no_sample_size_ever_reached_the_threshold() -> None:
-    """§5's sentence 'it never rises above the 78th percentile at any n'."""
+    """§5's claim, quantified over EVERY n instead of the five the table happens to list.
+
+    The earlier version took its maximum over n in (25, 50, 75, 100, 200) — exactly
+    the sizes §5 tabulates, and the ones its sentence was written from — so it could
+    not contradict the "at any n" quantifier it named in its own docstring. It
+    passed green against a false sentence: horizon 5 exceeds 78 at seven values of
+    n and peaks at 87.5 at n=8. Found by the 2026-09-19 audit, which is the second
+    time a guard in this file was written so it could not fail.
+    """
     reps = _reps()
     reals = {key: float(_row_starting(f"| {label} |")[1]) for label, key in _LABELS.items()}
     for key, real in reals.items():
-        worst = max(
-            _percentile_of([float(r[key]) for r in reps[:n]], real)
-            for n in (25, 50, 75, 100, 200)
-        )
-        assert worst <= 78.0, f"{key}: reached the {worst:.1f}th percentile, above the stated 78th"
+        by_n = {
+            n: _percentile_of([float(r[key]) for r in reps[:n]], real)
+            for n in range(1, len(reps) + 1)
+        }
+        peak = max(by_n.values())
+        settled = max(pct for n, pct in by_n.items() if n >= 25)
+        assert peak <= 87.5, f"{key}: peaks at the {peak:.1f}th percentile over all n"
+        assert settled <= 78.5, f"{key}: reaches the {settled:.1f}th once n >= 25"
+        # What the verdict actually rests on: it never approaches the 99th.
+        assert peak < 99.0, f"{key}: cleared its own null at some sample size"
 
 
 # ---------------------------------------------------------------------------

@@ -116,7 +116,16 @@ own null, recomputed at increasing n:
 | 100 | +0.0734 | 75.0% | +0.0890 | 74.0% |
 | 200 | +0.0729 | 75.0% | +0.0950 | 67.5% |
 
-It never rises above the 78th percentile at any n, against a threshold of the 99th.
+Across every n from 1 to 200, the real result peaks at the **87.5th** percentile —
+horizon 5 at n=8, where eight draws are not yet a distribution. From n=25 on it
+never rises above the **78.5th**, and horizon 1 never exceeds the **77.8th**. The
+threshold was the 99th.
+
+(An earlier version of this line said "never above the 78th at any n". That was
+false at seven values of n, and the test quoting it took its maximum over only the
+five sizes tabulated above, so it could not contradict the quantifier it claimed to
+guard. Both were corrected after the 2026-09-19 audit; the verdict is unchanged,
+because 87.5 is no closer to 99 than 78 was.)
 Stopping short of 200 would not have changed the answer, and reaching it did not.
 
 ## 6. What ships, per §7 of the pre-registration
