@@ -285,6 +285,39 @@ def load_closes_by_ticker(
     return {ticker: tuple(points) for ticker, points in grouped.items()}
 
 
+def load_bars_by_ticker(
+    engine: Engine, tickers: Sequence[str],
+) -> dict[str, tuple[RegularBar, ...]]:
+    """Stored bars of every requested ticker in ONE query, oldest first per ticker. Read-only.
+
+    5.3.1 wrote ``alfa_daily_bar`` and read nothing back; the spot frame (5.3.3) is
+    its first reader. One query for the whole board, exactly as
+    ``load_closes_by_ticker`` does, because a query per ticker would add a round
+    trip per row to every render.
+
+    A bar stored with nulls stays null here. The ATR window breaks on it rather
+    than spanning it (R-SP1), which is only possible if the null survives the read.
+    """
+    symbols = list(dict.fromkeys(t.strip().upper() for t in tickers if t.strip()))
+    if not symbols:
+        return {}
+    stmt = (
+        select(
+            AlfaDailyBar.ticker, AlfaDailyBar.day, AlfaDailyBar.open,
+            AlfaDailyBar.high, AlfaDailyBar.low, AlfaDailyBar.close,
+        )
+        .where(AlfaDailyBar.ticker.in_(symbols))
+        .order_by(AlfaDailyBar.ticker, AlfaDailyBar.day)
+    )
+    grouped: dict[str, list[RegularBar]] = {symbol: [] for symbol in symbols}
+    with session_factory(engine)() as session:
+        for ticker, day, bar_open, high, low, close in session.execute(stmt).all():
+            grouped.setdefault(ticker, []).append(
+                RegularBar(day=day, open=bar_open, high=high, low=low, close=close),
+            )
+    return {ticker: tuple(bars) for ticker, bars in grouped.items()}
+
+
 async def _refresh_ticker(
     client: JsonClient,
     factory: sessionmaker[Session],

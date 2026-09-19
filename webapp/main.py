@@ -609,6 +609,12 @@ def _build_board_page(
             marks, "atm",
             lambda tickers: alfa_page.db_atm_source(_board_reader().engine)(tickers),
         ),
+        # 5.3.3: the stored daily bars behind the ATR stop. One query, no UW call —
+        # the daily_close job already fetched these bars (contract §3.1).
+        bars_source=_timed(
+            marks, "bars",
+            lambda tickers: alfa_page.db_bars_source(_board_reader().engine)(tickers),
+        ),
         flow_since_source=_timed(
             marks, "flow_since",
             lambda keys: alfa_page.db_flow_since_source(_board_reader().engine)(keys),

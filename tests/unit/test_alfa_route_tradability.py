@@ -186,7 +186,11 @@ def test_gate_on_by_default_sections_and_chips(board: TestClient) -> None:
     assert re.search(r"kotasyon \d+ sn önce alındı", aaa)
     assert re.search(r"son işlem \d+ dk önce", aaa)
     # Phase 5.2.B1 (D10): the size cell (contract §6 B1) adds a third disclosed-default marker.
-    assert aaa.count("(varsayılan değer)") == 3  # round trip, 1 contract, and the size cell
+    # Round trip, 1 contract, the option size cell, and — since 5.3.3 — the spot cell,
+    # whose share count rests on the same unconfirmed capital_usd and r_usd (P43/P15).
+    # The count stays exhaustive on purpose: it is what would catch the marker appearing
+    # somewhere the owner's values are NOT in play.
+    assert aaa.count("(varsayılan değer)") == 4
 
     bbb = _row_html(body, "BBB")
     assert 'data-chip="untradable"' in bbb

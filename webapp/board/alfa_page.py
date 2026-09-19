@@ -90,6 +90,7 @@ from webapp.board.copy_tr import (
     NO_CLEAN_CANDIDATE,
     UNKNOWN_NOT_CLEAN,
 )
+from webapp.board.daily_close import ensure_daily_bar_tables, load_bars_by_ticker
 from webapp.board.delayed_panel import DelayedPanel, load_delayed_panels, unreadable_panel
 from webapp.board.direction import DIRECTION_LABELS, FALLBACK_MARKER
 from webapp.board.etf_holdings import read_focused_holdings
@@ -107,7 +108,7 @@ from webapp.board.evidence import (
     request_for,
     strength_label,
 )
-from webapp.board.moves import ATM_AGE_TEMPLATE, compare_moves
+from webapp.board.moves import ATM_AGE_TEMPLATE, compare_moves, expected_move
 from webapp.board.narrative import (
     NARRATIVE_COPY,
     CatalystCheck,
@@ -141,6 +142,14 @@ from webapp.board.regime import (
     read_regime_inputs,
 )
 from webapp.board.sizing import SIZE_COPY, SizeRead, SizeText, build_size, size_text
+from webapp.board.spot import (
+    REASON_NO_STOP_DISTANCE,
+    REASON_NOT_ENOUGH_BARS,
+    REASON_STALE_SPOT,
+    Bar,
+    SpotFrame,
+    build_spot_frame,
+)
 from webapp.board.ticker_info import read_ticker_infos
 from webapp.board.tradability import (
     CHIP_COPY,
@@ -186,11 +195,14 @@ if TYPE_CHECKING:
     from webapp.board.signals import BoardPrint
     from webapp.board.tradability import DepthView, QuoteView
     from webapp.journal import TradeRow
+    from webapp.ohlc import RegularBar
 
     QuoteSource = Callable[
         [Sequence[str]], tuple[Mapping[str, QuoteView], Mapping[str, DepthView]]
     ]
     AtmSource = Callable[[Sequence[str]], Mapping[str, tuple[AtmView, ...]]]
+    # 5.3.3: stored regular-session bars per ticker, oldest first, for the ATR.
+    BarsSource = Callable[[Sequence[str]], Mapping[str, tuple[RegularBar, ...]]]
     # B4: (dominant contract symbol, the source print's ET trade date) → its T+1 confirmation.
     OiKey = tuple[str, date]
     OiSource = Callable[[Sequence[OiKey]], Mapping[OiKey, OiConfirmView]]
@@ -463,6 +475,10 @@ class AlfaRowView:
     chase_text: ChaseText | None = None  # B3
     opening: OpeningView | None = None  # B4
     overlap: OverlapView | None = None  # B6
+    # Phase 5.3.3: the spot frame, appended with defaults so every earlier
+    # construction in the tests stays valid (the FAZ B pattern).
+    spot: SpotFrame | None = None
+    spot_text: SpotText | None = None
 
 
 @dataclass(frozen=True)
@@ -656,6 +672,186 @@ def build_audit(event_id: str | None, signal: StoredSignal | None) -> AuditView:
     )
 
 
+# ---------------------------------------------------------------------------
+# Phase 5.3.3: the spot frame on the row (contract §3.2, rules R-SP1-R-SP8)
+# ---------------------------------------------------------------------------
+
+# The arithmetic lives in webapp/board/spot.py, which holds no UI text by design;
+# these are the only sentences the frame speaks. No probability is stated and the
+# frame never says al or sat (R-SP4, R-SP5).
+SPOT_COPY: Final[Mapping[str, str]] = MappingProxyType(
+    {
+        "title": "Hisse çerçevesi",
+        "option_detail": "Opsiyon detayı",
+        "entry": "giriş {price}",
+        "entry_unknown": "giriş bilinmiyor",
+        "stop": "stop {price} · mesafe {distance} (%{pct})",
+        "stop_unknown": "stop bilinmiyor",
+        "shares": "{shares} hisse · riske edilen {risked} / {risk}",
+        "shares_unknown": "adet bilinmiyor",
+        # Not "beklenen hareket": the board's word for this quantity is the straddle's own
+        # pricing, and test_alfa_render_hygiene forbids "beklenen"/"expected" page-wide so
+        # the vol board's "IV-implied 1σ" stays the only reading of an implied move.
+        "target": "hedef {price} (ATM straddle) · {r}R",
+        "target_unknown": "hedef bilinmiyor (ATM straddle okunamadı)",
+        "atr": "ATR({period}) {atr} · {sessions} seans",
+        "atr_unknown": "ATR bilinmiyor · {sessions} seans",
+        "capped": "pozisyon üst sınırı bağladı: sermayenin en çok %{pct} kadarı",
+        "not_enough_bars": "yeterli günlük bar yok",
+        "no_stop_distance": "stop mesafesi yok; adet hesaplanmaz",
+        "stale_spot": "spot fiyat yok veya eski; çerçeve kurulmaz",
+        # R-EV1 is pinned by a COUNT: "olasılı" may appear exactly once per row, in the
+        # evidence hover. A frame that denied being a probability would double it, so the
+        # denial is phrased as "tahmin değildir" — the word moves.py already uses.
+        "disclosure": (
+            "Hedef, ATM straddle'ın bu vadeye fiyatladığı hareket kadar uzaklıktadır; tahmin "
+            "değildir. Adet, R tutarına göre aşağı yuvarlanır."
+        ),
+    },
+)
+
+# spot.py returns reason KEYS, never sentences, so the mapping lives here.
+_SPOT_REASONS: Final[Mapping[str, str]] = MappingProxyType(
+    {
+        REASON_NOT_ENOUGH_BARS: SPOT_COPY["not_enough_bars"],
+        REASON_NO_STOP_DISTANCE: SPOT_COPY["no_stop_distance"],
+        REASON_STALE_SPOT: SPOT_COPY["stale_spot"],
+    },
+)
+
+
+@dataclass(frozen=True)
+class SpotText:
+    """The row's rendered spot cells. Every unknown carries the reason it is unknown."""
+
+    title: str
+    entry: str
+    stop: str
+    shares: str
+    target: str
+    atr: str
+    reason: str | None  # R-SP1, R-SP2, R-SP8
+    capped: str | None  # R-SP6: disclosed, never silent
+    disclosure: str
+    # P15: the share count rests on capital_usd and r_usd. While the owner has not
+    # confirmed them the cell says so, exactly as the option size cell does; 5.3.5
+    # flips the flag and both markers disappear together.
+    default_marker: str | None
+    known: bool  # False: the frame was refused and says so
+
+
+def _dollars(value: float | None) -> str:
+    """Two decimals: these are share prices, not premiums."""
+    return ALFA_COPY["unknown"] if value is None else f"${value:,.2f}"
+
+
+def spot_text(frame: SpotFrame, *, settings: BoardSettings) -> SpotText:
+    """Render one frame. A refused cell reads ``bilinmiyor``, never a fallback number."""
+    shares = (
+        SPOT_COPY["shares"].format(
+            shares=frame.shares,
+            risked=_dollars(frame.risked_usd),
+            risk=_dollars(frame.risk_usd),
+        )
+        if frame.shares is not None
+        else SPOT_COPY["shares_unknown"]
+    )
+    return SpotText(
+        title=SPOT_COPY["title"],
+        entry=(
+            SPOT_COPY["entry"].format(price=_dollars(frame.entry))
+            if frame.entry is not None
+            else SPOT_COPY["entry_unknown"]
+        ),
+        stop=(
+            SPOT_COPY["stop"].format(
+                price=_dollars(frame.stop),
+                distance=_dollars(frame.stop_distance),
+                pct=f"{frame.stop_pct:.2f}",
+            )
+            if frame.stop is not None and frame.stop_distance is not None
+            and frame.stop_pct is not None
+            else SPOT_COPY["stop_unknown"]
+        ),
+        shares=shares,
+        target=(
+            SPOT_COPY["target"].format(
+                price=_dollars(frame.target), r=f"{frame.r_to_target:.1f}",
+            )
+            if frame.target is not None and frame.r_to_target is not None
+            else SPOT_COPY["target_unknown"]
+        ),
+        atr=(
+            SPOT_COPY["atr"].format(
+                period=settings.spot.atr_period,
+                atr=_dollars(frame.atr),
+                sessions=frame.sessions_used,
+            )
+            if frame.atr is not None
+            else SPOT_COPY["atr_unknown"].format(sessions=frame.sessions_used)
+        ),
+        reason=_SPOT_REASONS.get(frame.reason) if frame.reason is not None else None,
+        capped=(
+            SPOT_COPY["capped"].format(
+                pct=f"{settings.spot.max_position_pct_of_capital:.0f}",
+            )
+            if frame.capped_by_position_limit
+            else None
+        ),
+        disclosure=SPOT_COPY["disclosure"],
+        default_marker=(
+            None if settings.sizing.values_confirmed_by_owner else SIZE_COPY["default_value"]
+        ),
+        known=frame.reason is None,
+    )
+
+
+def build_row_spot_frame(
+    row: BoardRow,
+    bars: Sequence[RegularBar],
+    atm_rows: Sequence[AtmView],
+    now: datetime,
+    *,
+    settings: BoardSettings,
+) -> SpotFrame:
+    """The row's frame, entered at the same price B2 prices its comparison from.
+
+    The entry is a *fresh* ATM row's ``stock_price`` under the identical filter
+    ``build_move_view`` applies, so the two cells of one row can never disagree
+    about what the stock costs (contract §3.2). With no fresh row there is no
+    entry, and R-SP8 refuses the whole frame rather than sizing a real position
+    off a price that no longer exists.
+
+    The target is the expected move ``moves.py`` already computes from the ATM
+    straddle, applied in the row's direction. Nothing new is derived here (R-SP4).
+    """
+    moment = _aware(now)
+    max_age = settings.tradability.max_quote_age_seconds
+    fresh = tuple(
+        r for r in atm_rows
+        if (moment - _aware(r.fetched_at)).total_seconds() <= max_age
+    )
+    entry = next((r.stock_price for r in fresh if r.stock_price is not None), None)
+    expected = (
+        expected_move(atm_rows=fresh, expiry=row.dominant.key.expiry, now=moment)
+        if fresh
+        else None
+    )
+    target: float | None = None
+    if entry is not None and expected is not None:
+        move = entry * expected.expected_move_pct / 100.0
+        target = entry + move if row.direction == "up" else entry - move
+    return build_spot_frame(
+        [Bar(high=bar.high, low=bar.low, close=bar.close) for bar in bars],
+        entry=entry,
+        direction=row.direction,
+        spot=settings.spot,
+        sizing=settings.sizing,
+        target=target,
+        entry_is_stale=entry is None,
+    )
+
+
 def build_move_view(
     row: BoardRow,
     chip: TradabilityRead,
@@ -835,6 +1031,7 @@ def build_alfa_page(
     market_closed: bool = False,
     delayed_source: DelayedSource | None = None,
     atm_source: AtmSource | None = None,
+    bars_source: BarsSource | None = None,
     flow_since_source: FlowSinceSource | None = None,
     oi_source: OiSource | None = None,
     catalyst_source: CatalystSource | None = None,
@@ -904,6 +1101,14 @@ def build_alfa_page(
             atm_rows = atm_source([r.ticker for r in rows])
         except Exception:
             _logger.exception("alfa board: ATM read failed; the move comparison reads bilinmiyor")
+    # 5.3.3: stored bars for the ATR. A failed read leaves the frame refused with
+    # its reason, exactly as too few bars would (R-SP1); it never guesses a stop.
+    bars: Mapping[str, tuple[RegularBar, ...]] = {}
+    if bars_source is not None and rows:
+        try:
+            bars = bars_source([r.ticker for r in rows])
+        except Exception:
+            _logger.exception("alfa board: bar read failed; the spot frame reads bilinmiyor")
     oi_rows: Mapping[OiKey, OiConfirmView] = {}
     if oi_source is not None and requests:
         try:
@@ -1027,6 +1232,10 @@ def build_alfa_page(
             max_spot_age_seconds=settings.tradability.max_quote_age_seconds,
             now=moment,
         )
+        row_spot = build_row_spot_frame(
+            row, bars.get(row.ticker, ()), atm_rows.get(row.ticker, ()), moment,
+            settings=settings,
+        )
         views.append(
             AlfaRowView(
                 row=row,
@@ -1059,6 +1268,8 @@ def build_alfa_page(
                     non_directional_supporting=len(evidence.non_directional_supporting_labels()),
                 ),
                 delayed=_row_panel(row.ticker, panels, wired=delayed_source is not None),
+                spot=row_spot,
+                spot_text=spot_text(row_spot, settings=settings),
                 size=row_size,
                 size_text=size_text(row_size),
                 move=build_move_view(
@@ -1156,6 +1367,23 @@ def db_atm_source(engine: Engine) -> AtmSource:
 
     def _source(tickers: Sequence[str]) -> Mapping[str, tuple[AtmView, ...]]:
         return read_board_atm(engine, tickers)
+
+    return _source
+
+
+def db_bars_source(engine: Engine) -> BarsSource:
+    """A bar source reading ``alfa_daily_bar`` only (5.3.3; no Unusual Whales call).
+
+    The bars were already fetched and stored by the ``daily_close`` job, so the
+    spot frame costs the render one query and the budget nothing.
+    """
+
+    def _source(tickers: Sequence[str]) -> Mapping[str, tuple[RegularBar, ...]]:
+        # Ensure at read time, as delayed_panel.py does for alfa_daily_close: a board
+        # whose bar table has never been written must render a refused frame with its
+        # reason, not log a caught exception on every request. checkfirst, never altering.
+        ensure_daily_bar_tables(engine)
+        return load_bars_by_ticker(engine, tickers)
 
     return _source
 
@@ -1289,4 +1517,6 @@ def template_context() -> dict[str, object]:
         "catalyst_note": M22_MAY_DIFFER,
         # B5: the band's own frozen copy (the tripwire line and its status).
         "regime_copy": REGIME_COPY,
+        # 5.3.3: the spot frame's only sentences, and the option fold's summary.
+        "spot_copy": SPOT_COPY,
     }

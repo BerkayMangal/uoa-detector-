@@ -104,7 +104,13 @@ def test_rendered_cost_cells_are_never_negative_or_a_zero_entry(client: TestClie
     rows = _rows(client.get("/", params={"gate": "off"}).text)
     assert set(rows) == {"CRS", "ZZZ"}
     for ticker, row in rows.items():
-        chip = html.unescape(row[row.index("data-chip="): row.index("data-cases")])
+        # The chip strip, bounded by its OWN markup. This used to slice from
+        # "data-chip=" to "data-cases"; 5.3.3 moved the bull/bear grid above the chip
+        # (P43), which would have made the slice empty and every assertion below
+        # vacuously true. The chip div contains spans only, so its first </div> closes it.
+        chip_div = re.search(r'data-chip="[^"]*">.*?</div>', row, re.S)
+        assert chip_div is not None, ticker
+        chip = html.unescape(chip_div.group(0))
         assert "$-" not in chip, ticker
         assert "%-" not in chip, ticker
         for cell in ("data-round-trip", "data-lot"):

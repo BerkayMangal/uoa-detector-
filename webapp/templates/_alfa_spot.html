@@ -1,0 +1,30 @@
+{# Phase 5.3.3 (contract §3.2, R-SP1-R-SP8): the row's spot frame, in the units the owner
+   trades — entry, ATR stop, share count floored to his R, dollars actually risked, the
+   straddle's expected move as a target, and R to reach it. Every string comes from
+   alfa_page.SPOT_COPY; every number is arithmetic on the owner's own risk rules.
+
+   The frame states no probability and never says al/sat (R-SP4, R-SP5). A refused cell
+   reads bilinmiyor with its reason beside it, because a guessed stop is a number a real
+   position would be sized against (R-SP1, R-SP2, R-SP8). A zero share count is rendered,
+   not hidden (R-SP3), and a bound position cap is disclosed (R-SP6). #}
+{% if view.spot_text %}
+<div class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm"
+     data-spot="{{ 'known' if view.spot_text.known else 'unknown' }}">
+  <span class="text-gray-400">{{ view.spot_text.title }}</span>
+  <span class="text-gray-100" data-spot-entry>{{ view.spot_text.entry }}</span>
+  <span class="text-gray-100" data-spot-stop>{{ view.spot_text.stop }}</span>
+  <span class="text-gray-100" data-spot-shares>{{ view.spot_text.shares }}</span>
+  <span class="text-gray-300" data-spot-target>{{ view.spot_text.target }}</span>
+  <span class="text-xs text-gray-500" data-spot-atr>{{ view.spot_text.atr }}</span>
+  {% if view.spot_text.reason %}
+  <span class="text-amber-300" data-spot-reason>{{ view.spot_text.reason }}</span>
+  {% endif %}
+  {% if view.spot_text.capped %}
+  <span class="text-amber-300" data-spot-capped>{{ view.spot_text.capped }}</span>
+  {% endif %}
+  {% if view.spot_text.default_marker %}
+  <span class="text-xs text-amber-300/80" data-spot-default>{{ view.spot_text.default_marker }}</span>
+  {% endif %}
+</div>
+<p class="text-xs text-gray-500" data-spot-disclosure>{{ view.spot_text.disclosure }}</p>
+{% endif %}
