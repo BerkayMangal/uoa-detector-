@@ -210,7 +210,7 @@ A new study needs a fresh, non-overlapping window (`docs/next_studies.md`,
 | 5.0 | `main` ← `phase-3` unification (`docs/phase-5.0-merge-acceptance.md`); in progress |
 | 5.1 | **Foundation:** login (two users, no signup), Alembic for webapp tables with a prod stamp (additive only), append-only table policy, UW budget governor + `/health/budget`, advice-language lint, disclaimer, deeper `/health` |
 | 5.2 | **Alfa Board** (the terminal main screen; owner spec 2026-09-15, built before 5.1 by owner order): `docs/phase-5.2-alfa-board-acceptance.md`, `docs/phase-5.2-decision-cards-acceptance.md`; decisions in `docs/alfa-board-decisions.md` |
-| 5.3 | **Spot decision frame** (owner decisions 2026-09-17: ATR stop, spot-default view, $10k/1%): `docs/phase-5.3-spot-frame-acceptance.md`. Redefines the unstarted "Ticker detail" row — a per-ticker entry/stop/size frame is that scope's substance. |
+| 5.3 | **Spot decision frame** (owner decisions 2026-09-17: ATR stop, spot-default view, $10k/1%): `docs/phase-5.3-spot-frame-acceptance.md`, closeout `docs/phase-5.3-closeout.md`. Redefines the unstarted "Ticker detail" row — a per-ticker entry/stop/size frame is that scope's substance. CODE COMPLETE over the six §7 commits (`50c5557`, `0def633`, `6ba27df`, `1fca5c6`, `990a48e`, closeout), open until the owner merges them and the live board is verified. Decisions P43–P45 in `docs/alfa-board-decisions.md`; one open item, the frozen card's frame is not rendered on `/kart/{id}` (closeout §6.1). |
 | 5.4 | Live stream (SSE) |
 | 5.5 | Watchlist + alerts (notify only) |
 | 5.6 | Virtual portfolio / forward record (log-only paper positions, never executed) |
