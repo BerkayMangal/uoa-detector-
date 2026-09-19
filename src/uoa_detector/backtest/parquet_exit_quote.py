@@ -15,15 +15,22 @@ Lookup model:
   - ``get_bid`` resolves the month ``at`` falls in, lazily loads
     that ``{TICKER}/{YYYY-MM}.parquet`` (only the columns it
     needs), and indexes rows by contract → ascending ``(ts, bid)``.
-  - Walking-back lookup: the latest bid at-or-before ``at``. If
-    the ``at`` month has no row at-or-before ``at`` for the
-    contract (it first traded after the exit instant, or did not
-    trade that month at all), the search walks to earlier months
-    and takes their last bid — capped at ``_MAX_WALKBACK_MONTHS``
-    so a contract with no data anywhere does not scan forever.
-  - Returns ``None`` when no bid exists in range — ``SimplePnL``
-    then marks the trade open, exactly as with a missing dict
-    quote.
+  - The latest bid at-or-before ``at``, **from the exit's own
+    trading day**. A quote from any earlier session is refused.
+  - Returns ``None`` when no such bid exists — ``SimplePnL`` then
+    marks the trade open, exactly as with a missing dict quote.
+
+Staleness (pinned decision #2 of ``docs/phase-3.5.0-acceptance.md``,
+and the reason the same-day rule is here): this provider used to
+walk back up to three calendar months and take whatever bid it
+found. The 2026-09-19 audit proved that priced an exit off a bid
+recorded eighteen days BEFORE the position was opened and booked a
+fabricated winner, on the very path that produced the Phase 3.6
+verdict. ``sanity_audit.check_lookahead`` could not see it, because
+it compares the trade's own timestamps and never the timestamp of
+the quote that priced it. The guarded sibling in ``simple_pnl.py``
+has enforced the same-day rule since Phase 3.5.0.1; this one now
+matches it.
 
 Memory: month tables are cached as parsed per-contract series.
 Exits cluster near entries (holding window < ~1 month for the v5
@@ -45,11 +52,6 @@ _logger = logging.getLogger(__name__)
 
 # A contract's identity within a ticker: (option_type, strike, expiry).
 _ContractKey = tuple[str, Decimal, date]
-
-# How many months earlier than the exit month to scan before giving
-# up. The v5 holding windows are well under a month; 3 is generous
-# and bounds the walk for contracts with no data near the exit.
-_MAX_WALKBACK_MONTHS = 3
 
 # Columns pulled from the parquet — the full RawPrint schema is 21
 # columns; the exit-quote index needs only these five.
@@ -92,21 +94,24 @@ class ParquetExitQuoteProvider:
     ) -> Decimal | None:
         """Return the option's bid at-or-before ``at``, or ``None``."""
         key: _ContractKey = (option_type, strike, expiry.date())
-        ticker_u = ticker.upper()
-
-        year, month = at.year, at.month
-        for _ in range(_MAX_WALKBACK_MONTHS + 1):
-            series = self._load_month(ticker_u, year, month).get(key)
-            if series:
-                bid = _latest_at_or_before(series, at)
-                if bid is not None:
-                    return bid
-            # Walk to the previous month. Once we are before ``at``'s
-            # own month, "at-or-before at" means "the month's last
-            # row" — _latest_at_or_before with a far-future cutoff.
-            year, month = (year - 1, 12) if month == 1 else (year, month - 1)
-            at = datetime.max.replace(tzinfo=at.tzinfo)
-        return None
+        found = self._load_month(ticker.upper(), at.year, at.month).get(key)
+        if not found:
+            return None
+        quote = _latest_at_or_before(found, at)
+        if quote is None:
+            return None
+        quote_ts, bid = quote
+        # The quote must belong to the exit's own trading day. Without this the
+        # provider walked back up to three MONTHS and priced an exit off a bid
+        # recorded before the position was even opened — b5fcd7a's leak, reopened
+        # in this second provider and invisible to sanity_audit.check_lookahead,
+        # which compares the trade's own timestamps and never the quote's.
+        # The guarded sibling in simple_pnl.py has enforced this since 3.5.0.1;
+        # pinned decision #2 of docs/phase-3.5.0-acceptance.md says a missing bid
+        # leaves the trade OPEN and is never fabricated.
+        if quote_ts.date() != at.date():
+            return None
+        return bid
 
     # -- Month loading ---------------------------------------------------
 
@@ -168,16 +173,20 @@ def _as_date(value: object) -> date:
 
 def _latest_at_or_before(
     series: list[tuple[datetime, Decimal]], at: datetime,
-) -> Decimal | None:
-    """Return the bid of the latest entry with ``ts <= at``, or ``None``.
+) -> tuple[datetime, Decimal] | None:
+    """Return the latest ``(ts, bid)`` with ``ts <= at``, or ``None``.
+
+    The timestamp comes back with the bid on purpose: the caller has to be able
+    to refuse a quote from another session, and it cannot do that if the lookup
+    only hands it a price.
 
     ``series`` is ascending by timestamp. Linear walk — per-contract
     series are short (one contract's trades in one month).
     """
-    latest: Decimal | None = None
+    latest: tuple[datetime, Decimal] | None = None
     for ts, bid in series:
         if ts <= at:
-            latest = bid
+            latest = (ts, bid)
         else:
             break
     return latest
