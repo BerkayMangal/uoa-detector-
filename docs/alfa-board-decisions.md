@@ -913,3 +913,42 @@ removed the text the claim was about.
 **Undo:** drop `_alfa_spot.html`, un-fold the option strip in `_alfa_row.html`, and
 remove `bars_source` from `build_alfa_page` and `main.py`. `load_bars_by_ticker` can
 stay: it reads an append-only table and nothing else depends on the frame.
+
+## P44. The card already froze the frame, and the test that said so proved nothing
+
+5.3.4 was meant to add the spot frame to the decision card. It turned out there was
+nothing to add: `cards.snapshot` is recursive over dataclasses and `build_card_view`
+names no board field — on purpose, so "a field added to the row view model by another
+branch is frozen without a change to this module". The frame has been landing in
+`alfa_decision_card.card` since 5.3.3, with no column and no migration.
+
+**A change that costs nothing is also a change nobody notices breaking.** The existing
+parity test asserts `frozen["row_view"] == cards.snapshot(view)` — snapshot against
+snapshot. That holds just as well when every spot cell is `None` on both sides. It
+proves `snapshot` is a function; it does not prove the card carries the decision. Same
+shape as P39 and P40: an assertion that cannot fail the thing it names.
+
+**Decision.** The parity test compares across the two representations instead of within
+one. `tests/unit/test_alfa_card_spot_parity.py` renders the board, reads the spot cells
+out of the **HTML**, presses `Pas geç`, and compares the frozen JSON strings against
+what the page actually showed — after first asserting the frame is populated (entry $99,
+stop $84, 6 shares, $90 risked, ATR 10), so two empty frames cannot agree their way to
+a pass. It also pins that a refused frame freezes its **reason**: a card storing nulls
+without one would leave the owner, months later, unable to tell a missing stop from a
+stop of zero. And it asserts the mechanism, not only the result — `"spot"` appears
+nowhere in `cards.py`, so if anyone swaps the generic field walk for an explicit list,
+the frame stops being frozen silently.
+
+**Mutation-proved (P39/P40).** Three guards broken, each red, each restored to identical
+md5: `snapshot` dropping `spot*` fields (5 failed), the frame forced empty (4 failed),
+and freezing `row_view.row` instead of the whole view (5 failed).
+
+**A gap left open on purpose.** `GET /kart/{id}` renders the card's meta line, trade
+line and fills, and does **not** render the frozen row view — so the frame is stored and
+invisible on the card page. §5's stated purpose is that a card opened in three months
+explains the decision in the terms it was made in, and a frame nobody can see does not
+do that. But §7 scopes 5.3.4 to "card freezing + parity test", and widening it here
+would be editing a frozen contract by implementation rather than by discussion (D1). It
+is recorded for 5.3.6 and the call is the owner's.
+
+**Undo:** delete the test. Nothing else was added.
