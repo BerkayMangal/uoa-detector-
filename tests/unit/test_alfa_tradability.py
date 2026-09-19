@@ -200,7 +200,8 @@ def test_cost_cells_and_ages_on_a_tradable_quote() -> None:
     assert read.lot_pct_capital == pytest.approx(0.91)  # type: ignore[attr-defined]
     assert read.quote_age_seconds == 41  # type: ignore[attr-defined]
     assert read.last_trade_minutes == 4  # type: ignore[attr-defined]
-    assert read.values_confirmed is False  # type: ignore[attr-defined]
+    # 5.3.5: O3 is confirmed in the profile this chip reads.
+    assert read.values_confirmed is True  # type: ignore[attr-defined]
 
 
 def test_last_trade_falls_back_to_the_depth_quote_time() -> None:

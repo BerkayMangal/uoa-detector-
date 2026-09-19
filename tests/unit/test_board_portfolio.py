@@ -119,19 +119,30 @@ def test_capital_header_sums_open_long_premium(settings: BoardSettings) -> None:
     assert header.capital_usd == settings.sizing.capital_usd
     assert header.at_risk_pct == pytest.approx(2070.0 / settings.sizing.capital_usd * 100)
     assert header.unparsed == ("e",)
-    assert header.values_confirmed is False
+    assert header.values_confirmed is True  # 5.3.5: the profile carries O3's confirmation
     assert header.text == (
-        "Açıktaki prim riski: $2,070 · sermayenin %20.7 (varsayılan değer)"
+        "Açıktaki prim riski: $2,070 · sermayenin %20.7"
         " · 1 açık işlem okunamadı (bilinmiyor)"
     )
 
 
-def test_capital_header_without_default_mark_once_confirmed(settings: BoardSettings) -> None:
-    confirmed = settings.model_copy(update={
-        "sizing": settings.sizing.model_copy(update={"values_confirmed_by_owner": True}),
+def test_capital_header_marks_the_default_while_the_owner_has_not_confirmed(
+    settings: BoardSettings,
+) -> None:
+    """5.3.5 inverted this test instead of deleting it.
+
+    It used to confirm the values and assert the marker disappeared. The profile now
+    ships confirmed, so that direction is the default every other test already
+    exercises, and asserting it here would prove nothing. The direction still worth
+    pinning is the one that protects the owner: an unconfirmed capital figure must
+    say so on the page.
+    """
+    unconfirmed = settings.model_copy(update={
+        "sizing": settings.sizing.model_copy(update={"values_confirmed_by_owner": False}),
     })
-    header = pf.capital_header([], settings=confirmed, today=_TODAY)
-    assert header.text == "Açıktaki prim riski: $0 · sermayenin %0.0"
+    header = pf.capital_header([], settings=unconfirmed, today=_TODAY)
+    assert header.values_confirmed is False
+    assert header.text == "Açıktaki prim riski: $0 · sermayenin %0.0 (varsayılan değer)"
 
 
 # ---------------------------------------------------------------------------

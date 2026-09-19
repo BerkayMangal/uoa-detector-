@@ -33,8 +33,13 @@ def test_board_profile_loads_with_owner_decisions() -> None:
     )
     # R-UN2: 3+ unknown families forbid "Güçlü".
     assert s.evidence.max_unknown_for_strong + 1 == 3
-    # Disclosed defaults stay flagged until the owner confirms them (decision P15).
-    assert s.sizing.values_confirmed_by_owner is False
+    # O3 (5.3 contract §2, answered by the owner 2026-09-17): capital $10,000 and $100
+    # of risk per trade, confirmed — so no cell marks them as defaults any more (5.3.5).
+    # P15's disclosure mechanism is unchanged and still pinned against an unconfirmed
+    # copy in test_board_sizing, test_board_portfolio and the render tests.
+    assert s.sizing.capital_usd == 10_000
+    assert s.sizing.r_usd == 100
+    assert s.sizing.values_confirmed_by_owner is True
 
 
 def test_board_profile_is_not_a_calibration_section() -> None:

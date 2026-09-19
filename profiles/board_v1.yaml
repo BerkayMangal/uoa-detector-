@@ -39,9 +39,9 @@ cost:
   commission_per_contract_usd: 0.65  # per contract, per leg; the cost model of edge_to_money.md
 
 sizing:
-  capital_usd: 10000                 # DEFAULT: the owner's stated upper bound. Set the real value.
-  r_usd: 100                         # DEFAULT: 1% of capital. Set the real value.
-  values_confirmed_by_owner: false   # while false, size and cost cells show "(varsayılan değer)"
+  capital_usd: 10000                 # owner decision O3, answered 2026-09-17 (5.3 contract §2)
+  r_usd: 100                         # owner decision O3: 1% of capital per trade
+  values_confirmed_by_owner: true    # O3: confirmed, so no cell marks these as defaults (5.3.5)
 
 aggregation:
   intentional_min_top_strike_share_pct: 60.0   # top strike share >= this: "kasıtlı pozisyon"

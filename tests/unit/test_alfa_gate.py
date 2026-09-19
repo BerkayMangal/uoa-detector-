@@ -111,10 +111,11 @@ def _source(symbols: Sequence[str]) -> tuple[Mapping[str, QuoteView], Mapping[st
     )
 
 
-def _page(**kwargs: Any) -> Any:
+def _page(*, settings: Any = _SETTINGS, **kwargs: Any) -> Any:
+    """The seeded page. ``settings`` is overridable so a test can un-confirm O3 (5.3.5)."""
     options: dict[str, Any] = {"spread_cutoff_pct": _CUTOFF, "now": _NOW, "quote_source": _source}
     options.update(kwargs)
-    return build_alfa_page(_prints(), _SETTINGS, **options)
+    return build_alfa_page(_prints(), settings, **options)
 
 
 def _tickers(section: Any) -> list[str]:
@@ -193,7 +194,24 @@ def test_chip_text_on_a_tradable_row() -> None:
     assert text.exit_depth == "137 kontrat (son işlem anında)"
     assert text.quote_age == "kotasyon 41 sn önce alındı"
     assert text.last_trade == "son işlem 4 dk önce"
-    assert text.default_marker == "(varsayılan değer)"
+    # 5.3.5: O3 is confirmed in the profile, so the chip marks nothing as a default.
+    # The disclosure itself is pinned by the test immediately below.
+    assert text.default_marker is None
+
+
+def test_chip_text_marks_a_default_while_the_owner_has_not_confirmed() -> None:
+    """The disclosure, not its absence: an unconfirmed capital figure must say so.
+
+    Inverted by 5.3.5 rather than deleted. The cost cells are still computed from
+    `capital_usd`, so the only thing that changed is whether the owner has vouched
+    for that number — and the page has to keep being able to say that he has not.
+    """
+    unconfirmed = _SETTINGS.model_copy(
+        update={"sizing": _SETTINGS.sizing.model_copy(update={"values_confirmed_by_owner": False})},
+    )
+    aaa = _page(settings=unconfirmed).sections[0].views[0]
+    assert aaa.chip_text.lot == "$41 · sermayenin %0.41 kadarı"
+    assert aaa.chip_text.default_marker == "(varsayılan değer)"
 
 
 def test_chip_text_on_an_unknown_row_says_unknown() -> None:
@@ -205,12 +223,29 @@ def test_chip_text_on_an_unknown_row_says_unknown() -> None:
     assert text.quote_age is None
 
 
-def test_confirmed_owner_values_drop_the_default_marker() -> None:
-    confirmed = _SETTINGS.model_copy(
-        update={"sizing": _SETTINGS.sizing.model_copy(update={"values_confirmed_by_owner": True})},
-    )
-    page = build_alfa_page(_prints(), confirmed, spread_cutoff_pct=_CUTOFF, now=_NOW, quote_source=_source)
-    assert {v.chip_text.default_marker for v in page.views} == {None}
+def test_the_marker_tracks_the_confirmation_flag_and_nothing_else() -> None:
+    """Rewritten by 5.3.5, because the original had become vacuous.
+
+    It used to confirm the owner values and assert every marker was ``None``. Since
+    the profile now ships confirmed (O3), that assertion holds whether or not the
+    flag is read at all — it would pass with the confirmation ignored entirely,
+    which is the defect P39 and P40 exist to catch.
+
+    The contrast is the only form that can fail: one page, one set of quotes, one
+    flag apart, must differ.
+    """
+    def markers(*, confirmed: bool) -> set[str | None]:
+        settings = _SETTINGS.model_copy(
+            update={
+                "sizing": _SETTINGS.sizing.model_copy(
+                    update={"values_confirmed_by_owner": confirmed},
+                ),
+            },
+        )
+        return {v.chip_text.default_marker for v in _page(settings=settings).views}
+
+    assert markers(confirmed=True) == {None}
+    assert markers(confirmed=False) == {"(varsayılan değer)"}
 
 
 def test_spread_cutoff_is_read_from_the_live_calibration_profile() -> None:

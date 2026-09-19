@@ -185,12 +185,12 @@ def test_gate_on_by_default_sections_and_chips(board: TestClient) -> None:
     assert "137 kontrat (son işlem anında)" in aaa
     assert re.search(r"kotasyon \d+ sn önce alındı", aaa)
     assert re.search(r"son işlem \d+ dk önce", aaa)
-    # Phase 5.2.B1 (D10): the size cell (contract §6 B1) adds a third disclosed-default marker.
-    # Round trip, 1 contract, the option size cell, and — since 5.3.3 — the spot cell,
-    # whose share count rests on the same unconfirmed capital_usd and r_usd (P43/P15).
-    # The count stays exhaustive on purpose: it is what would catch the marker appearing
-    # somewhere the owner's values are NOT in play.
-    assert aaa.count("(varsayılan değer)") == 4
+    # 5.3.5: O3 is confirmed in the profile, so nothing marks a default any more. The
+    # count stays exhaustive at zero on purpose — that is what would catch a marker
+    # reappearing on values the owner has confirmed. The four sites it used to cover
+    # (round trip, 1 contract, the option size cell and the spot cell) are pinned
+    # against an explicitly unconfirmed copy further down this file.
+    assert aaa.count("(varsayılan değer)") == 0
 
     bbb = _row_html(body, "BBB")
     assert 'data-chip="untradable"' in bbb
@@ -243,19 +243,27 @@ def test_no_live_price_wording_and_no_mid_on_the_chip(board: TestClient) -> None
     assert "0.7777" not in body
 
 
-def test_confirmed_owner_values_drop_the_default_marker(
+def test_unconfirmed_owner_values_mark_every_cell_that_spends_them(
     board: TestClient, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Inverted by 5.3.5, which recorded O3's confirmation in the profile.
+
+    Monkeypatching confirmation ON would now assert the profile's own default and
+    prove nothing — the vacuity failure P39 and P40 exist to catch. The direction
+    worth pinning is the disclosure: with the values unconfirmed, all four sites
+    that spend them say so.
+    """
     import webapp.main as m
 
     settings = m._board_settings()
-    confirmed = settings.model_copy(
-        update={"sizing": settings.sizing.model_copy(update={"values_confirmed_by_owner": True})},
+    assert settings.sizing.values_confirmed_by_owner is True, "the profile ships confirmed (O3)"
+    unconfirmed = settings.model_copy(
+        update={"sizing": settings.sizing.model_copy(update={"values_confirmed_by_owner": False})},
     )
-    monkeypatch.setattr(m, "_board_settings", lambda: confirmed)
+    monkeypatch.setattr(m, "_board_settings", lambda: unconfirmed)
     body = board.get("/alfa").text
     assert "data-row" in body
-    assert "(varsayılan değer)" not in body
+    assert _row_html(body, "AAA").count("(varsayılan değer)") == 4
 
 
 def test_failed_quote_read_is_flagged_and_never_clean(

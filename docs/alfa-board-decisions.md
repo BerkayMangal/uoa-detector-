@@ -952,3 +952,41 @@ would be editing a frozen contract by implementation rather than by discussion (
 is recorded for 5.3.6 and the call is the owner's.
 
 **Undo:** delete the test. Nothing else was added.
+
+## P45. Recording the owner's confirmation turned three tests vacuous instead of red
+
+5.3.5 sets `sizing.values_confirmed_by_owner: true`, so `(varsayılan değer)`
+disappears from every cell and each count becomes a number the owner has vouched for.
+
+**Authority, because this is a profile edit.** The 5.3 contract §2 pins
+**O3 — Capital $10,000, risk per trade 1% ($100)**, states that
+`values_confirmed_by_owner` *becomes* `true`, and records that all three owner
+decisions "were answered by the owner on 2026-09-17". §7 assigns this exact flip to
+commit 5.3.5. The two numbers do not change — the profile already carried 10000 and
+100 — so no threshold moved (D4/D8); what changed is a disclosure flag whose value the
+frozen contract already fixed, plus two stale comments that still called the values
+defaults to be replaced.
+
+**The blast radius was measured, not guessed: eleven tests.** Three more than the
+prediction, and the extra three mattered — `test_board_settings` is where the profile's
+owner decisions are actually pinned, and it asserted the flag was `False`.
+
+**Three of them would have gone vacuous rather than red.** Each was named
+`test_confirmed_owner_values_drop_the_default_marker` (in `test_alfa_route_tradability`,
+`test_alfa_portfolio_render` and `test_alfa_gate`) and each monkeypatched confirmation
+**on** before asserting the marker was gone. With the profile now shipping confirmed,
+that is the default state: they would have kept passing while proving nothing, which is
+worse than failing. This is the third time this project has found that shape (P39, P40).
+
+**Decision: every affected test is inverted, never halved.** The direction worth pinning
+is the disclosure — an unconfirmed capital figure must say so — because that is the
+direction that protects the owner from reading an invented number as his own. So each
+test now asserts absence against the profile and presence against an explicitly
+unconfirmed copy. `test_alfa_gate`'s went further and asserts the **contrast** (one page,
+one set of quotes, one flag apart, must differ), the only form that cannot go vacuous.
+`test_alfa_route_tradability`'s exhaustive marker count stays exhaustive, at zero: it is
+now what would catch a marker reappearing on values the owner has confirmed.
+
+**Undo:** set `values_confirmed_by_owner: false` and invert the same tests back. The
+production code is untouched by this commit; only the profile flag, its comments and the
+tests move.

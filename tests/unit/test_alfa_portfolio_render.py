@@ -129,27 +129,29 @@ def test_the_capital_header_states_the_open_premium_at_risk(client: TestClient) 
     # Phase 5.2.B-fix2 (D10, review FB-H2): 2 x $4.10 x 100 = $820 of a $10,000 default
     # capital. The AMD leg expired on 25.06.2026, so its $200 entry premium is no longer
     # counted as premium at risk; the header discloses it instead of dropping it.
+    # 5.3.5: O3 is confirmed in the profile, so the header no longer marks a default.
     assert _cell(strip, "data-capital") == (
-        "Açıktaki prim riski: $820 · sermayenin %8.2 (varsayılan değer)"
+        "Açıktaki prim riski: $820 · sermayenin %8.2"
         " · 1 işlemin vadesi geçti ($200 hariç)"
     )
 
 
-def test_confirmed_owner_values_drop_the_default_marker(
+def test_unconfirmed_owner_values_mark_the_capital_header(
     client: TestClient, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Inverted by 5.3.5: confirmation is the profile's state, so the disclosure is the pin."""
     import webapp.main as m
 
-    confirmed = _SETTINGS.model_copy(
-        update={"sizing": _SETTINGS.sizing.model_copy(update={"values_confirmed_by_owner": True})},
+    unconfirmed = _SETTINGS.model_copy(
+        update={"sizing": _SETTINGS.sizing.model_copy(update={"values_confirmed_by_owner": False})},
     )
-    monkeypatch.setattr(m, "_board_settings", lambda: confirmed)
+    monkeypatch.setattr(m, "_board_settings", lambda: unconfirmed)
     body = client.get("/").text
     # Phase 5.2.B-fix2 (D10, review FB-H2): the expired AMD leg left the at-risk sum.
     assert _cell(_strip(body), "data-capital") == (
-        "Açıktaki prim riski: $820 · sermayenin %8.2 · 1 işlemin vadesi geçti ($200 hariç)"
+        "Açıktaki prim riski: $820 · sermayenin %8.2 (varsayılan değer)"
+        " · 1 işlemin vadesi geçti ($200 hariç)"
     )
-    assert "(varsayılan değer)" not in body
 
 
 def test_a_failed_journal_read_renders_no_capital_header() -> None:
