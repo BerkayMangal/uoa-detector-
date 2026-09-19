@@ -295,6 +295,13 @@ ALFA_COPY: Final[Mapping[str, str]] = MappingProxyType(
         # R-EM1 banner variants (review FA-04); "Bugün temiz aday yok" stays copy_tr.NO_CLEAN_CANDIDATE.
         "no_clean_candidate_dated": "{date} seansında temiz aday yok",
         "no_clean_candidate_undated": "Bu çalışmada temiz aday yok",
+        # Phase 5.3: the market being shut is not the same fact as a stale feed.
+        # Without this the board shows twenty rows of "kotasyon yok" on a Saturday
+        # and never says why, which reads as a broken page rather than a closed one.
+        "market_closed_dated": (
+            "Piyasa kapalı. Aşağıdaki satırlar {date} seansının verisiyle, canlı kotasyonla değil."
+        ),
+        "market_closed_undated": "Piyasa kapalı. Son tamamlanmış seans bilinmiyor.",
         "clean_candidate_unread": (
             "Temiz aday durumu okunamadı: kanıt veya kotasyon tabloları okunamadı. "
             "Bu, temiz aday yok demek değil."
@@ -481,6 +488,9 @@ class AlfaPage:
     newest_print_at: datetime | None = None  # the run's newest print (or signal) time
     rendered_at: datetime | None = None  # the page's clock
     delayed_failed: bool = False  # Phase 5.2.D1: the delayed bucket could not be read
+    # Phase 5.3: passed in by the caller; the page model stays pure and never
+    # reads a clock or a calendar of its own.
+    market_closed: bool = False
     regime: RegimeView | None = None  # B5; None only when no regime source was supplied
     # B6: the capital header and the single-bet strip. None and empty mean "no source".
     capital: CapitalHeader | None = None
@@ -505,6 +515,13 @@ class AlfaPage:
         if self.session_date == self.today:
             return NO_CLEAN_CANDIDATE
         return ALFA_COPY["no_clean_candidate_dated"].format(date=self.session_date.isoformat())
+
+    @property
+    def market_closed_text(self) -> str:
+        """Says the market is shut and dates what is on screen. Never implies a live quote."""
+        if self.session_date is None:
+            return ALFA_COPY["market_closed_undated"]
+        return ALFA_COPY["market_closed_dated"].format(date=self.session_date.isoformat())
 
     @property
     def _read_failed(self) -> bool:
@@ -815,6 +832,7 @@ def build_alfa_page(
     profile_hash_source: ProfileHashSource | None = None,
     profile_resolver: ProfileResolver | None = None,
     run_latest_ts: datetime | None = None,
+    market_closed: bool = False,
     delayed_source: DelayedSource | None = None,
     atm_source: AtmSource | None = None,
     flow_since_source: FlowSinceSource | None = None,
@@ -843,7 +861,7 @@ def build_alfa_page(
     if prints is None:
         return AlfaPage(
             rows=(), views=(), sections=(), print_count=0, load_failed=True, gate_on=gate_on,
-            today=_et_date(moment), regime=regime,
+            today=_et_date(moment), regime=regime, market_closed=market_closed,
         )
     rows = build_board_rows(prints, settings.aggregation)
     symbols = tuple(dominant_symbol(r) for r in rows)
@@ -1077,6 +1095,7 @@ def build_alfa_page(
         newest_print_at=newest,
         rendered_at=moment,
         delayed_failed=delayed_failed,
+        market_closed=market_closed,
         regime=regime,
         capital=(
             capital_header(trades, settings=settings, today=today) if trades is not None else None
