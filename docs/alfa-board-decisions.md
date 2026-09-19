@@ -953,6 +953,47 @@ is recorded for 5.3.6 and the call is the owner's.
 
 **Undo:** delete the test. Nothing else was added.
 
+## P46. A closed session enters at its own close, and the price has to carry a date
+
+The owner merged 5.3, opened the board on a Saturday and saw every spot cell read
+`bilinmiyor`. The page was right — R-SP8 refuses an entry whose quote is stale, and the
+newest `alfa_atm` row was 17 hours old against a 900-second threshold — but "right" is
+not the same as useful, and a frame that is silent every evening and all weekend is
+silent most of the time the owner actually looks at it.
+
+**Decision.** R-SP8 is narrowed, not removed. While the market is **open**, a stale
+quote is still refused: that is the dangerous case, where the price has moved and
+sizing off the old one risks real money against a number that no longer exists. While
+the market is **closed**, the entry is the last stored regular-session close. That is
+not a stale quote; it is the definitive price of the session the page already labels
+itself with ("Piyasa kapalı. Aşağıdaki satırlar 2026-09-18 seansının verisiyle").
+
+**The price carries its date.** `SpotFrame` gained `entry_as_of` and `entry_is_close`,
+and the cell reads `giriş $349.54 (2026-09-18 kapanışı)`. Without the date the reader
+cannot tell Friday's close from a live price, which would be a worse failure than the
+silence this replaces.
+
+**The target stays unknown on a closed session, on purpose.** It comes from the ATM
+straddle, and B2 refuses a stale ATM row (review FB-H4). Pricing the spot target off
+one while B2 reads `bilinmiyor` would make the two halves of one row disagree — the
+exact thing that rule exists to prevent. So the owner sees entry, stop, ATR, share
+count and dollars risked; R waits for a live straddle.
+
+**A defect the render test caught and review did not.** `build_spot_frame`'s refusal
+branches copy the empty frame and set only what they expose. R-SP1 exposes the entry —
+so on a closed session every too-few-bars row rendered a bare `giriş $50.00`, an
+undated price reading as a live one. Both refusal branches that expose an entry now
+carry its provenance, and two unit tests pin it. The lesson repeats P43's: the page
+test found what reading the diff did not.
+
+**Mutation-proved (P39/P40).** Four guards broken, each red, each restored to identical
+md5: the closed-session fallback removed, the `market_closed` condition ignored (which
+would refuse nothing), the date dropped from the rendered entry, and R-SP1's branch
+dropping the provenance again.
+
+**Undo:** delete the `market_closed` branch in `build_row_spot_frame` and the two
+provenance fields. R-SP8 returns to refusing every stale entry, open or closed.
+
 ## P45. Recording the owner's confirmation turned three tests vacuous instead of red
 
 5.3.5 sets `sizing.values_confirmed_by_owner: true`, so `(varsayılan değer)`
