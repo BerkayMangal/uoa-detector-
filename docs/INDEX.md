@@ -32,6 +32,7 @@ Whether UW-fed Track B is closed or open is an open item for Berkay (§7).
 | Gamma pinning / reversion: REJECTED | `scripts/study_gamma_pinning.py` | `ed45ecb` (Phase 4.11) |
 | Vol premium: untradeable after costs | `docs/edge_to_money.md` (`scripts/edge_validation.py`) | `a5af279` (Phase 4.22) |
 | Conditioning replication: WEAK | `docs/study_D_result.md`, pre-registered in `docs/preregister_D.md` and `docs/preregister_D_addendum.md` | `2e3094a`, `6c189e4`, `ba09f92` (Phase 4.32) |
+| Options-flow signal search (Study E): REJECTED | `docs/study-E-result.md`, pre-registered in `docs/study-E-signal-preregistration.md`; mean OOS rank IC +0.0253 (1 session) and +0.0239 (5 sessions) land at the 75.0th and 67.5th percentile of a 200-pass shuffled-label null whose pre-registered threshold was the 99th | `588e014` (protocol), `83750fc` (result) |
 | UW-fed Track B never testable | `docs/phase-3.5.5-status.md` B1 (probed 2026-05-18: the subscription returns the last 7 trading days) | `e2f7350` |
 
 **Unusual Whales layer.** Phase 3.9, live-verified 2026-09-14:
