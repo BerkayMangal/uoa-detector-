@@ -32,6 +32,7 @@ Whether UW-fed Track B is closed or open is an open item for Berkay (§7).
 | Gamma pinning / reversion: REJECTED | `scripts/study_gamma_pinning.py` | `ed45ecb` (Phase 4.11) |
 | Vol premium: untradeable after costs | `docs/edge_to_money.md` (`scripts/edge_validation.py`) | `a5af279` (Phase 4.22) |
 | Conditioning replication: WEAK | `docs/study_D_result.md`, pre-registered in `docs/preregister_D.md` and `docs/preregister_D_addendum.md` | `2e3094a`, `6c189e4`, `ba09f92` (Phase 4.32) |
+| Options-flow signal search (Study E): REJECTED | `docs/study-E-result.md`, pre-registered in `docs/study-E-signal-preregistration.md`; mean OOS rank IC +0.0253 (1 session) and +0.0239 (5 sessions) land at the 75.0th and 67.5th percentile of a 200-pass shuffled-label null whose pre-registered threshold was the 99th | `588e014` (protocol), `83750fc` (result) |
 | UW-fed Track B never testable | `docs/phase-3.5.5-status.md` B1 (probed 2026-05-18: the subscription returns the last 7 trading days) | `e2f7350` |
 
 **Unusual Whales layer.** Phase 3.9, live-verified 2026-09-14:
@@ -217,7 +218,8 @@ A new study needs a fresh, non-overlapping window (`docs/next_studies.md`,
 | 5.8 | AI assistant (read-only DB tools, no direct UW tool, per-user cost cap) |
 | 5.9 | Landing, methodology, glossary, legal |
 | 5.10–5.19 | Engine and data fixes, in registry order. First candidates: flow_poll → `/api/option-trades/flow-alerts`; stage-level `provider_error`; gamma_live units and client reuse; exit-quote staleness rule and engine retirement; falsification gates into the profile (D8); 3.9 §7 flags; D11 TODO removal; dedicated Postgres, retention and backups. |
-| 5.20+ | Research studies (`preregister_<L>.md`, next letter E; non-burned windows only) |
+| 5.20 | **Study E** — can anything learnable rank next-session or five-session returns across the board's ten tickers? Pre-registered in `docs/study-E-signal-preregistration.md`, answered in `docs/study-E-result.md`: **REJECTED** against its own 200-pass shuffled-label null. Its two docs keep `study-E-*` names instead of the `preregister_<L>.md` pattern; the deviation is recorded here rather than silently extended to later letters. |
+| 5.21+ | Further research studies (`preregister_<L>.md`, next letter F; non-burned windows only) |
 
 Detail for the 5.10–5.19 candidates:
 - **Falsification gates (D8).** `src/uoa_detector/backtest/falsification.py:79-81`
