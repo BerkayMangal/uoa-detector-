@@ -217,7 +217,8 @@ A new study needs a fresh, non-overlapping window (`docs/next_studies.md`,
 | 5.8 | AI assistant (read-only DB tools, no direct UW tool, per-user cost cap) |
 | 5.9 | Landing, methodology, glossary, legal |
 | 5.10–5.19 | Engine and data fixes, in registry order. First candidates: flow_poll → `/api/option-trades/flow-alerts`; stage-level `provider_error`; gamma_live units and client reuse; exit-quote staleness rule and engine retirement; falsification gates into the profile (D8); 3.9 §7 flags; D11 TODO removal; dedicated Postgres, retention and backups. |
-| 5.20+ | Research studies (`preregister_<L>.md`, next letter E; non-burned windows only) |
+| 5.20 | **Study E** — can anything learnable rank next-session or five-session returns across the board's ten tickers? Pre-registered in `docs/study-E-signal-preregistration.md`, answered in `docs/study-E-result.md`: **REJECTED** against its own 200-pass shuffled-label null. Its two docs keep `study-E-*` names instead of the `preregister_<L>.md` pattern; the deviation is recorded here rather than silently extended to later letters. |
+| 5.21+ | Further research studies (`preregister_<L>.md`, next letter F; non-burned windows only) |
 
 Detail for the 5.10–5.19 candidates:
 - **Falsification gates (D8).** `src/uoa_detector/backtest/falsification.py:79-81`
