@@ -844,3 +844,72 @@ with #39 in `400cdf0`; the number was read off the open branches before either
 merged, so the two appends did not collide.)
 
 **Undo:** restore the Railway-only `auth_curl_cfg` and the single `exit "$fail"`.
+
+## P43. The spot frame reaches the row, and folding the option cells nearly hid the bear case
+
+5.3.3 put `Hisse çerçevesi` on every row — entry, ATR stop, share count floored to R,
+dollars actually risked, the straddle's target and R to reach it — and folded the
+option cost cells under `Opsiyon detayı`. Four things had to be decided on the way.
+
+**5.3.1 stored bars and never read them.** `alfa_daily_bar` shipped with
+`ensure_daily_bar_tables`, `_store_bars` and `_insert_missing_bars` and no reader at
+all, so the table had been filling up unread since it landed. `load_bars_by_ticker`
+sits beside `load_closes_by_ticker` and uses one query for the whole board, because a
+query per ticker would add a round trip per row to every render. Stored nulls survive
+the read, which is what lets the ATR window break on a gap instead of spanning it.
+
+**A board whose bar table was never written logged a caught exception per request.**
+The read is wrapped, so the page degraded correctly — but a stack trace on every
+render is not a degraded read, it is noise that hides the next real one.
+`db_bars_source` now ensures the table at read time, the pattern `delayed_panel.py`
+already uses for `alfa_daily_close`: `checkfirst`, never altering.
+
+**Decision: the bull/bear grid moved ABOVE the fold.** Folding the option strip in
+place would have put the bear case inside a collapsed `<details>`. The honesty auditor
+would not have caught it — `visible_text` strips tags and still reads folded text — and
+that is exactly why it needed deciding rather than noticing later. A counter-argument
+the reader has to open is not a counter-argument (R-CA1), so the grid now sits above
+the spot frame and only the chip, the lot size and the break-even comparison fold.
+
+**Decision: the spot cell carries `(varsayılan değer)` too.** The share count rests on
+`capital_usd` and `r_usd`, still unconfirmed at 5.3.3. The option size cell already
+discloses that (P15). A spot cell sizing *shares* off the same two unconfirmed numbers
+in silence would be the more misleading of the two, since shares are what actually get
+bought. 5.3.5 flips the flag and both markers disappear together.
+
+**Two copy corrections that older guards forced, and both were right to.** The first
+draft wrote "beklenen hareket"; `test_alfa_render_hygiene` forbids "beklenen" and
+"expected" page-wide so that the vol board's `IV-implied 1σ move` stays the only
+reading of an implied move. The cell now reads `hedef $X (ATM straddle)`, matching
+`moves.py`'s own wording. The draft also denied being a probability on every row,
+which broke R-EV1 — pinned by a *count*, `text.count("olasılı") == len(rows)`, once
+per row in the evidence hover. The denial is now "tahmin değildir", the word
+`moves.py` already uses. Neither was caught by review; both were caught by tests
+written for other phases.
+
+**The entry is B2's price or nothing.** `build_row_spot_frame` applies the identical
+freshness filter as `build_move_view` and reads `stock_price` from a fresh `alfa_atm`
+row, so the two cells of one row can never disagree about what the stock costs. No
+fresh row means no entry, and R-SP8 refuses the whole frame rather than sizing a real
+position off a price that no longer exists.
+
+**Mutation-proved (P39/P40).** Five guards broken, each confirmed to turn
+`test_alfa_spot_render.py` red, then restored to identical md5: the reason mapping, the
+cap disclosure, the ATM freshness filter, the default marker, and the cases-outside-
+the-fold rule.
+
+**Two existing tests were touched, and D10 says to say why.** Neither assertion was
+weakened. `test_alfa_route_tradability` counted `(varsayılan değer)` exactly three
+times per row and named the three sites in a comment; the spot cell is a legitimate
+fourth, so the count is 4 and the comment names it. The count stays exhaustive on
+purpose — it is what would catch the marker appearing where the owner's values are not
+in play. `test_alfa_cost_cells_unexecutable_quotes` sliced the chip strip from
+`data-chip=` to `data-cases`, which encoded the old ordering; with the grid moved above
+the chip that slice became **empty**, so its cell assertions would have passed while
+checking nothing. It now matches the chip div itself. The second one is the more
+interesting failure: the restructure did not break that test's claim, it silently
+removed the text the claim was about.
+
+**Undo:** drop `_alfa_spot.html`, un-fold the option strip in `_alfa_row.html`, and
+remove `bars_source` from `build_alfa_page` and `main.py`. `load_bars_by_ticker` can
+stay: it reads an append-only table and nothing else depends on the frame.
