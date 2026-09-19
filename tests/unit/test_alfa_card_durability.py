@@ -44,6 +44,15 @@ _DESTRUCTIVE: Final[tuple[tuple[str, re.Pattern[str]], ...]] = (
     ("TRUNCATE", re.compile(r"\bTRUNCATE\b")),
     ("truncate(", re.compile(r"\btruncate\s*\(")),
     ("reset(", re.compile(r"\breset\s*\(")),
+    # Raw SQL and the driver-level escape hatch. None of these appear in the
+    # package today, which is precisely why they were absent: a scan assembled
+    # from what the code currently contains cannot catch what someone adds
+    # tomorrow, and this scan exists for tomorrow. ``DELETE FROM`` slipped past
+    # BOTH scans — the shape list below and ``_DELETE_CALL``, which only matches
+    # SQLAlchemy's ``delete(Model)`` form and never raw SQL (audit 2026-09-19).
+    ("DELETE FROM", re.compile(r"\bDELETE\s+FROM\b", re.IGNORECASE)),
+    ("ALTER TABLE", re.compile(r"\bALTER\s+TABLE\b", re.IGNORECASE)),
+    ("exec_driver_sql(", re.compile(r"\bexec_driver_sql\s*\(")),
 )
 
 # The pinned exception (see the module docstring). Nothing else may appear.
@@ -229,6 +238,12 @@ _WOULD_BE_CAUGHT: Final = (
     "table.truncate()",
     "repo.reset()",
     "    def reset(self) -> None:",
+    # The four the scan could not see before the 2026-09-19 audit. Each one wipes
+    # or reshapes an append-only table and each one would have passed silently.
+    'session.execute(text("DELETE FROM alfa_decision_card"))',
+    'session.execute(text("delete from alfa_fill where 1=1"))',
+    'session.execute(text("ALTER TABLE alfa_decision_card DROP COLUMN decision"))',
+    'connection.exec_driver_sql("DELETE FROM alfa_outcome")',
 )
 
 
