@@ -27,10 +27,14 @@ found. The 2026-09-19 audit proved that priced an exit off a bid
 recorded eighteen days BEFORE the position was opened and booked a
 fabricated winner, on the very path that produced the Phase 3.6
 verdict. ``sanity_audit.check_lookahead`` could not see it, because
-it compares the trade's own timestamps and never the timestamp of
-the quote that priced it. The guarded sibling in ``simple_pnl.py``
-has enforced the same-day rule since Phase 3.5.0.1; this one now
-matches it.
+it compared the trade's own timestamps and never the timestamp of
+the quote that priced it. That is fixed as of 2026-09-20: exit-quote
+sources answer ``get_quote`` with a ``QuotedBid`` carrying the
+quote's timestamp, ``RealizedTrade`` records it, and the audit fails
+a trade whose quote sits outside the position or on another session.
+The guarded sibling in ``simple_pnl.py`` has enforced the same-day
+rule since Phase 3.5.0.1; this one matches it, and the audit now
+verifies both rather than trusting either.
 
 Memory: month tables are cached as parsed per-contract series.
 Exits cluster near entries (holding window < ~1 month for the v5
@@ -44,6 +48,8 @@ import logging
 from datetime import date, datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING
+
+from uoa_detector.backtest.pnl_provider import QuotedBid
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -92,7 +98,35 @@ class ParquetExitQuoteProvider:
         option_type: str,
         at: datetime,
     ) -> Decimal | None:
-        """Return the option's bid at-or-before ``at``, or ``None``."""
+        """The bid alone, for readers that do not need the quote's timestamp.
+
+        A thin view over ``get_quote`` so the two can never disagree about which
+        quote is the right one. The pricing path uses ``get_quote``; this exists
+        because the provider's tests read the bid directly and there is no reason to
+        rewrite them.
+        """
+        quote = self.get_quote(
+            ticker=ticker, strike=strike, expiry=expiry,
+            option_type=option_type, at=at,
+        )
+        return None if quote is None else quote.bid
+
+    def get_quote(
+        self,
+        *,
+        ticker: str,
+        strike: Decimal,
+        expiry: datetime,
+        option_type: str,
+        at: datetime,
+    ) -> QuotedBid | None:
+        """Return the option's bid at-or-before ``at`` with its own timestamp.
+
+        The timestamp travels with the bid so ``sanity_audit.check_lookahead`` can
+        verify the exit was priced inside the position's life and session. Before
+        2026-09-20 this method returned the bid alone and the audit was blind to the
+        very leak this class's docstring describes.
+        """
         key: _ContractKey = (option_type, strike, expiry.date())
         found = self._load_month(ticker.upper(), at.year, at.month).get(key)
         if not found:
@@ -104,14 +138,16 @@ class ParquetExitQuoteProvider:
         # The quote must belong to the exit's own trading day. Without this the
         # provider walked back up to three MONTHS and priced an exit off a bid
         # recorded before the position was even opened — b5fcd7a's leak, reopened
-        # in this second provider and invisible to sanity_audit.check_lookahead,
-        # which compares the trade's own timestamps and never the quote's.
+        # in this second provider. It was invisible to sanity_audit.check_lookahead
+        # until 2026-09-20, because that check compared the trade's own timestamps
+        # and never the quote's; it now receives ``exit_quote_ts`` and fails such a
+        # trade, so this guard is verified rather than merely trusted.
         # The guarded sibling in simple_pnl.py has enforced this since 3.5.0.1;
         # pinned decision #2 of docs/phase-3.5.0-acceptance.md says a missing bid
         # leaves the trade OPEN and is never fabricated.
         if quote_ts.date() != at.date():
             return None
-        return bid
+        return QuotedBid(bid=bid, quote_ts=quote_ts)
 
     # -- Month loading ---------------------------------------------------
 

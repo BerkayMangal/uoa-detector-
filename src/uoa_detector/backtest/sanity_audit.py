@@ -5,11 +5,15 @@ spreads of the traded universe) into the audit checks pinned in the
 Phase 3.5 acceptance doc:
 
   - **Look-ahead leakage** — every closed trade must exit strictly
-    after it enters; a closed trade with ``exit_ts <= entry_ts`` (or a
-    missing ``exit_ts``) is a time-travel bug. (Entry is at the signal
-    timestamp, so ``event_ts == entry_ts``; the "no provider data after
-    event_ts" half of the contract is enforced upstream by the as-of
-    providers + event-time discipline (D9), not re-checked here.)
+    after it enters, **and** must be priced off a quote inside its own
+    life and on its own exit session. A closed trade with
+    ``exit_ts <= entry_ts`` (or a missing ``exit_ts``) is a time-travel
+    bug; so is one whose ``exit_quote_ts`` predates entry or belongs to
+    another day. A trade carrying no ``exit_quote_ts`` is counted as
+    *unverifiable*, never as clean. (Entry is at the signal timestamp,
+    so ``event_ts == entry_ts``; the "no provider data after event_ts"
+    half of the contract is enforced upstream by the as-of providers +
+    event-time discipline (D9), not re-checked here.)
   - **Trade frequency** — closed-trade count vs the Phase 3.2.4 prep
     target of 60 (30/yr × 2yr); < 20 risks statistical insignificance,
     > 200 suggests the backtest is too easy to satisfy.
@@ -48,23 +52,73 @@ class LeakageReport:
 
     closed_trades: int
     violations: tuple[str, ...]
-    """event_ids of closed trades whose exit is missing or not strictly
-    after entry — each is a time-travel bug."""
+    """event_ids of closed trades whose exit is missing, not strictly after
+    entry, or priced off a quote outside the exit's own session — each is a
+    time-travel bug."""
+    unverifiable: tuple[str, ...] = ()
+    """event_ids of closed trades carrying no ``exit_quote_ts``, so the quote
+    behind the exit cannot be checked here.
+
+    Not violations, and deliberately not silence: a provider that drops its
+    quote's timestamp leaves this check blind, and the count says how blind.
+    """
 
     @property
     def ok(self) -> bool:
         return not self.violations
 
+    @property
+    def fully_verified(self) -> bool:
+        """True only when every closed trade could actually be checked."""
+        return not self.violations and not self.unverifiable
+
 
 def check_lookahead(trades: Sequence[RealizedTrade]) -> LeakageReport:
-    """Every closed trade must exit strictly after it enters."""
+    """Every closed trade must exit after it enters, priced off its own session.
+
+    Two things are checked, and the second is why this function was rewritten on
+    2026-09-20.
+
+    The first — ``exit_ts > entry_ts`` — catches a negative holding period. It does
+    **not** catch an exit priced off a quote from another day, which is exactly the
+    leak the 2026-09-19 audit found in ``parquet_exit_quote``: the trade's own
+    timestamps were impeccable while the bid that priced it had been recorded 18 days
+    before the position opened. That produced ``realized_r=+0.1467`` out of nothing,
+    and this function passed it — the provider's own docstring said so, calling the
+    defect "invisible to sanity_audit.check_lookahead, which compares the trade's own
+    timestamps and never the quote's".
+
+    So when a trade carries ``exit_quote_ts``, the quote must sit inside the
+    position's life and on the exit's own calendar day. The same-day rule is the one
+    the guarded sibling in ``simple_pnl`` has enforced since 3.5.0.1; this makes the
+    audit able to see it rather than trusting each provider to have got it right.
+
+    A trade carrying no ``exit_quote_ts`` is reported as **unverifiable** rather than
+    passed. Counting it as clean would restore exactly the blindness this change
+    removes, and a check that cannot say what it could not see is a formality.
+    """
     closed = [t for t in trades if t.realized_r is not None]
-    violations = tuple(
-        t.event_id
-        for t in closed
-        if t.exit_ts is None or t.exit_ts <= t.entry_ts
+    violations: list[str] = []
+    unverifiable: list[str] = []
+    for trade in closed:
+        if trade.exit_ts is None or trade.exit_ts <= trade.entry_ts:
+            violations.append(trade.event_id)
+            continue
+        quote_ts = trade.exit_quote_ts
+        if quote_ts is None:
+            unverifiable.append(trade.event_id)
+        elif not (trade.entry_ts <= quote_ts <= trade.exit_ts):
+            # A quote from before the position opened, or from after it closed.
+            violations.append(trade.event_id)
+        elif quote_ts.date() != trade.exit_ts.date():
+            # Inside the position's life but from an earlier session: the option did
+            # not quote on the exit day and the bid is stale, not a price.
+            violations.append(trade.event_id)
+    return LeakageReport(
+        closed_trades=len(closed),
+        violations=tuple(violations),
+        unverifiable=tuple(unverifiable),
     )
-    return LeakageReport(closed_trades=len(closed), violations=violations)
 
 
 # ---------------------------------------------------------------------------

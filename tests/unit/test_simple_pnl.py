@@ -23,6 +23,7 @@ from uoa_detector.backtest import (
     DictExitQuoteProvider,
     SimplePnLProvider,
 )
+from uoa_detector.backtest.sanity_audit import check_lookahead
 from uoa_detector.calibration import load_default_profile
 from uoa_detector.calibration.profile import BacktestConfig
 from uoa_detector.domain.agreement import single_source_agreement
@@ -149,6 +150,46 @@ def test_simple_pnl_winner_returns_positive_r() -> None:
     assert out.realized_r == pytest.approx(0.6467, abs=1e-3)
     assert out.exit_reason == "fixed_window_elapsed"
     assert out.exit_ts == expected_exit
+
+
+def test_the_exit_quote_timestamp_reaches_the_realized_trade() -> None:
+    """The quote that priced the exit must be named on the trade it priced.
+
+    Without this test, ``exit_quote_ts=None`` would pass the entire suite and
+    ``sanity_audit.check_lookahead`` would then report every trade as *unverifiable*
+    — the same blindness the field was added to remove, one level up. The 2026-09-19
+    leak got through because nothing compared the quote's timestamp to the trade's;
+    dropping it on the floor here would restore exactly that.
+
+    The expected timestamp is asked of the provider rather than written as a
+    constant, so this pins the identity of the quote used, not a number that happens
+    to match today's fixture.
+    """
+    entry_ts = datetime(2025, 6, 11, 15, 30, tzinfo=UTC)
+    sig = _build_signal(entry_ts=entry_ts, option_price=Decimal("1.50"), max_r=1.0)
+    expected_exit = entry_ts + timedelta(days=5)
+    quotes = _quotes_with_one_exit(exit_ts=expected_exit, bid=Decimal("2.50"))
+
+    out = SimplePnLProvider(_config(), quotes).provide(sig)
+
+    quote = quotes.get_quote(
+        ticker=sig.ticker,
+        strike=sig.strike,
+        expiry=datetime.combine(sig.expiry, datetime.min.time()),
+        option_type=sig.option_type,
+        at=expected_exit,
+    )
+    assert quote is not None
+    assert out.exit_quote_ts == quote.quote_ts, (
+        "the trade must name the quote that priced it"
+    )
+
+    # End to end: provider -> RealizedTrade -> audit. A clean trade must come back
+    # verified, not merely unflagged.
+    report = check_lookahead([out])
+    assert report.ok
+    assert report.fully_verified
+    assert report.unverifiable == ()
 
 
 def test_simple_pnl_loser_returns_negative_r() -> None:
