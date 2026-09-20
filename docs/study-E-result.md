@@ -170,6 +170,28 @@ symbol's normalised source: md5 `e23d7e12e50c9eadb545da3f29f6100f` on both. The
 working copy's only differences are an unused import and an `int()` cast inside
 `main()`, which the runner never calls.
 
+> **Amended 2026-09-20 (audit).** `scripts/study_e_signal.py` now **purges the fold
+> boundary**: the training window ends `horizon - 1` sessions before the test window
+> opens, and the same purge applies to the inner split that selects the
+> configuration. It did not before, and the 2026-09-19 audit was right to call that a
+> defect — at horizon 5, fold 0's last training day carried a label built entirely
+> from sessions inside the test fold, which contradicts this study's own
+> pre-registration ("no row from a test fold ever informs its own training set").
+>
+> Two consequences, stated rather than buried. **The md5 above no longer matches the
+> committed file**, because `folds` and `run_once` changed; it records what produced
+> the published figures, which is what a reproduction note is for. And **the figures
+> in §1 and §5 were produced without the purge**, so the runner as committed will not
+> reproduce them exactly. A purged re-run is owed and is not being presented as done.
+>
+> The verdict is unchanged, and the reason is directional: the leak let training
+> labels see test-window prices, which can only **inflate** the real arm's IC, while
+> the null permutes within each day and so destroys the cross-sectional content of
+> exactly those leaked returns. A rejection that held with the real arm inflated
+> holds without it. Study F, whose pre-registration was amended before its runner
+> existed precisely so it would never be in this position, reached the same verdict
+> on a panel seven times wider (`docs/study-F-result.md`).
+
 The 17,037 raw prints behind §4 are **not** committed: 2.5 MB of vendor row-level
 data, re-exportable from the `signal` table. What ships is the aggregate the study
 actually modelled, so §4's nine correlations are recomputed by the test above from
