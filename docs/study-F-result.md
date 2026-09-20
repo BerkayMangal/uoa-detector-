@@ -119,6 +119,28 @@ one has not already searched. Until that exists, this cell is an observation
 recorded honestly, with its provenance in the shipped file, and nothing more. It
 is not evidence, it does not reach the board, and no position may be sized on it.
 
+**And that window does not currently exist.** Measured 2026-09-20, after this
+result was written: `GET /api/stock/{t}/ohlc/1d` returns exactly 252 regular
+sessions — the same 2025-09-18 to 2026-09-18 span for SPY, PLTR and AAPL, with
+**zero** sessions before this study's window opened. The ~752 rows the
+pre-registration noted are pre-market, regular and post-market rows of those same
+252 days, not a longer history. The vendor with a longer daily history is
+ThetaData, whose credentials are invalid (`docs/study-E-result.md` §4) and whose
+bulk download is out of scope.
+
+So the follow-up this section calls for cannot be run backwards on the data
+available. It can only be run **forwards**: freeze the hypothesis and the
+thresholds now, let the sessions accumulate, and score it when the window is long
+enough to be out-of-sample by construction rather than by assertion. That is done —
+`docs/study-G-preregistration.md`, frozen 2026-09-20 before a single session of its
+data existed, reusing this study's features, models, protocol and null unchanged so
+the search does not widen, with three evaluation dates fixed in advance and the
+first no earlier than roughly 2027-04. Running it on
+this window instead — the only one on disk — is the move the paragraph above
+refuses, and measuring the constraint does not make the refusal weaker. It makes
+it the only honest option, which is why it is recorded here rather than left for a
+later reader to discover while looking for a way to use the number.
+
 ## 5. Completion, and the verdict's independence from the pass count
 
 Both labels completed **200 of 200** shuffled passes at both horizons; the reps
