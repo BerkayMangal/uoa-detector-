@@ -317,6 +317,9 @@ def test_status_labels_are_byte_exact_and_clean() -> None:
         "acilis": "açılış (T+1 OI teyitli)",
         "kapanis": "kapanış (T+1 OI düştü)",
         "kapsam_disi": "kapsam-dışı (T+1'den önce vade)",
+        # Phase 5.2.B-fix6 (D10, review RB-01): the sixth status retires a flag whose
+        # session has left the historic window. The contract's four labels are unchanged.
+        "kacirildi": "doğrulanamadı (T+1 verisi penceresi kapandı)",
     }
     for text in [*oc.STATUS_LABELS.values(), oc.NO_ROW_LABEL]:
         assert ensure_clean(text) == text

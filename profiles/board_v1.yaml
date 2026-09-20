@@ -94,6 +94,10 @@ opening_closing:
   confirm_open_min_ratio: 0.5        # delta OI >= ratio x flagged size: açılış
   confirm_close_max_ratio: -0.5      # delta OI <= ratio x flagged size: kapanış
   job_time_et: "07:15"               # UW publishes start-of-day OI around 06:30-06:45 ET
+  # Phase 5.2.B-fix6: added (the key was missing). The historic request asks for 5 rows, so a
+  # flag this many sessions old can no longer be resolved: it is retired instead of costing one
+  # request every pre-market until the contract expires (review RB-01).
+  max_confirm_age_sessions: 5
 
 catalyst:
   macro_event_names:                 # matched case-insensitively as substrings of the event name

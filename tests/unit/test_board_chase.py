@@ -215,7 +215,9 @@ def test_flow_context_is_direction_aware_and_labelled() -> None:
     assert flow_context(_tape(400_000.0), "up") == "continuing"
     assert flow_context(_tape(400_000.0), "down") == "reversed"
     assert flow_context(_tape(-400_000.0), "up") == "reversed"
-    assert flow_context(_tape(0.0), "up") == "unknown"
+    # Phase 5.2.B-fix9 (D10, review FB-06): a tape that was read and sums to zero is a
+    # measurement, so it no longer reports the same state as a missing row (decision P8).
+    assert flow_context(_tape(0.0), "up") == "flat"
     assert flow_context(None, "up") == "unknown"
     assert FLOW_LABELS["continuing"] == "akış baskıdan beri sürüyor"
     assert FLOW_LABELS["reversed"] == "akış baskıdan beri döndü"

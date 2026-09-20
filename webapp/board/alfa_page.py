@@ -135,7 +135,6 @@ from webapp.board.portfolio import (
 )
 from webapp.board.quotes import dominant_symbol, read_board_quotes
 from webapp.board.regime import (
-    GAMMA_TICKERS,
     STATUS_SEPARATOR,
     RegimeInputs,
     build_regime_band,
@@ -346,15 +345,6 @@ REGIME_COPY: Final[Mapping[str, str]] = MappingProxyType({"status_separator": ST
 EMPTY_REGIME_INPUTS: Final = RegimeInputs(
     tide_buckets=(), gamma=(), gex=(), curve=None, vix=None, history=(),
 )
-REGIME_CHIP_KEYS: Final[tuple[str, ...]] = (
-    "tide",
-    *(f"gamma:{t}" for t in GAMMA_TICKERS),
-    *(f"flip:{t}" for t in GAMMA_TICKERS),
-    "curve",
-    "vix_curve",
-    "vix_spot",
-)
-
 FILL_SIDE_LABELS: Final[Mapping[str, str]] = MappingProxyType(
     {
         "at_ask": "ask (alım)",

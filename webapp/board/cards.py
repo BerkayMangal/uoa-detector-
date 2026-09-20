@@ -89,6 +89,13 @@ CARD_COPY: Final[Mapping[str, str]] = MappingProxyType(
         # page says "Nothing is lost", which is true of a read-only view and false
         # of a decision: an unrecorded pass is gone. So the press gets this line.
         "write_failed": "Karar yazılamadı; hiçbir şey kaydedilmedi — tekrar dene.",
+        # The journal form is the app's older English page, so this line stays in
+        # that page's language. It is frozen here rather than written into the
+        # template so it passes the same honesty guard as the rest, and so the
+        # claim has one home next to the rule it depends on (``is_linkable``).
+        "journal_link": (
+            "Linked to board decision card {card_id} — saving stores this trade's id on that card."
+        ),
     },
 )
 

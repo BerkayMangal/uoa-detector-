@@ -11,7 +11,12 @@ is therefore confirmed by ``ΔOI = OI(T+1) - OI(T)``:
 - ``kapanış (T+1 OI düştü)``: ΔOI <= ``opening_closing.confirm_close_max_ratio`` x flagged size;
 - ``henüz doğrulanmadı``: T+1 not published yet (status ``bekliyor``), or ΔOI between
   the two cutoffs (final status ``arada``);
-- ``kapsam-dışı (T+1'den önce vade)``: the contract expires before the next session.
+- ``kapsam-dışı (T+1'den önce vade)``: the contract expires before the next session;
+- ``doğrulanamadı (T+1 verisi penceresi kapandı)``: the flag is
+  ``opening_closing.max_confirm_age_sessions`` sessions old, so its session has left
+  the ``historic`` window the request returns. It can never be resolved, so it is
+  retired once (final status ``kacirildi``, read as ``bilinmiyor``) instead of
+  costing one request every pre-market until the contract expires (review RB-01).
 
 ``alfa_oi_confirm`` is append-only forward evidence (contract §4.2). A row is
 inserted once per (option_symbol, trade_date) and never deleted or reset. Its
@@ -36,6 +41,7 @@ from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from typing import TYPE_CHECKING, Any, Final, Literal, cast
+from weakref import WeakSet
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import Date, DateTime, Float, Integer, String, select, update
@@ -66,7 +72,7 @@ HISTORIC_PATH: Final = "/api/option-contract/{symbol}/historic"
 # when the job runs within a few sessions of the flag. Not a cutoff.
 HISTORIC_LIMIT: Final = 5
 
-OiStatus = Literal["bekliyor", "acilis", "kapanis", "arada", "kapsam_disi"]
+OiStatus = Literal["bekliyor", "acilis", "kapanis", "arada", "kapsam_disi", "kacirildi"]
 EvidenceState = Literal["lehte", "aleyhte", "bilinmiyor", "kapsam-dışı"]
 
 # Frozen copy (contract §6 B4, byte for byte).
@@ -76,6 +82,9 @@ STATUS_LABELS: Final[Mapping[OiStatus, str]] = {
     "acilis": "açılış (T+1 OI teyitli)",
     "kapanis": "kapanış (T+1 OI düştü)",
     "kapsam_disi": "kapsam-dışı (T+1'den önce vade)",
+    # Phase 5.2.B-fix6 (review RB-01): the historic window no longer contains the print's
+    # session, so this flag can never be resolved. It is a permanent unknown, not a "not yet".
+    "kacirildi": "doğrulanamadı (T+1 verisi penceresi kapandı)",
 }
 NO_ROW_LABEL: Final = "henüz doğrulanmadı"
 
@@ -86,9 +95,13 @@ _EVIDENCE: Final[Mapping[OiStatus, EvidenceState]] = {
     "bekliyor": "bilinmiyor",
     "arada": "bilinmiyor",
     "kapsam_disi": "kapsam-dışı",
+    "kacirildi": "bilinmiyor",
 }
-_FINAL: Final[frozenset[str]] = frozenset({"acilis", "kapanis", "arada", "kapsam_disi"})
+_FINAL: Final[frozenset[str]] = frozenset(
+    {"acilis", "kapanis", "arada", "kapsam_disi", "kacirildi"},
+)
 _PENDING: Final = "bekliyor"
+_MISSED: Final = "kacirildi"
 
 _ET: Final = ZoneInfo("America/New_York")
 _SATURDAY: Final = 5
@@ -159,6 +172,8 @@ class OiConfirmReport:
     no_data: tuple[str, ...]
     degraded: tuple[str, ...]
     requests: int
+    # Phase 5.2.B-fix6: rows retired because their session left the historic window.
+    retired: tuple[tuple[str, date], ...] = ()
 
 
 @dataclass(frozen=True)
@@ -228,6 +243,28 @@ async def confirm_open_interest(
             recorded += 1
             out_of_scope += int(beyond)
 
+    # A flag whose session has left the historic window can never be resolved: retire it
+    # instead of spending one request on it every pre-market (review RB-01).
+    retired: list[tuple[str, date]] = []
+    max_age_sessions = settings.opening_closing.max_confirm_age_sessions
+    with sessions() as session, session.begin():
+        stale = session.scalars(
+            select(AlfaOiConfirm)
+            .where(
+                AlfaOiConfirm.status == _PENDING,
+                AlfaOiConfirm.trade_date < today,
+                AlfaOiConfirm.expiry >= today,
+            )
+            .order_by(AlfaOiConfirm.option_symbol, AlfaOiConfirm.trade_date),
+        ).all()
+        for row in stale:
+            if sessions_since(row.trade_date, today) < max_age_sessions:
+                continue
+            row.status = _MISSED
+            row.board_profile_hash = profile_hash
+            row.resolved_at = checked_at
+            retired.append((row.option_symbol, row.trade_date))
+
     with sessions() as session:
         pending = session.scalars(
             select(AlfaOiConfirm)
@@ -295,7 +332,7 @@ async def confirm_open_interest(
         checked_at=checked_at, recorded=recorded, already_recorded=already,
         out_of_scope=out_of_scope, rejected=tuple(rejected), resolved=tuple(resolved),
         awaiting=tuple(awaiting), no_data=tuple(no_data), degraded=tuple(degraded),
-        requests=requests,
+        requests=requests, retired=tuple(retired),
     )
 
 
@@ -310,6 +347,24 @@ def next_session(day: date) -> date:
     while nxt.weekday() >= _SATURDAY:
         nxt += timedelta(days=1)
     return nxt
+
+
+def sessions_since(day: date, today: date) -> int:
+    """Weekday sessions strictly after ``day``, up to and including ``today``.
+
+    Holidays are not modelled, the same as ``next_session``. The T+1 job asks for
+    ``HISTORIC_LIMIT`` rows, so a flag this many sessions old has left the window
+    the request returns (Phase 5.2.B-fix6).
+    """
+    if today <= day:
+        return 0
+    count = 0
+    cursor = day + timedelta(days=1)
+    while cursor <= today:
+        if cursor.weekday() < _SATURDAY:
+            count += 1
+        cursor += timedelta(days=1)
+    return count
 
 
 def expires_before_next_session(expiry: date, trade_date: date) -> bool:
@@ -395,6 +450,9 @@ BOARD_STATES: Final[Mapping[OiStatus, OIConfirmState]] = {
     "bekliyor": "unconfirmed",
     "arada": "unconfirmed",
     "kapsam_disi": "expires_before_t1",
+    # Phase 5.2.B-fix6: a retired flag is a permanent unknown, so the Açık pozisyon
+    # family reads it exactly like an unconfirmed one (contract §9).
+    "kacirildi": "unconfirmed",
 }
 
 
@@ -403,8 +461,11 @@ def board_state(view: OiConfirmView | None) -> OIConfirmState | None:
     return None if view is None else BOARD_STATES[view.status]
 
 
-# The engine whose confirmation table is known to exist (the render path checks once).
-_tables_ready_for: list[Engine] = []
+# The engines whose confirmation table is known to exist. A set, not one slot: the web app
+# and the refresher hold different Engine objects for the same database and alternate
+# through this reader, which made the one-slot guard re-issue catalog DDL on every call
+# (review RB-05).
+_tables_ready_for: WeakSet[Engine] = WeakSet()
 
 
 def read_board_oi(
@@ -418,9 +479,9 @@ def read_board_oi(
     wanted = [(symbol.strip().upper(), day) for symbol, day in keys if symbol.strip()]
     if not wanted:
         return {}
-    if not _tables_ready_for or _tables_ready_for[0] is not engine:
+    if engine not in _tables_ready_for:
         ensure_oi_confirm_tables(engine)
-        _tables_ready_for[:] = [engine]
+        _tables_ready_for.add(engine)
     with Session(engine) as session:
         return load_oi_confirms(session, wanted)
 

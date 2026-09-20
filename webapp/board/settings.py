@@ -150,6 +150,7 @@ class OpeningClosingSettings(_Strict):
     confirm_open_min_ratio: float = Field(gt=0)
     confirm_close_max_ratio: float = Field(lt=0)
     job_time_et: str = Field(pattern=_CLOCK)
+    max_confirm_age_sessions: int = Field(ge=1)  # Phase 5.2.B-fix6
 
 
 class CatalystSettings(_Strict):

@@ -35,6 +35,7 @@ import logging
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from typing import TYPE_CHECKING, Any, Final, Protocol, cast
+from weakref import WeakSet
 
 from sqlalchemy import DateTime, String, Table, select
 from sqlalchemy.orm import Mapped, Session, mapped_column
@@ -178,10 +179,23 @@ def upsert_ticker_infos(
     return written
 
 
+# The engines whose info table is known to exist. A set, not one slot: the web app and the
+# refresher hold different Engine objects for the same database (review RB-05).
+_tables_ready_for: WeakSet[Engine] = WeakSet()
+
+
+def _ready(engine: Engine) -> None:
+    """Create ``alfa_ticker_info`` once per engine, so a fresh database reads empty (RB-04)."""
+    if engine not in _tables_ready_for:
+        ensure_ticker_info_tables(engine)
+        _tables_ready_for.add(engine)
+
+
 def read_ticker_infos(engine: Engine, tickers: Iterable[str]) -> dict[str, TickerInfoView]:
     wanted = {_symbol(t) for t in tickers if t and t.strip()}
     if not wanted:
         return {}
+    _ready(engine)
     with Session(engine) as session:
         rows = session.execute(
             select(AlfaTickerInfo).where(AlfaTickerInfo.ticker.in_(wanted)),

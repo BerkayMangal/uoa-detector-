@@ -55,6 +55,7 @@ from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Final, Literal
+from weakref import WeakSet
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import select
@@ -698,19 +699,21 @@ def _metadata(raw: str | None) -> Mapping[str, str] | None:
     return MappingProxyType({str(k): str(v) for k, v in parsed.items()})
 
 
-# The engine whose evidence tables are known to exist (the render path checks once).
-_tables_ready_for: list[Engine] = []
+# The engines whose evidence tables are known to exist. A set, not one slot: the web app
+# and the refresher hold different Engine objects for the same database and alternate
+# through this reader (review RB-05).
+_tables_ready_for: WeakSet[Engine] = WeakSet()
 
 
 def read_evidence_inputs(engine: Engine, run_id: str, requests: Sequence[EvidenceRequest]) -> EvidenceInputs:
     """Telemetry of the source prints, the tapes of their trading days and ticker info."""
     if not requests:
         return EMPTY_INPUTS
-    if not _tables_ready_for or _tables_ready_for[0] is not engine:
+    if engine not in _tables_ready_for:
         ensure_telemetry_tables(engine)
         ensure_netprem_tables(engine)
         ensure_ticker_info_tables(engine)
-        _tables_ready_for[:] = [engine]
+        _tables_ready_for.add(engine)
     event_ids = sorted({r.event_id for r in requests})
     telemetry: dict[str, dict[str, StageTelemetryView]] = {}
     with Session(engine) as session:

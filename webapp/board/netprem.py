@@ -46,6 +46,7 @@ import math
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from typing import TYPE_CHECKING, Any, Final, Protocol, cast
+from weakref import WeakSet
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import Date, DateTime, Float, Integer, String, Table, func, select
@@ -350,6 +351,18 @@ def _summary(row: Any) -> TapeSummary | None:
     )
 
 
+# The engines whose tape table is known to exist. A set, not one slot: the web app and the
+# refresher hold different Engine objects for the same database (review RB-05).
+_tables_ready_for: WeakSet[Engine] = WeakSet()
+
+
+def _ready(engine: Engine) -> None:
+    """Create ``alfa_net_prem`` once per engine, so a fresh database reads empty (review RB-04)."""
+    if engine not in _tables_ready_for:
+        ensure_netprem_tables(engine)
+        _tables_ready_for.add(engine)
+
+
 def read_tape_summaries(
     engine: Engine, keys: Iterable[tuple[str, date]],
 ) -> dict[tuple[str, date], TapeSummary]:
@@ -357,6 +370,7 @@ def read_tape_summaries(
     wanted = {(ticker.strip().upper(), day) for ticker, day in keys}
     if not wanted:
         return {}
+    _ready(engine)
     stmt = (
         select(*_summary_columns())
         .where(
@@ -395,6 +409,7 @@ def read_net_premium_since(
     engine: Engine, ticker: str, trade_date: date, since: datetime,
 ) -> TapeSummary | None:
     """The tape summed from the minute containing ``since`` onwards, or None without rows."""
+    _ready(engine)
     with Session(engine) as session:
         return _since_summary(session, ticker, trade_date, since)
 
@@ -419,6 +434,7 @@ def read_net_premium_since_many(
     )
     if not wanted:
         return {}
+    _ready(engine)
     earliest = min(since for _ticker, _day, since in wanted).replace(second=0, microsecond=0)
     stmt = select(
         AlfaNetPrem.ticker,
