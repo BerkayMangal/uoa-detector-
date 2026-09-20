@@ -102,14 +102,39 @@ def test_report_includes_falsification_section() -> None:
 
 
 def test_report_includes_per_metric_pass_fail_breakdown() -> None:
-    """The per-metric breakdown table appears after the 4×5 table."""
-    fixtures = {
-        c: _trades(c, 60, 0.5)
-        for c in ("tier1_single", "tier1_fusion", "tier2_single", "tier2_fusion")
-    }
+    """The per-metric breakdown carries every cell against every metric.
+
+    The earlier assertion was ``"PASS" in md or "FAIL" in md or "INSUFFICIENT" in
+    md``. That is true of almost any report this function could return — including
+    one that dropped four of its five metric columns, rendered a single cell, or
+    lost the table entirely while leaving the word PASS somewhere in the prose
+    above it. It could not fail, which is the defect the 2026-09-19 audit was
+    looking for, so it is replaced by the shape the table actually has.
+    """
+    cells = ("tier1_single", "tier1_fusion", "tier2_single", "tier2_fusion")
+    fixtures = {c: _trades(c, 60, 0.5) for c in cells}
     md = render_4cell_comparison_report(_run_4cell(fixtures))
     assert "Per-metric pass/fail breakdown" in md
-    assert "PASS" in md or "FAIL" in md or "INSUFFICIENT" in md
+
+    section = md.split("Per-metric pass/fail breakdown", 1)[1]
+    statuses = 0
+    for cell in cells:
+        row = next(
+            (ln for ln in section.splitlines() if ln.startswith(f"| `{cell}` |")), None,
+        )
+        assert row is not None, f"{cell} has no row in the per-metric table"
+        values = [c.strip() for c in row.strip().strip("|").split("|")][1:]
+        assert len(values) == 5, (
+            f"{cell}: the breakdown covers five metrics; this row has {len(values)}: {values}"
+        )
+        for value in values:
+            # Each cell is a marker plus a verdict word, e.g. "PASS" behind a tick.
+            parts = value.split()
+            assert len(parts) == 2 and parts[1] in {"PASS", "FAIL", "INSUFFICIENT"}, (
+                f"{cell}: unexpected status cell {value!r}"
+            )
+        statuses += len(values)
+    assert statuses == 20, "four cells against five metrics"
 
 
 # ---------------------------------------------------------------------------

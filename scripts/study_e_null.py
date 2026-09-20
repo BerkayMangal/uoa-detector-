@@ -76,7 +76,12 @@ def main() -> int:
             row: dict[str, float | int] = {"rep": rep}
             for horizon, panel in panels.items():
                 rng = np.random.default_rng(1000 + rep)
-                results = se.run_once(panel, shuffle=True, rng=rng)  # type: ignore[attr-defined]
+                # ``horizon`` is positional since 2026-09-20: the protocol module
+                # purges the fold boundary and needs the label span to do it. This
+                # call site is dynamically imported, so neither mypy nor the test
+                # suite would have caught the stale signature — it would have failed
+                # only when someone reran the null.
+                results = se.run_once(panel, horizon, shuffle=True, rng=rng)  # type: ignore[attr-defined]
                 row[f"h{horizon}"] = float(np.nanmean([r.ic for r in results]))
                 del results
                 gc.collect()

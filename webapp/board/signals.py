@@ -181,18 +181,18 @@ class BoardSignalReader:
         missing = [k for k in keys if k not in cache.meta]
         if not missing:
             return
-        available = set(
-            session.execute(
-                select(AlfaPrintMeta.event_id).where(AlfaPrintMeta.run_id == run_id),
-            ).scalars(),
-        )
-        wanted = [k for k in missing if k in available]
-        if not wanted:
-            return
+        # One query, not two. A probe used to run first, selecting EVERY event_id
+        # of the run to decide which of ``missing`` were worth asking for — a full
+        # scan of the run's print-meta on every board render whose only effect was
+        # to narrow an IN list that narrows nothing: an id with no row returns no
+        # row either way, and the cache is filled from what comes back rather than
+        # from what was asked for (audit 2026-09-19).
         stmt = select(
             AlfaPrintMeta.event_id, AlfaPrintMeta.fill_side, AlfaPrintMeta.option_chain,
         ).where(AlfaPrintMeta.run_id == run_id)
         if cache.meta:
-            stmt = stmt.where(AlfaPrintMeta.event_id.in_(wanted))
+            # First load takes the run in one sweep; later renders ask only for
+            # what they are missing, which keeps the IN list bounded by the page.
+            stmt = stmt.where(AlfaPrintMeta.event_id.in_(missing))
         for event_id, fill_side, option_chain in session.execute(stmt):
             cache.meta[event_id] = PrintMetaView(fill_side=fill_side, option_chain=option_chain)

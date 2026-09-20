@@ -7,7 +7,8 @@ implements it literally. Nothing here may be tuned after a result is seen (D4).
 
     features   close-only, computed from information available at the close of t
     label      next-session log return, scored as a within-day rank IC
-    folds      expanding walk-forward, train 120 / test 21, rolled by 21
+    folds      expanding walk-forward, train 120 / test 21, rolled by 21, with the
+               training window ending horizon-1 sessions before the test opens
     search     a fixed grid of 64 XGBoost configurations per fold
     null       the SAME search on labels permuted WITHIN each day, N times
 
@@ -112,16 +113,39 @@ class FoldResult:
     config: dict[str, float] = field(default_factory=dict)
 
 
-def folds(days: list[pd.Timestamp]) -> list[tuple[list[pd.Timestamp], list[pd.Timestamp]]]:
+def folds(
+    days: list[pd.Timestamp], horizon: int,
+) -> list[tuple[list[pd.Timestamp], list[pd.Timestamp]]]:
+    """Expanding walk-forward with a purge at the fold boundary.
+
+    The training window ends ``horizon - 1`` sessions before the test window opens,
+    so no training label's window reaches into the test fold. A no-op at horizon 1;
+    it drops the last four training days at horizon 5.
+
+    Added 2026-09-20. The 2026-09-19 audit found this harness had no purge: the
+    label at day t spans t+1..t+horizon, so at horizon 5 fold 0's last training day
+    was 2026-05-18 with a label built entirely from sessions inside the test fold
+    that opened 2026-05-19. That contradicted the pre-registration's own "no row
+    from a test fold ever informs its own training set".
+
+    ``docs/study-E-result.md`` is NOT revised by this change and its §7 records why:
+    the leak inflates the arm that failed, and a rejection that held despite an
+    inflated real arm still holds. The published figures were produced by the
+    unpurged harness, so this function no longer reproduces them exactly; a purged
+    re-run is owed and would only push the real result further from its threshold.
+    """
+    purge = horizon - 1
     out = []
     start = TRAIN
     while start + TEST <= len(days):
-        out.append((days[:start], days[start:start + TEST]))
+        out.append((days[: start - purge], days[start:start + TEST]))
         start += STEP
     return out
 
 
-def run_once(panel: pd.DataFrame, *, shuffle: bool, rng: np.random.Generator) -> list[FoldResult]:
+def run_once(
+    panel: pd.DataFrame, horizon: int, *, shuffle: bool, rng: np.random.Generator,
+) -> list[FoldResult]:
     """One full pass of the pre-registered search. ``shuffle`` permutes y within each day."""
     from xgboost import XGBRegressor
 
@@ -133,12 +157,15 @@ def run_once(panel: pd.DataFrame, *, shuffle: bool, rng: np.random.Generator) ->
 
     days = sorted(work["day"].unique())
     results: list[FoldResult] = []
-    for index, (train_days, test_days) in enumerate(folds(days)):
+    for index, (train_days, test_days) in enumerate(folds(days, horizon)):
         tr = work[work["day"].isin(train_days)]
         te = work[work["day"].isin(test_days)]
-        # Configuration is chosen on the LAST 21 training days only, never on test.
+        # Configuration is chosen on the LAST 21 training days only, never on test —
+        # and the purge applies to this inner split too, or model selection reads
+        # labels that span into its own validation window (addendum, 2026-09-20).
         inner_cut = train_days[-TEST:]
-        inner_tr = tr[~tr["day"].isin(inner_cut)]
+        inner_purge = train_days[-(TEST + horizon - 1):-TEST] if horizon > 1 else []
+        inner_tr = tr[~tr["day"].isin([*inner_cut, *inner_purge])]
         inner_va = tr[tr["day"].isin(inner_cut)]
         best_ic, best_cfg = -np.inf, GRID[0]
         for cfg in GRID:
@@ -179,10 +206,10 @@ def main() -> int:
     for horizon in HORIZONS:
         panel = build_panel(wide, horizon)
         days = sorted(panel["day"].unique())
-        fold_list = folds(days)
+        fold_list = folds(days, horizon)
         print(f"\n== horizon {horizon} session(s): rows={len(panel)} "
               f"days={len(days)} folds={len(fold_list)} fits={len(GRID) * len(fold_list)}")
-        real = run_once(panel, shuffle=False, rng=np.random.default_rng(0))
+        real = run_once(panel, horizon, shuffle=False, rng=np.random.default_rng(0))
         for r in real:
             print(f"   fold {r.fold}: train={r.train_days} test={r.test_days} IC={r.ic:+.4f}")
         mean_ic = float(np.nanmean([r.ic for r in real]))
@@ -201,7 +228,7 @@ def main() -> int:
             for rep in range(args.null):
                 rng = np.random.default_rng(1000 + rep)
                 null_means.append(float(np.nanmean(
-                    [r.ic for r in run_once(panel, shuffle=True, rng=rng)],
+                    [r.ic for r in run_once(panel, horizon, shuffle=True, rng=rng)],
                 )))
                 if (rep + 1) % 10 == 0:
                     arr = np.array(null_means)
