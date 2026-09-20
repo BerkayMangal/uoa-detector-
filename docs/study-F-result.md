@@ -52,14 +52,57 @@ produce +0.0400.
 
 That is the finding, and it is the same one Study E reached on a narrower panel:
 **the search is stronger than the data.** Without this control, horizon 1's
-+0.0400 with 3-of-3 positive folds would have read as a result, SHAP would have
-explained it convincingly, and the explanation would have been of noise.
++0.0400 with 3-of-3 positive folds would have read as a result, and a SHAP plot
+would have been produced to explain it. §2a measures what that plot would have
+been worth.
 
 The null also says something about which models find noise most easily. Across
 200 passes the best-of-ten was won by `ridge` 41 times and by the analog
 predictor 33 times at horizon 1 — the two configurations that score **worst** on
 the real labels (`ridge` −0.0307, `analog` +0.0110). A configuration that wins on
 shuffled labels is not a good model; it is a flexible one.
+
+### 2a. What a SHAP plot of this model would have been worth
+
+§6 permits SHAP on the winning configuration for description only. An earlier draft
+of this document declined to compute it, on the argument that a plot of a failed
+search describes nothing but noise. That was an argument, not a number, so it has
+been replaced with the measurement (`scripts/study_f_shap.py`, 20 shuffles per cell).
+
+The winning configuration is refitted exactly as the search fitted it — same purged
+folds, same training-window standardisation — and its mean |SHAP| per feature is
+taken on each test fold. The same is then done on labels shuffled within each day.
+Two agreements come out: how much the real arm's feature ranking agrees with a
+shuffled arm's, and how much two shuffled arms agree with each other.
+
+| cell | real ↔ shuffled | shuffled ↔ shuffled | top-5 overlap, real | top-5 overlap, shuffled pairs |
+|---|---|---|---|---|
+| 1 session, forward | +0.451 (sd 0.078) | +0.553 (sd 0.101) | 0.95 / 5 | 1.78 / 5 |
+| 5 sessions, forward | +0.775 (sd 0.037) | +0.837 (sd 0.045) | 2.20 / 5 | 4.27 / 5 |
+| 5 sessions, market-neutral | +0.606 (sd 0.080) | +0.656 (sd 0.079) | 1.85 / 5 | 2.72 / 5 |
+
+Two things, and the first corrects the earlier draft.
+
+**The real arm is not merely noise-shaped.** In all three cells it agrees with the
+shuffled arms *less* than the shuffled arms agree with each other, and its top-5
+features overlap theirs about half as often. The model does respond to the real
+labels differently from destroyed ones, so "SHAP would only have described noise"
+was too strong and is withdrawn.
+
+**But what the shuffled arms share is the more useful number.** They agree with each
+other at +0.55 to +0.84, and at horizon 5 their top-5 lists overlap **4.27 of 5** —
+on labels with no information in them at all. Most of a SHAP ranking here is not the
+data speaking; it is the feature distribution and the tree's own preferences, which
+come out nearly the same whatever the labels say. A reader shown the real arm's
+top-5 (`atr_14_pct`, `ret_5`, `idio_ret_5`, `ret_1`, `clv` at horizon 1) would be
+looking mostly at that.
+
+And the response the real arm does have **does not become a ranking**: the IC still
+sits below its null's 99th percentile in every one of these cells. The honest
+summary is not "SHAP shows noise" but **"SHAP shows a structure the model found and
+could not turn into out-of-sample ordering"** — which is why §6 forbids it from
+touching the verdict, and why no feature was added, removed or re-weighted after
+seeing these numbers.
 
 ## 3. Why a 2.9× wider panel did not change the answer
 
@@ -196,6 +239,8 @@ removes "the data was too narrow" as an explanation for the previous rejection.
 | the 37-feature library, prefix-only by signature | `src/uoa_detector/research/features.py` |
 | the search, its purge and its null | `scripts/study_f_runner.py` |
 | the four thresholds applied to the output | `scripts/study_f_verdict.py` |
+| §2a's SHAP agreement measurement | `scripts/study_f_shap.py` |
+| its output, three cells x 20 shuffles | `data/study_f/shap_forward_h1.json`, `shap_forward_h5.json`, `shap_idio_h5.json` |
 | 402 forward-label passes, one JSON line each | `data/study_f/null_forward.jsonl` |
 | 402 market-neutral passes | `data/study_f/null_idio.jsonl` |
 | every figure above, recomputed on each test run | `tests/unit/test_study_f_null_evidence.py` |
@@ -215,10 +260,17 @@ uv run --group research python scripts/study_f_verdict.py \
 The runner is resumable: it skips (horizon, rep) pairs already present in its
 output, so a killed run continues by being run again.
 
-**What is not in this repository.** SHAP was not computed. §6 allows it for
-description only and forbids it from changing the verdict; with T1 failed on both
-horizons there is nothing to describe but noise, and a SHAP plot of noise is the
-artifact this study was designed to avoid producing. The liquidity filter dropped
+**SHAP was computed after all**, and §2a reports it: not as a plot, but as the
+agreement between the real arm's feature ranking and the rankings the same
+configuration produces on shuffled labels. The earlier draft of this section said it
+had not been computed because a plot of a failed search describes only noise; the
+measurement showed that was too strong, so the claim was withdrawn rather than kept
+because it sounded disciplined. §6's rule held throughout: nothing in §2a touched the
+verdict, and no feature was added, removed or re-weighted after seeing it.
+
+**What is not in this repository.** No SHAP plots — the per-feature numbers ship as
+JSON instead, because the argument is about agreement between rankings and a picture
+cannot be recomputed by a test. The liquidity filter dropped
 CHGG (median daily dollar volume $1.2M) and ROOT ($17.0M) under the $20M rule
 declared in §3 before any fit, leaving 68 names; RDFN returned an empty payload
 and is absent from the panel, so 71 were requested and 70 stored.

@@ -34,9 +34,11 @@ between a number and its noun.
 from __future__ import annotations
 
 import csv
+import importlib.util
 import json
 import re
 import statistics as st
+import sys
 from pathlib import Path
 
 _REPO = Path(__file__).resolve().parents[2]
@@ -368,3 +370,141 @@ def test_the_document_states_that_nothing_reaches_the_board() -> None:
     doc = _flat()
     assert "**Nothing from this study reaches the board.**" in doc
     assert "no score, no probability" in doc
+
+
+# ---------------------------------------------------------------------------
+# §2a — what a SHAP plot of this model would have been worth
+# ---------------------------------------------------------------------------
+
+_SHAP = {
+    "1 session, forward": (_REPO / "data" / "study_f" / "shap_forward_h1.json", _FORWARD, 1),
+    "5 sessions, forward": (_REPO / "data" / "study_f" / "shap_forward_h5.json", _FORWARD, 5),
+    "5 sessions, market-neutral": (
+        _REPO / "data" / "study_f" / "shap_idio_h5.json", _IDIO, 5,
+    ),
+}
+
+
+def _shap(label: str) -> dict[str, object]:
+    return json.loads(_SHAP[label][0].read_text(encoding="utf-8"))
+
+
+def test_section_2a_table_is_derived_from_the_shipped_shap_files() -> None:
+    for label in _SHAP:
+        data = _shap(label)
+        cells = _row_starting(f"| {label} |")
+        real = data["real_vs_shuffled_spearman"]
+        between = data["shuffled_vs_shuffled_spearman"]
+        assert isinstance(real, dict)
+        assert isinstance(between, dict)
+        assert cells[1] == f"{real['mean']:+.3f} (sd {real['sd']:.3f})", (
+            f"{label}: real-vs-shuffled agreement"
+        )
+        assert cells[2] == f"{between['mean']:+.3f} (sd {between['sd']:.3f})", (
+            f"{label}: shuffled-vs-shuffled agreement"
+        )
+        overlap = data["real_top5_overlap_with_shuffled"]
+        between_overlap = data["shuffled_top5_overlap_between"]
+        assert isinstance(overlap, dict)
+        assert isinstance(between_overlap, dict)
+        assert cells[3] == f"{overlap['mean']:.2f} / 5", f"{label}: real top-5 overlap"
+        assert cells[4] == f"{between_overlap['mean']:.2f} / 5", f"{label}: shuffled pairs"
+
+
+def test_each_shap_cell_ran_on_the_configuration_that_won_it() -> None:
+    """A SHAP pass on a configuration the search did not pick describes nothing.
+
+    §6 fixes SHAP to *the winning* configuration, so the cell's config must equal the
+    ``best_config`` its own null file recorded for that horizon and label.
+    """
+    for label, (_path, null_path, horizon) in _SHAP.items():
+        data = _shap(label)
+        real, _nulls = _arm(null_path, horizon)
+        assert data["config"] == str(real["best_config"]), label
+        assert data["horizon"] == horizon, label
+        assert data["shuffles"] == 20, label
+        assert len(data["features"]) == 37, label  # type: ignore[arg-type]
+        assert len(data["real_importance"]) == 37, label  # type: ignore[arg-type]
+
+
+def test_the_real_arm_agrees_with_shuffles_less_than_shuffles_agree_with_each_other() -> None:
+    """§2a's first claim, held in every cell.
+
+    This is the direction that made the earlier "SHAP would only describe noise"
+    wording too strong. If it ever inverts, the paragraph is wrong and this fails
+    before a reader can be misled by it.
+    """
+    for label in _SHAP:
+        data = _shap(label)
+        real = data["real_vs_shuffled_spearman"]
+        between = data["shuffled_vs_shuffled_spearman"]
+        assert isinstance(real, dict)
+        assert isinstance(between, dict)
+        assert real["mean"] < between["mean"], f"{label}: agreement direction"
+        overlap = data["real_top5_overlap_with_shuffled"]
+        between_overlap = data["shuffled_top5_overlap_between"]
+        assert isinstance(overlap, dict)
+        assert isinstance(between_overlap, dict)
+        assert overlap["mean"] < between_overlap["mean"], f"{label}: top-5 direction"
+
+
+def test_section_2a_quotes_the_figure_its_argument_rests_on() -> None:
+    """The horizon-5 shuffled overlap: 5 features, 4.27 of them shared, on dead labels."""
+    data = _shap("5 sessions, forward")
+    between_overlap = data["shuffled_top5_overlap_between"]
+    assert isinstance(between_overlap, dict)
+    assert f"**{between_overlap['mean']:.2f} of 5**" in _flat(), (
+        f"§2a should quote {between_overlap['mean']:.2f} of 5"
+    )
+
+
+def test_section_2a_names_the_horizon_1_top_five_it_shows_the_reader() -> None:
+    """Compared as a set: the document lists them by importance, the file sorts them."""
+    top5 = _shap("1 session, forward")["real_top5"]
+    assert isinstance(top5, list)
+    doc = _flat()
+    for name in top5:
+        assert f"`{name}`" in doc, f"§2a should name {name}"
+    assert len(top5) == 5
+
+
+def test_the_document_withdraws_the_claim_the_measurement_did_not_support() -> None:
+    """The earlier draft said SHAP was not computed because it would show only noise.
+
+    Both halves changed, and the document has to say so rather than quietly reading as
+    though it always measured this.
+    """
+    doc = _flat()
+    assert "was too strong and is withdrawn" in doc
+    assert "**SHAP was computed after all**" in doc
+    # And §6's rule must still be stated as having held.
+    assert "no feature was added, removed or re-weighted" in doc
+
+
+def test_the_shap_script_parses_a_configuration_label_back_exactly() -> None:
+    """``xgb_d3_n100_lr0.03`` must become the configuration the search used.
+
+    A silent mis-parse would fit a different model and describe it as the winner. The
+    expectation is written out here rather than derived from the string.
+    """
+    path = _REPO / "scripts" / "study_f_shap.py"
+    spec = importlib.util.spec_from_file_location("study_f_shap", path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+
+    assert module._xgb_kwargs("xgb_d3_n100_lr0.03") == {
+        "max_depth": 3, "n_estimators": 100, "learning_rate": 0.03,
+    }
+    assert module._xgb_kwargs("xgb_d2_n300_lr0.1") == {
+        "max_depth": 2, "n_estimators": 300, "learning_rate": 0.1,
+    }
+    # And the non-tree configurations are refused rather than silently mangled.
+    for label in ("ridge", "analog"):
+        try:
+            module._xgb_kwargs(label)
+        except SystemExit:
+            continue
+        msg = f"{label} should be refused: SHAP here is defined on the tree models"
+        raise AssertionError(msg)
