@@ -30,6 +30,7 @@ Trade outcome semantics:
 from __future__ import annotations
 
 from datetime import datetime
+from decimal import Decimal
 from typing import TYPE_CHECKING, Literal, Protocol, runtime_checkable
 
 from pydantic import BaseModel, ConfigDict
@@ -48,6 +49,27 @@ ExitReason = Literal[
 ]
 
 
+class QuotedBid(BaseModel):
+    """A bid together with the timestamp of the quote it came from.
+
+    Exit-quote sources answer with this rather than a bare ``Decimal`` so the audit
+    can check WHICH quote priced an exit, not merely that the exit came after the
+    entry. The 2026-09-19 audit found an exit priced off a bid recorded **18 days
+    before the position opened**: the trade's own timestamps were impeccable, and
+    ``sanity_audit.check_lookahead`` had nothing to compare them against, so a
+    fabricated ``realized_r=+0.1467`` passed every check the run made.
+
+    Carrying the timestamp costs one field and closes that hole at the audit, rather
+    than relying on each provider to have implemented its own staleness rule
+    correctly — which is precisely the assumption that failed.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    bid: Decimal
+    quote_ts: datetime
+
+
 class RealizedTrade(BaseModel):
     """One trade's realized outcome, in R-units (unitless multiples of risk).
 
@@ -60,6 +82,12 @@ class RealizedTrade(BaseModel):
       - ``exit_ts`` populated for closed trades; None for open.
       - ``exit_reason`` always populated; ``"holding_window_open"``
         for open trades.
+      - ``exit_quote_ts`` is the timestamp of the quote that priced the
+        exit, when the source reported one. Added 2026-09-20 so
+        ``sanity_audit.check_lookahead`` can verify the exit was priced
+        inside the position's own life and session; a trade without it is
+        reported *unverifiable* there, never clean. Defaulted so the
+        existing fixtures and the NoOp/Mock providers stay valid.
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
@@ -69,6 +97,7 @@ class RealizedTrade(BaseModel):
     entry_ts: datetime
     exit_ts: datetime | None
     exit_reason: ExitReason
+    exit_quote_ts: datetime | None = None
 
 
 @runtime_checkable

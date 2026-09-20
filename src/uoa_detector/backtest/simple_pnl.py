@@ -51,7 +51,7 @@ from decimal import Decimal
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 from uoa_detector.backtest.parquet_schema import validate_schema_or_raise
-from uoa_detector.backtest.pnl_provider import RealizedTrade
+from uoa_detector.backtest.pnl_provider import QuotedBid, RealizedTrade
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -98,6 +98,26 @@ class ExitQuoteProvider(Protocol):
         at: datetime,
     ) -> Decimal | None:
         """Return the option bid at ``at``, or None if unavailable."""
+
+    def get_quote(
+        self,
+        *,
+        ticker: str,
+        strike: Decimal,
+        expiry: datetime,
+        option_type: str,
+        at: datetime,
+    ) -> QuotedBid | None:
+        """The same lookup, carrying the timestamp of the quote it found.
+
+        This is the method the pricing path uses, and the reason it exists is that
+        ``get_bid`` alone cannot be audited. On 2026-09-19 an exit was priced off a
+        bid recorded 18 days before the position opened; every timestamp the trade
+        carried was correct, so ``sanity_audit.check_lookahead`` had nothing to
+        compare and the fabricated return passed. A provider that reports which
+        quote it used makes that leak visible at the audit instead of relying on
+        each provider's own staleness rule being right.
+        """
 
 
 class DictExitQuoteProvider:
@@ -151,6 +171,36 @@ class DictExitQuoteProvider:
             else:
                 break
         return latest
+
+    def get_quote(
+        self,
+        *,
+        ticker: str,
+        strike: Decimal,
+        expiry: datetime,
+        option_type: str,
+        at: datetime,
+    ) -> QuotedBid | None:
+        """The walking-back lookup, with the timestamp of the quote it landed on.
+
+        This provider deliberately applies **no** staleness rule — fixtures decide
+        what they hand back, and several tests rely on a quote from an earlier day
+        being returned. That is exactly why the timestamp has to travel: the audit,
+        not the test double, is where such a quote gets caught.
+        """
+        expiry_iso = expiry.date().isoformat() if hasattr(expiry, "date") else str(expiry)
+        series = self._quotes.get((ticker, option_type, strike, expiry_iso))
+        if not series:
+            return None
+        found: tuple[datetime, Decimal] | None = None
+        for ts, bid in series:
+            if ts <= at:
+                found = (ts, bid)
+            else:
+                break
+        if found is None:
+            return None
+        return QuotedBid(bid=found[1], quote_ts=found[0])
 
 
 class ParquetExitQuoteProvider:
@@ -241,6 +291,40 @@ class ParquetExitQuoteProvider:
         if latest_ts.date() != at.date():
             return None
         return latest_bid
+
+    def get_quote(
+        self,
+        *,
+        ticker: str,
+        strike: Decimal,
+        expiry: datetime,
+        option_type: str,
+        at: datetime,
+    ) -> QuotedBid | None:
+        """The same-day-guarded lookup, carrying the quote's own timestamp.
+
+        The guard here has held since 3.5.0.1; reporting the timestamp lets the audit
+        confirm it held, rather than taking this class's word for it.
+        """
+        ticker_up = ticker.upper()
+        if self._tickers is not None and ticker_up not in self._tickers:
+            return None
+        contract_index = self._ticker_index(ticker_up)
+        expiry_iso = (
+            expiry.date().isoformat() if hasattr(expiry, "date") else str(expiry)
+        )
+        series = contract_index.get((option_type, strike, expiry_iso))
+        if not series:
+            return None
+        found: tuple[datetime, Decimal] | None = None
+        for ts, bid in series:
+            if ts <= at:
+                found = (ts, bid)
+            else:
+                break
+        if found is None or found[0].date() != at.date():
+            return None
+        return QuotedBid(bid=found[1], quote_ts=found[0])
 
     # ---- Index construction -------------------------------------------
 
@@ -351,16 +435,20 @@ class SimplePnLProvider:
         if exit_ts <= signal.timestamp:
             return self._open_trade(signal)
 
-        # Look up the exit bid. None → mark as open (data not available).
-        exit_bid = self._quotes.get_bid(
+        # Look up the exit quote. None → mark as open (data not available).
+        # ``get_quote`` rather than ``get_bid`` on purpose: the quote's timestamp has
+        # to reach RealizedTrade, or sanity_audit.check_lookahead is blind to an exit
+        # priced off another session — the 2026-09-19 leak.
+        exit_quote = self._quotes.get_quote(
             ticker=signal.ticker,
             strike=signal.strike,
             expiry=datetime.combine(signal.expiry, datetime.min.time()),
             option_type=signal.option_type,
             at=exit_ts,
         )
-        if exit_bid is None:
+        if exit_quote is None:
             return self._open_trade(signal)
+        exit_bid = exit_quote.bid
 
         # PnL math. Entry was the ask the operator paid.
         entry_ask = signal.option_price  # the StoredSignal carries the
@@ -389,6 +477,7 @@ class SimplePnLProvider:
             entry_ts=signal.timestamp,
             exit_ts=exit_ts,
             exit_reason=exit_reason,
+            exit_quote_ts=exit_quote.quote_ts,
         )
 
     # ---- Helpers ------------------------------------------------------
