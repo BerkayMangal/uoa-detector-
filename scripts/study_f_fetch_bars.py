@@ -1,6 +1,11 @@
 """Fetch daily regular-session bars for the Study F research universe.
 
-    uv run python scripts/study_f_fetch_bars.py data/study_f/universe.txt data/study_f/bars.csv
+    uv run python scripts/study_f_fetch_bars.py <universe.txt> <out.csv> [since]
+
+``since`` is an optional inclusive ISO lower bound on the session date:
+
+    ... data/study_f/universe.txt data/study_f/bars.csv                 # every session
+    ... data/study_f/universe.txt data/study_g/bars.csv 2026-09-19      # Study G's window
 
 One Unusual Whales request per ticker (``/api/stock/{t}/ohlc/1d``), parsed by the
 same ``webapp.ohlc.regular_session_bars`` the live board uses, so the research
@@ -22,6 +27,7 @@ import asyncio
 import csv
 import pathlib
 import sys
+from datetime import date
 
 # pyproject packages only src/uoa_detector, so `webapp` is never installed and a
 # script run as `python scripts/x.py` gets scripts/ on sys.path instead of the repo
@@ -96,11 +102,36 @@ async def _fetch_one(client: object, ticker: str) -> list[dict[str, object]]:
     return [values for day, values in sorted(seen.items()) if day not in conflicting]
 
 
+def keep_since(
+    rows: list[dict[str, object]], since: str | None,
+) -> list[dict[str, object]]:
+    """Rows whose session date is on or after ``since``. Inclusive; None keeps all.
+
+    A named function rather than a comprehension inside ``main`` so a test can
+    exercise the real boundary instead of restating the comparison — a test that
+    rewrites the rule it is checking passes whatever this file does, which is the
+    shape of guard this repository has shipped five times.
+    """
+    if since is None:
+        return rows
+    return [row for row in rows if str(row["day"]) >= since]
+
+
 async def main() -> int:
     if len(sys.argv) < 3:
         print(__doc__)
         return 2
     universe_path, out_path = pathlib.Path(sys.argv[1]), pathlib.Path(sys.argv[2])
+    # Optional inclusive lower bound on the session date, as an ISO day. Study G is
+    # scored on sessions that did not exist when its hypothesis was frozen
+    # (docs/study-G-preregistration.md §5), and the cleanest place to enforce that
+    # boundary is here — at panel construction — rather than in the search code,
+    # which is the committed producer of Study F's published result and must keep
+    # behaving exactly as it did. ISO dates compare correctly as strings.
+    since = sys.argv[3] if len(sys.argv) > 3 else None
+    if since is not None:
+        date.fromisoformat(since)  # fail now on a malformed bound, not after 71 requests
+        print(f"keeping sessions on or after {since}", flush=True)
     tickers = [
         line.strip().upper()
         for line in universe_path.read_text(encoding="utf-8").splitlines()
@@ -126,7 +157,7 @@ async def main() -> int:
             writer.writeheader()
         for ticker in todo:
             try:
-                rows = await _fetch_one(client, ticker)
+                rows = keep_since(await _fetch_one(client, ticker), since)
                 requests += 1
             except UnusualWhalesNotFoundError:
                 print(f"  {ticker}: no data (not found)", flush=True)
