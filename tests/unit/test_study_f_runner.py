@@ -259,6 +259,51 @@ def test_the_frozen_feature_list_is_37_names_with_the_cross_sectional_one_last()
     assert panel.x.shape[1] == 37
 
 
+def test_ranks_are_zero_based_with_ties_sharing_their_group_mean() -> None:
+    """Hand-computed, because ``rank_within_day`` divides by ``count - 1``.
+
+    A one-based rank would put every scaled feature on [1/(n-1), n/(n-1)] instead of
+    [0, 1] — a silent shift in every ridge input and every Spearman, with no other
+    test failing. These expectations are written out rather than derived from the
+    implementation, so a rewrite of the ranking cannot redefine what "correct" means.
+    """
+    runner = _runner()
+    ranks = runner._ranks
+    # Distinct values: 0..n-1 in value order.
+    assert ranks(np.asarray([5.0, 1.0, 3.0])).tolist() == [2.0, 0.0, 1.0]
+    # A tied pair takes the mean of the two positions it would have occupied.
+    assert ranks(np.asarray([1.0, 1.0, 2.0])).tolist() == [0.5, 0.5, 2.0]
+    # Three equal values occupy positions 0, 1, 2 — mean 1.0.
+    assert ranks(np.asarray([7.0, 7.0, 7.0])).tolist() == [1.0, 1.0, 1.0]
+    # A single element is rank 0, not 1. This is the zero-based claim at n=1.
+    assert ranks(np.asarray([4.2])).tolist() == [0.0]
+    # Two separate groups: {1,1} -> 0.5 each, {2,2} -> 2.5 each.
+    assert ranks(np.asarray([1.0, 2.0, 1.0, 2.0])).tolist() == [0.5, 2.5, 0.5, 2.5]
+    # Ties at the end, which is where an off-by-one in the run boundaries would show.
+    assert ranks(np.asarray([0.0, 9.0, 9.0])).tolist() == [0.0, 1.5, 1.5]
+
+
+def test_the_rank_sum_is_fixed_whatever_the_ties() -> None:
+    """The invariant that makes tie-averaging correct rather than merely plausible.
+
+    Averaging within a group preserves the total, so the sum must always be
+    0+1+...+(n-1) — for distinct values, for heavy ties, and for all-equal. A rewrite
+    that mishandled a boundary would break this even when the spot checks above pass.
+    """
+    runner = _runner()
+    rng = np.random.default_rng(7)
+    for size in (2, 5, 68):
+        for values in (
+            rng.normal(size=size),
+            rng.integers(0, 3, size=size).astype(float),
+            np.zeros(size),
+        ):
+            result = runner._ranks(values)
+            assert result.min() >= 0.0
+            assert result.max() <= size - 1
+            assert result.sum() == pytest.approx(size * (size - 1) / 2)
+
+
 def test_the_cross_sectional_rank_uses_only_that_days_names() -> None:
     """A rank that leaked across days would move when another day's values changed."""
     runner = _runner()
