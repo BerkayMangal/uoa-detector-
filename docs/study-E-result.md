@@ -16,19 +16,44 @@ turns the gate red instead of reaching a reader.
 
 **Rejected.** Both horizons fail threshold 1, and fail it by a wide margin.
 
+The harness was corrected on 2026-09-20: its walk-forward had no purge at the fold
+boundary, so at horizon 5 the final training rows carried labels built from
+test-window prices (§7 records the correction and what it costs). The table below is
+the **purged** run — the protocol as it was always specified — over 200 shuffled
+passes, from `data/study_e/null_means_purged.jsonl`.
+
 | horizon | real mean OOS rank IC | null mean | null sd | null p99 | percentile of the real result | shuffled draws beating it |
 |---|---|---|---|---|---|---|
 | 1 session | **+0.0253** | +0.0027 | 0.0335 | +0.0729 | **75.0th** | 50 / 200 |
-| 5 sessions | **+0.0239** | +0.0025 | 0.0431 | +0.0950 | **67.5th** | 65 / 200 |
+| 5 sessions | **+0.0075** | −0.0012 | 0.0441 | +0.0982 | **58.5th** | 83 / 200 |
 
 Threshold 1 asked the real result to exceed the **99th percentile** of its own
-null. It reaches the **75.0th** at best. Roughly one shuffled draw in
-3 beats it, and the real information coefficient would have to be about
-2.9 times larger to clear the bar.
+null. It reaches the **75.0th** at best. The real information coefficient would have
+to be about **2.9 times larger** at one session, and **13.1 times larger** at five,
+to clear the bar.
+
+### 1a. What the purge changed, and what it did not
+
+At horizon 1 the purge is `horizon − 1 = 0` sessions — a no-op — and the numbers
+prove it rather than assert it: **200 of 200** null reps are identical to the
+unpurged run to the last decimal, same seeds, same panel. At horizon 5 it changed
+**every** rep (0 of 200 identical) and moved the real arm down by a factor of 3.2.
+
+| horizon | unpurged real IC | purged real IC | unpurged percentile | purged percentile |
+|---|---|---|---|---|
+| 1 session (purge is a no-op) | +0.0253 | +0.0253 | 75.0th | 75.0th |
+| 5 sessions (purge is active) | +0.0239 | +0.0075 | 67.5th | 58.5th |
+
+So the leak lived entirely at horizon 5, and it **inflated** the arm that failed.
+That is the direction §7 argued from before this run existed, now measured: a
+rejection that held with the real arm inflated holds more comfortably without it.
+The per-fold detail shows where the inflation sat — horizon 5's folds went from
+(+0.020, −0.159, +0.211) to (+0.021, −0.176, +0.178): the first fold barely moved,
+while the best fold lost a third of its IC and the worst got worse.
 
 Threshold 4 (stability) also fails on its own: 2 of 4 positive folds at horizon 1
-(−0.017, −0.077, +0.097, +0.099) and 2 of 3 at horizon 5 (+0.020, −0.159,
-+0.211). The per-fold spread is wider than the effect.
+(−0.017, −0.077, +0.097, +0.099) and 2 of 3 at horizon 5 (+0.021, −0.176,
++0.178). The per-fold spread is wider than the effect.
 
 Thresholds 2 (costs) and 3 (not the market) were never reached. A signal that
 does not clear its null is not worth costing out.
@@ -41,10 +66,10 @@ certifying itself: permuting labels **within each day** destroys
 the signal while preserving the cross-sectional structure and the market factor,
 and the search then finds nothing on average, as it must.
 
-But its **spread is large**: sd 0.033 and 0.043, and its 99th
-percentiles sit at +0.0729 and +0.0950. So a 64-configuration grid
-over this sample manufactures an apparent IC of that size from pure noise about as
-easily as the real labels produce +0.0253.
+But its **spread is large**: sd 0.0335 and 0.0441, with 99th
+percentiles at +0.0729 and +0.0982 and maxima at +0.0906 and +0.1215. So a
+64-configuration grid over this sample manufactures an apparent IC of that size from
+pure noise about as easily as the real labels produce +0.0253.
 
 That is the finding. Not "the model is weak" but **the search is stronger than
 the data**. Without this control the real +0.0253 would have looked like a
@@ -110,22 +135,24 @@ own null, recomputed at increasing n:
 
 | n | h1 null p99 | h1 percentile | h5 null p99 | h5 percentile |
 |---|---|---|---|---|
-| 25 | +0.0550 | 68.0% | +0.0885 | 72.0% |
-| 50 | +0.0635 | 72.0% | +0.0890 | 74.0% |
-| 75 | +0.0625 | 77.3% | +0.0890 | 77.3% |
-| 100 | +0.0734 | 75.0% | +0.0890 | 74.0% |
-| 200 | +0.0729 | 75.0% | +0.0950 | 67.5% |
+| 25 | +0.0550 | 68.0% | +0.1033 | 56.0% |
+| 50 | +0.0635 | 72.0% | +0.1033 | 58.0% |
+| 75 | +0.0625 | 77.3% | +0.0880 | 61.3% |
+| 100 | +0.0734 | 75.0% | +0.1033 | 63.0% |
+| 200 | +0.0729 | 75.0% | +0.0982 | 58.5% |
 
-Across every n from 1 to 200, the real result peaks at the **87.5th** percentile —
-horizon 5 at n=8, where eight draws are not yet a distribution. From n=25 on it
-never rises above the **78.5th**, and horizon 1 never exceeds the **77.8th**. The
-threshold was the 99th.
+Across every n from 1 to 200, the real result peaks at the **77.8th** percentile at
+horizon 1 (n=9) and the **63.9th** at horizon 5 (n=108). From n=25 on neither rises
+above those figures. The threshold was the 99th.
 
-(An earlier version of this line said "never above the 78th at any n". That was
-false at seven values of n, and the test quoting it took its maximum over only the
-five sizes tabulated above, so it could not contradict the quantifier it claimed to
-guard. Both were corrected after the 2026-09-19 audit; the verdict is unchanged,
-because 87.5 is no closer to 99 than 78 was.)
+(Two earlier corrections are kept on the record rather than tidied away. A version
+of this line said "never above the 78th at any n", which was false at seven values
+of n on the unpurged data, and the test quoting it took its maximum over only the
+five sizes tabulated above, so it could not contradict the quantifier it named.
+Both were fixed after the 2026-09-19 audit. The figures above are now from the
+**purged** run; on the unpurged data horizon 5 peaked at the 87.5th at n=8, where
+eight draws are not yet a distribution. The verdict never depended on any of it —
+63.9 is further from 99 than 87.5 was, and 87.5 was already not close.)
 Stopping short of 200 would not have changed the answer, and reaching it did not.
 
 ## 6. What ships, per §7 of the pre-registration
@@ -178,11 +205,20 @@ working copy's only differences are an unused import and an `int()` cast inside
 > from sessions inside the test fold, which contradicts this study's own
 > pre-registration ("no row from a test fold ever informs its own training set").
 >
-> Two consequences, stated rather than buried. **The md5 above no longer matches the
-> committed file**, because `folds` and `run_once` changed; it records what produced
-> the published figures, which is what a reproduction note is for. And **the figures
-> in §1 and §5 were produced without the purge**, so the runner as committed will not
-> reproduce them exactly. A purged re-run is owed and is not being presented as done.
+> **The md5 above no longer matches the committed file**, because `folds` and
+> `run_once` changed. It is kept because it records what produced the *unpurged*
+> figures, which is what a reproduction note is for.
+>
+> **The purged re-run is done.** Completed 2026-09-20, 200 shuffled passes per
+> horizon, shipped as `data/study_e/null_means_purged.jsonl` alongside — not instead
+> of — the original. §1 and §5 now report the purged run and §1a shows what changed:
+> horizon 1 identical on all 200 reps because the purge is a no-op there, horizon 5
+> different on all 200 with the real arm falling from +0.0239 to +0.0075. The real
+> arm was recomputed with the same purged harness, so §1 compares like with like
+> rather than a purged null against an unpurged result.
+>
+> Both files ship because deleting the first one would erase the evidence that the
+> leak existed and the measurement of how large it was.
 >
 > The verdict is unchanged, and the reason is directional: the leak let training
 > labels see test-window prices, which can only **inflate** the real arm's IC, while
