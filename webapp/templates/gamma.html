@@ -55,13 +55,13 @@
       </td>
     </tr>
   {% endfor %}
-  {% if not rows %}<tr><td colspan="9" class="px-3 py-6 text-center text-gray-500">Henüz gamma verisi yok. Zincir erişilebilirken <code>scripts/gamma_snapshot.py</code> çalıştırılmalı.</td></tr>{% endif %}
+  {% if not rows %}<tr><td colspan="9" class="px-3 py-6 text-center text-gray-500">Henüz gamma verisi yok. Tablo yalnız ABD seansı içinde dolar; canlı gamma döngüsü her turda yeniden kurar.</td></tr>{% endif %}
   </tbody>
 </table>
 </div>
 
 <p class="mt-3 text-xs text-gray-600">
-  Refreshed by the daily snapshot job from the ThetaData chain (UW's gamma endpoints aren't in our tier).
+  Refreshed in-process by the live gamma loop every 240s during the US session, from Unusual Whales per-strike dealer gamma exposure.
   Flip ↑ = spot above flip (calmer / long-gamma zone); ↓ = below (jumpier).
 </p>
 
