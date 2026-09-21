@@ -10,11 +10,12 @@ sürekli yazılır. Doğrulanmamış her şey "DOĞRULANMADI" diye etiketlidir.
 - **Durum: ÇALIŞIYOR** — FAZ A, B, C ve D canlıda.
 - **URL:** https://uoa-detector-production.up.railway.app/ — kullanıcı adı/şifre masaüstündeki
   `uoa-dashboard-login.txt` dosyasında.
-- **Canlı SHA:** `d42e60b` — tahta ve rayların üstüne Faz 5.3 spot karar çerçevesi (ATR durdurma, hisse adedi, hedef),
+- **Canlı SHA:** `d6b061e` — tahta ve rayların üstüne Faz 5.3 spot karar çerçevesi (ATR durdurma, hisse adedi, hedef),
   Study E/F/G, çıkış-kotasyonu sızıntısının kapatılması ve 21 Eylül'ün bayat-metin düzeltmeleri.
-- **Son doğrulama:** 2026-09-21 06:38Z — `/health` 200 ve `d42e60b` bildiriyor, şifresiz her yol 401 (duvar ayakta;
-  kimlik bilgileri tanımsız olsaydı 503 derdi). **DOĞRULANMADI:** sayfa içeriği, açılma süresi, dürüstlük denetimi ve
-  `alfa_` satır sayıları — bunlar `WEB_AUTH_USER`/`WEB_AUTH_PASSWORD` gerektiriyor ve bende yok.
+- **Son doğrulama:** 2026-09-21 07:08Z, PR #61 merge'inden hemen sonra — Railway `d6b061e`'yi **~75 saniyede** aldı,
+  `/health` 200 ve doğru commit'i bildiriyor, şifresiz her yol 401 (duvar ayakta; kimlik bilgileri tanımsız
+  olsaydı 503 derdi). **DOĞRULANMADI:** sayfa içeriği, açılma süresi, dürüstlük denetimi ve `alfa_` satır
+  sayıları — bunlar `WEB_AUTH_USER`/`WEB_AUTH_PASSWORD` gerektiriyor ve bende yok.
 - **Durma sebebi:** — (çalışma sürüyor).
 - **Sırada:** bugün 13:30Z (16:30 TRT) açılışta canlı veriyle doğrulama; kapanıştan sonra Study G'nin ilk seans satırı.
 
@@ -215,8 +216,8 @@ Alfa Board (Phase 5.2) devam. Oku, bu sırayla: docs/alfa-board-ozet.md,
 docs/alfa-board-decisions.md (P1-P46), CLAUDE.md (D1-D12).
 Donmuş, asla düzenleme: docs/phase-5.2-alfa-board-acceptance.md,
 docs/phase-5.2-decision-cards-acceptance.md.
-Canlı: https://uoa-detector-production.up.railway.app/ · main = d42e60b
-İlk iş: RAILWAY_DIR=<railway dizini> bash scripts/verify_live_board.sh d42e60b
+Canlı: https://uoa-detector-production.up.railway.app/ · main = d6b061e
+İlk iş: RAILWAY_DIR=<railway dizini> bash scripts/verify_live_board.sh d6b061e
 (Railway CLI yoksa: WEB_AUTH_USER / WEB_AUTH_PASSWORD / DATABASE_URL ortam
 değişkenlerinden okunur; eksik olan kontrol SKIP der ve çıkış kodu 2 = PARTIAL.)
 
