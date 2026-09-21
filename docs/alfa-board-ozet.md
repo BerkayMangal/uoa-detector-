@@ -1,6 +1,6 @@
 # Alfa Board — Berkay için özet
 
-**Son güncelleme: 2026-09-16 14:45Z (TRT 17:45).** Bu dosya çalışma sürdükçe tazelenir; en son değil,
+**Son güncelleme: 2026-09-21 06:45Z (TRT 09:45).** Bu dosya çalışma sürdükçe tazelenir; en son değil,
 sürekli yazılır. Doğrulanmamış her şey "DOĞRULANMADI" diye etiketlidir.
 
 ---
@@ -10,10 +10,13 @@ sürekli yazılır. Doğrulanmamış her şey "DOĞRULANMADI" diye etiketlidir.
 - **Durum: ÇALIŞIYOR** — FAZ A, B, C ve D canlıda.
 - **URL:** https://uoa-detector-production.up.railway.app/ — kullanıcı adı/şifre masaüstündeki
   `uoa-dashboard-login.txt` dosyasında.
-- **Canlı SHA:** `0f71140` — tahta, raylar, karar kartları, FAZ B/D, pas defteri, dolum kaydı, günlük sonuç işi, kayıt defteri temizlikleri.
-- **Son doğrulama:** 2026-09-17 13:37-13:38Z / 16:37 TRT, **piyasa açıkken ve gerçek kotasyonlarla** — dürüstlük denetimi **PASS** (17 satır: 6 İŞLENİR, 4 DAR, kalanı kotasyon yok; boş sayfaya değil dolu sayfaya karşı), sağlık 200 ve doğru commit'i bildiriyor, şifresiz 401. Tahta uçtan uca **1,41-1,62 saniye** (bunun ~0,2 saniyesi benim buradan ölçtüğüm ağ gecikmesi), sunucu tarafı 1,16-1,35 s, `/defter` 0,19-0,21 s. Hedef 1,5 s. Gün içinde 2,6-4,5 saniyeye çıkan anlık sıçramalar da gördüm; aşama dökümlerini yakalayamadım, sebebini kanıtlamadım.
+- **Canlı SHA:** `d42e60b` — tahta ve rayların üstüne Faz 5.3 spot karar çerçevesi (ATR durdurma, hisse adedi, hedef),
+  Study E/F/G, çıkış-kotasyonu sızıntısının kapatılması ve 21 Eylül'ün bayat-metin düzeltmeleri.
+- **Son doğrulama:** 2026-09-21 06:38Z — `/health` 200 ve `d42e60b` bildiriyor, şifresiz her yol 401 (duvar ayakta;
+  kimlik bilgileri tanımsız olsaydı 503 derdi). **DOĞRULANMADI:** sayfa içeriği, açılma süresi, dürüstlük denetimi ve
+  `alfa_` satır sayıları — bunlar `WEB_AUTH_USER`/`WEB_AUTH_PASSWORD` gerektiriyor ve bende yok.
 - **Durma sebebi:** — (çalışma sürüyor).
-- **Sırada:** tahtanın yavaşlığında suçlu kaynağı isimlendiren ölçüm (canlıya alınıyor), sonra düzeltme; ardından 13:30Z açılışında canlı veriyle doğrulama.
+- **Sırada:** bugün 13:30Z (16:30 TRT) açılışta canlı veriyle doğrulama; kapanıştan sonra Study G'nin ilk seans satırı.
 
 ## 2. GERİ ALMA KARTI
 
@@ -135,6 +138,21 @@ yapılmadı, indirme başlatılmadı. Ayrıntı: `docs/thetadata-decision.md`.
 
 ## 9. OLMAYANLAR / BOZULANLAR
 
+- **21 Eylül'de düzeltilen üç bayat metin (hiçbiri eşik veya davranış değişikliği değil):**
+  1. `/gamma` sayfası kendi veri kaynağı hakkında yanlış söylüyordu — "günlük ThetaData
+     snapshot işinden tazelenir (UW'nin gamma uç noktaları bizim seviyemizde yok)". İkisi de
+     artık yanlış: sayfayı besleyen, seans içinde 240 saniyede bir dönen canlı UW gamma
+     döngüsü. Boş-durum metni de artık var olmayan bir betiği işaret ediyordu.
+  2. `docs/BACKTEST.md`, replay motorunun çıkış kotasyonunu 3 aya kadar geriye yürüttüğünü
+     anlatıyordu (`_MAX_WALKBACK_MONTHS = 3`). O sabit kodda hiçbir yerde yok ve aynı-gün
+     kuralı 2026-09-20'de uygulandı; doküman sızıntının kapatılmasından önceye kalmıştı.
+  3. Bu dosyanın kendisi canlı SHA olarak `0f71140` diyordu; canlı `d42e60b`.
+- **Study G'nin ilk veri çekimi koşuldu (21 Eylül 06:40Z).** 71 istek, sıfır satır — ve bu
+  doğru sonuç: `since 2026-09-19` filtresi çalışıyor, son mevcut seans 18 Eylül Cuma ve
+  bugünkü seans henüz kapanmadı. Boru hattı aynı anda kanıtlandı: sınırsız tek-ticker
+  denemesi SPY için 252 seans (2025-09-18..2026-09-18) döndürdü. İlk gerçek satır bu akşam
+  kapanıştan sonra düşer.
+
 - **17 Eylül'de üretimde bulunan ve düzeltilen iki şey:**
   1. **Pas defterinin günlük sonuç işi hiç çalışmamıştı.** İş yazılmış, test edilmiş ve canlıya çıkmıştı, ama günlük iş listesine hiç eklenmemişti; `alfa_job_run` tablosunda tek bir `outcomes` kaydı yoktu ve `alfa_outcome` tablosu veritabanında hiç oluşmamıştı. Bunu yakalaması gereken test, kontrol ettiği listeyi **kendi kuruyordu**, yani hiçbir zaman kırılamazdı. Düzeltildi; kanıtı bu akşam 17:30 ET'de `alfa_job_run`'da `outcomes` satırının düşmesi.
   2. **Canlı denetçi doğru bir sayfayı düşürdü** (bu ikinci kez): karşı argüman bulunamayan satırlar sözleşmenin ikinci biçimini basıyor, denetçi onu tanımıyordu. Düzeltildi ve teste bağlandı.
@@ -194,11 +212,11 @@ yapılmadı, indirme başlatılmadı. Ayrıntı: `docs/thetadata-decision.md`.
 
 ```
 Alfa Board (Phase 5.2) devam. Oku, bu sırayla: docs/alfa-board-ozet.md,
-docs/alfa-board-decisions.md (P1-P33), CLAUDE.md (D1-D12).
+docs/alfa-board-decisions.md (P1-P46), CLAUDE.md (D1-D12).
 Donmuş, asla düzenleme: docs/phase-5.2-alfa-board-acceptance.md,
 docs/phase-5.2-decision-cards-acceptance.md.
-Canlı: https://uoa-detector-production.up.railway.app/ · main = 957143d
-İlk iş: RAILWAY_DIR=<railway dizini> bash scripts/verify_live_board.sh 957143d
+Canlı: https://uoa-detector-production.up.railway.app/ · main = d42e60b
+İlk iş: RAILWAY_DIR=<railway dizini> bash scripts/verify_live_board.sh d42e60b
 (Railway CLI yoksa: WEB_AUTH_USER / WEB_AUTH_PASSWORD / DATABASE_URL ortam
 değişkenlerinden okunur; eksik olan kontrol SKIP der ve çıkış kodu 2 = PARTIAL.)
 

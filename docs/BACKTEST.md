@@ -703,15 +703,20 @@ lineages (`src/uoa_detector/cli.py::backtest_run_4cell`,
   or before entry stays open.
 - That closes `docs/phase-3.9-closeout.md` §7 flag 10(b) for both engines.
 
-### Exit-quote rules differ, so verdicts are not comparable
+### Exit-quote sources differ, so verdicts are not comparable
 
 | Class | Used by | Rule |
 |---|---|---|
 | `uoa_detector.backtest.simple_pnl.ParquetExitQuoteProvider` (also the package export `uoa_detector.backtest.ParquetExitQuoteProvider`) | `--trades historical` | Takes the latest bid at or before the exit instant, only if it falls on the same UTC calendar day. Otherwise it returns `None` and the trade stays open (pinned decision #2, `docs/phase-3.5.0-acceptance.md`). |
-| `uoa_detector.backtest.parquet_exit_quote.ParquetExitQuoteProvider` (import it by module path) | `--trades replay` | Takes the latest bid at or before the exit instant in the exit month. If there is none, it takes the last bid of up to 3 earlier months (`_MAX_WALKBACK_MONTHS = 3`), with no same-day limit. `None` leaves the trade open. |
+| `uoa_detector.backtest.parquet_exit_quote.ParquetExitQuoteProvider` (import it by module path) | `--trades replay` | Resolves the month file the exit falls in and takes the latest bid at or before the exit instant, only if that quote belongs to the exit's own trading day. A quote from any earlier session is refused and the trade stays open. Until 2026-09-20 this walked back up to three calendar months with no same-day limit; that is the leak which priced an exit off a bid recorded eighteen days before the position opened. |
 
-- **Consequence.** A replay run can realise a trade on a quote days or weeks
-  older than the exit, while a historical run leaves the same trade open.
+- **Consequence.** Since 2026-09-20 both providers enforce the same session
+  rule, so neither can realise a trade on a stale quote: `get_quote` returns a
+  `QuotedBid` carrying the quote's timestamp, `RealizedTrade` records it as
+  `exit_quote_ts`, and `sanity_audit.check_lookahead` fails a trade whose quote
+  sits outside the position's life or on another session. What still differs is
+  the data path and how each resolves the month, so the verdicts remain not
+  comparable.
 - **The 3.6 verdict.** The Phase 3.6 EDGE REJECTED verdict
   (`docs/phase-3.6-results.md`) came from `replay`.
 - **Name the mode.** Every report or verdict must name its mode
