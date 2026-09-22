@@ -24,6 +24,10 @@ index records it. Created in Phase 5.0.12 per
 > testable, because UW history is about 7 days (phase-3.5.5-status B1).
 
 Whether UW-fed Track B is closed or open is an open item for Berkay (§7).
+As of 2026-09-22 that item carries a different fact than when it was opened: the
+history the clause says does not exist is reachable for ~95 sessions
+(`docs/uw-retroactive-window-2026-09-22.md`). This changes what is testable, not
+what is true — no verdict in this section moves.
 
 | Clause | Evidence | Commits |
 |---|---|---|
@@ -34,7 +38,7 @@ Whether UW-fed Track B is closed or open is an open item for Berkay (§7).
 | Conditioning replication: WEAK | `docs/study_D_result.md`, pre-registered in `docs/preregister_D.md` and `docs/preregister_D_addendum.md` | `2e3094a`, `6c189e4`, `ba09f92` (Phase 4.32) |
 | Options-flow signal search (Study E): REJECTED | `docs/study-E-result.md`, pre-registered in `docs/study-E-signal-preregistration.md`. **Purged figures (2026-09-20, primary):** mean OOS rank IC +0.0253 (1 session) and +0.0075 (5 sessions) land at the 75.0th and 58.5th percentile of a 200-pass shuffled-label null whose pre-registered threshold was the 99th. The original harness had no purge at the fold boundary; correcting it left horizon 1 identical on all 200 reps (the purge is a no-op there) and moved horizon 5's real arm from +0.0239 to +0.0075, so the leak inflated the arm that failed and the rejection is now further from its threshold, not nearer. Both null files ship (`null_means.jsonl`, `null_means_purged.jsonl`) so the size of the leak stays measurable | `588e014` (protocol), `83750fc` (result), `7177a4c` (purge), `4eaed27` (purged re-run) |
 | Daily-OHLCV pattern search on a 70-name panel (Study F): REJECTED | `docs/study-F-result.md`, pre-registered in `docs/study-F-preregistration.md` and amended by `docs/study-F-preregistration-addendum.md`; best-of-ten mean OOS rank IC +0.0400 (1 session) and +0.0139 (5 sessions) land at the 97.5th and 47.5th percentile of a 200-pass best-of-ten shuffled-label null whose pre-registered threshold was the 99th. Removes "the panel was too narrow" as an explanation for Study E: 70 names instead of 10, full OHLCV instead of closes, effective breadth 4.0 → 11.5 | `243bebb` (protocol), `f38eefa` (purge amendment) |
-| UW-fed Track B never testable | `docs/phase-3.5.5-status.md` B1 (probed 2026-05-18: the subscription returns the last 7 trading days) | `e2f7350` |
+| UW-fed Track B never testable | `docs/phase-3.5.5-status.md` B1 (probed 2026-05-18: the subscription returns the last 7 trading days). **The premise is stale as of 2026-09-22**: re-measured, the floor is a near-fixed anchor at 2026-05-12 rather than a rolling seven days (it advanced ~3 sessions while the calendar advanced ~90), so ~95 sessions are reachable today on every axis Track B scores — `docs/uw-retroactive-window-2026-09-22.md`. The clause is left as written because it is quoted verbatim from the contract; what changed is the fact under it | `e2f7350` |
 
 **Unusual Whales layer.** Phase 3.9, live-verified 2026-09-14:
 `docs/phase-3.9-uw-endpoint-correction-acceptance.md` and
