@@ -1,7 +1,7 @@
 # options-alpha-v1 — durum
 
-**Faz 5.24** · dal `p70-options-alpha-h03` · taban `main` 90b86e8
-**Son güncelleme:** 2026-09-23 12:40Z
+**Faz 5.24** · dal `p71-options-alpha-h01` · taban `main` eb8b766
+**Son güncelleme:** 2026-09-23 15:10Z
 
 Ana ürün **opsiyon sinyal terminali**. Hisse tarafı yalnız karşılaştırma kolu.
 
@@ -17,6 +17,7 @@ Ana ürün **opsiyon sinyal terminali**. Hisse tarafı yalnız karşılaştırma
 | **M3** | Çıkış motoru + gerçek sonuç kaydı | **DONE** (merge, canlı) | `exits.py` · 9 elle-hesap test · `replay/2026-09-08/*_outcome.json` |
 | **M4** | 12 hipotez ailesine veri fizibilitesi | **DONE** | `HYPOTHESES.md` — 8 tam, 3 kısıtlı, 0 erişilemez |
 | **M5** | İlk aileyi koş ve hükme bağla | **DONE — REDDEDİLDİ** | `RESULT_H03.md` · `h03_result.json` |
+| **M5b** | İkinci aile (bağımsız kol değişkeni) | **DONE — REDDEDİLDİ** | `RESULT_H01.md` · `h01_result.json` |
 | **M6** | Track B replikasyonu | **ENGEL ÖLÇÜLDÜ** | Pencere ~95 seans, şartı 4 çeyrek → kısmi test / yetersiz süre |
 | **M7** | Ayrı opsiyon ekranı + tarayıcı doğrulaması | TODO | B1 yalnız *gözle doğrulamayı* tutar |
 | **M8** | Mutasyon kanıtı tablosu | **DONE** | `mutation_proof.md` — 7/7 koruma kırmızıya döndü, 0 sağ kalan |
@@ -107,6 +108,62 @@ Bütçe bu çalışma için büyütülmedi.
 
 ---
 
+## M5b — H01 koştu ve reddedildi
+
+**Hipotez:** bir kontratın seans hacmi **kendi hissesinin** son 20 seanslık
+dağılımına göre olağandışı yüksekse (≥ %90'lık), sonraki net opsiyon P&L'i normal
+seviyedeki (%40–60) kontratlardan iyi olur.
+
+H03'ün yapısal kusuru burada kasten düzeltildi: **uygunluk kapıları** hangi
+kontratın işlenebilir olduğunu, **ayrı** bir değişken (göreli hacim yüzdeliği)
+hangi kola gireceğini söylüyor. H03'te seçim filtresiyle kol değişkeni mekanik
+korelasyondaydı ve kontrol kolu 7'de kalmıştı; burada **111'e 91**.
+
+**Giriş D+1 kapanışı** — bir seansın hacmi ancak o seans kapandıktan sonra
+tamamlanır. Ara bant (%60–90) kasten kullanılmadı.
+
+### Eleme zinciri
+
+1.655.820 satır tarandı → **62.615** uygun → **879** yapı kuruldu → 1.758
+fiyatlandı → **202** risk kapısını geçti. Kayıt sayısı tam 202.
+
+### Kollar (birincil: `time_only`, 5 işlem günü, maliyet sonrası)
+
+| Kol | n | Ortalama | Medyan | Kazanma |
+|---|---|---|---|---|
+| Yüksek (≥%90) | **111** | **−54,52 $** | −45,20 $ | %10,8 |
+| Kontrol (%40–60) | **91** | **−70,75 $** | −46,80 $ | %4,4 |
+
+### Neden bu bir geçiş değil
+
+`EXPLORATORY_PASS` üç şartı **birden** istiyordu; ikisi düştü:
+
+| §7 şartı | Durum |
+|---|---|
+| Kontrolü geçiyor | sağlandı |
+| Maliyet sonrası **pozitif** | **DÜŞTÜ** (−54,52 $, 111'de 12 kazanan) |
+| Bootstrap aralığı sıfırı **içermiyor** | **DÜŞTÜ** ([−3,28, +37,58]) |
+
+Üç teşhis ham +16,23 $'lık farkı çözüyor: **medyan farkı yalnız +1,60 $**
+(fark merkezde değil kuyrukta), kontrolün tek −699,20 $'lık işlemi çıkarılınca
+fark **+9,25 $**'a iniyor, ve **en kalabalık kovada yüksek kol daha kötü**
+(−49,13'e −45,89). Bileşim ayıklanınca fark +11,57 $ ve yüksek kol 6 kovanın
+5'inde iyi — yani etki tamamen Simpson değil, ama ağırlığın en büyük olduğu tek
+kovada işaret ters.
+
+Dolayısıyla dürüst tam hüküm: **işlenebilirlik reddedildi** (iki kol da ağır
+negatif) **ve göreli etki kurulamadı** (aralık sıfırı içeriyor). İkisi farklı
+cümle.
+
+### Kendi koşucumda bulunan kusur
+
+İlk hâli §7'yi yanlış uyguluyordu: yalnız birinci şarta bakıyor, merdivende
+**var olmayan** bir etiket (`EXPLORATORY_PASS_CANDIDATE`) üretiyor, ve §7'nin
+açıkça istediği bootstrap'i **hiç hesaplamıyordu**. Düzeltilmeseydi bu aile
+yanlış etiketle yayımlanacaktı.
+
+---
+
 ## Protokol disiplininin kaydı
 
 H03 dört belgeyle donduruldu ve **dördü de koşumdan önce commit'lendi**:
@@ -153,6 +210,6 @@ QQQ **−47,20 $**.
 ## Henüz yapılmamış olanlar (açıkça)
 
 - Opsiyon ekranı yok; açık PAPER pozisyonları canlı zamanlayıcıda izlenmiyor.
-- Kalan 11 hipotez ailesi koşmadı.
+- Kalan 10 hipotez ailesi koşmadı.
 
 Hiçbiri dış engel değil; yazılmamış kod. Engeller `BLOCKERS.md`'de.

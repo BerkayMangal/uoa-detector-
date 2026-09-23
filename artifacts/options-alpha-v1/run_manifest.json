@@ -1,9 +1,9 @@
 {
   "scope": "options_alpha_v1",
   "phase": "5.24",
-  "generated_at": "2026-09-23T11:40:29.789573+00:00",
+  "generated_at": "2026-09-23T12:06:00.647363+00:00",
   "base_commit": "2243384cbef85b34e1ed45cb207b0e89610071f6",
-  "note": "base_commit is the branch point; this milestone is not committed yet at write time.",
+  "note": "base_commit at the top level is the branch point of the first milestone; each later milestone carries its own base_commit. A milestone is written before its own commit exists, so its gate line describes the tree that was tested, not a commit sha.",
   "milestones": [
     {
       "id": "M0",
@@ -325,6 +325,127 @@
       "code": {
         "proof_script": "c85d9b657b60597a0c0e194b497710d6b39e4932e948ac1e49d387f75ef90bfc"
       }
+    },
+    {
+      "id": "M5b",
+      "name": "H01 run to a verdict: relative volume against the ticker's own distribution",
+      "status": "DONE",
+      "verdict": "REJECTED",
+      "verdict_failed_clauses": [
+        "maliyet sonrasi pozitif degil (-54.52 $)",
+        "blok bootstrap araligi sifiri iceriyor"
+      ],
+      "base_commit": "d78b9a074a3bb228afb9618345dfaa20e80312cb",
+      "protocol": [
+        "docs/options-alpha-v1/PREREG_H01.md",
+        "docs/options-alpha-v1/PREREG_H01_ADDENDUM.md"
+      ],
+      "protocol_frozen_before_run": {
+        "prereg": true,
+        "prereg_commit": "d78b9a0",
+        "addendum": false,
+        "addendum_note": "PREREG_H01_ADDENDUM.md was written AFTER results were seen. It resolves a branch the frozen ladder did not name (high arm beats the control while losing money) using the cost-positive clause that was frozen before any number existed. The addendum states this in its own header."
+      },
+      "commands": [
+        "uv run python scripts/options_alpha_h01_study.py"
+      ],
+      "harvest_window": [
+        "2026-05-14",
+        "2026-09-15"
+      ],
+      "entry_window": [
+        "2026-06-12",
+        "2026-09-15"
+      ],
+      "entry_sessions": 58,
+      "harvest": {
+        "reused_from": "M5",
+        "files": 850,
+        "sessions": 85,
+        "requests_spent": 0,
+        "note": "reads the local harvest only; spends no quota"
+      },
+      "arm_definition": {
+        "high": "percentile >= 90.0",
+        "control": "40.0 <= percentile <= 60.0",
+        "unused_band": "60.0-90.0"
+      },
+      "information_time": "entry at the D+1 close; a session's volume is complete only after that session closes",
+      "funnel": {
+        "scanned": 1655820,
+        "eligible": 62615,
+        "structures_built": 879,
+        "priced": 1758,
+        "passed_cost_gate": 879,
+        "passed_risk_gate": 202
+      },
+      "ticker_sessions_dropped_one_armed": 30,
+      "arms_primary_time_only": {
+        "high": {
+          "n": 111,
+          "n_with_pnl": 111,
+          "mean_pnl_usd": -54.52,
+          "median_pnl_usd": -45.2,
+          "total_pnl_usd": -6051.4,
+          "win_rate": 0.108
+        },
+        "control": {
+          "n": 91,
+          "n_with_pnl": 91,
+          "mean_pnl_usd": -70.75,
+          "median_pnl_usd": -46.8,
+          "total_pnl_usd": -6438.2,
+          "win_rate": 0.044
+        }
+      },
+      "secondary_variants": {
+        "time_and_stop": {
+          "high": -33.68,
+          "control": -36.9
+        },
+        "time_target_stop": {
+          "high": -33.68,
+          "control": -36.9
+        }
+      },
+      "block_bootstrap": {
+        "blocks": 58,
+        "reps": 10000,
+        "seed": 20260923,
+        "observed_difference_usd": 16.23,
+        "ci95": [
+          -3.28,
+          37.58
+        ],
+        "share_at_or_below_zero": 0.056,
+        "excludes_zero": false
+      },
+      "dropped_buckets": 2,
+      "result_artifact": {
+        "path": "artifacts/options-alpha-v1/h01_result.json",
+        "sha256": "c609fe8b914ee1b93601880b05c399213298fdfab718e6ccdadba5a7b358cde1",
+        "records": 202
+      },
+      "code": {
+        "study": "3e30000a6832f8b2e99bff18761ba7ea0f1838fb73bc9d49195329f190243148"
+      },
+      "profile_sha256": "b7886203115d469d72fa8ea1554d2ffea04f9ede237c3cd98d910381ac258f39",
+      "data_quality_tier": "B",
+      "headline": "high arm mean -54.52 USD against control -70.75 USD on the frozen primary. The high arm beats the control but loses money (111 structures, 11 winners) and the session-block interval [-3.28, 37.58] spans zero, so two of section 7's three pass clauses fail. REJECTED.",
+      "diagnostics": [
+        "median gap is +1.60 USD against a +16.23 USD mean gap: the difference lives in the tails, not the centre",
+        "removing one control trade (SPY 2026-07-22, -699.20 USD) cuts the raw gap to +9.25 USD",
+        "the most populated bucket (DTE 14-30, delta 0.25-0.40) REVERSES the sign: high -49.13 against control -45.89",
+        "composition-adjusted gap is +11.57 USD with the high arm better in 5 of 6 buckets, so it is not purely a Simpson reversal"
+      ],
+      "refused": "secondary variants again lose less (-33.68 vs -36.90) and were NOT promoted to primary; INSUFFICIENT_DATA was available via section 7's 'uncertainty too wide' clause and would have left the door open, and was not taken either",
+      "defects_found_and_fixed": [
+        "the verdict function implemented only the FIRST of section 7's three pass clauses",
+        "it emitted 'EXPLORATORY_PASS_CANDIDATE', a label that appears nowhere in the frozen ladder",
+        "the session-block bootstrap that section 7 explicitly requires was not computed at all; computing it is what produced the interval that independently fails the third clause"
+      ],
+      "structural_fact": "879 structures built, 202 cleared the risk gate; the remaining 677 sized to zero against the 100 USD R. Same capital-scale constraint M5 hit, not a data problem.",
+      "gate": "4280 passed, 52 skipped; mypy --strict clean on 191 source files; ruff clean; uv lock consistent"
     }
   ]
 }
