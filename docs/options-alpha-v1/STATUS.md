@@ -19,7 +19,7 @@ Ana ürün **opsiyon sinyal terminali**. Hisse tarafı yalnız karşılaştırma
 | **M5** | İlk aileyi koş ve hükme bağla | **DONE — REDDEDİLDİ** | `RESULT_H03.md` · `h03_result.json` |
 | **M5b** | İkinci aile (bağımsız kol değişkeni) | **DONE — REDDEDİLDİ** | `RESULT_H01.md` · `h01_result.json` |
 | **M6** | Track B replikasyonu | **ENGEL ÖLÇÜLDÜ** | Pencere ~95 seans, şartı 4 çeyrek → kısmi test / yetersiz süre |
-| **M7** | Ayrı opsiyon ekranı + tarayıcı doğrulaması | TODO | B1 yalnız *gözle doğrulamayı* tutar |
+| **M7** | Ayrı opsiyon ekranı + tarayıcı doğrulaması | **KISMEN** | `/opsiyon` kodlandı + test edildi; *gözle* canlı doğrulama B1'e bağlı |
 | **M8** | Mutasyon kanıtı tablosu | **DONE** | `mutation_proof.md` — 7/7 koruma kırmızıya döndü, 0 sağ kalan |
 
 ---
@@ -209,7 +209,11 @@ QQQ **−47,20 $**.
 
 ## Henüz yapılmamış olanlar (açıkça)
 
-- Opsiyon ekranı yok; açık PAPER pozisyonları canlı zamanlayıcıda izlenmiyor.
+- Açık PAPER pozisyonları canlı zamanlayıcıda **izlenmiyor**: `/opsiyon` ekranı
+  commit'li artefaktları okur, kendisi yeni fiyat çekmez.
 - Kalan 10 hipotez ailesi koşmadı.
+- `/opsiyon` ekranının **gözle** canlı doğrulaması yapılmadı — auth duvarının
+  arkasında ve kimlik bilgileri bende değil (`BLOCKERS.md` B1). Kod tarafı
+  test edildi: rota render ediyor, auth testleri rotayı otomatik kapsıyor.
 
 Hiçbiri dış engel değil; yazılmamış kod. Engeller `BLOCKERS.md`'de.

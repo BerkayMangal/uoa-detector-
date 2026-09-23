@@ -42,7 +42,9 @@ def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[TestClie
     m._REPO = m._JOURNAL = m._GAMMA = None
 
 
-@pytest.mark.parametrize("path", ["/", "/gamma", "/journal", "/journal/new", "/health"])
+@pytest.mark.parametrize(
+    "path", ["/", "/gamma", "/journal", "/journal/new", "/opsiyon", "/health"],
+)
 def test_every_route_renders(client: TestClient, path: str) -> None:
     assert client.get(path).status_code == 200
 

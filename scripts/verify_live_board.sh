@@ -37,7 +37,7 @@ URL="${BOARD_URL:-https://uoa-detector-production.up.railway.app}"
 EXPECT_SHA="${1:-}"
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TMP="$(mktemp -d)"
-trap 'rm -f "$TMP"/page.html "$TMP"/health.json; rmdir "$TMP" 2>/dev/null' EXIT
+trap 'rm -f "$TMP"/page.html "$TMP"/opsiyon.html "$TMP"/health.json; rmdir "$TMP" 2>/dev/null' EXIT
 fail=0
 skipped=0
 note() { printf '%-28s %s\n' "$1" "$2"; }
@@ -114,6 +114,41 @@ if [ -n "$AUTH_CFG" ]; then
 else
   skip "/ with credentials" "no WEB_AUTH_USER / WEB_AUTH_PASSWORD, no Railway CLI"
   skip "live render (s)" "needs credentials"
+fi
+
+# 2b. the option screen (Phase 5.24 M7).
+#
+# BLOCKERS.md B1 names this screen as the thing the missing credentials block.
+# Closing B1 by running this script without ever looking at /opsiyon would close
+# it on the wrong evidence, so the screen is checked here or B1 stays open.
+code=$(curl -s -o /dev/null -w '%{http_code}' "$URL/opsiyon")
+[ "$code" = 401 ] && note "/opsiyon without credentials" "401" \
+  || bad "/opsiyon without credentials" "$code"
+if [ -n "$AUTH_CFG" ]; then
+  code=$(printf '%s\n' "$AUTH_CFG" | curl -s -K - -o "$TMP/opsiyon.html" -w '%{http_code}' "$URL/opsiyon")
+  [ "$code" = 200 ] && note "/opsiyon with credentials" "200" \
+    || bad "/opsiyon with credentials" "$code"
+
+  # "Could not read" and "nothing to show" are different statements and the screen
+  # must commit to one of them. A page that renders neither marker has drifted.
+  if grep -q 'data-state="load-failed"' "$TMP/opsiyon.html"; then
+    bad "/opsiyon state" "load-failed — artefaktlar okunamadi"
+  elif grep -q 'data-state="ok"' "$TMP/opsiyon.html"; then
+    note "/opsiyon state" "ok"
+  elif grep -q 'data-state="no-cards"' "$TMP/opsiyon.html"; then
+    bad "/opsiyon state" "no-cards — kartlar commit'li, bos gorunmemeli"
+  else
+    bad "/opsiyon state" "data-state isareti yok"
+  fi
+
+  # Every research family in this scope is REJECTED. A screen that renders the
+  # cards but drops the verdicts would be selling a rejected result as a signal.
+  grep -q 'REJECTED' "$TMP/opsiyon.html" \
+    && note "/opsiyon verdicts" "REJECTED gorunuyor" \
+    || bad "/opsiyon verdicts" "hukum satiri yok"
+else
+  skip "/opsiyon with credentials" "no WEB_AUTH_USER / WEB_AUTH_PASSWORD, no Railway CLI"
+  skip "/opsiyon honesty audit" "needs credentials"
 fi
 
 # 3. honesty audit on the live html

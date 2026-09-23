@@ -1,0 +1,190 @@
+{% extends "base.html" %}
+{% block content %}
+
+<h2 class="text-xl font-bold text-white mb-1">Opsiyon terminali &mdash; PAPER kartlar</h2>
+<p class="text-sm text-gray-400 mb-4 max-w-3xl">
+  Bu ekran <code>options_alpha_v1</code> kapsamının <strong>gerçek veriden üretilmiş</strong> kağıt
+  üstü kartlarını, puanlanmış sonuçlarını ve araştırma hükümlerini gösterir. Hiçbir şey emir
+  göndermez, hiçbir kart al-sat tavsiyesi değildir.
+  <strong class="text-amber-300">Bu kapsamda koşan araştırma ailelerinin tamamı reddedildi</strong> &mdash;
+  aşağıdaki kartlar hattın çalıştığının kanıtıdır, kanıtlanmış bir edge'in değil.
+</p>
+
+<p class="rounded-lg border border-amber-800/40 bg-amber-900/15 px-3 py-2 mb-6 max-w-3xl text-sm text-amber-100">
+  Veri kalitesi <strong>B</strong>: zaman alanı <code>last_tape_time</code>, yani son <em>işlem</em>
+  zamanı, kotasyon zamanı değil. Gün içi sıra, stop/hedef önceliği ve gerçekleşme iddiası yok;
+  her sonuç günlük kapanış değerleri üzerinden hesaplandı.
+</p>
+
+{# The board must never look calm when it simply could not read. #}
+<div data-state="{{ board.state }}">
+
+{% if board.state == 'load-failed' %}
+  <div class="rounded-lg border border-red-800/50 bg-red-900/20 px-4 py-3 mb-6 text-sm text-red-100">
+    <strong>Artefaktlar okunamadı.</strong> Bu &ldquo;bugün kart yok&rdquo; demek değildir &mdash;
+    bakılamadı demektir.
+  </div>
+{% elif board.state == 'no-cards' %}
+  <div class="rounded-lg border border-amber-800/50 bg-amber-900/20 px-4 py-3 mb-6 text-sm text-amber-100">
+    <strong>Hiç kart bulunamadı.</strong> Kartlar commit'li olduğu için bu beklenen bir durum
+    değil; dosyaların yerinde olup olmadığı kontrol edilmeli.
+  </div>
+{% endif %}
+
+{% if board.problems %}
+  <div class="rounded-lg border border-red-800/40 bg-red-900/15 px-4 py-3 mb-6 text-sm text-red-100">
+    <div class="font-semibold mb-1">Okuma sırasında çıkan sorunlar</div>
+    <ul class="list-disc ml-5 space-y-0.5">
+      {% for problem in board.problems %}<li>{{ problem }}</li>{% endfor %}
+    </ul>
+  </div>
+{% endif %}
+
+{# --- research verdicts -------------------------------------------------- #}
+<h3 class="text-lg font-semibold text-white mb-2">Araştırma hükümleri</h3>
+{% if board.research %}
+<div class="overflow-x-auto rounded-lg border border-gray-800 mb-8">
+<table class="w-full text-sm">
+  <thead class="text-xs text-gray-500 bg-gray-900/60 border-b border-gray-800">
+    <tr>
+      <th class="text-left px-3 py-2">Aile</th>
+      <th class="text-left">Ne sınandı</th>
+      <th class="text-left">Hüküm</th>
+      <th class="text-left px-3">Neden</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for row in board.research %}
+    <tr class="border-b border-gray-900">
+      <td class="px-3 py-2 font-mono text-gray-300">{{ row.milestone }}</td>
+      <td class="text-gray-400">{{ row.name }}</td>
+      <td>
+        <span class="px-2 py-0.5 rounded text-xs font-semibold
+          {{ 'bg-red-900/40 text-red-200' if row.verdict == 'REJECTED' else 'bg-gray-800 text-gray-300' }}">
+          {{ row.verdict }}
+        </span>
+      </td>
+      <td class="px-3 py-2 text-gray-400">
+        {{ row.headline }}
+        {% if row.failed_clauses %}
+          <ul class="list-disc ml-5 mt-1 text-red-200/80">
+            {% for clause in row.failed_clauses %}<li>{{ clause }}</li>{% endfor %}
+          </ul>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+{% else %}
+  <p class="text-sm text-gray-500 mb-8">Hüküm kaydı okunamadı.</p>
+{% endif %}
+
+{# --- scored total ------------------------------------------------------- #}
+{% if board.closed_count %}
+<p class="text-sm mb-6">
+  Puanlanmış {{ board.closed_count }} pozisyon, birincil çıkışta toplam
+  <strong class="{{ 'text-red-300' if board.closed_pnl_usd is not none and board.closed_pnl_usd < 0 else 'text-emerald-300' }}">
+    {{ board.closed_pnl_usd }} $</strong>.
+  <span class="text-gray-500">Kağıt üstü; hiçbir emir girilmedi.</span>
+</p>
+{% endif %}
+
+{# --- cards -------------------------------------------------------------- #}
+<h3 class="text-lg font-semibold text-white mb-2">Kartlar</h3>
+<div class="space-y-4">
+{% for card in board.cards %}
+  <div class="rounded-lg border border-gray-800 bg-gray-900/30 p-4" data-card="{{ card.underlying }}">
+
+    <div class="flex items-baseline gap-3 flex-wrap mb-2">
+      <span class="text-lg font-bold text-white">{{ card.underlying }}</span>
+      <span class="text-sm text-gray-400">{{ card.session }}</span>
+      <span class="text-sm text-gray-400">{{ card.structure }} &middot; {{ card.direction }}</span>
+      <span class="px-2 py-0.5 rounded text-xs bg-gray-800 text-gray-300">{{ card.research_status }}</span>
+      <span class="px-2 py-0.5 rounded text-xs bg-gray-800 text-gray-300">{{ card.opportunity_status }}</span>
+      <span class="px-2 py-0.5 rounded text-xs bg-gray-800 text-gray-400">kaynak: {{ card.data_origin }}</span>
+      <span class="px-2 py-0.5 rounded text-xs bg-gray-800 text-gray-400">kalite {{ card.quality_tier }}</span>
+    </div>
+
+    {% if card.contradictions %}
+    <div class="rounded border border-red-700/60 bg-red-900/25 px-3 py-2 mb-3 text-sm text-red-100"
+         data-contradiction>
+      <div class="font-semibold mb-1">Bu kart kendi motoruyla çelişiyor</div>
+      <ul class="list-disc ml-5 space-y-0.5">
+        {% for item in card.contradictions %}<li>{{ item }}</li>{% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-1 text-sm mb-3">
+      <div><span class="text-gray-500">adet</span> <span class="text-gray-200">{{ card.quantity }}</span></div>
+      <div><span class="text-gray-500">giriş maliyeti</span> <span class="text-gray-200">{{ card.entry_cost_usd }} $</span></div>
+      <div><span class="text-gray-500">azami zarar</span> <span class="text-red-300">{{ card.max_loss_usd }} $</span></div>
+      <div><span class="text-gray-500">azami kâr</span> <span class="text-emerald-300">{{ card.max_profit_usd }} $</span></div>
+      <div><span class="text-gray-500">hedef</span> <span class="text-gray-200">{{ card.target_usd }} $</span></div>
+      <div><span class="text-gray-500">stop</span> <span class="text-gray-200">{{ card.planned_stop_usd }} $</span></div>
+    </div>
+
+    <div class="overflow-x-auto rounded border border-gray-800 mb-3">
+      <table class="w-full text-xs">
+        <thead class="text-gray-500 bg-gray-900/60">
+          <tr>
+            <th class="text-left px-2 py-1">bacak</th>
+            <th class="text-left">yön</th>
+            <th class="text-right">kullanım</th>
+            <th class="text-left px-2">vade</th>
+            <th class="text-right">bid</th>
+            <th class="text-right px-2">ask</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for leg in card.legs %}
+          <tr class="border-t border-gray-900">
+            <td class="px-2 py-1 font-mono text-gray-300">{{ leg.occ_symbol }}</td>
+            <td class="{{ 'text-emerald-300' if leg.side == 'long' else 'text-amber-300' }}">{{ leg.side }}</td>
+            <td class="text-right text-gray-300">{{ leg.strike }}</td>
+            <td class="px-2 text-gray-400">{{ leg.expiry }}</td>
+            <td class="text-right text-gray-400">{{ leg.bid }}</td>
+            <td class="text-right px-2 text-gray-400">{{ leg.ask }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {% if card.primary_outcome %}
+    <div class="rounded border border-gray-800 bg-gray-900/40 px-3 py-2 mb-3 text-sm" data-outcome>
+      <span class="text-gray-500">gerçek sonuç ({{ card.primary_outcome.variant }}):</span>
+      <strong class="{{ 'text-red-300' if card.primary_outcome.pnl_usd.startswith('-') else 'text-emerald-300' }}">
+        {{ card.primary_outcome.pnl_usd }} $</strong>
+      <span class="text-gray-500">&middot; çıkış {{ card.primary_outcome.reason }}
+        {{ card.primary_outcome.exit_day }} &middot; {{ card.primary_outcome.held_trading_days }} işlem günü tutuldu</span>
+      {% if card.other_outcomes %}
+        <div class="text-xs text-gray-500 mt-1">
+          diğer varyantlar:
+          {% for other in card.other_outcomes %}{{ other.variant }} {{ other.pnl_usd }} ${% if not loop.last %} &middot; {% endif %}{% endfor %}
+        </div>
+      {% endif %}
+    </div>
+    {% else %}
+    <p class="text-sm text-gray-500 mb-3">Henüz puanlanmadı &mdash; sonuç kaydı yok.</p>
+    {% endif %}
+
+    <p class="text-sm text-gray-400 mb-1"><span class="text-gray-500">tetik:</span> {{ card.trigger }}</p>
+    <p class="text-sm text-gray-400 mb-1"><span class="text-gray-500">geçersizleşme:</span> {{ card.invalidation }}</p>
+    <p class="rounded border border-amber-800/40 bg-amber-900/15 px-3 py-2 mt-2 text-sm text-amber-100">
+      <span class="font-semibold">Karşı argüman:</span> {{ card.counter_argument }}
+    </p>
+    {% if card.missing_data %}
+      <p class="text-xs text-gray-500 mt-2">
+        eksik veri: {% for item in card.missing_data %}{{ item }}{% if not loop.last %} &middot; {% endif %}{% endfor %}
+      </p>
+    {% endif %}
+    <p class="text-xs text-gray-600 mt-1 font-mono">{{ card.source_path }}</p>
+  </div>
+{% endfor %}
+</div>
+
+</div>
+{% endblock %}
