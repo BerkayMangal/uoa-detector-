@@ -19,7 +19,38 @@ Ana ürün **opsiyon sinyal terminali**. Hisse tarafı yalnız karşılaştırma
 | **M5** | İlk aileyi koş ve hükme bağla | **DONE — REDDEDİLDİ** | `RESULT_H03.md` · `h03_result.json` |
 | **M6** | Track B replikasyonu | **ENGEL ÖLÇÜLDÜ** | Pencere ~95 seans, şartı 4 çeyrek → kısmi test / yetersiz süre |
 | **M7** | Ayrı opsiyon ekranı + tarayıcı doğrulaması | TODO | B1 yalnız *gözle doğrulamayı* tutar |
-| **M8** | Mutasyon kanıtı tablosu | TODO | — |
+| **M8** | Mutasyon kanıtı tablosu | **DONE** | `mutation_proof.md` — 7/7 koruma kırmızıya döndü, 0 sağ kalan |
+
+---
+
+## M8 — korumalar gerçekten kırılabiliyor mu
+
+Yeşil test paketi, bir korumanın bir şeyi koruduğunun kanıtı değildir. Bu proje
+kırılamayan nöbetçileri defalarca yakaladı — ve bu kapsamda da bir tane çıktı:
+belirsizlik dalı günlük **kapanışı** iki eşiğe karşı sınıyordu, oysa kapanış
+ikisinin birden tarafında olamaz.
+
+Yedi kritik koruma kasten bozuldu; her birinde **adı konmuş** testin kırmızıya
+döndüğü, sonra dosyanın **bayt-birebir** geri alındığı doğrulandı.
+
+| Koruma | Mutasyon | Sonuç |
+|---|---|---|
+| Long girişi ask'ten fiyatlanır | giriş tarafını çıkış tarafıyla değiştir | test kırmızı |
+| Çaprazlanmış kotasyon reddedilir | kontrolü `if False:` yap | test kırmızı |
+| Bütçeye sığmayan yapı sıfır adettir | adedi `max(1, …)` ile yukarı zorla | test kırmızı |
+| Hedef yapının tavanını aşamaz | tavan sınırını kaldır | test kırmızı |
+| Replay kartı giriş olarak sunulmaz | durumu hep `PAPER_ENTRY_READY` yap | test kırmızı |
+| Aynı gün iki eşik: sıra uydurulmaz | stop yerine hedefi uygula | test kırmızı |
+| Fiyatlanamayan pozisyon başarılı sayılmaz | `NO_EXIT_DATA` yerine `TIME` yaz | test kırmızı |
+
+**7 mutasyon, 0 sağ kalan.** Betik ayrıca mutasyondan önce testin zaten yeşil
+olduğunu doğruluyor — kırmızı bir testin mutasyonla kırmızı kalması hiçbir şey
+kanıtlamaz. Satır silme mutasyonu kullanılmadı: ayrıştırılamayan dosya, testin
+kırılabildiğini göstermez.
+
+```
+uv run python scripts/options_alpha_mutation_proof.py
+```
 
 ---
 
@@ -121,8 +152,6 @@ QQQ **−47,20 $**.
 
 ## Henüz yapılmamış olanlar (açıkça)
 
-- **Mutasyon kanıtı tablosu yok.** Kritik korumaların doğru sebepten kırıldığı
-  gösterilmedi (§17).
 - Opsiyon ekranı yok; açık PAPER pozisyonları canlı zamanlayıcıda izlenmiyor.
 - Kalan 11 hipotez ailesi koşmadı.
 
