@@ -35,3 +35,11 @@ data/spot_series/
 # Phase 4 screener: generated local seed DB (Railway uses Postgres)
 webapp/*.db
 .coverage
+
+# Options Alpha v1 (phase 5.24) chain harvest. One file per (ticker, session),
+# ~1 MB each, so the full H03 window is several hundred megabytes of vendor rows
+# that scripts/options_alpha_harvest_chains.py regenerates on demand. The coverage
+# manifest IS committed, so which sessions were fetched and how many rows each
+# carried stays auditable without shipping the payloads -- the same treatment
+# data/chain_snapshots already gets.
+artifacts/options-alpha-v1/harvest/

@@ -1,0 +1,5329 @@
+{
+  "hypothesis": "H03",
+  "protocol": [
+    "docs/options-alpha-v1/PREREG_H03.md",
+    "docs/options-alpha-v1/PREREG_H03_ADDENDUM.md",
+    "docs/options-alpha-v1/PREREG_H03_ADDENDUM_2.md"
+  ],
+  "profile_sha256": "b7886203115d469d72fa8ea1554d2ffea04f9ede237c3cd98d910381ac258f39",
+  "quality_tier": "B",
+  "sessions_available": 85,
+  "window": [
+    "2026-05-14",
+    "2026-09-15"
+  ],
+  "primary_metric": "net option P&L per structure, exit time_only, 5 trading days",
+  "ticker_sessions_without_candidate": 84,
+  "funnel": {
+    "scanned": 1544478,
+    "eligible": 58787,
+    "structures_built": 554,
+    "priced": 1108,
+    "passed_cost_gate": 554,
+    "passed_risk_gate": 141,
+    "top_drop_reasons": [
+      [
+        "acik pozisyon yetersiz",
+        587159
+      ],
+      [
+        "DTE cok kisa",
+        285567
+      ],
+      [
+        "bid cok dusuk",
+        201320
+      ],
+      [
+        "makas cok genis",
+        136465
+      ],
+      [
+        "hacim yetersiz",
+        128036
+      ],
+      [
+        "DTE cok uzun",
+        75302
+      ],
+      [
+        "delta bandi disinda",
+        71838
+      ],
+      [
+        "risk butcesine sigmadi (tek yapi 221.60 $, butce 100.0 $)",
+        15
+      ]
+    ]
+  },
+  "arms": {
+    "confirmed": {
+      "n": 134,
+      "n_with_pnl": 134,
+      "mean_pnl_usd": -75.31,
+      "median_pnl_usd": -46.9,
+      "total_pnl_usd": -10091.4,
+      "win_rate": 0.075
+    },
+    "control": {
+      "n": 7,
+      "n_with_pnl": 7,
+      "mean_pnl_usd": -52.57,
+      "median_pnl_usd": -49.6,
+      "total_pnl_usd": -368.0,
+      "win_rate": 0.0
+    }
+  },
+  "buckets": {
+    "dte 14-30 / delta 0.25-0.4": {
+      "control": {
+        "n": 7,
+        "mean_pnl_usd": -52.57
+      },
+      "confirmed": {
+        "n": 74,
+        "mean_pnl_usd": -82.81
+      }
+    }
+  },
+  "dropped_buckets": [
+    "dte 14-30 / delta 0.4-0.55 (yalniz confirmed)",
+    "dte 14-30 / delta 0.55-0.7 (yalniz confirmed)",
+    "dte 31-45 / delta 0.25-0.4 (yalniz confirmed)",
+    "dte 31-45 / delta 0.4-0.55 (yalniz confirmed)",
+    "dte 46-60 / delta 0.25-0.4 (yalniz confirmed)",
+    "dte 46-60 / delta 0.4-0.55 (yalniz confirmed)"
+  ],
+  "secondary_variants": {
+    "time_and_stop": {
+      "confirmed": -34.23,
+      "control": -46.71
+    },
+    "time_target_stop": {
+      "confirmed": -34.25,
+      "control": -46.71
+    }
+  },
+  "sample_floor_met": true,
+  "verdict": "REJECTED",
+  "verdict_note": "EXPLORATORY_PASS_CANDIDATE yalnizca on-kosullari gosterir; kesin hukum blok bootstrap belirsizligi ile birlikte verilir. B kalite veride FORWARD_PASS hicbir kosulda cikamaz.",
+  "records": [
+    {
+      "ticker": "QQQ",
+      "flow_session": "2026-05-14",
+      "entry_session": "2026-05-15",
+      "symbol": "QQQ260618P00700000",
+      "arm": "confirmed",
+      "dte_bucket": "31-45",
+      "delta_bucket": "0.4-0.55",
+      "oi_before": 14174,
+      "oi_after": 25211,
+      "structure": "bear_put_debit",
+      "entry_debit": "0.54",
+      "quantity": 1,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-56.60",
+          "return_on_risk": -1.0,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-29.60",
+          "return_on_risk": -0.5229681978798587,
+          "held": 1,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-29.60",
+          "return_on_risk": -0.5229681978798587,
+          "held": 1,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "SPY",
+      "flow_session": "2026-05-15",
+      "entry_session": "2026-05-18",
+      "symbol": "SPY260618P00735000",
+      "arm": "confirmed",
+      "dte_bucket": "31-45",
+      "delta_bucket": "0.4-0.55",
+      "oi_before": 9751,
+      "oi_after": 30393,
+      "structure": "bear_put_debit",
+      "entry_debit": "0.41",
+      "quantity": 2,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-47.20",
+          "return_on_risk": -0.5412844036697247,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-47.20",
+          "return_on_risk": -0.5412844036697247,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-47.20",
+          "return_on_risk": -0.5412844036697247,
+          "held": 5,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "NVDA",
+      "flow_session": "2026-05-15",
+      "entry_session": "2026-05-18",
+      "symbol": "NVDA260605C00235000",
+      "arm": "control",
+      "dte_bucket": "14-30",
+      "delta_bucket": "0.25-0.4",
+      "oi_before": 11415,
+      "oi_after": 6489,
+      "structure": "bull_call_debit",
+      "entry_debit": "0.76",
+      "quantity": 1,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-64.60",
+          "return_on_risk": -0.821882951653944,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-40.60",
+          "return_on_risk": -0.5165394402035624,
+          "held": 3,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-40.60",
+          "return_on_risk": -0.5165394402035624,
+          "held": 3,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "SPY",
+      "flow_session": "2026-05-18",
+      "entry_session": "2026-05-19",
+      "symbol": "SPY260605P00725000",
+      "arm": "confirmed",
+      "dte_bucket": "14-30",
+      "delta_bucket": "0.25-0.4",
+      "oi_before": 4443,
+      "oi_after": 57021,
+      "structure": "bear_put_debit",
+      "entry_debit": "0.32",
+      "quantity": 2,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-59.20",
+          "return_on_risk": -0.8554913294797688,
+          "held": 5,
+          "unpriced_days": 1
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-37.20",
+          "return_on_risk": -0.5375722543352601,
+          "held": 1,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-37.20",
+          "return_on_risk": -0.5375722543352601,
+          "held": 1,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "QQQ",
+      "flow_session": "2026-05-18",
+      "entry_session": "2026-05-19",
+      "symbol": "QQQ260618P00685000",
+      "arm": "confirmed",
+      "dte_bucket": "14-30",
+      "delta_bucket": "0.25-0.4",
+      "oi_before": 3139,
+      "oi_after": 17360,
+      "structure": "bear_put_debit",
+      "entry_debit": "0.39",
+      "quantity": 2,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-81.20",
+          "return_on_risk": -0.9759615384615384,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-43.20",
+          "return_on_risk": -0.5192307692307693,
+          "held": 1,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-43.20",
+          "return_on_risk": -0.5192307692307693,
+          "held": 1,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "MSFT",
+      "flow_session": "2026-05-19",
+      "entry_session": "2026-05-20",
+      "symbol": "MSFT260605C00435000",
+      "arm": "confirmed",
+      "dte_bucket": "14-30",
+      "delta_bucket": "0.25-0.4",
+      "oi_before": 1264,
+      "oi_after": 7142,
+      "structure": "bull_call_debit",
+      "entry_debit": "0.82",
+      "quantity": 1,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-60.60",
+          "return_on_risk": -0.7163120567375887,
+          "held": 5,
+          "unpriced_days": 2
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-43.60",
+          "return_on_risk": -0.5153664302600472,
+          "held": 1,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-43.60",
+          "return_on_risk": -0.5153664302600472,
+          "held": 1,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "SPY",
+      "flow_session": "2026-05-20",
+      "entry_session": "2026-05-21",
+      "symbol": "SPY260630P00730000",
+      "arm": "confirmed",
+      "dte_bucket": "31-45",
+      "delta_bucket": "0.25-0.4",
+      "oi_before": 2996,
+      "oi_after": 8511,
+      "structure": "bear_put_debit",
+      "entry_debit": "0.32",
+      "quantity": 2,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-47.20",
+          "return_on_risk": -0.6820809248554913,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-37.20",
+          "return_on_risk": -0.5375722543352601,
+          "held": 3,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-37.20",
+          "return_on_risk": -0.5375722543352601,
+          "held": 3,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "QQQ",
+      "flow_session": "2026-05-20",
+      "entry_session": "2026-05-21",
+      "symbol": "QQQ260605P00696000",
+      "arm": "confirmed",
+      "dte_bucket": "14-30",
+      "delta_bucket": "0.25-0.4",
+      "oi_before": 470,
+      "oi_after": 4601,
+      "structure": "bear_put_debit",
+      "entry_debit": "0.53",
+      "quantity": 1,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-54.60",
+          "return_on_risk": -0.9820143884892086,
+          "held": 5,
+          "unpriced_days": 3
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-29.60",
+          "return_on_risk": -0.5323741007194245,
+          "held": 1,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-29.60",
+          "return_on_risk": -0.5323741007194245,
+          "held": 1,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "SPY",
+      "flow_session": "2026-05-21",
+      "entry_session": "2026-05-22",
+      "symbol": "SPY260605C00750000",
+      "arm": "confirmed",
+      "dte_bucket": "14-30",
+      "delta_bucket": "0.4-0.55",
+      "oi_before": 4159,
+      "oi_after": 7840,
+      "structure": "bull_call_debit",
+      "entry_debit": "0.53",
+      "quantity": 1,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-0.60",
+          "return_on_risk": -0.01079136690647482,
+          "held": 5,
+          "unpriced_days": 4
+        },
+        "time_and_stop": {
+          "reason": "time",
+          "pnl_usd": "-0.60",
+          "return_on_risk": -0.01079136690647482,
+          "held": 5,
+          "unpriced_days": 4
+        },
+        "time_target_stop": {
+          "reason": "time",
+          "pnl_usd": "-0.60",
+          "return_on_risk": -0.01079136690647482,
+          "held": 5,
+          "unpriced_days": 4
+        }
+      }
+    },
+    {
+      "ticker": "NVDA",
+      "flow_session": "2026-05-21",
+      "entry_session": "2026-05-22",
+      "symbol": "NVDA260605C00225000",
+      "arm": "confirmed",
+      "dte_bucket": "14-30",
+      "delta_bucket": "0.25-0.4",
+      "oi_before": 6698,
+      "oi_after": 9474,
+      "structure": "bull_call_debit",
+      "entry_debit": "0.60",
+      "quantity": 1,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-18.60",
+          "return_on_risk": -0.2971246006389776,
+          "held": 5,
+          "unpriced_days": 4
+        },
+        "time_and_stop": {
+          "reason": "time",
+          "pnl_usd": "-18.60",
+          "return_on_risk": -0.2971246006389776,
+          "held": 5,
+          "unpriced_days": 4
+        },
+        "time_target_stop": {
+          "reason": "time",
+          "pnl_usd": "-18.60",
+          "return_on_risk": -0.2971246006389776,
+          "held": 5,
+          "unpriced_days": 4
+        }
+      }
+    },
+    {
+      "ticker": "QQQ",
+      "flow_session": "2026-05-22",
+      "entry_session": "2026-05-26",
+      "symbol": "QQQ260618P00715000",
+      "arm": "confirmed",
+      "dte_bucket": "14-30",
+      "delta_bucket": "0.25-0.4",
+      "oi_before": 7372,
+      "oi_after": 27831,
+      "structure": "bear_put_debit",
+      "entry_debit": "0.43",
+      "quantity": 2,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-163.20",
+          "return_on_risk": -1.7894736842105263,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-47.20",
+          "return_on_risk": -0.5175438596491229,
+          "held": 1,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-47.20",
+          "return_on_risk": -0.5175438596491229,
+          "held": 1,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "AMZN",
+      "flow_session": "2026-05-22",
+      "entry_session": "2026-05-26",
+      "symbol": "AMZN260612C00275000",
+      "arm": "confirmed",
+      "dte_bucket": "14-30",
+      "delta_bucket": "0.25-0.4",
+      "oi_before": 1650,
+      "oi_after": 1800,
+      "structure": "bull_call_debit",
+      "entry_debit": "0.89",
+      "quantity": 1,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-79.60",
+          "return_on_risk": -0.868995633187773,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-47.60",
+          "return_on_risk": -0.519650655021834,
+          "held": 4,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-47.60",
+          "return_on_risk": -0.519650655021834,
+          "held": 4,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "SPY",
+      "flow_session": "2026-05-26",
+      "entry_session": "2026-05-27",
+      "symbol": "SPY260612C00760000",
+      "arm": "confirmed",
+      "dte_bucket": "14-30",
+      "delta_bucket": "0.25-0.4",
+      "oi_before": 10061,
+      "oi_after": 31417,
+      "structure": "bull_call_debit",
+      "entry_debit": "0.42",
+      "quantity": 2,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "16.80",
+          "return_on_risk": 0.18834080717488788,
+          "held": 5,
+          "unpriced_days": 1
+        },
+        "time_and_stop": {
+          "reason": "time",
+          "pnl_usd": "16.80",
+          "return_on_risk": 0.18834080717488788,
+          "held": 5,
+          "unpriced_days": 1
+        },
+        "time_target_stop": {
+          "reason": "time",
+          "pnl_usd": "16.80",
+          "return_on_risk": 0.18834080717488788,
+          "held": 5,
+          "unpriced_days": 1
+        }
+      }
+    },
+    {
+      "ticker": "AMZN",
+      "flow_session": "2026-05-26",
+      "entry_session": "2026-05-27",
+      "symbol": "AMZN260618P00262500",
+      "arm": "confirmed",
+      "dte_bucket": "14-30",
+      "delta_bucket": "0.25-0.4",
+      "oi_before": 483,
+      "oi_after": 708,
+      "structure": "bear_put_debit",
+      "entry_debit": "0.82",
+      "quantity": 1,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "55.40",
+          "return_on_risk": 0.6548463356973995,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_and_stop": {
+          "reason": "time",
+          "pnl_usd": "55.40",
+          "return_on_risk": 0.6548463356973995,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "time",
+          "pnl_usd": "55.40",
+          "return_on_risk": 0.6548463356973995,
+          "held": 5,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "SPY",
+      "flow_session": "2026-05-27",
+      "entry_session": "2026-05-28",
+      "symbol": "SPY260618P00750000",
+      "arm": "confirmed",
+      "dte_bucket": "14-30",
+      "delta_bucket": "0.4-0.55",
+      "oi_before": 3326,
+      "oi_after": 5453,
+      "structure": "bear_put_debit",
+      "entry_debit": "0.37",
+      "quantity": 2,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-27.20",
+          "return_on_risk": -0.3434343434343434,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-43.20",
+          "return_on_risk": -0.5454545454545454,
+          "held": 4,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-43.20",
+          "return_on_risk": -0.5454545454545454,
+          "held": 4,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "QQQ",
+      "flow_session": "2026-05-27",
+      "entry_session": "2026-05-28",
+      "symbol": "QQQ260618P00723000",
+      "arm": "confirmed",
+      "dte_bucket": "14-30",
+      "delta_bucket": "0.25-0.4",
+      "oi_before": 905,
+      "oi_after": 3765,
+      "structure": "bear_put_debit",
+      "entry_debit": "0.41",
+      "quantity": 2,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-263.20",
+          "return_on_risk": -3.018348623853211,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-47.20",
+          "return_on_risk": -0.5412844036697247,
+          "held": 1,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-47.20",
+          "return_on_risk": -0.5412844036697247,
+          "held": 1,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "NVDA",
+      "flow_session": "2026-05-27",
+      "entry_session": "2026-05-28",
+      "symbol": "NVDA260612C00225000",
+      "arm": "confirmed",
+      "dte_bucket": "14-30",
+      "delta_bucket": "0.25-0.4",
+      "oi_before": 9558,
+      "oi_after": 32543,
+      "structure": "bull_call_debit",
+      "entry_debit": "0.62",
+      "quantity": 1,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "20.40",
+          "return_on_risk": 0.3157894736842105,
+          "held": 5,
+          "unpriced_days": 2
+        },
+        "time_and_stop": {
+          "reason": "time",
+          "pnl_usd": "20.40",
+          "return_on_risk": 0.3157894736842105,
+          "held": 5,
+          "unpriced_days": 2
+        },
+        "time_target_stop": {
+          "reason": "time",
+          "pnl_usd": "20.40",
+          "return_on_risk": 0.3157894736842105,
+          "held": 5,
+          "unpriced_days": 2
+        }
+      }
+    },
+    {
+      "ticker": "TSLA",
+      "flow_session": "2026-05-27",
+      "entry_session": "2026-05-28",
+      "symbol": "TSLA260618C00480000",
+      "arm": "confirmed",
+      "dte_bucket": "14-30",
+      "delta_bucket": "0.25-0.4",
+      "oi_before": 11248,
+      "oi_after": 15306,
+      "structure": "bull_call_debit",
+      "entry_debit": "0.71",
+      "quantity": 1,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-66.60",
+          "return_on_risk": -0.904891304347826,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-37.60",
+          "return_on_risk": -0.5108695652173914,
+          "held": 1,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-37.60",
+          "return_on_risk": -0.5108695652173914,
+          "held": 1,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "SPY",
+      "flow_session": "2026-05-28",
+      "entry_session": "2026-05-29",
+      "symbol": "SPY260618P00745000",
+      "arm": "confirmed",
+      "dte_bucket": "14-30",
+      "delta_bucket": "0.25-0.4",
+      "oi_before": 8666,
+      "oi_after": 16112,
+      "structure": "bear_put_debit",
+      "entry_debit": "0.27",
+      "quantity": 3,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-796.80",
+          "return_on_risk": -8.972972972972974,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-46.80",
+          "return_on_risk": -0.527027027027027,
+          "held": 3,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-46.80",
+          "return_on_risk": -0.527027027027027,
+          "held": 3,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "QQQ",
+      "flow_session": "2026-05-28",
+      "entry_session": "2026-05-29",
+      "symbol": "QQQ260618P00730000",
+      "arm": "confirmed",
+      "dte_bucket": "14-30",
+      "delta_bucket": "0.25-0.4",
+      "oi_before": 1999,
+      "oi_after": 11839,
+      "structure": "bear_put_debit",
+      "entry_debit": "0.46",
+      "quantity": 2,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-411.20",
+          "return_on_risk": -4.230452674897119,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-51.20",
+          "return_on_risk": -0.5267489711934157,
+          "held": 1,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-51.20",
+          "return_on_risk": -0.5267489711934157,
+          "held": 1,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "SPY",
+      "flow_session": "2026-05-29",
+      "entry_session": "2026-06-01",
+      "symbol": "SPY260630P00745000",
+      "arm": "confirmed",
+      "dte_bucket": "14-30",
+      "delta_bucket": "0.25-0.4",
+      "oi_before": 4785,
+      "oi_after": 12002,
+      "structure": "bear_put_debit",
+      "entry_debit": "0.28",
+      "quantity": 3,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-361.80",
+          "return_on_risk": -3.9411764705882355,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-49.80",
+          "return_on_risk": -0.5424836601307189,
+          "held": 2,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-49.80",
+          "return_on_risk": -0.5424836601307189,
+          "held": 2,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "QQQ",
+      "flow_session": "2026-05-29",
+      "entry_session": "2026-06-01",
+      "symbol": "QQQ260618P00730000",
+      "arm": "confirmed",
+      "dte_bucket": "14-30",
+      "delta_bucket": "0.25-0.4",
+      "oi_before": 11839,
+      "oi_after": 15437,
+      "structure": "bear_put_debit",
+      "entry_debit": "0.40",
+      "quantity": 2,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-195.20",
+          "return_on_risk": -2.291079812206573,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-45.20",
+          "return_on_risk": -0.5305164319248826,
+          "held": 1,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-45.20",
+          "return_on_risk": -0.5305164319248826,
+          "held": 1,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "SPY",
+      "flow_session": "2026-06-01",
+      "entry_session": "2026-06-02",
+      "symbol": "SPY260618P00755000",
+      "arm": "confirmed",
+      "dte_bucket": "14-30",
+      "delta_bucket": "0.4-0.55",
+      "oi_before": 2270,
+      "oi_after": 3892,
+      "structure": "bear_put_debit",
+      "entry_debit": "0.37",
+      "quantity": 2,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-441.20",
+          "return_on_risk": -5.570707070707071,
+          "held": 5,
+          "unpriced_days": 1
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-43.20",
+          "return_on_risk": -0.5454545454545454,
+          "held": 1,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-43.20",
+          "return_on_risk": -0.5454545454545454,
+          "held": 1,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "META",
+      "flow_session": "2026-06-01",
+      "entry_session": "2026-06-02",
+      "symbol": "META260618C00620000",
+      "arm": "confirmed",
+      "dte_bucket": "14-30",
+      "delta_bucket": "0.25-0.4",
+      "oi_before": 4342,
+      "oi_after": 4424,
+      "structure": "bull_call_debit",
+      "entry_debit": "0.97",
+      "quantity": 1,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-79.60",
+          "return_on_risk": -0.7991967871485943,
+          "held": 5,
+          "unpriced_days": 1
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-51.60",
+          "return_on_risk": -0.5180722891566265,
+          "held": 3,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-51.60",
+          "return_on_risk": -0.5180722891566265,
+          "held": 3,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "MSFT",
+      "flow_session": "2026-06-02",
+      "entry_session": "2026-06-03",
+      "symbol": "MSFT260618C00447500",
+      "arm": "confirmed",
+      "dte_bucket": "14-30",
+      "delta_bucket": "0.25-0.4",
+      "oi_before": 647,
+      "oi_after": 839,
+      "structure": "bull_call_debit",
+      "entry_debit": "0.92",
+      "quantity": 1,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-90.60",
+          "return_on_risk": -0.9577167019027484,
+          "held": 5,
+          "unpriced_days": 2
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-48.60",
+          "return_on_risk": -0.5137420718816068,
+          "held": 1,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-48.60",
+          "return_on_risk": -0.5137420718816068,
+          "held": 1,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "SPY",
+      "flow_session": "2026-06-03",
+      "entry_session": "2026-06-04",
+      "symbol": "SPY260630P00750000",
+      "arm": "confirmed",
+      "dte_bucket": "14-30",
+      "delta_bucket": "0.25-0.4",
+      "oi_before": 4542,
+      "oi_after": 7888,
+      "structure": "bear_put_debit",
+      "entry_debit": "0.34",
+      "quantity": 2,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-637.20",
+          "return_on_risk": -8.704918032786885,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-39.20",
+          "return_on_risk": -0.5355191256830601,
+          "held": 1,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-39.20",
+          "return_on_risk": -0.5355191256830601,
+          "held": 1,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "NVDA",
+      "flow_session": "2026-06-03",
+      "entry_session": "2026-06-04",
+      "symbol": "NVDA260618P00212500",
+      "arm": "confirmed",
+      "dte_bucket": "14-30",
+      "delta_bucket": "0.25-0.4",
+      "oi_before": 1601,
+      "oi_after": 3233,
+      "structure": "bear_put_debit",
+      "entry_debit": "0.26",
+      "quantity": 3,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-25.80",
+          "return_on_risk": -0.3006993006993007,
+          "held": 5,
+          "unpriced_days": 3
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-46.80",
+          "return_on_risk": -0.5454545454545454,
+          "held": 1,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-46.80",
+          "return_on_risk": -0.5454545454545454,
+          "held": 1,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "AMZN",
+      "flow_session": "2026-06-03",
+      "entry_session": "2026-06-04",
+      "symbol": "AMZN260618C00262500",
+      "arm": "confirmed",
+      "dte_bucket": "14-30",
+      "delta_bucket": "0.25-0.4",
+      "oi_before": 2360,
+      "oi_after": 4239,
+      "structure": "bull_call_debit",
+      "entry_debit": "0.89",
+      "quantity": 1,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-76.60",
+          "return_on_risk": -0.8362445414847162,
+          "held": 5,
+          "unpriced_days": 3
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-47.60",
+          "return_on_risk": -0.519650655021834,
+          "held": 1,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-47.60",
+          "return_on_risk": -0.519650655021834,
+          "held": 1,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "SPY",
+      "flow_session": "2026-06-04",
+      "entry_session": "2026-06-05",
+      "symbol": "SPY260731P00735000",
+      "arm": "confirmed",
+      "dte_bucket": "46-60",
+      "delta_bucket": "0.4-0.55",
+      "oi_before": 1595,
+      "oi_after": 4105,
+      "structure": "bear_put_debit",
+      "entry_debit": "0.53",
+      "quantity": 1,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-30.60",
+          "return_on_risk": -0.5503597122302158,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-29.60",
+          "return_on_risk": -0.5323741007194245,
+          "held": 3,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-29.60",
+          "return_on_risk": -0.5323741007194245,
+          "held": 3,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "SPY",
+      "flow_session": "2026-06-05",
+      "entry_session": "2026-06-08",
+      "symbol": "SPY260717P00720000",
+      "arm": "confirmed",
+      "dte_bucket": "31-45",
+      "delta_bucket": "0.25-0.4",
+      "oi_before": 31819,
+      "oi_after": 32016,
+      "structure": "bear_put_debit",
+      "entry_debit": "0.28",
+      "quantity": 3,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-67.80",
+          "return_on_risk": -0.738562091503268,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-49.80",
+          "return_on_risk": -0.5424836601307189,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-49.80",
+          "return_on_risk": -0.5424836601307189,
+          "held": 5,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "SPY",
+      "flow_session": "2026-06-08",
+      "entry_session": "2026-06-09",
+      "symbol": "SPY260731P00710000",
+      "arm": "confirmed",
+      "dte_bucket": "46-60",
+      "delta_bucket": "0.25-0.4",
+      "oi_before": 6750,
+      "oi_after": 16769,
+      "structure": "bear_put_debit",
+      "entry_debit": "0.29",
+      "quantity": 3,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-70.80",
+          "return_on_risk": -0.7468354430379747,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-52.80",
+          "return_on_risk": -0.5569620253164557,
+          "held": 2,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-52.80",
+          "return_on_risk": -0.5569620253164557,
+          "held": 2,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "TSLA",
+      "flow_session": "2026-06-08",
+      "entry_session": "2026-06-09",
+      "symbol": "TSLA260626C00415000",
+      "arm": "control",
+      "dte_bucket": "14-30",
+      "delta_bucket": "0.25-0.4",
+      "oi_before": 1383,
+      "oi_after": 1202,
+      "structure": "bull_call_debit",
+      "entry_debit": "0.92",
+      "quantity": 1,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-24.60",
+          "return_on_risk": -0.26004228329809725,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-48.60",
+          "return_on_risk": -0.5137420718816068,
+          "held": 1,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-48.60",
+          "return_on_risk": -0.5137420718816068,
+          "held": 1,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "SPY",
+      "flow_session": "2026-06-09",
+      "entry_session": "2026-06-10",
+      "symbol": "SPY260630P00725000",
+      "arm": "confirmed",
+      "dte_bucket": "14-30",
+      "delta_bucket": "0.4-0.55",
+      "oi_before": 26129,
+      "oi_after": 31625,
+      "structure": "bear_put_debit",
+      "entry_debit": "0.52",
+      "quantity": 1,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-41.60",
+          "return_on_risk": -0.7619047619047619,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-28.60",
+          "return_on_risk": -0.5238095238095238,
+          "held": 1,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-28.60",
+          "return_on_risk": -0.5238095238095238,
+          "held": 1,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "SPY",
+      "flow_session": "2026-06-10",
+      "entry_session": "2026-06-11",
+      "symbol": "SPY260630P00720000",
+      "arm": "confirmed",
+      "dte_bucket": "14-30",
+      "delta_bucket": "0.25-0.4",
+      "oi_before": 10198,
+      "oi_after": 13682,
+      "structure": "bear_put_debit",
+      "entry_debit": "0.28",
+      "quantity": 3,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-79.80",
+          "return_on_risk": -0.869281045751634,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-49.80",
+          "return_on_risk": -0.5424836601307189,
+          "held": 1,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-49.80",
+          "return_on_risk": -0.5424836601307189,
+          "held": 1,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "QQQ",
+      "flow_session": "2026-06-10",
+      "entry_session": "2026-06-11",
+      "symbol": "QQQ260702P00700000",
+      "arm": "confirmed",
+      "dte_bucket": "14-30",
+      "delta_bucket": "0.25-0.4",
+      "oi_before": 3066,
+      "oi_after": 5411,
+      "structure": "bear_put_debit",
+      "entry_debit": "0.79",
+      "quantity": 1,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-81.60",
+          "return_on_risk": -1.0,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-41.60",
+          "return_on_risk": -0.5098039215686274,
+          "held": 1,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-41.60",
+          "return_on_risk": -0.5098039215686274,
+          "held": 1,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "SPY",
+      "flow_session": "2026-06-11",
+      "entry_session": "2026-06-12",
+      "symbol": "SPY260630P00735000",
+      "arm": "confirmed",
+      "dte_bucket": "14-30",
+      "delta_bucket": "0.25-0.4",
+      "oi_before": 7668,
+      "oi_after": 26865,
+      "structure": "bear_put_debit",
+      "entry_debit": "0.37",
+      "quantity": 2,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-53.20",
+          "return_on_risk": -0.6717171717171717,
+          "held": 5,
+          "unpriced_days": 1
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-43.20",
+          "return_on_risk": -0.5454545454545454,
+          "held": 1,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-43.20",
+          "return_on_risk": -0.5454545454545454,
+          "held": 1,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "AAPL",
+      "flow_session": "2026-06-11",
+      "entry_session": "2026-06-12",
+      "symbol": "AAPL260626C00300000",
+      "arm": "confirmed",
+      "dte_bucket": "14-30",
+      "delta_bucket": "0.25-0.4",
+      "oi_before": 3150,
+      "oi_after": 3538,
+      "structure": "bull_call_debit",
+      "entry_debit": "0.70",
+      "quantity": 1,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "12.40",
+          "return_on_risk": 0.17079889807162535,
+          "held": 5,
+          "unpriced_days": 3
+        },
+        "time_and_stop": {
+          "reason": "time",
+          "pnl_usd": "12.40",
+          "return_on_risk": 0.17079889807162535,
+          "held": 5,
+          "unpriced_days": 3
+        },
+        "time_target_stop": {
+          "reason": "time",
+          "pnl_usd": "12.40",
+          "return_on_risk": 0.17079889807162535,
+          "held": 5,
+          "unpriced_days": 3
+        }
+      }
+    },
+    {
+      "ticker": "SPY",
+      "flow_session": "2026-06-12",
+      "entry_session": "2026-06-15",
+      "symbol": "SPY260731P00730000",
+      "arm": "confirmed",
+      "dte_bucket": "46-60",
+      "delta_bucket": "0.25-0.4",
+      "oi_before": 1506,
+      "oi_after": 9115,
+      "structure": "bear_put_debit",
+      "entry_debit": "0.23",
+      "quantity": 3,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "1.20",
+          "return_on_risk": 0.015625,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_and_stop": {
+          "reason": "time",
+          "pnl_usd": "1.20",
+          "return_on_risk": 0.015625,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "time",
+          "pnl_usd": "1.20",
+          "return_on_risk": 0.015625,
+          "held": 5,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "SPY",
+      "flow_session": "2026-06-15",
+      "entry_session": "2026-06-16",
+      "symbol": "SPY260717P00750000",
+      "arm": "confirmed",
+      "dte_bucket": "31-45",
+      "delta_bucket": "0.4-0.55",
+      "oi_before": 14059,
+      "oi_after": 28172,
+      "structure": "bear_put_debit",
+      "entry_debit": "0.46",
+      "quantity": 2,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-133.20",
+          "return_on_risk": -1.3703703703703705,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-51.20",
+          "return_on_risk": -0.5267489711934157,
+          "held": 1,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-51.20",
+          "return_on_risk": -0.5267489711934157,
+          "held": 1,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "QQQ",
+      "flow_session": "2026-06-15",
+      "entry_session": "2026-06-16",
+      "symbol": "QQQ260717P00715000",
+      "arm": "confirmed",
+      "dte_bucket": "31-45",
+      "delta_bucket": "0.25-0.4",
+      "oi_before": 7109,
+      "oi_after": 18537,
+      "structure": "bear_put_debit",
+      "entry_debit": "0.51",
+      "quantity": 1,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-114.60",
+          "return_on_risk": -2.138059701492537,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-27.60",
+          "return_on_risk": -0.5149253731343284,
+          "held": 1,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-27.60",
+          "return_on_risk": -0.5149253731343284,
+          "held": 1,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "QQQ",
+      "flow_session": "2026-06-18",
+      "entry_session": "2026-06-22",
+      "symbol": "QQQ260717P00740000",
+      "arm": "confirmed",
+      "dte_bucket": "14-30",
+      "delta_bucket": "0.4-0.55",
+      "oi_before": 9573,
+      "oi_after": 14494,
+      "structure": "bear_put_debit",
+      "entry_debit": "0.56",
+      "quantity": 1,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-123.60",
+          "return_on_risk": -2.1092150170648463,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-30.60",
+          "return_on_risk": -0.5221843003412969,
+          "held": 1,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-30.60",
+          "return_on_risk": -0.5221843003412969,
+          "held": 1,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "AMZN",
+      "flow_session": "2026-06-18",
+      "entry_session": "2026-06-22",
+      "symbol": "AMZN260710C00245000",
+      "arm": "control",
+      "dte_bucket": "14-30",
+      "delta_bucket": "0.25-0.4",
+      "oi_before": 4219,
+      "oi_after": 3441,
+      "structure": "bull_call_debit",
+      "entry_debit": "0.96",
+      "quantity": 1,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-33.60",
+          "return_on_risk": -0.3407707910750507,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-50.60",
+          "return_on_risk": -0.513184584178499,
+          "held": 1,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-50.60",
+          "return_on_risk": -0.513184584178499,
+          "held": 1,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "SPY",
+      "flow_session": "2026-06-23",
+      "entry_session": "2026-06-24",
+      "symbol": "SPY260821P00720000",
+      "arm": "confirmed",
+      "dte_bucket": "46-60",
+      "delta_bucket": "0.25-0.4",
+      "oi_before": 11288,
+      "oi_after": 26167,
+      "structure": "bear_put_debit",
+      "entry_debit": "0.38",
+      "quantity": 2,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-55.20",
+          "return_on_risk": -0.6798029556650246,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-43.20",
+          "return_on_risk": -0.5320197044334976,
+          "held": 1,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-43.20",
+          "return_on_risk": -0.5320197044334976,
+          "held": 1,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "QQQ",
+      "flow_session": "2026-06-23",
+      "entry_session": "2026-06-24",
+      "symbol": "QQQ260717C00748000",
+      "arm": "confirmed",
+      "dte_bucket": "14-30",
+      "delta_bucket": "0.25-0.4",
+      "oi_before": 1373,
+      "oi_after": 31536,
+      "structure": "bull_call_debit",
+      "entry_debit": "0.88",
+      "quantity": 1,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-74.60",
+          "return_on_risk": -0.8233995584988962,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-46.60",
+          "return_on_risk": -0.5143487858719646,
+          "held": 1,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-46.60",
+          "return_on_risk": -0.5143487858719646,
+          "held": 1,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "AAPL",
+      "flow_session": "2026-06-23",
+      "entry_session": "2026-06-24",
+      "symbol": "AAPL260717C00302500",
+      "arm": "confirmed",
+      "dte_bucket": "14-30",
+      "delta_bucket": "0.25-0.4",
+      "oi_before": 372,
+      "oi_after": 764,
+      "structure": "bull_call_debit",
+      "entry_debit": "0.95",
+      "quantity": 1,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-47.60",
+          "return_on_risk": -0.48770491803278687,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-49.60",
+          "return_on_risk": -0.5081967213114754,
+          "held": 1,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-49.60",
+          "return_on_risk": -0.5081967213114754,
+          "held": 1,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "NVDA",
+      "flow_session": "2026-06-23",
+      "entry_session": "2026-06-24",
+      "symbol": "NVDA260710C00210000",
+      "arm": "confirmed",
+      "dte_bucket": "14-30",
+      "delta_bucket": "0.25-0.4",
+      "oi_before": 4406,
+      "oi_after": 11005,
+      "structure": "bull_call_debit",
+      "entry_debit": "0.61",
+      "quantity": 1,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-28.60",
+          "return_on_risk": -0.449685534591195,
+          "held": 5,
+          "unpriced_days": 1
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-33.60",
+          "return_on_risk": -0.5283018867924528,
+          "held": 1,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-33.60",
+          "return_on_risk": -0.5283018867924528,
+          "held": 1,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "AMZN",
+      "flow_session": "2026-06-23",
+      "entry_session": "2026-06-24",
+      "symbol": "AMZN260717C00245000",
+      "arm": "confirmed",
+      "dte_bucket": "14-30",
+      "delta_bucket": "0.25-0.4",
+      "oi_before": 12008,
+      "oi_after": 20245,
+      "structure": "bull_call_debit",
+      "entry_debit": "0.97",
+      "quantity": 1,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-24.60",
+          "return_on_risk": -0.2469879518072289,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-51.60",
+          "return_on_risk": -0.5180722891566265,
+          "held": 1,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-51.60",
+          "return_on_risk": -0.5180722891566265,
+          "held": 1,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "TSLA",
+      "flow_session": "2026-06-23",
+      "entry_session": "2026-06-24",
+      "symbol": "TSLA260710C00390000",
+      "arm": "confirmed",
+      "dte_bucket": "14-30",
+      "delta_bucket": "0.25-0.4",
+      "oi_before": 957,
+      "oi_after": 1430,
+      "structure": "bull_call_debit",
+      "entry_debit": "0.97",
+      "quantity": 1,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-29.60",
+          "return_on_risk": -0.2971887550200803,
+          "held": 5,
+          "unpriced_days": 1
+        },
+        "time_and_stop": {
+          "reason": "time",
+          "pnl_usd": "-29.60",
+          "return_on_risk": -0.2971887550200803,
+          "held": 5,
+          "unpriced_days": 1
+        },
+        "time_target_stop": {
+          "reason": "time",
+          "pnl_usd": "-29.60",
+          "return_on_risk": -0.2971887550200803,
+          "held": 5,
+          "unpriced_days": 1
+        }
+      }
+    },
+    {
+      "ticker": "SPY",
+      "flow_session": "2026-06-24",
+      "entry_session": "2026-06-25",
+      "symbol": "SPY260710C00740000",
+      "arm": "confirmed",
+      "dte_bucket": "14-30",
+      "delta_bucket": "0.4-0.55",
+      "oi_before": 1921,
+      "oi_after": 2657,
+      "structure": "bull_call_debit",
+      "entry_debit": "0.57",
+      "quantity": 1,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-18.60",
+          "return_on_risk": -0.31208053691275167,
+          "held": 5,
+          "unpriced_days": 2
+        },
+        "time_and_stop": {
+          "reason": "time",
+          "pnl_usd": "-18.60",
+          "return_on_risk": -0.31208053691275167,
+          "held": 5,
+          "unpriced_days": 2
+        },
+        "time_target_stop": {
+          "reason": "time",
+          "pnl_usd": "-18.60",
+          "return_on_risk": -0.31208053691275167,
+          "held": 5,
+          "unpriced_days": 2
+        }
+      }
+    },
+    {
+      "ticker": "QQQ",
+      "flow_session": "2026-06-24",
+      "entry_session": "2026-06-25",
+      "symbol": "QQQ260710P00693000",
+      "arm": "confirmed",
+      "dte_bucket": "14-30",
+      "delta_bucket": "0.25-0.4",
+      "oi_before": 258,
+      "oi_after": 6516,
+      "structure": "bear_put_debit",
+      "entry_debit": "0.38",
+      "quantity": 2,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-79.20",
+          "return_on_risk": -0.9753694581280788,
+          "held": 5,
+          "unpriced_days": 2
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-43.20",
+          "return_on_risk": -0.5320197044334976,
+          "held": 1,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-43.20",
+          "return_on_risk": -0.5320197044334976,
+          "held": 1,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "AMZN",
+      "flow_session": "2026-06-24",
+      "entry_session": "2026-06-25",
+      "symbol": "AMZN260717C00237500",
+      "arm": "confirmed",
+      "dte_bucket": "14-30",
+      "delta_bucket": "0.25-0.4",
+      "oi_before": 544,
+      "oi_after": 948,
+      "structure": "bull_call_debit",
+      "entry_debit": "0.82",
+      "quantity": 1,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-34.60",
+          "return_on_risk": -0.408983451536643,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-43.60",
+          "return_on_risk": -0.5153664302600472,
+          "held": 1,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-43.60",
+          "return_on_risk": -0.5153664302600472,
+          "held": 1,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "SPY",
+      "flow_session": "2026-06-25",
+      "entry_session": "2026-06-26",
+      "symbol": "SPY260717P00734000",
+      "arm": "confirmed",
+      "dte_bucket": "14-30",
+      "delta_bucket": "0.4-0.55",
+      "oi_before": 2454,
+      "oi_after": 2613,
+      "structure": "bear_put_debit",
+      "entry_debit": "0.51",
+      "quantity": 1,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-45.60",
+          "return_on_risk": -0.8507462686567164,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-27.60",
+          "return_on_risk": -0.5149253731343284,
+          "held": 1,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-27.60",
+          "return_on_risk": -0.5149253731343284,
+          "held": 1,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "QQQ",
+      "flow_session": "2026-06-25",
+      "entry_session": "2026-06-26",
+      "symbol": "QQQ260717P00695000",
+      "arm": "confirmed",
+      "dte_bucket": "14-30",
+      "delta_bucket": "0.25-0.4",
+      "oi_before": 10071,
+      "oi_after": 24467,
+      "structure": "bear_put_debit",
+      "entry_debit": "0.46",
+      "quantity": 2,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-87.20",
+          "return_on_risk": -0.897119341563786,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-51.20",
+          "return_on_risk": -0.5267489711934157,
+          "held": 1,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-51.20",
+          "return_on_risk": -0.5267489711934157,
+          "held": 1,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "SPY",
+      "flow_session": "2026-06-30",
+      "entry_session": "2026-07-01",
+      "symbol": "SPY260717C00752000",
+      "arm": "confirmed",
+      "dte_bucket": "14-30",
+      "delta_bucket": "0.25-0.4",
+      "oi_before": 3992,
+      "oi_after": 11083,
+      "structure": "bull_call_debit",
+      "entry_debit": "0.50",
+      "quantity": 1,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-9.60",
+          "return_on_risk": -0.18250950570342206,
+          "held": 5,
+          "unpriced_days": 2
+        },
+        "time_and_stop": {
+          "reason": "time",
+          "pnl_usd": "-9.60",
+          "return_on_risk": -0.18250950570342206,
+          "held": 5,
+          "unpriced_days": 2
+        },
+        "time_target_stop": {
+          "reason": "time",
+          "pnl_usd": "-9.60",
+          "return_on_risk": -0.18250950570342206,
+          "held": 5,
+          "unpriced_days": 2
+        }
+      }
+    },
+    {
+      "ticker": "QQQ",
+      "flow_session": "2026-06-30",
+      "entry_session": "2026-07-01",
+      "symbol": "QQQ260717C00748000",
+      "arm": "control",
+      "dte_bucket": "14-30",
+      "delta_bucket": "0.25-0.4",
+      "oi_before": 31505,
+      "oi_after": 20354,
+      "structure": "bull_call_debit",
+      "entry_debit": "0.44",
+      "quantity": 2,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-93.20",
+          "return_on_risk": -1.0,
+          "held": 5,
+          "unpriced_days": 2
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-49.20",
+          "return_on_risk": -0.5278969957081545,
+          "held": 1,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-49.20",
+          "return_on_risk": -0.5278969957081545,
+          "held": 1,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "AAPL",
+      "flow_session": "2026-06-30",
+      "entry_session": "2026-07-01",
+      "symbol": "AAPL260717P00287500",
+      "arm": "confirmed",
+      "dte_bucket": "14-30",
+      "delta_bucket": "0.25-0.4",
+      "oi_before": 273,
+      "oi_after": 396,
+      "structure": "bear_put_debit",
+      "entry_debit": "0.84",
+      "quantity": 1,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-82.60",
+          "return_on_risk": -0.953810623556582,
+          "held": 5,
+          "unpriced_days": 2
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-44.60",
+          "return_on_risk": -0.5150115473441108,
+          "held": 1,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-44.60",
+          "return_on_risk": -0.5150115473441108,
+          "held": 1,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "NVDA",
+      "flow_session": "2026-06-30",
+      "entry_session": "2026-07-01",
+      "symbol": "NVDA260717C00207500",
+      "arm": "confirmed",
+      "dte_bucket": "14-30",
+      "delta_bucket": "0.25-0.4",
+      "oi_before": 3554,
+      "oi_after": 6677,
+      "structure": "bull_call_debit",
+      "entry_debit": "0.64",
+      "quantity": 1,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-23.60",
+          "return_on_risk": -0.35435435435435436,
+          "held": 5,
+          "unpriced_days": 2
+        },
+        "time_and_stop": {
+          "reason": "time",
+          "pnl_usd": "-23.60",
+          "return_on_risk": -0.35435435435435436,
+          "held": 5,
+          "unpriced_days": 2
+        },
+        "time_target_stop": {
+          "reason": "time",
+          "pnl_usd": "-23.60",
+          "return_on_risk": -0.35435435435435436,
+          "held": 5,
+          "unpriced_days": 2
+        }
+      }
+    },
+    {
+      "ticker": "SPY",
+      "flow_session": "2026-07-01",
+      "entry_session": "2026-07-02",
+      "symbol": "SPY260731P00743000",
+      "arm": "confirmed",
+      "dte_bucket": "14-30",
+      "delta_bucket": "0.4-0.55",
+      "oi_before": 1075,
+      "oi_after": 26230,
+      "structure": "bear_put_debit",
+      "entry_debit": "0.43",
+      "quantity": 2,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-55.20",
+          "return_on_risk": -0.6052631578947368,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-47.20",
+          "return_on_risk": -0.5175438596491229,
+          "held": 4,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-47.20",
+          "return_on_risk": -0.5175438596491229,
+          "held": 4,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "QQQ",
+      "flow_session": "2026-07-01",
+      "entry_session": "2026-07-02",
+      "symbol": "QQQ260717P00713000",
+      "arm": "confirmed",
+      "dte_bucket": "14-30",
+      "delta_bucket": "0.4-0.55",
+      "oi_before": 1489,
+      "oi_after": 7749,
+      "structure": "bear_put_debit",
+      "entry_debit": "0.51",
+      "quantity": 1,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-25.60",
+          "return_on_risk": -0.47761194029850745,
+          "held": 5,
+          "unpriced_days": 3
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-27.60",
+          "return_on_risk": -0.5149253731343284,
+          "held": 1,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-27.60",
+          "return_on_risk": -0.5149253731343284,
+          "held": 1,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "SPY",
+      "flow_session": "2026-07-02",
+      "entry_session": "2026-07-06",
+      "symbol": "SPY260731P00750000",
+      "arm": "confirmed",
+      "dte_bucket": "14-30",
+      "delta_bucket": "0.4-0.55",
+      "oi_before": 3008,
+      "oi_after": 8151,
+      "structure": "bear_put_debit",
+      "entry_debit": "0.40",
+      "quantity": 2,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-17.20",
+          "return_on_risk": -0.20187793427230047,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_and_stop": {
+          "reason": "time",
+          "pnl_usd": "-17.20",
+          "return_on_risk": -0.20187793427230047,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "time",
+          "pnl_usd": "-17.20",
+          "return_on_risk": -0.20187793427230047,
+          "held": 5,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "QQQ",
+      "flow_session": "2026-07-02",
+      "entry_session": "2026-07-06",
+      "symbol": "QQQ260731C00725000",
+      "arm": "confirmed",
+      "dte_bucket": "14-30",
+      "delta_bucket": "0.4-0.55",
+      "oi_before": 1955,
+      "oi_after": 4015,
+      "structure": "bull_call_debit",
+      "entry_debit": "0.88",
+      "quantity": 1,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-76.60",
+          "return_on_risk": -0.8454746136865342,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-46.60",
+          "return_on_risk": -0.5143487858719646,
+          "held": 1,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-46.60",
+          "return_on_risk": -0.5143487858719646,
+          "held": 1,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "SPY",
+      "flow_session": "2026-07-06",
+      "entry_session": "2026-07-07",
+      "symbol": "SPY260821P00730000",
+      "arm": "confirmed",
+      "dte_bucket": "31-45",
+      "delta_bucket": "0.25-0.4",
+      "oi_before": 24787,
+      "oi_after": 36063,
+      "structure": "bear_put_debit",
+      "entry_debit": "0.26",
+      "quantity": 3,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-43.80",
+          "return_on_risk": -0.5104895104895105,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-46.80",
+          "return_on_risk": -0.5454545454545454,
+          "held": 3,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-46.80",
+          "return_on_risk": -0.5454545454545454,
+          "held": 3,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "QQQ",
+      "flow_session": "2026-07-06",
+      "entry_session": "2026-07-07",
+      "symbol": "QQQ260731C00730000",
+      "arm": "confirmed",
+      "dte_bucket": "14-30",
+      "delta_bucket": "0.25-0.4",
+      "oi_before": 2142,
+      "oi_after": 15418,
+      "structure": "bull_call_debit",
+      "entry_debit": "0.69",
+      "quantity": 1,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-39.60",
+          "return_on_risk": -0.553072625698324,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-37.60",
+          "return_on_risk": -0.5251396648044693,
+          "held": 1,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-37.60",
+          "return_on_risk": -0.5251396648044693,
+          "held": 1,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "SPY",
+      "flow_session": "2026-07-07",
+      "entry_session": "2026-07-08",
+      "symbol": "SPY260821P00746000",
+      "arm": "confirmed",
+      "dte_bucket": "31-45",
+      "delta_bucket": "0.4-0.55",
+      "oi_before": 842,
+      "oi_after": 3106,
+      "structure": "bear_put_debit",
+      "entry_debit": "0.45",
+      "quantity": 2,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-51.20",
+          "return_on_risk": -0.5378151260504201,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-51.20",
+          "return_on_risk": -0.5378151260504201,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-51.20",
+          "return_on_risk": -0.5378151260504201,
+          "held": 5,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "QQQ",
+      "flow_session": "2026-07-07",
+      "entry_session": "2026-07-08",
+      "symbol": "QQQ260831P00680000",
+      "arm": "confirmed",
+      "dte_bucket": "46-60",
+      "delta_bucket": "0.25-0.4",
+      "oi_before": 333,
+      "oi_after": 6651,
+      "structure": "bear_put_debit",
+      "entry_debit": "0.56",
+      "quantity": 1,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-81.60",
+          "return_on_risk": -1.3924914675767919,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-30.60",
+          "return_on_risk": -0.5221843003412969,
+          "held": 1,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-30.60",
+          "return_on_risk": -0.5221843003412969,
+          "held": 1,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "SPY",
+      "flow_session": "2026-07-08",
+      "entry_session": "2026-07-09",
+      "symbol": "SPY260821P00749000",
+      "arm": "confirmed",
+      "dte_bucket": "31-45",
+      "delta_bucket": "0.4-0.55",
+      "oi_before": 1701,
+      "oi_after": 1781,
+      "structure": "bear_put_debit",
+      "entry_debit": "0.39",
+      "quantity": 2,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-27.20",
+          "return_on_risk": -0.3269230769230769,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_and_stop": {
+          "reason": "time",
+          "pnl_usd": "-27.20",
+          "return_on_risk": -0.3269230769230769,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "time",
+          "pnl_usd": "-27.20",
+          "return_on_risk": -0.3269230769230769,
+          "held": 5,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "SPY",
+      "flow_session": "2026-07-09",
+      "entry_session": "2026-07-10",
+      "symbol": "SPY260724C00758000",
+      "arm": "confirmed",
+      "dte_bucket": "14-30",
+      "delta_bucket": "0.4-0.55",
+      "oi_before": 1089,
+      "oi_after": 13363,
+      "structure": "bull_call_debit",
+      "entry_debit": "0.55",
+      "quantity": 1,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-19.60",
+          "return_on_risk": -0.3402777777777778,
+          "held": 5,
+          "unpriced_days": 3
+        },
+        "time_and_stop": {
+          "reason": "time",
+          "pnl_usd": "-19.60",
+          "return_on_risk": -0.3402777777777778,
+          "held": 5,
+          "unpriced_days": 3
+        },
+        "time_target_stop": {
+          "reason": "time",
+          "pnl_usd": "-19.60",
+          "return_on_risk": -0.3402777777777778,
+          "held": 5,
+          "unpriced_days": 3
+        }
+      }
+    },
+    {
+      "ticker": "QQQ",
+      "flow_session": "2026-07-09",
+      "entry_session": "2026-07-10",
+      "symbol": "QQQ260731C00736000",
+      "arm": "confirmed",
+      "dte_bucket": "14-30",
+      "delta_bucket": "0.4-0.55",
+      "oi_before": 28359,
+      "oi_after": 56573,
+      "structure": "bull_call_debit",
+      "entry_debit": "0.60",
+      "quantity": 1,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-56.60",
+          "return_on_risk": -0.9041533546325878,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-32.60",
+          "return_on_risk": -0.5207667731629393,
+          "held": 1,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-32.60",
+          "return_on_risk": -0.5207667731629393,
+          "held": 1,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "QQQ",
+      "flow_session": "2026-07-10",
+      "entry_session": "2026-07-13",
+      "symbol": "QQQ260814C00730000",
+      "arm": "confirmed",
+      "dte_bucket": "31-45",
+      "delta_bucket": "0.25-0.4",
+      "oi_before": 509,
+      "oi_after": 7399,
+      "structure": "bull_call_debit",
+      "entry_debit": "0.66",
+      "quantity": 1,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-50.60",
+          "return_on_risk": -0.7376093294460642,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-35.60",
+          "return_on_risk": -0.5189504373177842,
+          "held": 1,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-35.60",
+          "return_on_risk": -0.5189504373177842,
+          "held": 1,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "TSLA",
+      "flow_session": "2026-07-10",
+      "entry_session": "2026-07-13",
+      "symbol": "TSLA260731C00420000",
+      "arm": "confirmed",
+      "dte_bucket": "14-30",
+      "delta_bucket": "0.25-0.4",
+      "oi_before": 1595,
+      "oi_after": 1807,
+      "structure": "bull_call_debit",
+      "entry_debit": "0.82",
+      "quantity": 1,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-66.60",
+          "return_on_risk": -0.7872340425531915,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-43.60",
+          "return_on_risk": -0.5153664302600472,
+          "held": 4,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-43.60",
+          "return_on_risk": -0.5153664302600472,
+          "held": 4,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "SPY",
+      "flow_session": "2026-07-13",
+      "entry_session": "2026-07-14",
+      "symbol": "SPY260731P00750000",
+      "arm": "confirmed",
+      "dte_bucket": "14-30",
+      "delta_bucket": "0.4-0.55",
+      "oi_before": 8558,
+      "oi_after": 33067,
+      "structure": "bear_put_debit",
+      "entry_debit": "0.39",
+      "quantity": 2,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-7.20",
+          "return_on_risk": -0.08653846153846154,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-43.20",
+          "return_on_risk": -0.5192307692307693,
+          "held": 3,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-43.20",
+          "return_on_risk": -0.5192307692307693,
+          "held": 3,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "QQQ",
+      "flow_session": "2026-07-13",
+      "entry_session": "2026-07-14",
+      "symbol": "QQQ260807P00700000",
+      "arm": "confirmed",
+      "dte_bucket": "14-30",
+      "delta_bucket": "0.25-0.4",
+      "oi_before": 1838,
+      "oi_after": 29225,
+      "structure": "bear_put_debit",
+      "entry_debit": "0.36",
+      "quantity": 2,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-37.20",
+          "return_on_risk": -0.48186528497409326,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-41.20",
+          "return_on_risk": -0.533678756476684,
+          "held": 1,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-41.20",
+          "return_on_risk": -0.533678756476684,
+          "held": 1,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "SPY",
+      "flow_session": "2026-07-14",
+      "entry_session": "2026-07-15",
+      "symbol": "SPY260807P00745000",
+      "arm": "confirmed",
+      "dte_bucket": "14-30",
+      "delta_bucket": "0.25-0.4",
+      "oi_before": 1706,
+      "oi_after": 13305,
+      "structure": "bear_put_debit",
+      "entry_debit": "0.29",
+      "quantity": 3,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-34.80",
+          "return_on_risk": -0.3670886075949367,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_and_stop": {
+          "reason": "time",
+          "pnl_usd": "-34.80",
+          "return_on_risk": -0.3670886075949367,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "time",
+          "pnl_usd": "-34.80",
+          "return_on_risk": -0.3670886075949367,
+          "held": 5,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "QQQ",
+      "flow_session": "2026-07-14",
+      "entry_session": "2026-07-15",
+      "symbol": "QQQ260814C00735000",
+      "arm": "confirmed",
+      "dte_bucket": "14-30",
+      "delta_bucket": "0.25-0.4",
+      "oi_before": 326,
+      "oi_after": 10531,
+      "structure": "bull_call_debit",
+      "entry_debit": "0.70",
+      "quantity": 1,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-73.60",
+          "return_on_risk": -1.0137741046831956,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-37.60",
+          "return_on_risk": -0.5179063360881543,
+          "held": 1,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-37.60",
+          "return_on_risk": -0.5179063360881543,
+          "held": 1,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "SPY",
+      "flow_session": "2026-07-15",
+      "entry_session": "2026-07-16",
+      "symbol": "SPY260731P00752000",
+      "arm": "confirmed",
+      "dte_bucket": "14-30",
+      "delta_bucket": "0.4-0.55",
+      "oi_before": 1897,
+      "oi_after": 2405,
+      "structure": "bear_put_debit",
+      "entry_debit": "0.47",
+      "quantity": 2,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-49.20",
+          "return_on_risk": -0.4959677419354839,
+          "held": 5,
+          "unpriced_days": 2
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-51.20",
+          "return_on_risk": -0.5161290322580645,
+          "held": 1,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-51.20",
+          "return_on_risk": -0.5161290322580645,
+          "held": 1,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "QQQ",
+      "flow_session": "2026-07-15",
+      "entry_session": "2026-07-16",
+      "symbol": "QQQ260731P00695000",
+      "arm": "confirmed",
+      "dte_bucket": "14-30",
+      "delta_bucket": "0.25-0.4",
+      "oi_before": 19862,
+      "oi_after": 36483,
+      "structure": "bear_put_debit",
+      "entry_debit": "0.42",
+      "quantity": 2,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-55.20",
+          "return_on_risk": -0.6188340807174888,
+          "held": 5,
+          "unpriced_days": 2
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-47.20",
+          "return_on_risk": -0.5291479820627802,
+          "held": 3,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-47.20",
+          "return_on_risk": -0.5291479820627802,
+          "held": 3,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "TSLA",
+      "flow_session": "2026-07-15",
+      "entry_session": "2026-07-16",
+      "symbol": "TSLA260731C00410000",
+      "arm": "confirmed",
+      "dte_bucket": "14-30",
+      "delta_bucket": "0.25-0.4",
+      "oi_before": 1910,
+      "oi_after": 2271,
+      "structure": "bull_call_debit",
+      "entry_debit": "0.92",
+      "quantity": 1,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-59.60",
+          "return_on_risk": -0.6300211416490487,
+          "held": 5,
+          "unpriced_days": 2
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-48.60",
+          "return_on_risk": -0.5137420718816068,
+          "held": 1,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-48.60",
+          "return_on_risk": -0.5137420718816068,
+          "held": 1,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "QQQ",
+      "flow_session": "2026-07-16",
+      "entry_session": "2026-07-17",
+      "symbol": "QQQ260807P00690000",
+      "arm": "confirmed",
+      "dte_bucket": "14-30",
+      "delta_bucket": "0.4-0.55",
+      "oi_before": 1136,
+      "oi_after": 55763,
+      "structure": "bear_put_debit",
+      "entry_debit": "0.51",
+      "quantity": 1,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-25.60",
+          "return_on_risk": -0.47761194029850745,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-27.60",
+          "return_on_risk": -0.5149253731343284,
+          "held": 1,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-27.60",
+          "return_on_risk": -0.5149253731343284,
+          "held": 1,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "QQQ",
+      "flow_session": "2026-07-20",
+      "entry_session": "2026-07-21",
+      "symbol": "QQQ260814C00705000",
+      "arm": "confirmed",
+      "dte_bucket": "14-30",
+      "delta_bucket": "0.55-0.7",
+      "oi_before": 370,
+      "oi_after": 2325,
+      "structure": "bull_call_debit",
+      "entry_debit": "0.86",
+      "quantity": 1,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-72.60",
+          "return_on_risk": -0.8194130925507901,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-45.60",
+          "return_on_risk": -0.5146726862302483,
+          "held": 1,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-45.60",
+          "return_on_risk": -0.5146726862302483,
+          "held": 1,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "SPY",
+      "flow_session": "2026-07-21",
+      "entry_session": "2026-07-22",
+      "symbol": "SPY260807P00733000",
+      "arm": "confirmed",
+      "dte_bucket": "14-30",
+      "delta_bucket": "0.25-0.4",
+      "oi_before": 1376,
+      "oi_after": 9854,
+      "structure": "bear_put_debit",
+      "entry_debit": "0.22",
+      "quantity": 4,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-14.40",
+          "return_on_risk": -0.14634146341463414,
+          "held": 5,
+          "unpriced_days": 1
+        },
+        "time_and_stop": {
+          "reason": "time",
+          "pnl_usd": "-14.40",
+          "return_on_risk": -0.14634146341463414,
+          "held": 5,
+          "unpriced_days": 1
+        },
+        "time_target_stop": {
+          "reason": "time",
+          "pnl_usd": "-14.40",
+          "return_on_risk": -0.14634146341463414,
+          "held": 5,
+          "unpriced_days": 1
+        }
+      }
+    },
+    {
+      "ticker": "QQQ",
+      "flow_session": "2026-07-21",
+      "entry_session": "2026-07-22",
+      "symbol": "QQQ260807P00695000",
+      "arm": "confirmed",
+      "dte_bucket": "14-30",
+      "delta_bucket": "0.25-0.4",
+      "oi_before": 1277,
+      "oi_after": 5594,
+      "structure": "bear_put_debit",
+      "entry_debit": "0.60",
+      "quantity": 1,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-339.60",
+          "return_on_risk": -5.424920127795527,
+          "held": 5,
+          "unpriced_days": 1
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-32.60",
+          "return_on_risk": -0.5207667731629393,
+          "held": 1,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-32.60",
+          "return_on_risk": -0.5207667731629393,
+          "held": 1,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "SPY",
+      "flow_session": "2026-07-22",
+      "entry_session": "2026-07-23",
+      "symbol": "SPY260831P00730000",
+      "arm": "confirmed",
+      "dte_bucket": "31-45",
+      "delta_bucket": "0.25-0.4",
+      "oi_before": 3233,
+      "oi_after": 22263,
+      "structure": "bear_put_debit",
+      "entry_debit": "0.33",
+      "quantity": 2,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-41.20",
+          "return_on_risk": -0.5786516853932584,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-39.20",
+          "return_on_risk": -0.550561797752809,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-39.20",
+          "return_on_risk": -0.550561797752809,
+          "held": 5,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "QQQ",
+      "flow_session": "2026-07-22",
+      "entry_session": "2026-07-23",
+      "symbol": "QQQ260814P00685000",
+      "arm": "confirmed",
+      "dte_bucket": "14-30",
+      "delta_bucket": "0.25-0.4",
+      "oi_before": 1210,
+      "oi_after": 5172,
+      "structure": "bear_put_debit",
+      "entry_debit": "0.60",
+      "quantity": 1,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-62.60",
+          "return_on_risk": -1.0,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-32.60",
+          "return_on_risk": -0.5207667731629393,
+          "held": 1,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-32.60",
+          "return_on_risk": -0.5207667731629393,
+          "held": 1,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "QQQ",
+      "flow_session": "2026-07-23",
+      "entry_session": "2026-07-24",
+      "symbol": "QQQ260821P00693000",
+      "arm": "confirmed",
+      "dte_bucket": "14-30",
+      "delta_bucket": "0.4-0.55",
+      "oi_before": 323,
+      "oi_after": 5178,
+      "structure": "bear_put_debit",
+      "entry_debit": "0.79",
+      "quantity": 1,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-72.60",
+          "return_on_risk": -0.8897058823529411,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-41.60",
+          "return_on_risk": -0.5098039215686274,
+          "held": 1,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-41.60",
+          "return_on_risk": -0.5098039215686274,
+          "held": 1,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "SPY",
+      "flow_session": "2026-07-24",
+      "entry_session": "2026-07-27",
+      "symbol": "SPY260814C00750000",
+      "arm": "confirmed",
+      "dte_bucket": "14-30",
+      "delta_bucket": "0.25-0.4",
+      "oi_before": 1745,
+      "oi_after": 34744,
+      "structure": "bull_call_debit",
+      "entry_debit": "0.48",
+      "quantity": 1,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "7.40",
+          "return_on_risk": 0.14624505928853754,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-26.60",
+          "return_on_risk": -0.525691699604743,
+          "held": 2,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-26.60",
+          "return_on_risk": -0.525691699604743,
+          "held": 2,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "SPY",
+      "flow_session": "2026-07-27",
+      "entry_session": "2026-07-28",
+      "symbol": "SPY260821C00740000",
+      "arm": "confirmed",
+      "dte_bucket": "14-30",
+      "delta_bucket": "0.4-0.55",
+      "oi_before": 6375,
+      "oi_after": 7572,
+      "structure": "bull_call_debit",
+      "entry_debit": "0.76",
+      "quantity": 1,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-336.60",
+          "return_on_risk": -4.282442748091603,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-40.60",
+          "return_on_risk": -0.5165394402035624,
+          "held": 1,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-40.60",
+          "return_on_risk": -0.5165394402035624,
+          "held": 1,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "QQQ",
+      "flow_session": "2026-07-27",
+      "entry_session": "2026-07-28",
+      "symbol": "QQQ260821C00690000",
+      "arm": "confirmed",
+      "dte_bucket": "14-30",
+      "delta_bucket": "0.25-0.4",
+      "oi_before": 4904,
+      "oi_after": 8579,
+      "structure": "bull_call_debit",
+      "entry_debit": "0.65",
+      "quantity": 1,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-375.60",
+          "return_on_risk": -5.556213017751479,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-35.60",
+          "return_on_risk": -0.5266272189349113,
+          "held": 1,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-35.60",
+          "return_on_risk": -0.5266272189349113,
+          "held": 1,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "SPY",
+      "flow_session": "2026-07-28",
+      "entry_session": "2026-07-29",
+      "symbol": "SPY260821C00741000",
+      "arm": "confirmed",
+      "dte_bucket": "14-30",
+      "delta_bucket": "0.25-0.4",
+      "oi_before": 2269,
+      "oi_after": 4499,
+      "structure": "bull_call_debit",
+      "entry_debit": "0.55",
+      "quantity": 1,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-95.60",
+          "return_on_risk": -1.6597222222222223,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-29.60",
+          "return_on_risk": -0.5138888888888888,
+          "held": 1,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-29.60",
+          "return_on_risk": -0.5138888888888888,
+          "held": 1,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "QQQ",
+      "flow_session": "2026-07-28",
+      "entry_session": "2026-07-29",
+      "symbol": "QQQ260831C00695000",
+      "arm": "confirmed",
+      "dte_bucket": "31-45",
+      "delta_bucket": "0.25-0.4",
+      "oi_before": 549,
+      "oi_after": 12613,
+      "structure": "bull_call_debit",
+      "entry_debit": "0.87",
+      "quantity": 1,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-154.60",
+          "return_on_risk": -1.7254464285714286,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-45.60",
+          "return_on_risk": -0.5089285714285714,
+          "held": 1,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-45.60",
+          "return_on_risk": -0.5089285714285714,
+          "held": 1,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "NVDA",
+      "flow_session": "2026-07-28",
+      "entry_session": "2026-07-29",
+      "symbol": "NVDA260814C00202500",
+      "arm": "confirmed",
+      "dte_bucket": "14-30",
+      "delta_bucket": "0.25-0.4",
+      "oi_before": 483,
+      "oi_after": 6667,
+      "structure": "bull_call_debit",
+      "entry_debit": "0.71",
+      "quantity": 1,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "71.40",
+          "return_on_risk": 0.970108695652174,
+          "held": 5,
+          "unpriced_days": 1
+        },
+        "time_and_stop": {
+          "reason": "time",
+          "pnl_usd": "71.40",
+          "return_on_risk": 0.970108695652174,
+          "held": 5,
+          "unpriced_days": 1
+        },
+        "time_target_stop": {
+          "reason": "target",
+          "pnl_usd": "68.40",
+          "return_on_risk": 0.9293478260869565,
+          "held": 4,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "SPY",
+      "flow_session": "2026-07-30",
+      "entry_session": "2026-07-31",
+      "symbol": "SPY260821P00736000",
+      "arm": "confirmed",
+      "dte_bucket": "14-30",
+      "delta_bucket": "0.25-0.4",
+      "oi_before": 1627,
+      "oi_after": 2384,
+      "structure": "bear_put_debit",
+      "entry_debit": "0.30",
+      "quantity": 3,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-91.80",
+          "return_on_risk": -0.9386503067484663,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-52.80",
+          "return_on_risk": -0.5398773006134969,
+          "held": 1,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-52.80",
+          "return_on_risk": -0.5398773006134969,
+          "held": 1,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "QQQ",
+      "flow_session": "2026-07-30",
+      "entry_session": "2026-07-31",
+      "symbol": "QQQ260814P00685000",
+      "arm": "confirmed",
+      "dte_bucket": "14-30",
+      "delta_bucket": "0.4-0.55",
+      "oi_before": 5022,
+      "oi_after": 26091,
+      "structure": "bear_put_debit",
+      "entry_debit": "0.63",
+      "quantity": 1,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-92.60",
+          "return_on_risk": -1.4115853658536586,
+          "held": 5,
+          "unpriced_days": 3
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-33.60",
+          "return_on_risk": -0.5121951219512195,
+          "held": 1,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-33.60",
+          "return_on_risk": -0.5121951219512195,
+          "held": 1,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "TSLA",
+      "flow_session": "2026-07-30",
+      "entry_session": "2026-07-31",
+      "symbol": "TSLA260821C00325000",
+      "arm": "confirmed",
+      "dte_bucket": "14-30",
+      "delta_bucket": "0.25-0.4",
+      "oi_before": 2121,
+      "oi_after": 4711,
+      "structure": "bull_call_debit",
+      "entry_debit": "0.92",
+      "quantity": 1,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-9.60",
+          "return_on_risk": -0.1014799154334038,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_and_stop": {
+          "reason": "time",
+          "pnl_usd": "-9.60",
+          "return_on_risk": -0.1014799154334038,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "time",
+          "pnl_usd": "-9.60",
+          "return_on_risk": -0.1014799154334038,
+          "held": 5,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "QQQ",
+      "flow_session": "2026-07-31",
+      "entry_session": "2026-08-03",
+      "symbol": "QQQ260831C00710000",
+      "arm": "confirmed",
+      "dte_bucket": "14-30",
+      "delta_bucket": "0.4-0.55",
+      "oi_before": 4847,
+      "oi_after": 6997,
+      "structure": "bull_call_debit",
+      "entry_debit": "0.67",
+      "quantity": 1,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-19.60",
+          "return_on_risk": -0.28160919540229884,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-35.60",
+          "return_on_risk": -0.5114942528735632,
+          "held": 1,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-35.60",
+          "return_on_risk": -0.5114942528735632,
+          "held": 1,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "SPY",
+      "flow_session": "2026-08-03",
+      "entry_session": "2026-08-04",
+      "symbol": "SPY260821P00760000",
+      "arm": "confirmed",
+      "dte_bucket": "14-30",
+      "delta_bucket": "0.25-0.4",
+      "oi_before": 4139,
+      "oi_after": 24195,
+      "structure": "bear_put_debit",
+      "entry_debit": "0.38",
+      "quantity": 2,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-55.20",
+          "return_on_risk": -0.6798029556650246,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-43.20",
+          "return_on_risk": -0.5320197044334976,
+          "held": 1,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-43.20",
+          "return_on_risk": -0.5320197044334976,
+          "held": 1,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "SPY",
+      "flow_session": "2026-08-04",
+      "entry_session": "2026-08-05",
+      "symbol": "SPY260821C00785000",
+      "arm": "confirmed",
+      "dte_bucket": "14-30",
+      "delta_bucket": "0.25-0.4",
+      "oi_before": 4062,
+      "oi_after": 79505,
+      "structure": "bull_call_debit",
+      "entry_debit": "0.32",
+      "quantity": 2,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-45.20",
+          "return_on_risk": -0.653179190751445,
+          "held": 5,
+          "unpriced_days": 1
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-37.20",
+          "return_on_risk": -0.5375722543352601,
+          "held": 1,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-37.20",
+          "return_on_risk": -0.5375722543352601,
+          "held": 1,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "QQQ",
+      "flow_session": "2026-08-04",
+      "entry_session": "2026-08-05",
+      "symbol": "QQQ260821C00730000",
+      "arm": "confirmed",
+      "dte_bucket": "14-30",
+      "delta_bucket": "0.25-0.4",
+      "oi_before": 30688,
+      "oi_after": 40129,
+      "structure": "bull_call_debit",
+      "entry_debit": "0.56",
+      "quantity": 1,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-37.60",
+          "return_on_risk": -0.6416382252559727,
+          "held": 5,
+          "unpriced_days": 1
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-30.60",
+          "return_on_risk": -0.5221843003412969,
+          "held": 1,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-30.60",
+          "return_on_risk": -0.5221843003412969,
+          "held": 1,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "NVDA",
+      "flow_session": "2026-08-04",
+      "entry_session": "2026-08-05",
+      "symbol": "NVDA260821P00212500",
+      "arm": "confirmed",
+      "dte_bucket": "14-30",
+      "delta_bucket": "0.25-0.4",
+      "oi_before": 505,
+      "oi_after": 797,
+      "structure": "bear_put_debit",
+      "entry_debit": "0.87",
+      "quantity": 1,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-22.60",
+          "return_on_risk": -0.25223214285714285,
+          "held": 5,
+          "unpriced_days": 1
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-45.60",
+          "return_on_risk": -0.5089285714285714,
+          "held": 2,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-45.60",
+          "return_on_risk": -0.5089285714285714,
+          "held": 2,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "SPY",
+      "flow_session": "2026-08-05",
+      "entry_session": "2026-08-06",
+      "symbol": "SPY260918P00760000",
+      "arm": "confirmed",
+      "dte_bucket": "31-45",
+      "delta_bucket": "0.25-0.4",
+      "oi_before": 11572,
+      "oi_after": 26703,
+      "structure": "bear_put_debit",
+      "entry_debit": "0.35",
+      "quantity": 2,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-43.20",
+          "return_on_risk": -0.574468085106383,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-39.20",
+          "return_on_risk": -0.5212765957446809,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-39.20",
+          "return_on_risk": -0.5212765957446809,
+          "held": 5,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "QQQ",
+      "flow_session": "2026-08-05",
+      "entry_session": "2026-08-06",
+      "symbol": "QQQ260821P00715000",
+      "arm": "confirmed",
+      "dte_bucket": "14-30",
+      "delta_bucket": "0.4-0.55",
+      "oi_before": 7394,
+      "oi_after": 12342,
+      "structure": "bear_put_debit",
+      "entry_debit": "0.56",
+      "quantity": 1,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-30.60",
+          "return_on_risk": -0.5221843003412969,
+          "held": 5,
+          "unpriced_days": 2
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-30.60",
+          "return_on_risk": -0.5221843003412969,
+          "held": 1,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-30.60",
+          "return_on_risk": -0.5221843003412969,
+          "held": 1,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "SPY",
+      "flow_session": "2026-08-06",
+      "entry_session": "2026-08-07",
+      "symbol": "SPY260918C00790000",
+      "arm": "confirmed",
+      "dte_bucket": "31-45",
+      "delta_bucket": "0.25-0.4",
+      "oi_before": 14051,
+      "oi_after": 40349,
+      "structure": "bull_call_debit",
+      "entry_debit": "0.45",
+      "quantity": 2,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-35.20",
+          "return_on_risk": -0.3697478991596639,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_and_stop": {
+          "reason": "time",
+          "pnl_usd": "-35.20",
+          "return_on_risk": -0.3697478991596639,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "time",
+          "pnl_usd": "-35.20",
+          "return_on_risk": -0.3697478991596639,
+          "held": 5,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "QQQ",
+      "flow_session": "2026-08-06",
+      "entry_session": "2026-08-07",
+      "symbol": "QQQ260828P00700000",
+      "arm": "confirmed",
+      "dte_bucket": "14-30",
+      "delta_bucket": "0.25-0.4",
+      "oi_before": 1189,
+      "oi_after": 7090,
+      "structure": "bear_put_debit",
+      "entry_debit": "0.31",
+      "quantity": 2,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-59.20",
+          "return_on_risk": -0.8809523809523809,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-35.20",
+          "return_on_risk": -0.5238095238095238,
+          "held": 1,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-35.20",
+          "return_on_risk": -0.5238095238095238,
+          "held": 1,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "QQQ",
+      "flow_session": "2026-08-07",
+      "entry_session": "2026-08-10",
+      "symbol": "QQQ260831C00725000",
+      "arm": "confirmed",
+      "dte_bucket": "14-30",
+      "delta_bucket": "0.4-0.55",
+      "oi_before": 2751,
+      "oi_after": 5796,
+      "structure": "bull_call_debit",
+      "entry_debit": "0.67",
+      "quantity": 1,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-24.60",
+          "return_on_risk": -0.35344827586206895,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-35.60",
+          "return_on_risk": -0.5114942528735632,
+          "held": 1,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-35.60",
+          "return_on_risk": -0.5114942528735632,
+          "held": 1,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "SPY",
+      "flow_session": "2026-08-10",
+      "entry_session": "2026-08-11",
+      "symbol": "SPY260918P00775000",
+      "arm": "confirmed",
+      "dte_bucket": "31-45",
+      "delta_bucket": "0.4-0.55",
+      "oi_before": 5259,
+      "oi_after": 25028,
+      "structure": "bear_put_debit",
+      "entry_debit": "0.55",
+      "quantity": 1,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-28.60",
+          "return_on_risk": -0.4965277777777778,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_and_stop": {
+          "reason": "time",
+          "pnl_usd": "-28.60",
+          "return_on_risk": -0.4965277777777778,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "time",
+          "pnl_usd": "-28.60",
+          "return_on_risk": -0.4965277777777778,
+          "held": 5,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "QQQ",
+      "flow_session": "2026-08-10",
+      "entry_session": "2026-08-11",
+      "symbol": "QQQ260930C00730000",
+      "arm": "confirmed",
+      "dte_bucket": "46-60",
+      "delta_bucket": "0.4-0.55",
+      "oi_before": 1605,
+      "oi_after": 3249,
+      "structure": "bull_call_debit",
+      "entry_debit": "0.66",
+      "quantity": 1,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-40.60",
+          "return_on_risk": -0.5918367346938775,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-35.60",
+          "return_on_risk": -0.5189504373177842,
+          "held": 1,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-35.60",
+          "return_on_risk": -0.5189504373177842,
+          "held": 1,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "SPY",
+      "flow_session": "2026-08-11",
+      "entry_session": "2026-08-12",
+      "symbol": "SPY260828C00780000",
+      "arm": "confirmed",
+      "dte_bucket": "14-30",
+      "delta_bucket": "0.25-0.4",
+      "oi_before": 2286,
+      "oi_after": 2470,
+      "structure": "bull_call_debit",
+      "entry_debit": "0.46",
+      "quantity": 2,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-63.20",
+          "return_on_risk": -0.6502057613168725,
+          "held": 5,
+          "unpriced_days": 1
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-51.20",
+          "return_on_risk": -0.5267489711934157,
+          "held": 4,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-51.20",
+          "return_on_risk": -0.5267489711934157,
+          "held": 4,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "QQQ",
+      "flow_session": "2026-08-11",
+      "entry_session": "2026-08-12",
+      "symbol": "QQQ260831C00720000",
+      "arm": "confirmed",
+      "dte_bucket": "14-30",
+      "delta_bucket": "0.55-0.7",
+      "oi_before": 1070,
+      "oi_after": 1334,
+      "structure": "bull_call_debit",
+      "entry_debit": "0.82",
+      "quantity": 1,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-46.60",
+          "return_on_risk": -0.5508274231678487,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-43.60",
+          "return_on_risk": -0.5153664302600472,
+          "held": 1,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-43.60",
+          "return_on_risk": -0.5153664302600472,
+          "held": 1,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "AMZN",
+      "flow_session": "2026-08-11",
+      "entry_session": "2026-08-12",
+      "symbol": "AMZN260828C00275000",
+      "arm": "control",
+      "dte_bucket": "14-30",
+      "delta_bucket": "0.25-0.4",
+      "oi_before": 7040,
+      "oi_after": 4486,
+      "structure": "bull_call_debit",
+      "entry_debit": "0.90",
+      "quantity": 1,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-76.60",
+          "return_on_risk": -0.8272138228941684,
+          "held": 5,
+          "unpriced_days": 1
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-47.60",
+          "return_on_risk": -0.5140388768898488,
+          "held": 1,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-47.60",
+          "return_on_risk": -0.5140388768898488,
+          "held": 1,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "SPY",
+      "flow_session": "2026-08-13",
+      "entry_session": "2026-08-14",
+      "symbol": "SPY260918P00770000",
+      "arm": "confirmed",
+      "dte_bucket": "31-45",
+      "delta_bucket": "0.25-0.4",
+      "oi_before": 12865,
+      "oi_after": 20422,
+      "structure": "bear_put_debit",
+      "entry_debit": "0.39",
+      "quantity": 2,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-23.20",
+          "return_on_risk": -0.27884615384615385,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_and_stop": {
+          "reason": "time",
+          "pnl_usd": "-23.20",
+          "return_on_risk": -0.27884615384615385,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "time",
+          "pnl_usd": "-23.20",
+          "return_on_risk": -0.27884615384615385,
+          "held": 5,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "QQQ",
+      "flow_session": "2026-08-13",
+      "entry_session": "2026-08-14",
+      "symbol": "QQQ260930P00710000",
+      "arm": "confirmed",
+      "dte_bucket": "46-60",
+      "delta_bucket": "0.25-0.4",
+      "oi_before": 836,
+      "oi_after": 3852,
+      "structure": "bear_put_debit",
+      "entry_debit": "0.57",
+      "quantity": 1,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-37.60",
+          "return_on_risk": -0.6308724832214765,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-31.60",
+          "return_on_risk": -0.5302013422818792,
+          "held": 1,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-31.60",
+          "return_on_risk": -0.5302013422818792,
+          "held": 1,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "SPY",
+      "flow_session": "2026-08-17",
+      "entry_session": "2026-08-18",
+      "symbol": "SPY260904P00760000",
+      "arm": "confirmed",
+      "dte_bucket": "14-30",
+      "delta_bucket": "0.25-0.4",
+      "oi_before": 2022,
+      "oi_after": 10434,
+      "structure": "bear_put_debit",
+      "entry_debit": "0.33",
+      "quantity": 2,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-23.20",
+          "return_on_risk": -0.3258426966292135,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_and_stop": {
+          "reason": "time",
+          "pnl_usd": "-23.20",
+          "return_on_risk": -0.3258426966292135,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "time",
+          "pnl_usd": "-23.20",
+          "return_on_risk": -0.3258426966292135,
+          "held": 5,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "QQQ",
+      "flow_session": "2026-08-17",
+      "entry_session": "2026-08-18",
+      "symbol": "QQQ261016P00716000",
+      "arm": "confirmed",
+      "dte_bucket": "46-60",
+      "delta_bucket": "0.4-0.55",
+      "oi_before": 432,
+      "oi_after": 11350,
+      "structure": "bear_put_debit",
+      "entry_debit": "0.62",
+      "quantity": 1,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-38.60",
+          "return_on_risk": -0.5975232198142415,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-33.60",
+          "return_on_risk": -0.5201238390092879,
+          "held": 1,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-33.60",
+          "return_on_risk": -0.5201238390092879,
+          "held": 1,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "AMZN",
+      "flow_session": "2026-08-17",
+      "entry_session": "2026-08-18",
+      "symbol": "AMZN260904C00270000",
+      "arm": "confirmed",
+      "dte_bucket": "14-30",
+      "delta_bucket": "0.25-0.4",
+      "oi_before": 1222,
+      "oi_after": 1808,
+      "structure": "bull_call_debit",
+      "entry_debit": "0.84",
+      "quantity": 1,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-43.60",
+          "return_on_risk": -0.5034642032332564,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-44.60",
+          "return_on_risk": -0.5150115473441108,
+          "held": 2,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-44.60",
+          "return_on_risk": -0.5150115473441108,
+          "held": 2,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "SPY",
+      "flow_session": "2026-08-18",
+      "entry_session": "2026-08-19",
+      "symbol": "SPY260918P00755000",
+      "arm": "confirmed",
+      "dte_bucket": "14-30",
+      "delta_bucket": "0.25-0.4",
+      "oi_before": 14022,
+      "oi_after": 35919,
+      "structure": "bear_put_debit",
+      "entry_debit": "0.24",
+      "quantity": 3,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-22.80",
+          "return_on_risk": -0.2857142857142857,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_and_stop": {
+          "reason": "time",
+          "pnl_usd": "-22.80",
+          "return_on_risk": -0.2857142857142857,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "time",
+          "pnl_usd": "-22.80",
+          "return_on_risk": -0.2857142857142857,
+          "held": 5,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "QQQ",
+      "flow_session": "2026-08-18",
+      "entry_session": "2026-08-19",
+      "symbol": "QQQ260918C00719000",
+      "arm": "confirmed",
+      "dte_bucket": "14-30",
+      "delta_bucket": "0.4-0.55",
+      "oi_before": 1341,
+      "oi_after": 4255,
+      "structure": "bull_call_debit",
+      "entry_debit": "0.69",
+      "quantity": 1,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-44.60",
+          "return_on_risk": -0.6229050279329609,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-37.60",
+          "return_on_risk": -0.5251396648044693,
+          "held": 1,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-37.60",
+          "return_on_risk": -0.5251396648044693,
+          "held": 1,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "SPY",
+      "flow_session": "2026-08-19",
+      "entry_session": "2026-08-20",
+      "symbol": "SPY260911P00760000",
+      "arm": "confirmed",
+      "dte_bucket": "14-30",
+      "delta_bucket": "0.4-0.55",
+      "oi_before": 1923,
+      "oi_after": 35094,
+      "structure": "bear_put_debit",
+      "entry_debit": "0.39",
+      "quantity": 2,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-53.20",
+          "return_on_risk": -0.6394230769230769,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-43.20",
+          "return_on_risk": -0.5192307692307693,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-43.20",
+          "return_on_risk": -0.5192307692307693,
+          "held": 5,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "QQQ",
+      "flow_session": "2026-08-19",
+      "entry_session": "2026-08-20",
+      "symbol": "QQQ260911P00705000",
+      "arm": "confirmed",
+      "dte_bucket": "14-30",
+      "delta_bucket": "0.4-0.55",
+      "oi_before": 1372,
+      "oi_after": 33721,
+      "structure": "bear_put_debit",
+      "entry_debit": "0.52",
+      "quantity": 1,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-62.60",
+          "return_on_risk": -1.1465201465201464,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-28.60",
+          "return_on_risk": -0.5238095238095238,
+          "held": 1,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-28.60",
+          "return_on_risk": -0.5238095238095238,
+          "held": 1,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "NVDA",
+      "flow_session": "2026-08-20",
+      "entry_session": "2026-08-21",
+      "symbol": "NVDA260904C00227500",
+      "arm": "confirmed",
+      "dte_bucket": "14-30",
+      "delta_bucket": "0.25-0.4",
+      "oi_before": 611,
+      "oi_after": 1604,
+      "structure": "bull_call_debit",
+      "entry_debit": "0.69",
+      "quantity": 1,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-28.60",
+          "return_on_risk": -0.3994413407821229,
+          "held": 5,
+          "unpriced_days": 3
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-37.60",
+          "return_on_risk": -0.5251396648044693,
+          "held": 1,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-37.60",
+          "return_on_risk": -0.5251396648044693,
+          "held": 1,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "QQQ",
+      "flow_session": "2026-08-21",
+      "entry_session": "2026-08-24",
+      "symbol": "QQQ261016P00690000",
+      "arm": "confirmed",
+      "dte_bucket": "46-60",
+      "delta_bucket": "0.25-0.4",
+      "oi_before": 4527,
+      "oi_after": 10615,
+      "structure": "bear_put_debit",
+      "entry_debit": "0.45",
+      "quantity": 2,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-77.20",
+          "return_on_risk": -0.8109243697478992,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-51.20",
+          "return_on_risk": -0.5378151260504201,
+          "held": 1,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-51.20",
+          "return_on_risk": -0.5378151260504201,
+          "held": 1,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "TSLA",
+      "flow_session": "2026-08-21",
+      "entry_session": "2026-08-24",
+      "symbol": "TSLA260911C00360000",
+      "arm": "confirmed",
+      "dte_bucket": "14-30",
+      "delta_bucket": "0.25-0.4",
+      "oi_before": 1496,
+      "oi_after": 1933,
+      "structure": "bull_call_debit",
+      "entry_debit": "0.97",
+      "quantity": 1,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "10.40",
+          "return_on_risk": 0.10441767068273092,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_and_stop": {
+          "reason": "time",
+          "pnl_usd": "10.40",
+          "return_on_risk": 0.10441767068273092,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "time",
+          "pnl_usd": "10.40",
+          "return_on_risk": 0.10441767068273092,
+          "held": 5,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "SPY",
+      "flow_session": "2026-08-24",
+      "entry_session": "2026-08-25",
+      "symbol": "SPY260930P00754000",
+      "arm": "confirmed",
+      "dte_bucket": "31-45",
+      "delta_bucket": "0.25-0.4",
+      "oi_before": 463,
+      "oi_after": 6816,
+      "structure": "bear_put_debit",
+      "entry_debit": "0.30",
+      "quantity": 3,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-22.80",
+          "return_on_risk": -0.2331288343558282,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_and_stop": {
+          "reason": "time",
+          "pnl_usd": "-22.80",
+          "return_on_risk": -0.2331288343558282,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "time",
+          "pnl_usd": "-22.80",
+          "return_on_risk": -0.2331288343558282,
+          "held": 5,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "TSLA",
+      "flow_session": "2026-08-24",
+      "entry_session": "2026-08-25",
+      "symbol": "TSLA260911C00370000",
+      "arm": "confirmed",
+      "dte_bucket": "14-30",
+      "delta_bucket": "0.25-0.4",
+      "oi_before": 2103,
+      "oi_after": 3198,
+      "structure": "bull_call_debit",
+      "entry_debit": "0.71",
+      "quantity": 1,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-18.60",
+          "return_on_risk": -0.25271739130434784,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-37.60",
+          "return_on_risk": -0.5108695652173914,
+          "held": 1,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-37.60",
+          "return_on_risk": -0.5108695652173914,
+          "held": 1,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "SPY",
+      "flow_session": "2026-08-25",
+      "entry_session": "2026-08-26",
+      "symbol": "SPY260930P00754000",
+      "arm": "confirmed",
+      "dte_bucket": "31-45",
+      "delta_bucket": "0.25-0.4",
+      "oi_before": 6816,
+      "oi_after": 14345,
+      "structure": "bear_put_debit",
+      "entry_debit": "0.30",
+      "quantity": 3,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-403.80",
+          "return_on_risk": -4.128834355828221,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-52.80",
+          "return_on_risk": -0.5398773006134969,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-52.80",
+          "return_on_risk": -0.5398773006134969,
+          "held": 5,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "QQQ",
+      "flow_session": "2026-08-25",
+      "entry_session": "2026-08-26",
+      "symbol": "QQQ260911C00720000",
+      "arm": "confirmed",
+      "dte_bucket": "14-30",
+      "delta_bucket": "0.4-0.55",
+      "oi_before": 1596,
+      "oi_after": 1986,
+      "structure": "bull_call_debit",
+      "entry_debit": "0.60",
+      "quantity": 1,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-42.60",
+          "return_on_risk": -0.6805111821086262,
+          "held": 5,
+          "unpriced_days": 1
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-32.60",
+          "return_on_risk": -0.5207667731629393,
+          "held": 1,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-32.60",
+          "return_on_risk": -0.5207667731629393,
+          "held": 1,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "AAPL",
+      "flow_session": "2026-08-25",
+      "entry_session": "2026-08-26",
+      "symbol": "AAPL260918C00322500",
+      "arm": "confirmed",
+      "dte_bucket": "14-30",
+      "delta_bucket": "0.25-0.4",
+      "oi_before": 372,
+      "oi_after": 423,
+      "structure": "bull_call_debit",
+      "entry_debit": "0.97",
+      "quantity": 1,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "5.40",
+          "return_on_risk": 0.05421686746987952,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_and_stop": {
+          "reason": "time",
+          "pnl_usd": "5.40",
+          "return_on_risk": 0.05421686746987952,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "time",
+          "pnl_usd": "5.40",
+          "return_on_risk": 0.05421686746987952,
+          "held": 5,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "SPY",
+      "flow_session": "2026-08-26",
+      "entry_session": "2026-08-27",
+      "symbol": "SPY260930P00756000",
+      "arm": "confirmed",
+      "dte_bucket": "31-45",
+      "delta_bucket": "0.25-0.4",
+      "oi_before": 396,
+      "oi_after": 1687,
+      "structure": "bear_put_debit",
+      "entry_debit": "0.28",
+      "quantity": 3,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-43.80",
+          "return_on_risk": -0.477124183006536,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-49.80",
+          "return_on_risk": -0.5424836601307189,
+          "held": 4,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-49.80",
+          "return_on_risk": -0.5424836601307189,
+          "held": 4,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "QQQ",
+      "flow_session": "2026-08-26",
+      "entry_session": "2026-08-27",
+      "symbol": "QQQ260930C00730000",
+      "arm": "confirmed",
+      "dte_bucket": "31-45",
+      "delta_bucket": "0.4-0.55",
+      "oi_before": 4744,
+      "oi_after": 12936,
+      "structure": "bull_call_debit",
+      "entry_debit": "0.81",
+      "quantity": 1,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-60.60",
+          "return_on_risk": -0.7248803827751196,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-43.60",
+          "return_on_risk": -0.5215311004784688,
+          "held": 1,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-43.60",
+          "return_on_risk": -0.5215311004784688,
+          "held": 1,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "AMZN",
+      "flow_session": "2026-08-26",
+      "entry_session": "2026-08-27",
+      "symbol": "AMZN260918C00267500",
+      "arm": "confirmed",
+      "dte_bucket": "14-30",
+      "delta_bucket": "0.25-0.4",
+      "oi_before": 320,
+      "oi_after": 1135,
+      "structure": "bull_call_debit",
+      "entry_debit": "0.80",
+      "quantity": 1,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-33.60",
+          "return_on_risk": -0.4067796610169492,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-42.60",
+          "return_on_risk": -0.5157384987893463,
+          "held": 3,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-42.60",
+          "return_on_risk": -0.5157384987893463,
+          "held": 3,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "SPY",
+      "flow_session": "2026-08-27",
+      "entry_session": "2026-08-28",
+      "symbol": "SPY261016P00765000",
+      "arm": "confirmed",
+      "dte_bucket": "46-60",
+      "delta_bucket": "0.4-0.55",
+      "oi_before": 4259,
+      "oi_after": 13268,
+      "structure": "bear_put_debit",
+      "entry_debit": "0.39",
+      "quantity": 2,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-23.20",
+          "return_on_risk": -0.27884615384615385,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-43.20",
+          "return_on_risk": -0.5192307692307693,
+          "held": 3,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-43.20",
+          "return_on_risk": -0.5192307692307693,
+          "held": 3,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "QQQ",
+      "flow_session": "2026-08-27",
+      "entry_session": "2026-08-28",
+      "symbol": "QQQ260918P00704000",
+      "arm": "confirmed",
+      "dte_bucket": "14-30",
+      "delta_bucket": "0.25-0.4",
+      "oi_before": 690,
+      "oi_after": 5207,
+      "structure": "bear_put_debit",
+      "entry_debit": "0.39",
+      "quantity": 2,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-61.20",
+          "return_on_risk": -0.7355769230769231,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-43.20",
+          "return_on_risk": -0.5192307692307693,
+          "held": 1,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-43.20",
+          "return_on_risk": -0.5192307692307693,
+          "held": 1,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "NVDA",
+      "flow_session": "2026-08-27",
+      "entry_session": "2026-08-28",
+      "symbol": "NVDA260918C00230000",
+      "arm": "confirmed",
+      "dte_bucket": "14-30",
+      "delta_bucket": "0.25-0.4",
+      "oi_before": 53196,
+      "oi_after": 54661,
+      "structure": "bull_call_debit",
+      "entry_debit": "0.54",
+      "quantity": 1,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "48.40",
+          "return_on_risk": 0.8551236749116607,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-29.60",
+          "return_on_risk": -0.5229681978798587,
+          "held": 1,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-29.60",
+          "return_on_risk": -0.5229681978798587,
+          "held": 1,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "SPY",
+      "flow_session": "2026-08-28",
+      "entry_session": "2026-08-31",
+      "symbol": "SPY260930P00754000",
+      "arm": "control",
+      "dte_bucket": "14-30",
+      "delta_bucket": "0.25-0.4",
+      "oi_before": 20281,
+      "oi_after": 12610,
+      "structure": "bear_put_debit",
+      "entry_debit": "0.26",
+      "quantity": 3,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-25.80",
+          "return_on_risk": -0.3006993006993007,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-46.80",
+          "return_on_risk": -0.5454545454545454,
+          "held": 2,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-46.80",
+          "return_on_risk": -0.5454545454545454,
+          "held": 2,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "QQQ",
+      "flow_session": "2026-08-28",
+      "entry_session": "2026-08-31",
+      "symbol": "QQQ260918P00710000",
+      "arm": "confirmed",
+      "dte_bucket": "14-30",
+      "delta_bucket": "0.25-0.4",
+      "oi_before": 28153,
+      "oi_after": 33411,
+      "structure": "bear_put_debit",
+      "entry_debit": "0.43",
+      "quantity": 2,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-53.20",
+          "return_on_risk": -0.5833333333333334,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-47.20",
+          "return_on_risk": -0.5175438596491229,
+          "held": 2,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-47.20",
+          "return_on_risk": -0.5175438596491229,
+          "held": 2,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "QQQ",
+      "flow_session": "2026-09-01",
+      "entry_session": "2026-09-02",
+      "symbol": "QQQ260925P00690000",
+      "arm": "confirmed",
+      "dte_bucket": "14-30",
+      "delta_bucket": "0.25-0.4",
+      "oi_before": 14955,
+      "oi_after": 70427,
+      "structure": "bear_put_debit",
+      "entry_debit": "0.44",
+      "quantity": 2,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-81.20",
+          "return_on_risk": -0.871244635193133,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-49.20",
+          "return_on_risk": -0.5278969957081545,
+          "held": 1,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-49.20",
+          "return_on_risk": -0.5278969957081545,
+          "held": 1,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "SPY",
+      "flow_session": "2026-09-02",
+      "entry_session": "2026-09-03",
+      "symbol": "SPY260930P00765000",
+      "arm": "confirmed",
+      "dte_bucket": "14-30",
+      "delta_bucket": "0.25-0.4",
+      "oi_before": 1572,
+      "oi_after": 2302,
+      "structure": "bear_put_debit",
+      "entry_debit": "0.33",
+      "quantity": 2,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-1.20",
+          "return_on_risk": -0.016853932584269662,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-39.20",
+          "return_on_risk": -0.550561797752809,
+          "held": 4,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-39.20",
+          "return_on_risk": -0.550561797752809,
+          "held": 4,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "QQQ",
+      "flow_session": "2026-09-02",
+      "entry_session": "2026-09-03",
+      "symbol": "QQQ260930C00725000",
+      "arm": "confirmed",
+      "dte_bucket": "14-30",
+      "delta_bucket": "0.4-0.55",
+      "oi_before": 3240,
+      "oi_after": 21757,
+      "structure": "bull_call_debit",
+      "entry_debit": "0.69",
+      "quantity": 1,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-42.60",
+          "return_on_risk": -0.5949720670391061,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-37.60",
+          "return_on_risk": -0.5251396648044693,
+          "held": 1,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-37.60",
+          "return_on_risk": -0.5251396648044693,
+          "held": 1,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "SPY",
+      "flow_session": "2026-09-03",
+      "entry_session": "2026-09-04",
+      "symbol": "SPY260918C00779000",
+      "arm": "confirmed",
+      "dte_bucket": "14-30",
+      "delta_bucket": "0.25-0.4",
+      "oi_before": 3298,
+      "oi_after": 40048,
+      "structure": "bull_call_debit",
+      "entry_debit": "0.34",
+      "quantity": 2,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-39.20",
+          "return_on_risk": -0.5355191256830601,
+          "held": 5,
+          "unpriced_days": 4
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-39.20",
+          "return_on_risk": -0.5355191256830601,
+          "held": 1,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-39.20",
+          "return_on_risk": -0.5355191256830601,
+          "held": 1,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "QQQ",
+      "flow_session": "2026-09-03",
+      "entry_session": "2026-09-04",
+      "symbol": "QQQ261002P00700000",
+      "arm": "confirmed",
+      "dte_bucket": "14-30",
+      "delta_bucket": "0.25-0.4",
+      "oi_before": 1305,
+      "oi_after": 6352,
+      "structure": "bear_put_debit",
+      "entry_debit": "0.41",
+      "quantity": 2,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-63.20",
+          "return_on_risk": -0.7247706422018348,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-47.20",
+          "return_on_risk": -0.5412844036697247,
+          "held": 1,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-47.20",
+          "return_on_risk": -0.5412844036697247,
+          "held": 1,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "AAPL",
+      "flow_session": "2026-09-03",
+      "entry_session": "2026-09-04",
+      "symbol": "AAPL260918C00327500",
+      "arm": "control",
+      "dte_bucket": "14-30",
+      "delta_bucket": "0.25-0.4",
+      "oi_before": 799,
+      "oi_after": 713,
+      "structure": "bull_call_debit",
+      "entry_debit": "0.82",
+      "quantity": 1,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-49.60",
+          "return_on_risk": -0.5862884160756501,
+          "held": 5,
+          "unpriced_days": 4
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-43.60",
+          "return_on_risk": -0.5153664302600472,
+          "held": 1,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-43.60",
+          "return_on_risk": -0.5153664302600472,
+          "held": 1,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "SPY",
+      "flow_session": "2026-09-04",
+      "entry_session": "2026-09-08",
+      "symbol": "SPY260925P00759000",
+      "arm": "confirmed",
+      "dte_bucket": "14-30",
+      "delta_bucket": "0.25-0.4",
+      "oi_before": 353,
+      "oi_after": 4513,
+      "structure": "bear_put_debit",
+      "entry_debit": "0.34",
+      "quantity": 2,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-9.20",
+          "return_on_risk": -0.12568306010928962,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_and_stop": {
+          "reason": "time",
+          "pnl_usd": "-9.20",
+          "return_on_risk": -0.12568306010928962,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "time",
+          "pnl_usd": "-9.20",
+          "return_on_risk": -0.12568306010928962,
+          "held": 5,
+          "unpriced_days": 0
+        }
+      }
+    },
+    {
+      "ticker": "QQQ",
+      "flow_session": "2026-09-04",
+      "entry_session": "2026-09-08",
+      "symbol": "QQQ260925P00718000",
+      "arm": "confirmed",
+      "dte_bucket": "14-30",
+      "delta_bucket": "0.4-0.55",
+      "oi_before": 428,
+      "oi_after": 8511,
+      "structure": "bear_put_debit",
+      "entry_debit": "0.62",
+      "quantity": 1,
+      "exits": {
+        "time_only": {
+          "reason": "time",
+          "pnl_usd": "-40.60",
+          "return_on_risk": -0.628482972136223,
+          "held": 5,
+          "unpriced_days": 0
+        },
+        "time_and_stop": {
+          "reason": "stop",
+          "pnl_usd": "-33.60",
+          "return_on_risk": -0.5201238390092879,
+          "held": 1,
+          "unpriced_days": 0
+        },
+        "time_target_stop": {
+          "reason": "stop",
+          "pnl_usd": "-33.60",
+          "return_on_risk": -0.5201238390092879,
+          "held": 1,
+          "unpriced_days": 0
+        }
+      }
+    }
+  ]
+}

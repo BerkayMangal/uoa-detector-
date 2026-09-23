@@ -1,8 +1,8 @@
 {
   "scope": "options_alpha_v1",
   "phase": "5.24",
-  "generated_at": "2026-09-23T11:01:00.064783+00:00",
-  "base_commit": "3143e121964cc3f07e9a81651cd8185527e7dcf4",
+  "generated_at": "2026-09-23T11:40:29.789573+00:00",
+  "base_commit": "2243384cbef85b34e1ed45cb207b0e89610071f6",
   "note": "base_commit is the branch point; this milestone is not committed yet at write time.",
   "milestones": [
     {
@@ -216,6 +216,115 @@
         "per-leg daily highs and lows are deliberately NOT combined into a package range: the two extremes need not be simultaneous"
       ],
       "gate": "4280 passed, 52 skipped; mypy --strict clean on 191 files; ruff clean; uv lock consistent"
+    },
+    {
+      "id": "M5",
+      "name": "H03 run to a verdict on the frozen window",
+      "status": "DONE",
+      "verdict": "REJECTED",
+      "protocol": [
+        "docs/options-alpha-v1/PREREG_H03.md",
+        "docs/options-alpha-v1/PREREG_H03_ADDENDUM.md",
+        "docs/options-alpha-v1/PREREG_H03_ADDENDUM_2.md",
+        "docs/options-alpha-v1/PREREG_H03_ADDENDUM_3.md"
+      ],
+      "protocol_frozen_before_run": true,
+      "commands": [
+        "uv run python scripts/options_alpha_harvest_chains.py --start 2026-05-14 --end 2026-09-15",
+        "uv run python scripts/options_alpha_h03_study.py"
+      ],
+      "window": [
+        "2026-05-14",
+        "2026-09-15"
+      ],
+      "sessions": 85,
+      "harvest": {
+        "files": 850,
+        "sessions": 85,
+        "bytes_on_disk": "384M",
+        "requests_spent": 845,
+        "gitignored": true
+      },
+      "funnel": {
+        "scanned": 1544478,
+        "eligible": 58787,
+        "structures_built": 554,
+        "priced": 1108,
+        "passed_cost_gate": 554,
+        "passed_risk_gate": 141
+      },
+      "arms_primary_time_only": {
+        "confirmed": {
+          "n": 134,
+          "n_with_pnl": 134,
+          "mean_pnl_usd": -75.31,
+          "median_pnl_usd": -46.9,
+          "total_pnl_usd": -10091.4,
+          "win_rate": 0.075
+        },
+        "control": {
+          "n": 7,
+          "n_with_pnl": 7,
+          "mean_pnl_usd": -52.57,
+          "median_pnl_usd": -49.6,
+          "total_pnl_usd": -368.0,
+          "win_rate": 0.0
+        }
+      },
+      "secondary_variants": {
+        "time_and_stop": {
+          "confirmed": -34.23,
+          "control": -46.71
+        },
+        "time_target_stop": {
+          "confirmed": -34.25,
+          "control": -46.71
+        }
+      },
+      "dropped_buckets": 6,
+      "result_artifact": {
+        "path": "artifacts/options-alpha-v1/h03_result.json",
+        "sha256": "ce2fb5bcd275cb01717e96b08747017a3b00dd760b5de38be1c15b79b740bc82",
+        "records": 141
+      },
+      "code": {
+        "harvester": "0e0fcc074c11416eb57a6b8a3660f4e7b642e762e20a45b3fcd066dd1ff843ae",
+        "study": "b3cec4352f134637305421606f147285a1ec2bfa02136bece245ae50db6a86f5"
+      },
+      "profile_sha256": "b7886203115d469d72fa8ea1554d2ffea04f9ede237c3cd98d910381ac258f39",
+      "data_quality_tier": "B",
+      "headline": "confirmed arm mean -75.31 USD against control -52.57 USD on the frozen primary; REJECTED. Control arm n=7 against confirmed n=134, the imbalance addendum 3 predicted before the run.",
+      "refused": "secondary exit variants favour the confirmed arm (-34.23 vs -46.71) and were NOT promoted to primary; the primary was fixed as time_only before the data was seen"
+    },
+    {
+      "id": "M8",
+      "name": "Mutation proof: every critical guard shown capable of failing",
+      "status": "DONE",
+      "command": "uv run python scripts/options_alpha_mutation_proof.py",
+      "mutations": 7,
+      "survivors": 0,
+      "all_files_restored_byte_identical": true,
+      "guards_proven": [
+        "long entry prices at the ask",
+        "crossed quote is refused",
+        "a structure over budget sizes to zero",
+        "target cannot exceed the structure ceiling",
+        "a replay card is never offered as an entry",
+        "same-day both-threshold touch takes the stop, order not invented",
+        "an unpriceable position is not a successful trade"
+      ],
+      "method_notes": [
+        "baseline checked first: a test already red proves nothing about the guard",
+        "no line-deletion mutations: a file that cannot parse proves nothing",
+        "restoration verified by sha256 of the original bytes, and by git status"
+      ],
+      "artifact": {
+        "path": "artifacts/options-alpha-v1/mutation_proof.md",
+        "sha256": "ee79cdb33e52ef933aa4439bd53dd87492882705d8aba42b8bd5d1b6a5ba215b"
+      },
+      "code": {
+        "proof_script": "c85d9b657b60597a0c0e194b497710d6b39e4932e948ac1e49d387f75ef90bfc"
+      }
     }
   ]
 }
