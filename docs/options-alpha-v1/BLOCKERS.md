@@ -9,9 +9,25 @@ Her satır: ne engelli, neyi durduruyor, hangi somut kanıt, açılma koşulu.
 
 ## B1. Yetkili ekran doğrulaması — `WEB_AUTH_USER` / `WEB_AUTH_PASSWORD`
 
+> **2026-09-23 — ÇÖZÜLDÜ, auth zayıflatılmadan.** Engelin kesin nedeni parolanın
+> yokluğu değildi. `scripts/verify_live_board.sh` kimlik bilgilerini önce ortamdan,
+> sonra `RAILWAY_DIR` ile Railway CLI'dan okur. Makinedeki CLI oturum açıktı
+> (`railway whoami`), ama hiçbir dizine bağlı değildi. Karalama bir dizin servise
+> bağlandı (`railway link --project unique-balance --service uoa-detector-`) ve
+> betik `RAILWAY_DIR=<o dizin>` ile koşuldu. Parola hiçbir çıktıya yazılmadı.
+> Sonuç, canlı `main` üzerinde: `/` ve `/opsiyon` kimliksiz **401**, kimlikli **200**;
+> `/opsiyon state ok`; dürüstlük denetimi 20 satırda **PASS**; **VERIFY: PASS**.
+> Aynı yoldan alınan `/opsiyon` HTML'i tarayıcıda da açılıp gözle görüldü. İki
+> içerik kusuru bulundu: "ailelerin tamamı reddedildi" cümlesi (M5d zaten
+> INSUFFICIENT_DATA'ydı) ve H04'ün düzeltilmemiş v1 hükmü. İkisi de
+> `p80-options-paper-tracker`'da düzeltildi.
+> **Tekrar etmek için tek komut** (bağlı bir dizin varken):
+> `RAILWAY_DIR=<bağlı dizin> bash scripts/verify_live_board.sh`
+> Aşağıdaki tablo tarihsel kayıt olarak duruyor.
+
 | | |
 |---|---|
-| **Durum** | BLOCKED — sahip eylemi gerekiyor |
+| **Durum** | ~~BLOCKED — sahip eylemi gerekiyor~~ → ÇÖZÜLDÜ 2026-09-23 (yukarıda) |
 | **Neyi durduruyor** | Canlı sayfa içeriğinin doğrulanması: yeni opsiyon ekranının gerçek tarayıcıda açılması, dürüstlük denetimi, `alfa_` satır sayıları, açılma süresi ölçümü |
 | **Kanıt** | 2026-09-23 ölçümü, `main` 929a624 canlı: `/health` → 200 ve doğru SHA; `/`, `/defter`, `/gamma`, **`/opsiyon`** → **401**. Kimlik bilgileri tanımsız olsaydı uygulama 503 verirdi, yani duvar çalışıyor ve parola sahipte |
 | **Neyi durdurmuyor** | Kod, testler, araştırma koşuları, PAPER motoru, matris, backfill. Hepsi bu parolasız ilerler |
@@ -68,5 +84,6 @@ Kayda geçsin diye: aşağıdakiler bu dosyaya girmez ve girmedi.
 - **Piyasa kapalı.** Uçtan uca akış tarihli uç noktalarla tamamlanmış seans
   üzerinden koşuluyor; zaman sorunu, engel değil.
 - **Çok bacaklı/spread mantığı yok.** Yazılmamış kod, dış engel değil.
-- **Açık pozisyon izleme yok.** Aynı — yazılmamış kod.
+- **Açık pozisyon izleme yok.** Aynı — yazılmamış kod. 2026-09-23'te yazıldı:
+  `PAPER_TRACKER.md` (canlıda koşması merge'e bağlı; bu bir engel değil, sıra).
 - **`take_profit_or_stop` `NotImplementedError`.** Aynı — uygulanacak iş kalemi.

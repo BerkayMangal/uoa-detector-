@@ -1,0 +1,482 @@
+{
+  "run_at": "2026-09-23T14:37:43.725443+00:00",
+  "database": "local sqlite (same code as the live options_paper daily job)",
+  "calendar": [
+    "SPY"
+  ],
+  "report": "registered 4; open 4; marks 20; outcomes 2; requests 4 granted / 0 refused; through 2026-09-22",
+  "status": "ok",
+  "requests_reserved_today_local_ledger": 5280,
+  "vendor_daily_count_after": 5282,
+  "positions": [
+    {
+      "position_id": "sig_591e4d839beeb3e4",
+      "source": "2026-09-08/paper_card_QQQ.json",
+      "data_origin": "replay",
+      "hypothesis_id": "H00_pipeline_smoke",
+      "research_status": "RESEARCH_ONLY",
+      "underlying": "QQQ",
+      "structure": "bear_put_debit",
+      "entry_session": "2026-09-08",
+      "marks": [
+        {
+          "session": "2026-09-09",
+          "closable_value": "0.13",
+          "quotes": {
+            "QQQ261016P00699000": {
+              "ask": "11.00",
+              "bid": "10.86",
+              "volume": 24
+            },
+            "QQQ261016P00700000": {
+              "ask": "11.26",
+              "bid": "11.13",
+              "volume": 5099
+            }
+          }
+        },
+        {
+          "session": "2026-09-10",
+          "closable_value": "0.15",
+          "quotes": {
+            "QQQ261016P00699000": {
+              "ask": "13.51",
+              "bid": "13.33",
+              "volume": 129
+            },
+            "QQQ261016P00700000": {
+              "ask": "13.83",
+              "bid": "13.66",
+              "volume": 6711
+            }
+          }
+        },
+        {
+          "session": "2026-09-11",
+          "closable_value": "0.18",
+          "quotes": {
+            "QQQ261016P00699000": {
+              "ask": "9.98",
+              "bid": "9.85",
+              "volume": 118
+            },
+            "QQQ261016P00700000": {
+              "ask": "10.26",
+              "bid": "10.16",
+              "volume": 5111
+            }
+          }
+        },
+        {
+          "session": "2026-09-14",
+          "closable_value": "0.16",
+          "quotes": {
+            "QQQ261016P00699000": {
+              "ask": "11.39",
+              "bid": "11.21",
+              "volume": 251
+            },
+            "QQQ261016P00700000": {
+              "ask": "11.64",
+              "bid": "11.55",
+              "volume": 13105
+            }
+          }
+        },
+        {
+          "session": "2026-09-15",
+          "closable_value": "0.19",
+          "quotes": {
+            "QQQ261016P00699000": {
+              "ask": "12.41",
+              "bid": "12.27",
+              "volume": 155
+            },
+            "QQQ261016P00700000": {
+              "ask": "12.72",
+              "bid": "12.60",
+              "volume": 4938
+            }
+          }
+        },
+        {
+          "session": "2026-09-16",
+          "closable_value": "0.17",
+          "quotes": {
+            "QQQ261016P00699000": {
+              "ask": "12.50",
+              "bid": "12.32",
+              "volume": 222
+            },
+            "QQQ261016P00700000": {
+              "ask": "12.84",
+              "bid": "12.67",
+              "volume": 12080
+            }
+          }
+        },
+        {
+          "session": "2026-09-17",
+          "closable_value": "0.17",
+          "quotes": {
+            "QQQ261016P00699000": {
+              "ask": "7.67",
+              "bid": "7.59",
+              "volume": 383
+            },
+            "QQQ261016P00700000": {
+              "ask": "7.91",
+              "bid": "7.84",
+              "volume": 9054
+            }
+          }
+        },
+        {
+          "session": "2026-09-18",
+          "closable_value": "0.12",
+          "quotes": {
+            "QQQ261016P00699000": {
+              "ask": "5.88",
+              "bid": "5.77",
+              "volume": 345
+            },
+            "QQQ261016P00700000": {
+              "ask": "6.07",
+              "bid": "6.00",
+              "volume": 8063
+            }
+          }
+        },
+        {
+          "session": "2026-09-21",
+          "closable_value": "0.05",
+          "quotes": {
+            "QQQ261016P00699000": {
+              "ask": "3.12",
+              "bid": "3.07",
+              "volume": 309
+            },
+            "QQQ261016P00700000": {
+              "ask": "3.21",
+              "bid": "3.17",
+              "volume": 56097
+            }
+          }
+        },
+        {
+          "session": "2026-09-22",
+          "closable_value": "0.03",
+          "quotes": {
+            "QQQ261016P00699000": {
+              "ask": "2.38",
+              "bid": "2.32",
+              "volume": 411
+            },
+            "QQQ261016P00700000": {
+              "ask": "2.45",
+              "bid": "2.41",
+              "volume": 8616
+            }
+          }
+        }
+      ],
+      "outcome": {
+        "plan_variant": "time_target_stop",
+        "reason": "stop",
+        "exit_day": "2026-09-09",
+        "exit_value": "0.20",
+        "pnl_usd": "-47.20",
+        "realised": true,
+        "variants": {
+          "time_and_stop": {
+            "exit_day": "2026-09-09",
+            "exit_value": "0.20",
+            "held": 1,
+            "notes": [
+              "stop 0.20/hisse, hedef 0.82/hisse — ikisi de yapinin cikis degerini izler",
+              "gunluk veri: gun ici sira bilinmiyor",
+              "2026-09-09: yalnizca kapanis vardi, gun ici dokunuslar gorunmez"
+            ],
+            "pnl_usd": "-47.20",
+            "reason": "stop",
+            "unpriced_days": 0
+          },
+          "time_only": {
+            "exit_day": "2026-09-15",
+            "exit_value": "0.19",
+            "held": 5,
+            "notes": [
+              "stop 0.20/hisse, hedef 0.82/hisse — ikisi de yapinin cikis degerini izler",
+              "gunluk veri: gun ici sira bilinmiyor"
+            ],
+            "pnl_usd": "-49.20",
+            "reason": "time",
+            "unpriced_days": 0
+          },
+          "time_target_stop": {
+            "exit_day": "2026-09-09",
+            "exit_value": "0.20",
+            "held": 1,
+            "notes": [
+              "stop 0.20/hisse, hedef 0.82/hisse — ikisi de yapinin cikis degerini izler",
+              "gunluk veri: gun ici sira bilinmiyor",
+              "2026-09-09: yalnizca kapanis vardi, gun ici dokunuslar gorunmez"
+            ],
+            "pnl_usd": "-47.20",
+            "reason": "stop",
+            "unpriced_days": 0
+          }
+        }
+      }
+    },
+    {
+      "position_id": "sig_d1ce1ed71d8c9136",
+      "source": "2026-09-08/paper_card_SPY.json",
+      "data_origin": "replay",
+      "hypothesis_id": "H00_pipeline_smoke",
+      "research_status": "RESEARCH_ONLY",
+      "underlying": "SPY",
+      "structure": "bull_call_debit",
+      "entry_session": "2026-09-08",
+      "marks": [
+        {
+          "session": "2026-09-09",
+          "closable_value": "0.43",
+          "quotes": {
+            "SPY261009C00768000": {
+              "ask": "9.00",
+              "bid": "8.92",
+              "volume": 129
+            },
+            "SPY261009C00769000": {
+              "ask": "8.49",
+              "bid": "8.41",
+              "volume": 204
+            }
+          }
+        },
+        {
+          "session": "2026-09-10",
+          "closable_value": "0.39",
+          "quotes": {
+            "SPY261009C00768000": {
+              "ask": "7.52",
+              "bid": "7.44",
+              "volume": 70
+            },
+            "SPY261009C00769000": {
+              "ask": "7.05",
+              "bid": "6.98",
+              "volume": 99
+            }
+          }
+        },
+        {
+          "session": "2026-09-11",
+          "closable_value": "0.47",
+          "quotes": {
+            "SPY261009C00768000": {
+              "ask": "8.68",
+              "bid": "8.62",
+              "volume": 240
+            },
+            "SPY261009C00769000": {
+              "ask": "8.15",
+              "bid": "8.09",
+              "volume": 468
+            }
+          }
+        },
+        {
+          "session": "2026-09-14",
+          "closable_value": "0.42",
+          "quotes": {
+            "SPY261009C00768000": {
+              "ask": "6.94",
+              "bid": "6.88",
+              "volume": 84
+            },
+            "SPY261009C00769000": {
+              "ask": "6.46",
+              "bid": "6.40",
+              "volume": 330
+            }
+          }
+        },
+        {
+          "session": "2026-09-15",
+          "closable_value": "0.34",
+          "quotes": {
+            "SPY261009C00768000": {
+              "ask": "5.66",
+              "bid": "5.55",
+              "volume": 1605
+            },
+            "SPY261009C00769000": {
+              "ask": "5.21",
+              "bid": "5.15",
+              "volume": 225
+            }
+          }
+        },
+        {
+          "session": "2026-09-16",
+          "closable_value": "0.31",
+          "quotes": {
+            "SPY261009C00768000": {
+              "ask": "4.12",
+              "bid": "4.08",
+              "volume": 467
+            },
+            "SPY261009C00769000": {
+              "ask": "3.77",
+              "bid": "3.74",
+              "volume": 244
+            }
+          }
+        },
+        {
+          "session": "2026-09-17",
+          "closable_value": "0.40",
+          "quotes": {
+            "SPY261009C00768000": {
+              "ask": "6.05",
+              "bid": "5.98",
+              "volume": 1758
+            },
+            "SPY261009C00769000": {
+              "ask": "5.58",
+              "bid": "5.51",
+              "volume": 1419
+            }
+          }
+        },
+        {
+          "session": "2026-09-18",
+          "closable_value": "0.43",
+          "quotes": {
+            "SPY261009C00768000": {
+              "ask": "6.38",
+              "bid": "6.31",
+              "volume": 291
+            },
+            "SPY261009C00769000": {
+              "ask": "5.88",
+              "bid": "5.81",
+              "volume": 182
+            }
+          }
+        },
+        {
+          "session": "2026-09-21",
+          "closable_value": "0.22",
+          "quotes": {
+            "SPY261009C00768000": {
+              "ask": "12.44",
+              "bid": "11.97",
+              "volume": 726
+            },
+            "SPY261009C00769000": {
+              "ask": "11.75",
+              "bid": "11.39",
+              "volume": 447
+            }
+          }
+        },
+        {
+          "session": "2026-09-22",
+          "closable_value": "-0.26",
+          "quotes": {
+            "SPY261009C00768000": {
+              "ask": "12.10",
+              "bid": "11.33",
+              "volume": 77
+            },
+            "SPY261009C00769000": {
+              "ask": "11.59",
+              "bid": "10.64",
+              "volume": 78
+            }
+          }
+        }
+      ],
+      "outcome": {
+        "plan_variant": "time_target_stop",
+        "reason": "time",
+        "exit_day": "2026-09-15",
+        "exit_value": "0.34",
+        "pnl_usd": "-30.60",
+        "realised": true,
+        "variants": {
+          "time_and_stop": {
+            "exit_day": "2026-09-15",
+            "exit_value": "0.34",
+            "held": 5,
+            "notes": [
+              "stop 0.31/hisse, hedef 1.00/hisse — ikisi de yapinin cikis degerini izler",
+              "gunluk veri: gun ici sira bilinmiyor",
+              "hedef yapinin tavaniyla sinirlandi"
+            ],
+            "pnl_usd": "-30.60",
+            "reason": "time",
+            "unpriced_days": 0
+          },
+          "time_only": {
+            "exit_day": "2026-09-15",
+            "exit_value": "0.34",
+            "held": 5,
+            "notes": [
+              "stop 0.31/hisse, hedef 1.00/hisse — ikisi de yapinin cikis degerini izler",
+              "gunluk veri: gun ici sira bilinmiyor",
+              "hedef yapinin tavaniyla sinirlandi"
+            ],
+            "pnl_usd": "-30.60",
+            "reason": "time",
+            "unpriced_days": 0
+          },
+          "time_target_stop": {
+            "exit_day": "2026-09-15",
+            "exit_value": "0.34",
+            "held": 5,
+            "notes": [
+              "stop 0.31/hisse, hedef 1.00/hisse — ikisi de yapinin cikis degerini izler",
+              "gunluk veri: gun ici sira bilinmiyor",
+              "hedef yapinin tavaniyla sinirlandi"
+            ],
+            "pnl_usd": "-30.60",
+            "reason": "time",
+            "unpriced_days": 0
+          }
+        }
+      }
+    },
+    {
+      "position_id": "sig_05113e8fc9bd06b7",
+      "source": "2026-09-22/paper_card_QQQ.json",
+      "data_origin": "replay",
+      "hypothesis_id": "H00_pipeline_smoke",
+      "research_status": "RESEARCH_ONLY",
+      "underlying": "QQQ",
+      "structure": "bull_call_debit",
+      "entry_session": "2026-09-22",
+      "marks": [],
+      "outcome": null
+    },
+    {
+      "position_id": "sig_ac10da49ad392b74",
+      "source": "2026-09-22/paper_card_SPY.json",
+      "data_origin": "replay",
+      "hypothesis_id": "H00_pipeline_smoke",
+      "research_status": "RESEARCH_ONLY",
+      "underlying": "SPY",
+      "structure": "bull_call_debit",
+      "entry_session": "2026-09-22",
+      "marks": [],
+      "outcome": null
+    }
+  ],
+  "tracker_view": {
+    "runs": 1,
+    "last_status": "ok"
+  }
+}

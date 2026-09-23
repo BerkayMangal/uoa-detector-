@@ -1,0 +1,293 @@
+{
+ "QQQ": {
+  "card": "artifacts/options-alpha-v1/replay/2026-09-08/paper_card_QQQ.json",
+  "sessions": [
+   "2026-09-09",
+   "2026-09-10",
+   "2026-09-11",
+   "2026-09-14",
+   "2026-09-15",
+   "2026-09-16",
+   "2026-09-17",
+   "2026-09-18",
+   "2026-09-21",
+   "2026-09-22"
+  ],
+  "historic": {
+   "QQQ261016P00699000": {
+    "chains": [
+     {
+      "date": "2026-09-09",
+      "nbbo_bid": "10.86",
+      "nbbo_ask": "11.00",
+      "volume": 24
+     },
+     {
+      "date": "2026-09-10",
+      "nbbo_bid": "13.33",
+      "nbbo_ask": "13.51",
+      "volume": 129
+     },
+     {
+      "date": "2026-09-11",
+      "nbbo_bid": "9.85",
+      "nbbo_ask": "9.98",
+      "volume": 118
+     },
+     {
+      "date": "2026-09-14",
+      "nbbo_bid": "11.21",
+      "nbbo_ask": "11.39",
+      "volume": 251
+     },
+     {
+      "date": "2026-09-15",
+      "nbbo_bid": "12.27",
+      "nbbo_ask": "12.41",
+      "volume": 155
+     },
+     {
+      "date": "2026-09-16",
+      "nbbo_bid": "12.32",
+      "nbbo_ask": "12.50",
+      "volume": 222
+     },
+     {
+      "date": "2026-09-17",
+      "nbbo_bid": "7.59",
+      "nbbo_ask": "7.67",
+      "volume": 383
+     },
+     {
+      "date": "2026-09-18",
+      "nbbo_bid": "5.77",
+      "nbbo_ask": "5.88",
+      "volume": 345
+     },
+     {
+      "date": "2026-09-21",
+      "nbbo_bid": "3.07",
+      "nbbo_ask": "3.12",
+      "volume": 309
+     },
+     {
+      "date": "2026-09-22",
+      "nbbo_bid": "2.32",
+      "nbbo_ask": "2.38",
+      "volume": 411
+     }
+    ]
+   },
+   "QQQ261016P00700000": {
+    "chains": [
+     {
+      "date": "2026-09-09",
+      "nbbo_bid": "11.13",
+      "nbbo_ask": "11.26",
+      "volume": 5099
+     },
+     {
+      "date": "2026-09-10",
+      "nbbo_bid": "13.66",
+      "nbbo_ask": "13.83",
+      "volume": 6711
+     },
+     {
+      "date": "2026-09-11",
+      "nbbo_bid": "10.16",
+      "nbbo_ask": "10.26",
+      "volume": 5111
+     },
+     {
+      "date": "2026-09-14",
+      "nbbo_bid": "11.55",
+      "nbbo_ask": "11.64",
+      "volume": 13105
+     },
+     {
+      "date": "2026-09-15",
+      "nbbo_bid": "12.60",
+      "nbbo_ask": "12.72",
+      "volume": 4938
+     },
+     {
+      "date": "2026-09-16",
+      "nbbo_bid": "12.67",
+      "nbbo_ask": "12.84",
+      "volume": 12080
+     },
+     {
+      "date": "2026-09-17",
+      "nbbo_bid": "7.84",
+      "nbbo_ask": "7.91",
+      "volume": 9054
+     },
+     {
+      "date": "2026-09-18",
+      "nbbo_bid": "6.00",
+      "nbbo_ask": "6.07",
+      "volume": 8063
+     },
+     {
+      "date": "2026-09-21",
+      "nbbo_bid": "3.17",
+      "nbbo_ask": "3.21",
+      "volume": 56097
+     },
+     {
+      "date": "2026-09-22",
+      "nbbo_bid": "2.41",
+      "nbbo_ask": "2.45",
+      "volume": 8616
+     }
+    ]
+   }
+  }
+ },
+ "SPY": {
+  "card": "artifacts/options-alpha-v1/replay/2026-09-08/paper_card_SPY.json",
+  "sessions": [
+   "2026-09-09",
+   "2026-09-10",
+   "2026-09-11",
+   "2026-09-14",
+   "2026-09-15",
+   "2026-09-16",
+   "2026-09-17",
+   "2026-09-18",
+   "2026-09-21",
+   "2026-09-22"
+  ],
+  "historic": {
+   "SPY261009C00768000": {
+    "chains": [
+     {
+      "date": "2026-09-09",
+      "nbbo_bid": "8.92",
+      "nbbo_ask": "9.00",
+      "volume": 129
+     },
+     {
+      "date": "2026-09-10",
+      "nbbo_bid": "7.44",
+      "nbbo_ask": "7.52",
+      "volume": 70
+     },
+     {
+      "date": "2026-09-11",
+      "nbbo_bid": "8.62",
+      "nbbo_ask": "8.68",
+      "volume": 240
+     },
+     {
+      "date": "2026-09-14",
+      "nbbo_bid": "6.88",
+      "nbbo_ask": "6.94",
+      "volume": 84
+     },
+     {
+      "date": "2026-09-15",
+      "nbbo_bid": "5.55",
+      "nbbo_ask": "5.66",
+      "volume": 1605
+     },
+     {
+      "date": "2026-09-16",
+      "nbbo_bid": "4.08",
+      "nbbo_ask": "4.12",
+      "volume": 467
+     },
+     {
+      "date": "2026-09-17",
+      "nbbo_bid": "5.98",
+      "nbbo_ask": "6.05",
+      "volume": 1758
+     },
+     {
+      "date": "2026-09-18",
+      "nbbo_bid": "6.31",
+      "nbbo_ask": "6.38",
+      "volume": 291
+     },
+     {
+      "date": "2026-09-21",
+      "nbbo_bid": "11.97",
+      "nbbo_ask": "12.44",
+      "volume": 726
+     },
+     {
+      "date": "2026-09-22",
+      "nbbo_bid": "11.33",
+      "nbbo_ask": "12.10",
+      "volume": 77
+     }
+    ]
+   },
+   "SPY261009C00769000": {
+    "chains": [
+     {
+      "date": "2026-09-09",
+      "nbbo_bid": "8.41",
+      "nbbo_ask": "8.49",
+      "volume": 204
+     },
+     {
+      "date": "2026-09-10",
+      "nbbo_bid": "6.98",
+      "nbbo_ask": "7.05",
+      "volume": 99
+     },
+     {
+      "date": "2026-09-11",
+      "nbbo_bid": "8.09",
+      "nbbo_ask": "8.15",
+      "volume": 468
+     },
+     {
+      "date": "2026-09-14",
+      "nbbo_bid": "6.40",
+      "nbbo_ask": "6.46",
+      "volume": 330
+     },
+     {
+      "date": "2026-09-15",
+      "nbbo_bid": "5.15",
+      "nbbo_ask": "5.21",
+      "volume": 225
+     },
+     {
+      "date": "2026-09-16",
+      "nbbo_bid": "3.74",
+      "nbbo_ask": "3.77",
+      "volume": 244
+     },
+     {
+      "date": "2026-09-17",
+      "nbbo_bid": "5.51",
+      "nbbo_ask": "5.58",
+      "volume": 1419
+     },
+     {
+      "date": "2026-09-18",
+      "nbbo_bid": "5.81",
+      "nbbo_ask": "5.88",
+      "volume": 182
+     },
+     {
+      "date": "2026-09-21",
+      "nbbo_bid": "11.39",
+      "nbbo_ask": "11.75",
+      "volume": 447
+     },
+     {
+      "date": "2026-09-22",
+      "nbbo_bid": "10.64",
+      "nbbo_ask": "11.59",
+      "volume": 78
+     }
+    ]
+   }
+  }
+ },
+ "_source": "recorded from UW /api/option-contract/{occ}/historic on 2026-09-23 by scripts/options_alpha_tracker_e2e.py"
+}

@@ -6,7 +6,8 @@
   Bu ekran <code>options_alpha_v1</code> kapsamının <strong>gerçek veriden üretilmiş</strong> kağıt
   üstü kartlarını, puanlanmış sonuçlarını ve araştırma hükümlerini gösterir. Hiçbir şey emir
   göndermez, hiçbir kart al-sat tavsiyesi değildir.
-  <strong class="text-amber-300">Bu kapsamda koşan araştırma ailelerinin tamamı reddedildi</strong> &mdash;
+  <strong class="text-amber-300">Bu kapsamda koşan araştırma ailelerinin hiçbiri geçmedi</strong>
+  (her biri reddedildi ya da veri yetersiz kaldı) &mdash;
   aşağıdaki kartlar hattın çalıştığının kanıtıdır, kanıtlanmış bir edge'in değil.
 </p>
 
@@ -63,6 +64,12 @@
           {{ 'bg-red-900/40 text-red-200' if row.verdict == 'REJECTED' else 'bg-gray-800 text-gray-300' }}">
           {{ row.verdict }}
         </span>
+        {% if row.corrected %}
+          <div class="text-xs text-amber-300 mt-1" data-corrected>
+            düzeltildi &mdash; v1: {{ row.v1_verdict }}
+            {% if row.correction_doc %}<span class="text-gray-500">({{ row.correction_doc }})</span>{% endif %}
+          </div>
+        {% endif %}
       </td>
       <td class="px-3 py-2 text-gray-400">
         {{ row.headline }}
@@ -89,6 +96,65 @@
     {{ board.closed_pnl_usd }} $</strong>.
   <span class="text-gray-500">Kağıt üstü; hiçbir emir girilmedi.</span>
 </p>
+{% endif %}
+
+{# --- live tracking ------------------------------------------------------ #}
+<h3 class="text-lg font-semibold text-white mb-1">Canlı izleme</h3>
+<p class="text-xs text-gray-500 mb-2 max-w-3xl">
+  Günlük iş (<code>options_paper</code>) her seans kapanışından sonra açık PAPER kartların bacaklarını
+  gün sonu NBBO ile işaretler; uzun bacak bid'den, kısa bacak ask'ten. Eksik bacak eksik işarettir,
+  sıfır değildir. Ufkun son günü fiyatlanamazsa sonuç <strong>bilinmiyor</strong> olarak kalır.
+  <span class="text-amber-300">kaynak: replay</span> girişi tamamlanmış bir seansın kapanışıdır, güncel fırsat
+  değildir; hiçbir emir girilmedi.
+</p>
+{% if tracker is none %}
+  <div class="rounded-lg border border-red-800/40 bg-red-900/15 px-3 py-2 mb-6 text-sm text-red-100" data-tracker="unreadable">
+    İzleme kaydı okunamadı. Bu &ldquo;açık pozisyon yok&rdquo; demek değildir.
+  </div>
+{% elif tracker.runs == 0 %}
+  <div class="rounded-lg border border-amber-800/40 bg-amber-900/15 px-3 py-2 mb-6 text-sm text-amber-100" data-tracker="never-ran">
+    İzleme işi henüz hiç koşmadı (heartbeat kaydı yok).
+  </div>
+{% else %}
+  <p class="text-sm mb-2" data-tracker="alive">
+    Son koşu <span class="font-mono text-gray-200">{{ tracker.last_run_at.strftime('%Y-%m-%d %H:%M UTC') }}</span>
+    &middot; durum <span class="font-mono {{ 'text-emerald-300' if tracker.last_status == 'ok' else 'text-amber-300' }}">{{ tracker.last_status }}</span>
+    &middot; toplam {{ tracker.runs }} koşu
+    <span class="block text-xs text-gray-500 font-mono">{{ tracker.last_detail }}</span>
+  </p>
+  <div class="overflow-x-auto rounded-lg border border-gray-800 mb-8">
+  <table class="w-full text-sm">
+    <thead class="text-xs text-gray-500 bg-gray-900/60 border-b border-gray-800">
+      <tr>
+        <th class="text-left px-3 py-2">Dayanak</th><th class="text-left">Yapı</th><th class="text-left">Kaynak</th>
+        <th class="text-left">Giriş</th><th class="text-right">İşaret</th><th class="text-left px-3">Son işaret</th>
+        <th class="text-left">Durum</th><th class="text-right px-3">P&amp;L $</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for row in tracker.rows %}
+      <tr class="border-b border-gray-900" data-tracked="{{ row.state }}">
+        <td class="px-3 py-2 font-semibold text-gray-200">{{ row.underlying }}</td>
+        <td class="text-gray-400">{{ row.structure }}</td>
+        <td class="text-gray-400">{{ row.data_origin }}</td>
+        <td class="text-gray-400 font-mono">{{ row.entry_session }}</td>
+        <td class="text-right text-gray-400">{{ row.marks }}</td>
+        <td class="px-3 text-gray-400 font-mono">
+          {% if row.last_mark_session %}{{ row.last_mark_session }} &middot; {{ row.last_mark_value }}{% else %}&mdash;{% endif %}
+        </td>
+        <td>
+          {% if row.state == 'acik' %}<span class="text-sky-300">açık</span>
+          {% elif row.state == 'bilinmiyor' %}<span class="text-amber-300">bilinmiyor ({{ row.reason }})</span>
+          {% else %}<span class="text-gray-300">kapandı ({{ row.reason }}, {{ row.exit_day }})</span>{% endif %}
+        </td>
+        <td class="px-3 text-right font-mono {{ 'text-red-300' if row.pnl_usd and row.pnl_usd.startswith('-') else 'text-emerald-300' }}">
+          {{ row.pnl_usd if row.pnl_usd is not none else '—' }}
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
 {% endif %}
 
 {# --- cards -------------------------------------------------------------- #}

@@ -132,6 +132,15 @@ class ResearchRow:
     verdict: str
     headline: str
     failed_clauses: tuple[str, ...]
+    # Set when the verdict was rerun with a corrected engine (``correction_v2`` in
+    # the manifest). ``verdict`` then IS the corrected verdict and ``v1_verdict``
+    # is what the screen said before, shown next to it rather than silently replaced.
+    v1_verdict: str = ""
+    correction_doc: str = ""
+
+    @property
+    def corrected(self) -> bool:
+        return bool(self.v1_verdict)
 
 
 @dataclass(frozen=True)
@@ -268,6 +277,21 @@ def _research_rows(root: Path, problems: list[str]) -> tuple[ResearchRow, ...]:
         verdict = _text(milestone.get("verdict"))
         if not verdict:
             continue  # not a research family; M0/M1/M3/M8 are engineering milestones
+        correction = _mapping(milestone.get("correction_v2"))
+        corrected_verdict = _text(correction.get("verdict"))
+        if corrected_verdict:
+            rows.append(
+                ResearchRow(
+                    milestone=_text(milestone.get("id")),
+                    name=_text(milestone.get("name")),
+                    verdict=corrected_verdict,
+                    headline=_text(correction.get("why")),
+                    failed_clauses=_strings(correction.get("verdict_failed_clauses")),
+                    v1_verdict=verdict,
+                    correction_doc=_text(correction.get("doc")),
+                )
+            )
+            continue
         rows.append(
             ResearchRow(
                 milestone=_text(milestone.get("id")),

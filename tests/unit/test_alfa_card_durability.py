@@ -83,6 +83,11 @@ _APPEND_ONLY_TABLES: Final = {
     "alfa_delayed",          # disclosed filings, keyed by dedupe_key
     "alfa_daily_close",      # the close that scores an outcome
     "alfa_daily_bar",        # the session OHLC behind ATR; a lost bar breaks the window
+    # Phase 5.24 options PAPER tracker (docs/options-alpha-v1/PAPER_TRACKER.md):
+    "alfa_opt_paper_position",   # the card as registered; the thing being scored
+    "alfa_opt_paper_mark",       # the closable value a session actually had
+    "alfa_opt_paper_outcome",    # how a PAPER card resolved, written once
+    "alfa_opt_paper_heartbeat",  # proof the job ran; a lost row erases that proof
 }
 
 # Rebuildable: refreshed market data or fetch bookkeeping. A row lost here is
@@ -100,6 +105,7 @@ _REBUILDABLE_TABLES: Final = {
     "alfa_delayed_fetch",   # fetch coverage bookkeeping
     "alfa_etf_holding",     # rebuilt per snapshot
     "alfa_job_run",         # records what ran, not what was observed
+    "alfa_uw_quota",        # a request counter; the vendor's own count re-seeds it
 }
 
 # The subset carried as model classes, for the identity checks below.

@@ -39,7 +39,7 @@ from starlette.responses import PlainTextResponse
 
 from uoa_detector.sources.market_hours import is_market_open
 from webapp import explanations, gamma, journal, options_board, pricing
-from webapp.board import alfa_page, cards, decision_ledger, fills, outcomes
+from webapp.board import alfa_page, cards, decision_ledger, fills, options_paper, outcomes
 from webapp.board.copy_tr import IV_NOT_SELL_VOL
 from webapp.board.evidence import request_for
 from webapp.board.refresher import board_refresh_loop
@@ -435,7 +435,13 @@ def options_page(request: Request) -> HTMLResponse:
         lambda: options_board.load_board(_BASE.parent),
         options_board.unreadable("opsiyon artefaktlari okunamadi"),
     )
-    return templates.TemplateResponse(request, "opsiyon.html", {"board": board, **_EXPLAIN})
+    # The tracker's own tables; None renders as "could not read", never as "no positions".
+    tracker: options_paper.TrackerView | None = _safe(
+        lambda: options_paper.read_tracker(_board_reader().engine), None,
+    )
+    return templates.TemplateResponse(
+        request, "opsiyon.html", {"board": board, "tracker": tracker, **_EXPLAIN},
+    )
 
 
 # ---------------------------------------------------------------------------
