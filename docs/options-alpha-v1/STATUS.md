@@ -1,7 +1,7 @@
 # options-alpha-v1 — durum
 
-**Faz 5.24** · dal `p69-options-alpha-exit-engine` · taban `main` 3143e12
-**Son güncelleme:** 2026-09-23 12:10Z
+**Faz 5.24** · dal `p70-options-alpha-h03` · taban `main` 90b86e8
+**Son güncelleme:** 2026-09-23 12:40Z
 
 Ana ürün **opsiyon sinyal terminali**. Hisse tarafı yalnız karşılaştırma kolu.
 
@@ -11,120 +11,119 @@ Ana ürün **opsiyon sinyal terminali**. Hisse tarafı yalnız karşılaştırma
 
 | # | İş | Durum | Kanıt |
 |---|---|---|---|
-| **M0** | API yetenek matrisi | **DONE** (merge, canlı) | `artifacts/.../capability_matrix.json` · 9/9 VERIFIED |
+| **M0** | API yetenek matrisi | **DONE** (merge, canlı) | `capability_matrix.json` · 9/9 VERIFIED |
 | **M1** | Uçtan uca: veri → aday → kontrat/spread → maliyet/risk → PAPER kart | **DONE** (merge, canlı) | `replay/2026-09-22/paper_card_{SPY,QQQ}.json` |
 | **M2** | Dört temel yapı | **KISMEN** | `structures.py` dördünü de fiyatlıyor ve test ediyor; seçici long + dikey debit üretiyor |
-| **M3** | Çıkış motoru + gerçek sonuç kaydı | **DONE** | `exits.py` · 9 elle-hesap test · `replay/2026-09-08/*_outcome.json` |
+| **M3** | Çıkış motoru + gerçek sonuç kaydı | **DONE** (merge, canlı) | `exits.py` · 9 elle-hesap test · `replay/2026-09-08/*_outcome.json` |
 | **M4** | 12 hipotez ailesine veri fizibilitesi | **DONE** | `HYPOTHESES.md` — 8 tam, 3 kısıtlı, 0 erişilemez |
-| **M5** | Desteklenen ailelerin koşan uygulaması ve sonuçları | TODO | — |
+| **M5** | İlk aileyi koş ve hükme bağla | **DONE — REDDEDİLDİ** | `RESULT_H03.md` · `h03_result.json` |
 | **M6** | Track B replikasyonu | **ENGEL ÖLÇÜLDÜ** | Pencere ~95 seans, şartı 4 çeyrek → kısmi test / yetersiz süre |
 | **M7** | Ayrı opsiyon ekranı + tarayıcı doğrulaması | TODO | B1 yalnız *gözle doğrulamayı* tutar |
+| **M8** | Mutasyon kanıtı tablosu | TODO | — |
 
 ---
 
-## M3 — çıkış motoru ve ilk gerçek sonuçlar
+## M5 — H03 koştu ve reddedildi
 
-`take_profit_or_stop` bu depoda hiç uygulanmamıştı; legacy motor
-`NotImplementedError` fırlatıyor ve **öyle kalıyor** — yeni motor onun yerine
-geçmiyor, yanına ekleniyor.
+**Hipotez:** akışın kontratında ertesi yayımda açık pozisyon **artmışsa** (pozisyon
+kapanmayıp açılmışsa), sonraki net opsiyon P&L'i teyitsiz eşleştirilmiş
+kontratlardan iyi olur.
 
-Üç çıkış varyantı, sonuçlar görülmeden donduruldu: `time_only`,
-`time_and_stop`, `time_target_stop`. Stop ve hedef **yapının kendi çıkış
-değerini** izler, dayanak fiyatını değil.
+**Pencere:** 2026-05-14 … 2026-09-15, **85 seans**, 10 isim — ön-kayıttaki gibi.
 
-### Gerçek koşu: giriş 2026-09-08, tamamlanmış beş seansa karşı
+### Eleme zinciri
 
-| Kart | Yapı | Giriş | Sonuç | P&L |
+1.544.478 kontrat-satırı tarandı → **58.787** uygun → **554** yapı kuruldu →
+1.108 fiyatlandı (her aday long + spread) → **141** risk kapısını geçti.
+
+### Kollar (birincil: `time_only`, 5 işlem günü, maliyet sonrası)
+
+| Kol | n | Ortalama | Medyan | Kazanma |
 |---|---|---|---|---|
-| **SPY** `sig_d1ce1ed7` | 768/769 call debit | 0,62 | süreli çıkış, 0,34 | **−30,60 $ (−%47,4)** |
-| **QQQ** `sig_591e4d83` | 700/699 put debit ×2 | 0,41 | stop, 1. günde | **−47,20 $ (−%54,1)** |
+| Teyitli (OI arttı) | **134** | **−75,31 $** | −46,90 $ | %7,5 |
+| Kontrol (OI artmadı) | **7** | **−52,57 $** | −49,60 $ | %0 |
 
-SPY'da üç varyant da aynı sonucu verdi — değer stop seviyesinin (0,31) altına hiç
-inmedi. QQQ'da süreli varyant sonuna kadar taşıdı ve **−49,20 $** ile daha kötü
-bitirdi; stop erken çıkmanın işe yaradığı tek örnek bu, ama tek örnekten kural
-çıkmaz.
+**Teyitli kol kontrolden kötü → REDDEDİLDİ.**
 
-**İkisi de zarar. Bu bir sonuçtur, kusur değil** ve hiçbir şekilde
-güzelleştirilmedi.
+### Ek 3 koşumdan önce bunu söylemişti
 
-### Ölçüme dair iki dürüstlük kararı
+Seçim filtresi (`volume(D) > OI(D)`) ile kolları ayıran değişken
+(`OI(D+1) > OI(D)`) mekanik olarak korele. Açık pozisyon gün başı duruşu olduğu
+için, hacmi onu aşan bir kontratta hacmin çoğu zaten pozisyon açıyor demektir.
 
-**Paket gün içi aralığı üretilmedi.** `/historic` her bacağın günlük yüksek ve
-düşüğünü veriyor; uzun bacağın yükseğinden kısa bacağın düşüğünü çıkarmak
-paketin "olabileceği en iyi değeri" verirdi — ama o kombinasyon **hiç var
-olmadı**, iki uç aynı ana denk gelmek zorunda değil. Farklı zamanların en iyi iki
-fiyatını birleştirmek yasak. Bu yüzden yalnız kapanış kullanıldı ve motor
-"gün içi dokunuşlar görünmez" notunu kartın kendisine düşüyor.
+Gerçekleşen: **134'e 7**, ve yedi kovanın altısı tek kollu kaldığı için düştü.
 
-**Aynı gün iki eşiğe de dokunulursa sıra uydurulmuyor.** Günlük veri hangisinin
-önce olduğunu söyleyemez; motor belirsizliği işaretliyor ve **muhafazakâr** dalı
-(stop) uyguluyor, kârlı olanı değil.
+Dolayısıyla dürüst tam hüküm: **birincil ölçütte reddedildi, ve bu tasarım teyit
+sinyalinin kendine özgü bilgisini ayrıştıramadı.** İkisi farklı cümle.
 
-### M3 sırasında yakalanan iki kusur
+### Reddedilen cazibe
 
-1. **Belirsizlik dalı hiç tetiklenemiyordu.** Günde tek kapanış değeriyle bir
-   gözlem aynı anda hedefin üstünde ve stopun altında olamaz — hedef stoptan
-   büyük. Yani §14'ün istediği koruma, çalışamayacak bir kod parçasıydı.
-   Gözlem artık gün içi aralık taşıyor ve dal gerçekten çalışıyor.
-2. **Tetik metni sağlanmamış bir koşulu iddia ediyordu.** QQQ'da hiçbir uygun
-   kontratta hacim açık pozisyonu aşmıyordu (3.008'e karşı 40.509), kod yedek
-   seçime düşüyordu, ama kart yine de "hacim>OI (yeni pozisyonlanma)" yazıyordu.
-   Metin artık hangi dalın çalıştığını söylüyor ve yedek seçimde koşulun
-   **sağlanmadığını** açıkça yazıyor.
+| Varyant | Teyitli | Kontrol |
+|---|---|---|
+| `time_only` **(birincil)** | −75,31 $ | −52,57 $ |
+| `time_and_stop` | −34,23 $ | −46,71 $ |
+| `time_target_stop` | −34,25 $ | −46,71 $ |
+
+İkincil varyantlarda teyitli kol **daha iyi** görünüyor. Birincil ölçüt veriye
+bakılmadan sabitlenmişti; kazanana geçmedim. Takip edilecekse yeni ön-kayıt ve
+seçim maliyetinin tasarıma dahil edilmesi gerekir.
+
+### Yapısal gerçek
+
+554 yapının yalnız 141'i risk kapısını geçti; sebep tek — bir yapı 100 $ bütçeyi
+aşıyor (örn. 221,60 $). Bu veri ya da hipotez sorunu değil, **sermaye ölçeği**.
+Bütçe bu çalışma için büyütülmedi.
 
 ---
 
-## M4 — 12 ailenin fizibilitesi
+## Protokol disiplininin kaydı
 
-`HYPOTHESES.md`: **8 tam desteklenir**, **3 kısıtlı** (H05/H08/H09 — sektör
-üyeliği, kazanç takvimi ve IV-rank geçmişi nokta-zaman güvenli değil),
-**0 erişilemez**. §9'un "en az altı aile" hedefi veri açısından karşılanabilir.
+H03 dört belgeyle donduruldu ve **dördü de koşumdan önce commit'lendi**:
 
-Sıralama ekonomik gerekçeye göre: H03 → H01 → H04 → H06 → H10 → H02.
+| Belge | Ne dondurdu |
+|---|---|
+| `PREREG_H03.md` | Hipotez, bilgi zamanı, evren, pencere, birincil ölçüt, 3 deneme, hüküm merdiveni |
+| ek 1 | "Olağandışı akış" = `volume(D) > OI(D)`; seans-isim başına tek aday; **yedek seçim yok** |
+| ek 2 | Ek 1 kontrol kolunu yanlış tarif etmişti — sözleşme kazandı, kollar OI teyidine göre ayrılır |
+| ek 3 | Seçim filtresi ile kol değişkeninin mekanik korelasyonu; protokol **değiştirilmedi** |
 
----
-
-## M6 — Track B: ölçülmüş engel
-
-Özgün profil ve kabul şartları değiştirilmeden koşulur. Ama pencere **~95 seans**
-(2026-05-13'ten bugüne), Track B'nin kendi şartı **4 çeyrekte 3'ü pozitif** ve
-yılda ≥30 işlem. 95 seans ≈ 4,5 ay, dört çeyreği kapsamıyor.
-
-**Hüküm: KISMİ TEST / YETERSİZ SÜRE.** Yeni hipotez sonuçları Track B başarısı
-diye yazılamaz.
+Ek 2 ve ek 3, uygulama sırasında kendi belgelerimde bulduğum kusurları
+sonuçlardan **önce** kayda geçiriyor. Çelişkiyi görüp sessizce uygun olanı seçmek
+bu projenin defalarca yakaladığı hata.
 
 ---
 
-## Kaynak bütçesi (ölçüldü)
+## M0–M3 özet
+
+**Yetenek:** tarihli opsiyon zinciri gerçekten tarihsel (iki tarihte ortak 11.218
+kontratın 10.927'sinin değeri farklı). Kontrat geçmişi günlük NBBO serisi veriyor.
+Araştırma penceresi **2026-05-13**'te başlıyor. Kalite **B** — zaman alanı
+`last_tape_time`, yani son işlem zamanı.
+
+**İlk kartlar:** SPY 775/776 call debit (azami zarar 60,60 $), QQQ 760/761
+(50,60 $). Dört isim risk kapısında doğru şekilde reddedildi.
+
+**İlk gerçek sonuçlar:** 8 Eylül girişi, beş seans sonra SPY **−30,60 $**,
+QQQ **−47,20 $**.
+
+---
+
+## Kaynak bütçesi
 
 | Kaynak | Değer |
 |---|---|
-| UW günlük limit | **30.000** |
-| Bugün harcanan | **211** |
+| UW günlük limit | 30.000 |
+| Bugün harcanan | ~1.060 (hasat 845 + probe/kart ~215) |
+| Hasat | 850 dosya, 85 seans, 384 MB — **gitignore'da**, komutla yeniden üretilir |
 | Güvenli tavan | 5.000/gün |
-| Disk | artifact'lar ~3 MB |
-
-Kısıt kota değil: **veri kalitesi** (B seviyesi) ve **risk bütçesi** (100 $ R).
-
----
-
-## Tekrar üretme
-
-```bash
-uv run python scripts/probe_uw_option_capability.py
-uv run python scripts/options_alpha_replay_card.py --session 2026-09-08 --ticker SPY
-uv run python scripts/options_alpha_score_card.py \
-  artifacts/options-alpha-v1/replay/2026-09-08/paper_card_SPY.json
-```
 
 ---
 
 ## Henüz yapılmamış olanlar (açıkça)
 
-- Hiçbir hipotez ailesi koşmadı. Tetik `H00_pipeline_smoke` ve **edge iddiası
-  taşımıyor**; iki gerçek sonuç da zarar.
-- Açık PAPER pozisyonları canlı zamanlayıcıda izlenmiyor — motor var, iş yok.
-- Opsiyon ekranı yok.
-- Mutasyon kanıtı tablosu yazılmadı.
+- **Mutasyon kanıtı tablosu yok.** Kritik korumaların doğru sebepten kırıldığı
+  gösterilmedi (§17).
+- Opsiyon ekranı yok; açık PAPER pozisyonları canlı zamanlayıcıda izlenmiyor.
+- Kalan 11 hipotez ailesi koşmadı.
 
-Bunların hiçbiri dış engel değil; yazılmamış kod. Engeller `BLOCKERS.md`'de.
+Hiçbiri dış engel değil; yazılmamış kod. Engeller `BLOCKERS.md`'de.
