@@ -1,6 +1,6 @@
 # options-alpha-v1 — durum
 
-**Faz 5.24** · dal `p81-options-alpha-families` · taban `main` ce727cd
+**Faz 5.24** · dal `p81-options-alpha-families` · taban `main` 222ccdc
 **Son güncelleme:** 2026-09-23 — H02 reddedildi; on iki aile tek tabloda (`FAMILIES.md`)
 
 > Bu başlık bir süre bayat kaldı (`p71` / `eb8b766` yazıyordu) ve arada dört PR
@@ -21,8 +21,8 @@ Ana ürün **opsiyon sinyal terminali**. Hisse tarafı yalnız karşılaştırma
 | **M4** | 12 hipotez ailesine veri fizibilitesi | **DONE** | `HYPOTHESES.md` — 8 tam, 3 kısıtlı, 0 erişilemez |
 | **M5** | İlk aileyi koş ve hükme bağla | **DONE — REDDEDİLDİ** | `RESULT_H03.md` · `h03_result.json` |
 | **M5b** | İkinci aile (bağımsız kol değişkeni) | **DONE — REDDEDİLDİ** | `RESULT_H01.md` · `h01_result.json` |
-| **M5c** | Üçüncü aile (akış öncü mü, tepki mi) | **DONE — REDDEDİLDİ** | `RESULT_H04.md` · `h04_result.json` |
-| **M5d** | Dördüncü aile (prim ucuzken mi alınır) | **KOŞTU — INSUFFICIENT_DATA** | `RESULT_H10.md` · `h10_result.json` |
+| **M5c** | Üçüncü aile (akış öncü mü, tepki mi) | **KOŞTU — v1 REDDEDİLDİ → v2 INSUFFICIENT_DATA** | `RESULT_H04.md` · `h04_result_v2.json` · `AUDIT_H10_TRADES.md` §5 |
+| **M5d** | Dördüncü aile (prim ucuzken mi alınır) | **KOŞTU — INSUFFICIENT_DATA** (v1 ve v2) | `RESULT_H10.md` · `h10_result_v2.json` |
 | **M5e** | Beşinci aile (tekrarlayan akış) | **DONE — REDDEDİLDİ** | `RESULT_H02.md` · `h02_result.json` |
 | **M5f** | On iki ailenin tek tablosu (v2 motor) | **DONE** | `FAMILIES.md` |
 | **M6** | Track B replikasyonu | **ENGEL ÖLÇÜLDÜ** | Pencere ~95 seans, şartı 4 çeyrek → kısmi test / yetersiz süre |
