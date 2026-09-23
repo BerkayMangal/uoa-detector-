@@ -217,13 +217,22 @@ def evaluate_exit(
             break
 
     if reason is ExitReason.STILL_OPEN and observations:
+        # The loop only falls through here when no rule fired. Two cases, and
+        # neither may borrow an earlier day's value as the exit:
+        #   * fewer observations than the horizon -> the position is still open;
+        #   * the horizon was reached but its last day could not be priced -> the
+        #     exit is UNKNOWN. Booking the last priced day as a "time" exit turned
+        #     unknowns into realised P&L (H10 trade audit, 21 of 73 records).
         priced = [o for o in observations[:max_days] if o.exit_value is not None and o.is_complete]
-        if priced:
-            last = priced[-1]
-            exit_day, exit_value, reason = last.day, last.exit_value, ExitReason.TIME
-        else:
+        if held >= max_days:
             reason = ExitReason.NO_EXIT_DATA
-            notes.append("elde tutma boyunca fiyatlanabilir gun yok — cikis kaydedilemedi")
+            if priced:
+                notes.append(
+                    f"ufkun son gunu fiyatlanamadi — son fiyatli gun {priced[-1].day} "
+                    f"({priced[-1].exit_value}) cikis olarak KULLANILMADI"
+                )
+            else:
+                notes.append("elde tutma boyunca fiyatlanabilir gun yok — cikis kaydedilemedi")
 
     pnl_share: Decimal | None = None
     pnl_usd: Decimal | None = None

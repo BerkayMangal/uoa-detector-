@@ -1,5 +1,7 @@
 # H04 sonucu — REDDEDİLDİ (yön hipotezin tersine çıktı)
 
+> **Düzeltme 2026-09-23 (`AUDIT_H10_TRADES.md`).** Bu belgedeki sayılar v1 motorundan. Motor, ufkun son günü fiyatlanamadığında önceki bir günü `time` çıkışı olarak yazıyordu (hasat DTE<10 satırları atıyor). Düzeltilmiş motorla sürümlü yeniden koşum: hüküm **INSUFFICIENT_DATA**'ya döndü (v2: A 31, B 23 tamamlanmış yapı; B tabanın altında). Yön değişmedi: A yine B'nin gerisinde, iki kol da maliyet sonrası negatif. v1 artefaktı korunuyor; v2 ayrı dosyada.
+
 **Faz 5.24 · options_alpha_v1** · koşum **2026-09-23**
 **Protokol:** `PREREG_H04.md` — commit `17677a5`, merge `faf6982`, **bu koşucu
 dosyası var olmadan önce**. Ek yazılmadı.
