@@ -42,7 +42,7 @@ maliyetine göredir — sonuçlara bakılarak değil.
 | **H03** | T+1 OI uyumu | flow-alerts + `/historic` OI serisi | VAR | **Giriş ancak T+1 yayımlandıktan sonra**; OI gün başı semantiği zorunlu | **DESTEKLENİR** |
 | **H04** | Akış/fiyat gecikmesi | flow-alerts + `ohlc/1d` (+ `intraday` bağlam) | VAR | Gün içi sıra iddiası yok (B seviyesi) | **DESTEKLENİR** |
 | **H05** | Sektör-göreli akış | flow-alerts + sektör üyeliği | **KISMİ** | Sektör üyeliği **replay-güvenli değil** | **KISITLI** — üyelik bugünden alınırsa survivorship; ileriye dönük yakalama gerekir |
-| **H06** | Vade/strike yoğunlaşması ve göçü | `expiry-breakdown?date=` + zincir OI | VAR | Tarihli, nokta-zaman | **DESTEKLENİR** |
+| **H06** | Vade/strike yoğunlaşması ve göçü | `expiry-breakdown?date=` + zincir OI | VAR | Tarihli, nokta-zaman | **DESTEKLENİR** (veri) — ama kol kurgusu **sınanamadı**, bkz. `INFEASIBLE_H06.md` |
 | **H07** | Çok bacaklı işlem bağlamı | `multi-leg` + `/legs` | VAR | **24 saatlik pencere** → gün gün hasat | **DESTEKLENİR** (hasat maliyeti yüksek) |
 | **H08** | Olay sonrası devam | gerçek açıklanma zamanı + akış + fiyat | **KISMİ** | Kazanç takvimi revize ediliyor, replay-güvenli değil | **KISITLI** — yalnız açıklanma zamanı bağımsız doğrulanabilen olaylar |
 | **H09** | Olay öncesi prim davranışı | IV/vade yapısı + takvim | **KISMİ** | Aynı takvim sorunu + IV-rank geçmişi 2026-05-04'ten | **KISITLI** |
@@ -76,10 +76,36 @@ diye yazılamaz.
 3. **H04** — akış/fiyat gecikmesi. Beklenen ilişki yönü **sonucu görmeden**
    sabitlenmeli.
 4. **H06** — vade/strike yoğunlaşması. Tek uç nokta, düşük hasat maliyeti.
+   **2026-09-23: ölçüldü, dondurulmadı** — güç analizi kol kurgusunun yoğunlaşmayı
+   takvimden ayıramadığını gösterdi (`INFEASIBLE_H06.md`). Sıra H10'a geçti.
 5. **H10** — uzun prim/konveksite. Yapı motoru zaten mevcut.
 6. **H02** — tekrarlayan akış. Bölünmüş sweep birleştirmesi tasarım işi gerektirir.
 
 H05/H08/H09 kısıtlı; H07 pahalı; H11/H12 ilk dalgaya girmez.
+
+---
+
+## 2026-09-23 güncellemesi — ölçümden sonra
+
+Bu bölüm yukarıdaki tabloyu **değiştirmez**; o tablo 2026-09-23'te veri erişimi
+üzerine verilmiş bir yargıdır ve o yargı ayakta. Buraya eklenen, sonradan
+**ölçülen** şeydir.
+
+| Aile | Durum | Kayıt |
+|---|---|---|
+| **H03** | Koştu → REDDEDİLDİ | `RESULT_H03.md` |
+| **H01** | Koştu → REDDEDİLDİ | `RESULT_H01.md` |
+| **H04** | Koştu → REDDEDİLDİ (yön tersine) | `RESULT_H04.md` |
+| **H06** | **Koşulmadı** — kol kurgusu yoğunlaşmayı takvimden ayıramıyor | `INFEASIBLE_H06.md` |
+
+Veri fizibilitesi ile **istatistiksel** fizibilite farklı iddialardır. H06'nın uç
+noktası, alanları ve hasadı yeterliydi (kota maliyeti sıfır); çöken, kolların
+kurulabilirliğiydi. Tablodaki DESTEKLENİR bu yüzden yanlış değil, **eksik** bir
+ölçüttü.
+
+İlan edilmiş deneme sayısı **9**'da kaldı: koşulmayan aile deneme tüketmez.
+
+Sıradaki: **H10 — uzun prim / konveksite.**
 
 ---
 
