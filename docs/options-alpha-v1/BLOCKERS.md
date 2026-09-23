@@ -13,13 +13,20 @@ Her satır: ne engelli, neyi durduruyor, hangi somut kanıt, açılma koşulu.
 |---|---|
 | **Durum** | BLOCKED — sahip eylemi gerekiyor |
 | **Neyi durduruyor** | Canlı sayfa içeriğinin doğrulanması: yeni opsiyon ekranının gerçek tarayıcıda açılması, dürüstlük denetimi, `alfa_` satır sayıları, açılma süresi ölçümü |
-| **Kanıt** | 2026-09-23 ölçümü: `/health` → 200 ve doğru SHA; `/`, `/defter`, `/gamma` → **401**. Kimlik bilgileri tanımsız olsaydı uygulama 503 verirdi, yani duvar çalışıyor ve parola sahipte |
+| **Kanıt** | 2026-09-23 ölçümü, `main` 929a624 canlı: `/health` → 200 ve doğru SHA; `/`, `/defter`, `/gamma`, **`/opsiyon`** → **401**. Kimlik bilgileri tanımsız olsaydı uygulama 503 verirdi, yani duvar çalışıyor ve parola sahipte |
 | **Neyi durdurmuyor** | Kod, testler, araştırma koşuları, PAPER motoru, matris, backfill. Hepsi bu parolasız ilerler |
-| **Açılma koşulu** | İki ortam değişkeni. Sonra: `bash scripts/verify_live_board.sh` |
+| **Açılma koşulu** | İki ortam değişkeni. Sonra: `bash scripts/verify_live_board.sh` — script 2026-09-23'ten beri `/opsiyon`'u da kontrol ediyor: kimlik bilgisiz 401, kimlik bilgisiyle 200, `data-state` işareti ve hüküm satırlarının görünürlüğü |
 
 **Not:** Bu engel, yapılabilecek işlerin arkasına saklanamaz. Ekran kodu yazılır,
 test edilir, deploy edilir; yalnız "yetkili ekranı gözümle gördüm" iddiası
 bekler.
+
+**2026-09-23 durumu:** o not artık geçmiş zaman değil, yapıldı. `/opsiyon` yazıldı
+(`webapp/options_board.py`, 11 test), merge edildi (PR #70) ve **canlıda** auth
+duvarının arkasında 401 dönüyor. Doğrulama rail'i de ekranı kapsayacak şekilde
+genişletildi. B1 artık tek bir şeye indi: iki ortam değişkeni girilip script'in
+koşulması. Bekleyen iddia yalnızca **gözle görme**; kod, test, deploy ve rail
+tarafında bekleyen iş kalmadı.
 
 ---
 
