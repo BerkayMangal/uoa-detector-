@@ -1,7 +1,7 @@
 {
   "scope": "options_alpha_v1",
   "phase": "5.24",
-  "generated_at": "2026-09-23T12:06:00.647363+00:00",
+  "generated_at": "2026-09-23T12:47:54.994670+00:00",
   "base_commit": "2243384cbef85b34e1ed45cb207b0e89610071f6",
   "note": "base_commit at the top level is the branch point of the first milestone; each later milestone carries its own base_commit. A milestone is written before its own commit exists, so its gate line describes the tree that was tested, not a commit sha.",
   "milestones": [
@@ -446,6 +446,132 @@
       ],
       "structural_fact": "879 structures built, 202 cleared the risk gate; the remaining 677 sized to zero against the 100 USD R. Same capital-scale constraint M5 hit, not a data problem.",
       "gate": "4280 passed, 52 skipped; mypy --strict clean on 191 source files; ruff clean; uv lock consistent"
+    },
+    {
+      "id": "M5c",
+      "name": "H04 run to a verdict: does flow lead the underlying or follow it",
+      "status": "DONE",
+      "verdict": "REJECTED",
+      "verdict_failed_clauses": [
+        "A kolu B kolunu gecmiyor",
+        "A kolu maliyet sonrasi pozitif degil (-60.47 $)",
+        "blok bootstrap araligi sifiri iceriyor"
+      ],
+      "base_commit": "faf69823bb32de2b53f014f63666d47895426649",
+      "protocol": [
+        "docs/options-alpha-v1/PREREG_H04.md"
+      ],
+      "protocol_frozen_before_run": {
+        "prereg": true,
+        "prereg_commit": "17677a5",
+        "prereg_merge_commit": "faf6982",
+        "addendum": null,
+        "note": "PREREG_H04.md was committed and merged to main before scripts/options_alpha_h04_study.py was written. No addendum was needed. H03 required three addenda and H01 one, written after results; this family has none."
+      },
+      "thresholds_chosen_by_power_analysis": {
+        "script": "scripts/options_alpha_h04_power.py",
+        "script_sha256": "d0c41e8c8645885f38e0705323f5b84b39f94932b4de65f7536b2cff034c95b0",
+        "draft_bands": "z <= 0.5 / z >= 1.5",
+        "draft_problem": "arm B held 67 anchors, about 15 projected records against a floor of 30",
+        "frozen_bands": "z <= 0.40 / z >= 0.90",
+        "selection_rule": "subject to a dead band of at least 0.50 sigma, maximise the WEAKER arm's projected sample",
+        "counts_only": "the analysis evaluates no P&L, no exit and no outcome, so the choice is a power decision and not a result-fitted one; disclosed in PREREG_H04 section 4b",
+        "pairs_considered": 8
+      },
+      "documented_defect": "PREREG_H04 section 4 ends with a sentence inherited from H01 -- 'if an arm has no candidate the ticker-session drops from BOTH arms' -- which is inapplicable here: z belongs to the (ticker, session), so a ticker-session lands in exactly ONE arm and can never populate both. It licenses no alternative behaviour and changes no number, and is recorded rather than quietly ignored.",
+      "commands": [
+        "uv run python scripts/options_alpha_h04_study.py"
+      ],
+      "window": [
+        "2026-05-14",
+        "2026-09-15"
+      ],
+      "sessions": 85,
+      "arm_definition": {
+        "A_not_moved": "z <= 0.4",
+        "B_already_moved": "z >= 0.9",
+        "unused_band": "0.4-0.9",
+        "z": "|close(D)/close(D-1)-1| / stdev of the 20 returns strictly before D"
+      },
+      "candidate_rule": "volume percentile >= 90.0 of the ticker's own trailing 20 sessions, highest-volume qualifying contract",
+      "information_time": "entry at the D+1 close; both the volume distribution and sigma20 read strictly from sessions before D",
+      "underlying_bars": {
+        "path": "data/study_f/bars.csv",
+        "committed": true,
+        "requests_spent": 0
+      },
+      "harvest": {
+        "reused_from": "M5",
+        "files": 850,
+        "sessions": 85,
+        "requests_spent": 0
+      },
+      "funnel": {
+        "scanned": 1655820,
+        "eligible": 62615,
+        "structures_built": 272,
+        "priced": 544,
+        "passed_cost_gate": 272,
+        "passed_risk_gate": 75
+      },
+      "dead_band_dropped": 194,
+      "no_sigma_dropped": 0,
+      "arms_primary_time_only": {
+        "B_already_moved": {
+          "n": 33,
+          "n_with_pnl": 33,
+          "mean_pnl_usd": -51.93,
+          "median_pnl_usd": -46.6,
+          "total_pnl_usd": -1713.8,
+          "win_rate": 0.152,
+          "mean_z": 1.616
+        },
+        "A_not_moved": {
+          "n": 42,
+          "n_with_pnl": 42,
+          "mean_pnl_usd": -60.47,
+          "median_pnl_usd": -40.9,
+          "total_pnl_usd": -2539.6,
+          "win_rate": 0.119,
+          "mean_z": 0.196
+        }
+      },
+      "secondary_variants": {
+        "time_and_stop": {
+          "B_already_moved": -33.51,
+          "A_not_moved": -33.99
+        },
+        "time_target_stop": {
+          "B_already_moved": -33.51,
+          "A_not_moved": -33.99
+        }
+      },
+      "block_bootstrap": {
+        "blocks": 44,
+        "reps": 10000,
+        "seed": 20260923,
+        "observed_difference_usd": -8.53,
+        "ci95": [
+          -44.42,
+          25.7
+        ],
+        "share_at_or_below_zero": 0.683,
+        "excludes_zero": false
+      },
+      "dropped_buckets": 2,
+      "sample_floor_met": true,
+      "result_artifact": {
+        "path": "artifacts/options-alpha-v1/h04_result.json",
+        "sha256": "88c4f456e0d148ade587efce5552977c71d346d4470a1d8afd2afeeea9fa51cb",
+        "records": 75
+      },
+      "code": {
+        "study": "c820d136ce4c459d8a54ebb198452fb7964db2061ce3ed27e1336e0bbe7095c9"
+      },
+      "profile_sha256": "b7886203115d469d72fa8ea1554d2ffea04f9ede237c3cd98d910381ac258f39",
+      "data_quality_tier": "B",
+      "multiple_testing": "options_alpha_v1 kapsaminda ucuncu aile; toplam ilan edilmis deneme 9 (H03 3 + H01 3 + H04 3). Tek bir ailenin esigi gecmesi dokuz denemelik bir aramada tek basina kanit degildir.",
+      "gate": "4307 passed, 52 skipped; mypy --strict: no issues found in 192 source files; ruff clean; uv lock consistent"
     }
   ]
 }

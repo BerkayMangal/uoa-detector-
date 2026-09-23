@@ -18,6 +18,7 @@ Ana ürün **opsiyon sinyal terminali**. Hisse tarafı yalnız karşılaştırma
 | **M4** | 12 hipotez ailesine veri fizibilitesi | **DONE** | `HYPOTHESES.md` — 8 tam, 3 kısıtlı, 0 erişilemez |
 | **M5** | İlk aileyi koş ve hükme bağla | **DONE — REDDEDİLDİ** | `RESULT_H03.md` · `h03_result.json` |
 | **M5b** | İkinci aile (bağımsız kol değişkeni) | **DONE — REDDEDİLDİ** | `RESULT_H01.md` · `h01_result.json` |
+| **M5c** | Üçüncü aile (akış öncü mü, tepki mi) | **DONE — REDDEDİLDİ** | `RESULT_H04.md` · `h04_result.json` |
 | **M6** | Track B replikasyonu | **ENGEL ÖLÇÜLDÜ** | Pencere ~95 seans, şartı 4 çeyrek → kısmi test / yetersiz süre |
 | **M7** | Ayrı opsiyon ekranı + tarayıcı doğrulaması | **KISMEN** | `/opsiyon` kodlandı + test edildi; *gözle* canlı doğrulama B1'e bağlı |
 | **M8** | Mutasyon kanıtı tablosu | **DONE** | `mutation_proof.md` — 7/7 koruma kırmızıya döndü, 0 sağ kalan |
@@ -164,6 +165,40 @@ yanlış etiketle yayımlanacaktı.
 
 ---
 
+## M5c — H04 koştu, yön hipotezin tersine çıktı
+
+**Hipotez:** olağandışı hacim varken dayanak **henüz hareket etmemişse** akış
+fiyatı önceliyor olabilir (kol A); zaten hareket etmişse akış **tepki**dir (kol B).
+Ön-kayıtta yön sabitlendi: A, B'yi geçecek.
+
+| Kol | n | Ortalama | Medyan | Kazanma | Ort. z |
+|---|---|---|---|---|---|
+| A — hareket etmemiş (z ≤ 0,40) | **42** | **−60,47 $** | −40,90 $ | %11,9 | 0,196 |
+| B — zaten hareket etmiş (z ≥ 0,90) | **33** | **−51,93 $** | −46,60 $ | %15,2 | 1,616 |
+
+**A < B, yani yön tahminin tersi.** Ön-kayıt bunu önceden bağlamıştı: ters yön
+hipotezin **reddidir**, "aslında şunu bulduk" diye sunulamaz. §7'nin üç şartının
+**üçü** düştü (geçmiyor · pozitif değil · aralık [−44,42, +25,70] sıfırı içeriyor).
+
+**Simpson yok:** en kalabalık kovada da (n=24'e 25) B daha iyi; yön toplamla
+tutarlı. H01'de manşeti çeviren kova sorunu burada yaşanmadı, red daha net.
+
+### Güç analizi çalışmayı kurtardı
+
+Taslak bantlar `z ≤ 0,5 / z ≥ 1,5`'ti ve B kolunu ~15 kayıtta bırakıyordu → hüküm
+**INSUFFICIENT_DATA** olacak, hipotez sınanamadan kapanacaktı. Eşikler
+dondurmadan **önce**, yalnız **sayım** üzerinden 0,40/0,90'a çekildi. Gerçekleşen
+42 ve 33; taban tuttu. Çapraz doğrulama: güç betiği ölü banda 194 aday demişti,
+koşucu bağımsız olarak **194** buldu.
+
+### Provenance H01'den güçlü
+
+Ön-kayıt **kendi commit'iyle** (`17677a5`) ve **kendi merge'iyle** (`faf6982`),
+koşucu dosyası var olmadan dondurulmuştur. **Ek yazılmadı** — H03 üç, H01 bir ek
+gerektirmişti.
+
+---
+
 ## Protokol disiplininin kaydı
 
 H03 dört belgeyle donduruldu ve **dördü de koşumdan önce commit'lendi**:
@@ -211,7 +246,7 @@ QQQ **−47,20 $**.
 
 - Açık PAPER pozisyonları canlı zamanlayıcıda **izlenmiyor**: `/opsiyon` ekranı
   commit'li artefaktları okur, kendisi yeni fiyat çekmez.
-- Kalan 10 hipotez ailesi koşmadı.
+- Kalan 9 hipotez ailesi koşmadı.
 - `/opsiyon` ekranının **gözle** canlı doğrulaması yapılmadı — auth duvarının
   arkasında ve kimlik bilgileri bende değil (`BLOCKERS.md` B1). Kod tarafı
   test edildi: rota render ediyor, auth testleri rotayı otomatik kapsıyor.
