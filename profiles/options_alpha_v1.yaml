@@ -1,0 +1,146 @@
+# Options Alpha v1 — the numeric surface for phase 5.24.
+#
+# D8: no numeric threshold may live in code. Every number the option candidate,
+# construction, cost and risk path uses is here, and every result records this
+# file's hash so a number can never drift away from the result it produced.
+#
+# FROZEN BEFORE RESULTS. Section 11 of the task is explicit: the selection and
+# quality thresholds are fixed without seeing future returns. None of these
+# numbers is an edge claim, a tuned parameter or a backtested optimum. They are
+# conservative defaults chosen from liquidity and risk reasoning alone, written
+# down first so that changing one later is a visible, dated decision rather than
+# a silent fit.
+#
+# This file does NOT modify v5_default, v5_gamma_squeeze, v6_thetadata_confluence
+# or board_v1. Those carry recorded verdicts and stay untouched.
+
+version: 1
+scope: options_alpha_v1
+
+# ---------------------------------------------------------------- data quality
+quality:
+  # The chain's time field is last_tape_time -- the last TRADE time, not a quote
+  # timestamp -- so the instant a quote was valid is unknown. Tier B per the
+  # task's section 7: conservative research only. No intraday fill ordering and
+  # no stop/target sequencing claims may be made on this tier.
+  tier: B
+  tier_reason: "end-of-day NBBO snapshot; last_tape_time is a trade time, not a quote time"
+  # Oldest session the option chain answers for. Measured, not assumed:
+  # 2026-05-13 returns correctly dated rows, 2026-05-12 returns HTTP 403.
+  research_window_start: "2026-05-13"
+
+# ------------------------------------------------------------------- universe
+universe:
+  # Start narrow and liquid. Widening is a dated decision, not a default.
+  tickers: [SPY, QQQ, AAPL, NVDA, MSFT, AMZN, META, TSLA, AMD, GOOGL]
+  # UW's own "unusual" preset encodes volume>OI, OTM, DTE<=60, ask-side>=50%,
+  # premium>=$10k. It is a SELECTION BIAS, not a neutral sample, and any result
+  # using it must say so. Off by default; a hypothesis that wants it opts in.
+  use_unusual_preset: false
+
+# ------------------------------------------------------- contract eligibility
+contract:
+  # 14-60 DTE: long enough that theta is not the dominant term over a five-day
+  # hold, short enough to stay liquid. Excludes 0DTE entirely (out of scope).
+  min_dte: 14
+  max_dte: 60
+  # Near-the-money band. Deep OTM lottery tickets are excluded on purpose: the
+  # screener returns contracts at delta 0.001 and those are not a directional
+  # expression, they are a premium donation.
+  min_abs_delta: 0.25
+  max_abs_delta: 0.70
+  min_open_interest: 250
+  min_volume: 100
+  # Quote quality. A contract whose spread is a third of its mid is not
+  # tradeable at any size, whatever the signal says.
+  max_spread_pct_of_mid: 15.0
+  min_nbbo_bid: 0.10
+  # Standard deliverable only. Adjusted contracts, splits and non-100 multipliers
+  # are excluded rather than mispriced.
+  require_standard_multiplier: true
+  standard_multiplier: 100
+
+# ------------------------------------------------------------------ structures
+# First deliverable scope. Naked short, ratio, calendar, diagonal, credit
+# structures and 0DTE are all out of scope for v1.
+structures:
+  enabled: [long_call, long_put, bull_call_debit, bear_put_debit]
+  debit_spread:
+    # Short leg placed this many strikes above (calls) / below (puts) the long
+    # leg, snapped to listed strikes.
+    width_strikes: 1
+    # A spread is only preferred over the bare long when it actually cuts cost
+    # materially; otherwise the bare long keeps the convexity.
+    min_debit_reduction_pct: 20.0
+    # Both legs must come from the same chain snapshot and the same expiry.
+    require_same_expiry: true
+    require_same_session: true
+
+# ----------------------------------------------------------------------- costs
+costs:
+  # Conservative fill model: long opens at the ask and closes at the bid; a short
+  # leg opens at the bid and closes at the ask. The spread is therefore already
+  # paid inside these prices and must not be charged a second time.
+  entry_long_side: ask
+  exit_long_side: bid
+  entry_short_side: bid
+  exit_short_side: ask
+  # Per contract per leg per direction. Labelled simulation default: the real
+  # brokerage schedule is not verified.
+  commission_per_contract_per_leg_usd: 0.65
+  commission_is_simulation_default: true
+  # Extra haircut on top of the quoted side, for the latency between the quote
+  # that produced the signal and any hypothetical fill. Applied to the price
+  # actually transacted (entry * (1+r), exit * (1-r)), never to the package mid:
+  # a mid-based haircut shrinks as the market widens, which would make a worse
+  # quote look cheaper. The bid/ask spread is already inside these prices, so
+  # this is latency only and not a second charge for the spread.
+  extra_slippage_pct: 2.0
+
+# ------------------------------------------------------------------------ risk
+risk:
+  # SIMULATION ACCOUNT. These are the report's defaults carried forward as an
+  # explicitly labelled simulation setting, not verified account facts.
+  capital_usd: 10000
+  r_usd: 100
+  is_simulation_account: true
+  # Whole structures only. If one contract does not fit the risk budget the
+  # answer is zero, never a cheaper riskier expiry or a further OTM strike.
+  allow_fractional: false
+  max_structures_per_signal: 10
+  # Portfolio limits, applied across open PAPER positions.
+  max_open_premium_pct_of_capital: 25.0
+  max_positions_per_ticker: 1
+  max_open_positions: 8
+
+# ------------------------------------------------------------------------ exit
+exit:
+  # PRIMARY, frozen before any result is seen: five TRADING days.
+  primary_hold_trading_days: 5
+  # Secondary diagnostic only, never the headline.
+  secondary_hold_trading_days: 1
+  # Forced close before expiry: never hold into the last days, where the
+  # bid/ask widens and assignment operations begin to matter.
+  close_at_dte: 7
+  # Pre-frozen exit variants. Each one is a separate trial and is counted as
+  # such in the multiple-testing budget.
+  variants:
+    - id: time_only
+      description: "hold to primary_hold_trading_days, then close"
+    - id: time_and_stop
+      description: "time exit, plus close if the structure's exit value falls below stop_pct"
+    - id: time_target_stop
+      description: "time exit, plus target_pct and stop_pct on the structure's exit value"
+  # Stop and target track the STRUCTURE's exit value (what it could be closed
+  # for), not the underlying price. The underlying is a diagnostic, not the rule.
+  stop_pct_of_entry_debit: 50.0
+  target_pct_of_entry_debit: 100.0
+  tracks: structure_exit_value
+
+# --------------------------------------------------------------------- staleness
+freshness:
+  # A quote older than this cannot support a PAPER entry. The board's own rule.
+  max_quote_age_seconds: 900
+  # On tier B data the quote is an end-of-day snapshot, so a replay card is
+  # always marked as such and never presented as a live entry.
+  replay_cards_are_labelled: true

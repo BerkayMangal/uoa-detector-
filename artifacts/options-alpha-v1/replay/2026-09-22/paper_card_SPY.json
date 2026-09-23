@@ -1,0 +1,113 @@
+{
+  "card": {
+    "signal_id": "sig_ac10da49ad392b74",
+    "opportunity_id": "opp_28b5b818dbd299fa",
+    "hypothesis_id": "H00_pipeline_smoke",
+    "research_status": "RESEARCH_ONLY",
+    "opportunity_status": "WATCH",
+    "data_origin": "replay",
+    "decision_time": "2026-09-23T10:16:51.803910+00:00",
+    "session": "2026-09-22",
+    "underlying": "SPY",
+    "direction": "up",
+    "structure": "bull_call_debit",
+    "legs": [
+      {
+        "occ_symbol": "SPY261009C00775000",
+        "right": "call",
+        "strike": "775",
+        "expiry": "2026-10-09",
+        "multiplier": 100,
+        "side": "long",
+        "bid": "7.26",
+        "ask": "7.29",
+        "quote_as_of": "2026-09-22"
+      },
+      {
+        "occ_symbol": "SPY261009C00776000",
+        "right": "call",
+        "strike": "776",
+        "expiry": "2026-10-09",
+        "multiplier": 100,
+        "side": "short",
+        "bid": "6.72",
+        "ask": "6.74",
+        "quote_as_of": "2026-09-22"
+      }
+    ],
+    "net_debit_per_share": "0.58",
+    "limit_price": "0.58",
+    "quantity": 1,
+    "entry_cost_usd": "58.00",
+    "commission_usd": "2.60",
+    "structural_max_loss_usd": "60.60",
+    "max_profit_usd": "39.40",
+    "breakeven_underlying": "775.58",
+    "planned_stop_usd": "30.30",
+    "target_usd": "39.40",
+    "target_meaning": "yapinin cikis degeri uzerinden, dayanak fiyati uzerinden degil (+%100 / -%50) — yapinin tavaniyla sinirlandi (istenen 60.60 $ ulasilamaz)",
+    "max_hold_trading_days": 5,
+    "force_close_at_dte": 7,
+    "invalidation": "5 islem gunu doldu, vadeye 7 gun kaldi, ya da yapinin cikis degeri stop seviyesine dustu",
+    "trigger": "SPY261009C00775000: hacim 7496 > acik pozisyon 1805 (yeni pozisyonlanma), seansin en cok islem goren uygun kontrati",
+    "eligibility_reason": "debit %92.2 dustu (esik %20.0)",
+    "counter_argument": "Bu tetigin dogrulanmis bir edge'i YOK. Hat kanitidir, isaret degil. Hacmin OI'yi asmasi ayni gun acilip kapanan islemle de olusur ve yon soylemez; kotasyon gun sonu anlik goruntusu oldugu icin gercek bir giris fiyati vaat etmez.",
+    "missing_data": [
+      "kotasyon zaman damgasi yok (last_tape_time islem zamanidir)"
+    ],
+    "quality_tier": "B",
+    "profile_sha256": "b7886203115d469d72fa8ea1554d2ffea04f9ede237c3cd98d910381ac258f39",
+    "code_version": "210a0f3",
+    "data_manifest": {
+      "chain_snapshot": "artifacts/options-alpha-v1/replay/2026-09-22/chain_trimmed.json",
+      "underlying": {
+        "ticker": "SPY",
+        "date": "2026-09-22",
+        "open": 774.03,
+        "high": 775.14,
+        "low": 772.57,
+        "close": 773.38,
+        "source": "UW /api/stock/{t}/ohlc/1d, market_time=='r'",
+        "parser": "webapp.ohlc.regular_session_bars"
+      },
+      "session": "2026-09-22",
+      "quality_tier": "B"
+    },
+    "sources": [
+      "UW /api/stock/{t}/option-chains?date=&greeks=true",
+      "UW /api/screener/option-contracts?date=",
+      "UW /api/stock/{t}/ohlc/1d (market_time=='r')"
+    ],
+    "events": []
+  },
+  "funnel": {
+    "scanned": 1142,
+    "eligible": 123,
+    "structures_built": 1,
+    "priced": 2,
+    "passed_cost_gate": 1,
+    "passed_risk_gate": 1,
+    "top_drop_reasons": [
+      [
+        "acik pozisyon yetersiz",
+        496
+      ],
+      [
+        "hacim yetersiz",
+        187
+      ],
+      [
+        "delta bandi disinda",
+        168
+      ],
+      [
+        "bid cok dusuk",
+        165
+      ],
+      [
+        "makas cok genis",
+        3
+      ]
+    ]
+  }
+}

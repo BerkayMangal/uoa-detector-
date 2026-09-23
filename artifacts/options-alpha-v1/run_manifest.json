@@ -1,8 +1,8 @@
 {
   "scope": "options_alpha_v1",
   "phase": "5.24",
-  "generated_at": "2026-09-23T09:29:43.516065+00:00",
-  "base_commit": "5b7917c8944f5fa9c00b2cb45d03a549d5dc3135",
+  "generated_at": "2026-09-23T10:18:01.521977+00:00",
+  "base_commit": "210a0f3d5c5deb9a8f3e061360031400e888d081",
   "note": "base_commit is the branch point; this milestone is not committed yet at write time.",
   "milestones": [
     {
@@ -37,6 +37,81 @@
       },
       "data_quality_tier": "B",
       "research_window_start": "2026-05-13"
+    },
+    {
+      "id": "M1",
+      "name": "End-to-end real-data option candidate to PAPER card",
+      "status": "DONE",
+      "session": "2026-09-22",
+      "commands": [
+        "uv run python scripts/options_alpha_replay_card.py --session 2026-09-22 --ticker SPY",
+        "uv run python scripts/options_alpha_replay_card.py --session 2026-09-22 --ticker QQQ"
+      ],
+      "universe_run": [
+        "SPY",
+        "QQQ",
+        "AAPL",
+        "AMD",
+        "NVDA",
+        "TSLA"
+      ],
+      "cards_produced": {
+        "SPY": {
+          "path": "artifacts/options-alpha-v1/replay/2026-09-22/paper_card_SPY.json",
+          "sha256": "478d303c310a551991e5b0dc8652c627cdb05389626aeae70f12970f8c558d0f",
+          "signal_id": "sig_ac10da49ad392b74",
+          "structure": "bull_call_debit",
+          "research_status": "RESEARCH_ONLY",
+          "opportunity_status": "WATCH",
+          "net_debit_per_share": "0.58",
+          "structural_max_loss_usd": "60.60",
+          "max_profit_usd": "39.40",
+          "target_usd": "39.40",
+          "profile_sha256": "b7886203115d469d72fa8ea1554d2ffea04f9ede237c3cd98d910381ac258f39"
+        },
+        "QQQ": {
+          "path": "artifacts/options-alpha-v1/replay/2026-09-22/paper_card_QQQ.json",
+          "sha256": "766be854fa10f0545eacbe6e28bfd4891d775e553df5b4d0356f0c328cc8d45f",
+          "signal_id": "sig_05113e8fc9bd06b7",
+          "structure": "bull_call_debit",
+          "research_status": "RESEARCH_ONLY",
+          "opportunity_status": "WATCH",
+          "net_debit_per_share": "0.48",
+          "structural_max_loss_usd": "50.60",
+          "max_profit_usd": "49.40",
+          "target_usd": "49.40",
+          "profile_sha256": "b7886203115d469d72fa8ea1554d2ffea04f9ede237c3cd98d910381ac258f39"
+        }
+      },
+      "refused_at_risk_gate": [
+        "AAPL",
+        "AMD",
+        "NVDA",
+        "TSLA"
+      ],
+      "refusal_reason": "100 USD R cannot fund a 0.25-0.70 delta structure on these names; count is zero and the minimum budget is reported",
+      "profile": {
+        "path": "profiles/options_alpha_v1.yaml",
+        "sha256": "b7886203115d469d72fa8ea1554d2ffea04f9ede237c3cd98d910381ac258f39"
+      },
+      "code": {
+        "settings": "9de6e084a6da946b3726ac9bb045e870d8d1bb8dea4e760d11565992aacbdaf6",
+        "structures": "3346c4a7ec5be47e39ef949f9d792ce33110c08b2400c4cfce030afa2a39259d",
+        "selection": "49faeb859b43b374560009950aed778455306f1329694d2d25c202615cec3cc4",
+        "card": "a1418d4c4a9fbf8efc897635bc59fb99030f1a42281ae9bab3dc48f3ba12c8a1",
+        "runner": "ce92e5d348b90aea0cb2ef20f49bb877f2dd7263ca7205376e5fce8e6ca24929"
+      },
+      "data_quality_tier": "B",
+      "defects_found_and_fixed": [
+        "slippage haircut was taken from the package mid, so a wider market drew a smaller haircut",
+        "strike ladder was built from eligible contracts only, silently widening the spread",
+        "target exceeded the structure's own max profit and was unreachable"
+      ],
+      "gate": "4271 passed, 52 skipped; mypy --strict clean on 190 files; ruff clean; uv lock consistent",
+      "quota_after": {
+        "daily_count": "193",
+        "daily_limit": "30000"
+      }
     }
   ]
 }

@@ -109,3 +109,55 @@ serinin ilk günü 2026-05-12).
 yukarıda. İki uç nokta aynı çapayı bir gün farkla gösteriyor.
 
 **Geri alma.** Yok — ölçüm. Pencere büyürse yeniden ölçülür.
+
+---
+
+## D7. Kayma haircut'ı işlem gören fiyata uygulanır, paket ortasına değil
+
+**Karar.** Gecikme haircut'ı `giriş = ask × (1+r)`, `çıkış = bid × (1−r)`.
+
+**Neden.** İlk model haircut'ı paket **mid**'ine uyguluyordu ve sonuç perversdi:
+makas genişledikçe mid düşüyor, dolayısıyla kayma azalıyordu — yani **kötü bir
+piyasa daha ucuz görünüyordu**. Kendi yazdığım test yakaladı; testin öncülü de
+kısmen hatalıydı (iki kotasyonun ask'i aynıydı, yani girişin eşit olması doğru;
+farkı yaratan çıkış tarafıydı).
+
+Bir maliyeti iki kez saymamak için: makas zaten ask/bid fiyatlarının içinde, bu
+haircut yalnız **gecikme** içindir.
+
+**Geri alma.** `profiles/options_alpha_v1.yaml` → `costs.extra_slippage_pct`.
+
+---
+
+## D8. Spread'in kısa bacağı tam zincirden seçilir, uygun kontratlardan değil
+
+**Karar.** Strike merdiveni o vadenin **listelenmiş tüm** strike'larından kurulur.
+
+**Neden.** Merdiven başta *uygun* kontratlardan kuruluyordu. SPY'da eleme
+sonrası bir sonraki strike 776 değil 777 kalıyordu, yani `width_strikes: 1`
+istenmeden **2 dolarlık** spread üretiyordu ve yapı 112,60 $'a çıkıp 100 $'lık
+bütçeye sığmıyordu.
+
+Kavramsal hata şuydu: kısa bacak **yönsel bir ifade değil, hedge**. Uzun bacak
+için konan delta bandı ve hacim tabanını ondan da istemek yanlış. Düzeltmeden
+sonra SPY 775/776 kuruldu, azami zarar 60,60 $ oldu ve kart üretildi.
+
+Kısa bacak yine de denetimsiz değil: `price_structure` eksik, sıfır ve çaprazlanmış
+kotasyonu reddediyor; dayanak, vade, hak, çarpan ve seans eşitliğini zorunlu
+tutuyor.
+
+**Geri alma.** `selection.py::_same_expiry_ladder` çağrısına uygun listeyi geri ver.
+
+---
+
+## D9. Hedef, tanımlı-riskli yapının tavanını aşamaz
+
+**Karar.** Debit spread gibi tavanı olan yapılarda hedef `max_profit` ile
+sınırlanır ve sınırlandığı kartın metninde yazar.
+
+**Neden.** Motorun ürettiği **ilk gerçek kart** 60,60 $ hedef yazıyordu; oysa
+yapının azami kârı 39,40 $'dı. Yani kart, pozisyon mükemmel gitse bile
+ulaşılamayacak bir seviyeyi bekle diyordu. Yüzde kuralı (`+%100`) tek başına
+doğru, ama tavanı olan bir yapıya körlemesine uygulanamaz.
+
+**Geri alma.** Yok — bu bir hata düzeltmesi.

@@ -1,0 +1,10 @@
+{
+ "ticker": "SPY",
+ "date": "2026-09-22",
+ "open": 774.03,
+ "high": 775.14,
+ "low": 772.57,
+ "close": 773.38,
+ "source": "UW /api/stock/{t}/ohlc/1d, market_time=='r'",
+ "parser": "webapp.ohlc.regular_session_bars"
+}
