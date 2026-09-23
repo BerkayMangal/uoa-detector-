@@ -246,7 +246,12 @@ QQQ **−47,20 $**.
 
 - Açık PAPER pozisyonları canlı zamanlayıcıda **izlenmiyor**: `/opsiyon` ekranı
   commit'li artefaktları okur, kendisi yeni fiyat çekmez.
-- Kalan 9 hipotez ailesi koşmadı.
+- Kalan 9 hipotez ailesi koşmadı. Bunlardan **H06 ölçüldü ve bilinçli olarak
+  dondurulmadı**: güç analizi, kol kurgusunun yoğunlaşmayı takvimden ayıramadığını
+  gösterdi (tabanı tutan tek yapıda kol A'nın %65–67'si aylık vade; takvim
+  çıkarılınca kol B 3–4 gözleme çöküyor). Kayıt: `INFEASIBLE_H06.md`. Hipotez
+  çürütülmedi, **sınanmadı**; ilan edilmiş deneme sayısı 9'da kaldı çünkü
+  koşulmayan aile deneme tüketmez. Sıra **H10**'a geçti.
 - `/opsiyon` ekranının **gözle** canlı doğrulaması yapılmadı — auth duvarının
   arkasında ve kimlik bilgileri bende değil (`BLOCKERS.md` B1). Kod tarafı
   test edildi: rota render ediyor, auth testleri rotayı otomatik kapsıyor.
