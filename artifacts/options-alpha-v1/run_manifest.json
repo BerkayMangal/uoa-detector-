@@ -1,0 +1,42 @@
+{
+  "scope": "options_alpha_v1",
+  "phase": "5.24",
+  "generated_at": "2026-09-23T09:29:43.516065+00:00",
+  "base_commit": "5b7917c8944f5fa9c00b2cb45d03a549d5dc3135",
+  "note": "base_commit is the branch point; this milestone is not committed yet at write time.",
+  "milestones": [
+    {
+      "id": "M0",
+      "name": "API capability matrix",
+      "status": "DONE",
+      "command": "uv run python scripts/probe_uw_option_capability.py",
+      "script": {
+        "path": "scripts/probe_uw_option_capability.py",
+        "sha256": "5dce5743ecb12f585459c36b7080c4f92ae9737e6e012736ceaa1d949b0e31d2"
+      },
+      "artifact": {
+        "path": "artifacts/options-alpha-v1/capability_matrix.json",
+        "sha256": "d1d6ad83a7c074d69eb36f01c9536d1defc3db50ac7aedb9b47ebdac580b68b3",
+        "generated_at": "2026-09-23T09:28:03.329309+00:00"
+      },
+      "requests_spent": 19,
+      "quota_after": {
+        "daily_count": "193",
+        "daily_limit": "30000"
+      },
+      "verdicts": {
+        "option_chains_dated": "VERIFIED",
+        "option_chains_floor": "VERIFIED",
+        "option_chains_breadth": "VERIFIED",
+        "contract_historic": "VERIFIED",
+        "contract_intraday": "VERIFIED",
+        "screener_option_contracts": "VERIFIED",
+        "multi_leg": "VERIFIED",
+        "expiry_breakdown": "VERIFIED",
+        "volume_profile": "VERIFIED"
+      },
+      "data_quality_tier": "B",
+      "research_window_start": "2026-05-13"
+    }
+  ]
+}

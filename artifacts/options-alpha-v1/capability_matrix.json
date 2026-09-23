@@ -1,0 +1,212 @@
+{
+  "generated_at": "2026-09-23T09:28:03.329309+00:00",
+  "sessions_used": {
+    "a": "2026-09-22",
+    "b": "2026-09-15"
+  },
+  "requests_spent": 19,
+  "quota": {
+    "daily_count": "193",
+    "daily_limit": "30000"
+  },
+  "matrix": {
+    "option_chains_dated": {
+      "verdict": "VERIFIED",
+      "rows": {
+        "2026-09-22": 12380,
+        "2026-09-15": 13100
+      },
+      "common_contracts": 11218,
+      "values_moved": 10927,
+      "values_identical": 291,
+      "detail": "10927/11218 kontratin degeri iki tarih arasinda degisti"
+    },
+    "option_chains_floor": {
+      "verdict": "VERIFIED",
+      "oldest_reached": "2026-05-13",
+      "refused": [
+        "2026-05-12:403",
+        "2026-04-02:403"
+      ],
+      "detail": "en eski cevaplanan seans"
+    },
+    "option_chains_breadth": {
+      "verdict": "VERIFIED",
+      "by_ticker": {
+        "SPY": {
+          "status": 200,
+          "rows": 12380,
+          "day": "2026-09-22"
+        },
+        "AAPL": {
+          "status": 200,
+          "rows": 3536,
+          "day": "2026-09-22"
+        },
+        "NVDA": {
+          "status": 200,
+          "rows": 3834,
+          "day": "2026-09-22"
+        }
+      }
+    },
+    "contract_historic": {
+      "verdict": "VERIFIED",
+      "sample_contract": "SPY261016C00905000",
+      "rows": 92,
+      "first_day": "2026-05-12",
+      "last_day": "2026-09-22",
+      "has_nbbo_bid_ask": true,
+      "fields": [
+        "ask_volume",
+        "avg_price",
+        "bid_volume",
+        "canceled_volume",
+        "cross_volume",
+        "date",
+        "flex_oi_transfer",
+        "floor_volume",
+        "high_price",
+        "implied_volatility",
+        "iv_high",
+        "iv_low",
+        "last_price",
+        "last_tape_time",
+        "low_price",
+        "mid_volume",
+        "multi_leg_volume",
+        "nbbo_ask",
+        "nbbo_bid",
+        "neutral_volume",
+        "open_interest",
+        "open_price",
+        "stock_multi_leg_volume",
+        "sweep_volume",
+        "ticker_vol",
+        "total_ask_changes",
+        "total_bid_changes",
+        "total_premium",
+        "trades",
+        "volume"
+      ],
+      "detail": "gunluk NBBO serisi; zarf 'chains'"
+    },
+    "contract_intraday": {
+      "verdict": "VERIFIED",
+      "rows": 201,
+      "fields": [
+        "avg_price",
+        "close",
+        "high",
+        "iv_high",
+        "iv_low",
+        "low",
+        "open",
+        "premium_ask_side",
+        "premium_bid_side",
+        "premium_mid_side",
+        "premium_no_side",
+        "start_time",
+        "trading_hours",
+        "volume_ask_side",
+        "volume_bid_side",
+        "volume_mid_side",
+        "volume_multi",
+        "volume_no_side",
+        "volume_stock_multi"
+      ]
+    },
+    "screener_option_contracts": {
+      "verdict": "VERIFIED",
+      "sample": {
+        "2026-09-22": [
+          "SPY260922C00774000",
+          "SPY260923P00773000",
+          "SPY260923P00772000",
+          "SPY260923C00776000",
+          "SPY260923C00777000"
+        ],
+        "2026-06-26": [
+          "SPY260701P00705000",
+          "SPY260702P00725000",
+          "SPY260626P00708000",
+          "SPY260717P00696000",
+          "SPY260717P00694000"
+        ]
+      },
+      "detail": "date= farkli sonuc veriyor"
+    },
+    "multi_leg": {
+      "verdict": "VERIFIED",
+      "rows": 5,
+      "fields": [
+        "all_opening_legs",
+        "all_otm",
+        "avg_iv",
+        "bid_ask_spread",
+        "breakevens",
+        "code",
+        "diff_expirations",
+        "diff_strikes",
+        "diff_types",
+        "direction",
+        "executed_at",
+        "id",
+        "iv_term_spread",
+        "ivs",
+        "leg_count",
+        "max_dte",
+        "max_loss",
+        "max_profit",
+        "max_strike",
+        "min_dte",
+        "min_strike",
+        "net_ask",
+        "net_bid",
+        "net_delta",
+        "net_gamma",
+        "net_premium",
+        "net_price",
+        "net_side",
+        "net_theta",
+        "net_vega",
+        "ratios",
+        "size",
+        "strategy",
+        "strikes",
+        "ticker",
+        "total_premium",
+        "txns",
+        "underlying_price",
+        "uniq_exchanges"
+      ]
+    },
+    "expiry_breakdown": {
+      "verdict": "VERIFIED",
+      "rows": 31,
+      "fields": [
+        "chains",
+        "expires",
+        "open_interest",
+        "volume"
+      ]
+    },
+    "volume_profile": {
+      "verdict": "VERIFIED",
+      "rows": 102,
+      "fields": [
+        "ask_vol",
+        "bid_vol",
+        "cross_vol",
+        "date",
+        "floor_vol",
+        "mid_vol",
+        "multi_vol",
+        "price",
+        "sweep_vol",
+        "transactions",
+        "volume"
+      ]
+    }
+  }
+}
