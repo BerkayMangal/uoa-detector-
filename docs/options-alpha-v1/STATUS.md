@@ -47,8 +47,8 @@ tetiklenmedi (A'nın en büyük isim payı %36 < %50), ancak risk kapısı sonra
 kayıtların %72–86'sı QQQ+SPY. Ayrıntı `RESULT_H02.md`.
 
 **Kapsam notu (v2 motor):** koşan beş ailenin hiçbiri işlenebilirlik şartını
-geçmedi; kol ortalamaları yapı başına −46 $ ile −84 $ arasında (H03 kontrol n=4
-hariç). H03/H01/H02 REJECTED, H04/H10 INSUFFICIENT_DATA. Sıradaki adım altıncı bir aile değil,
+geçmedi; tüm kollar dahil kol ortalamaları yapı başına −37 $ ile −84 $ arasında
+(−37 $ H03'ün n=4'lük kontrol kolu). H03/H01/H02 REJECTED, H04/H10 INSUFFICIENT_DATA. Sıradaki adım altıncı bir aile değil,
 ortak paydanın (yapı + maliyet + 5 günlük tutma) sorgulanması.
 
 ---

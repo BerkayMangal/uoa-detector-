@@ -155,8 +155,9 @@ bir şey yok.
 Düzeltilmiş motorla (v2, `AUDIT_H10_TRADES.md`) beş aile koştu: **H03, H01, H02
 reddedildi; H04 ve H10 INSUFFICIENT_DATA.** (H04 v1'de REJECTED'tı; `no_exit_data`
 düzeltmesi bir kolu tabanın altına indirdi.) Hiçbir kol maliyet sonrası pozitif
-değil: tamamlanmış yapıların kol ortalamaları **−46 $ ile −84 $** arasında
-(H03 kontrol kolu n=4 hariç). Bu, tek tek hipotezlerden çok **yapı + maliyet +
+değil: tamamlanmış yapıların kol ortalamaları, tüm kollar dahil, **−37 $ ile
+−84 $** arasında (−37 $ H03'ün n=4'lük kontrol kolu; tabanı tutmayan kollar da
+sayıldı). Bu, tek tek hipotezlerden çok **yapı + maliyet +
 5 günlük tutma** kurgusunun kendisi hakkında bir işaret; bir sonraki adım altıncı
 bir aile değil, bu ortak paydanın sorgulanması olmalı.
 
