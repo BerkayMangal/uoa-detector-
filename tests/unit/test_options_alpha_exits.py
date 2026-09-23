@@ -159,7 +159,11 @@ def test_an_unpriceable_day_is_counted_never_treated_as_zero(
     settings: OptionsAlphaSettings,
 ) -> None:
     """A missing quote is missing information, not a worthless position."""
-    days = (obs(23, None, complete=False), obs(24, "0.70", high="0.72", low="0.68"))
+    days = (
+        obs(21, None, complete=False),
+        obs(22, "0.60"), obs(23, "0.62"), obs(24, "0.66"),
+        obs(25, "0.70", high="0.72", low="0.68"),
+    )
     out = run(ExitVariantId.TIME_ONLY, days, settings)
 
     assert out.unpriced_days == 1
@@ -169,7 +173,7 @@ def test_an_unpriceable_day_is_counted_never_treated_as_zero(
 
 def test_no_priceable_day_is_not_a_successful_trade(settings: OptionsAlphaSettings) -> None:
     """A position we could never price did not break even — it has no outcome."""
-    days = (obs(23, None, complete=False), obs(24, None, complete=False))
+    days = tuple(obs(d, None, complete=False) for d in range(21, 26))
     out = run(ExitVariantId.TIME_ONLY, days, settings)
 
     assert out.reason is ExitReason.NO_EXIT_DATA
@@ -195,3 +199,34 @@ def test_mfe_and_mae_use_the_range_so_a_round_trip_stays_visible(
 
     assert out.mfe_per_share == Decimal("0.95")
     assert out.mae_per_share == Decimal("0.35")
+
+
+def test_an_unpriced_last_horizon_day_is_unknown_not_an_earlier_day(
+    settings: OptionsAlphaSettings,
+) -> None:
+    """H10 trade audit: the fifth day's quotes were missing and the engine booked
+    the first day's value as a "time" exit. An unknown exit stays unknown."""
+    days = (
+        obs(21, "0.17"),
+        obs(22, None, complete=False), obs(23, None, complete=False),
+        obs(24, None, complete=False), obs(25, None, complete=False),
+    )
+    out = run(ExitVariantId.TIME_ONLY, days, settings)
+
+    assert out.reason is ExitReason.NO_EXIT_DATA
+    assert out.exit_value is None
+    assert out.pnl_usd is None
+    assert out.unpriced_days == 4
+    assert any("KULLANILMADI" in n for n in out.notes)
+
+
+def test_a_position_short_of_its_horizon_is_still_open(settings: OptionsAlphaSettings) -> None:
+    """Two observations into a five-day hold is an open position, not a time exit.
+    The live PAPER tracker depends on this: it scores positions mid-hold."""
+    days = (obs(21, "0.60"), obs(22, "0.64"))
+    out = run(ExitVariantId.TIME_ONLY, days, settings)
+
+    assert out.reason is ExitReason.STILL_OPEN
+    assert out.exit_value is None
+    assert out.pnl_usd is None
+    assert out.mfe_per_share == Decimal("0.64")

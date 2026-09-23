@@ -1,5 +1,7 @@
 # H03 sonucu — REDDEDİLDİ
 
+> **Düzeltme 2026-09-23 (`AUDIT_H10_TRADES.md`).** Bu belgedeki sayılar v1 motorundan. Motor, ufkun son günü fiyatlanamadığında önceki bir günü `time` çıkışı olarak yazıyordu (hasat DTE<10 satırları atıyor). Düzeltilmiş motorla sürümlü yeniden koşum: REJECTED kalıyor (v2: teyitli 96, kontrol 4 tamamlanmış yapı). v1 artefaktı korunuyor; v2 ayrı dosyada.
+
 **Koşum tarihi:** 2026-09-23 · **Protokol:** `PREREG_H03.md` + ek 1, 2, 3
 (hepsi koşumdan önce commit'lendi) · **Kalite seviyesi:** B
 **Artifact:** `artifacts/options-alpha-v1/h03_result.json`

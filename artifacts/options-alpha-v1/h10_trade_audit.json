@@ -1,0 +1,1689 @@
+{
+ "summary": {
+  "result_file": "artifacts/options-alpha-v1/h10_result.json",
+  "independent_arms_primary": {
+   "A_cheap": {
+    "realised": 32,
+    "unknown": 13,
+    "mean_pnl_usd": "-53.79"
+   },
+   "B_rich": {
+    "realised": 20,
+    "unknown": 8,
+    "mean_pnl_usd": "-46.13"
+   }
+  },
+  "sensitivity_loss_capped_at_max_risk": {
+   "A_cheap": {
+    "realised": 32,
+    "unknown": 13,
+    "mean_pnl_usd": "-48.94"
+   },
+   "B_rich": {
+    "realised": 20,
+    "unknown": 8,
+    "mean_pnl_usd": "-26.63"
+   }
+  },
+  "selection": "her kolda sha256(symbol|entry_session) sirasiyla ilk 5 — sonuca bakmaz",
+  "audited": 10,
+  "entry_debit_agrees": 10,
+  "pnl_agrees": 5,
+  "flags_in_sample": [
+   "MOTOR_BILINMEYENI_GERCEKLESMIS_SAYDI",
+   "NEGATIF_PAKET_DEGERI"
+  ],
+  "full_sweep": {
+   "records": 73,
+   "pnl_agrees": 52,
+   "unknown_booked_as_realised": 21,
+   "loss_beyond_max_risk": 6,
+   "negative_package_value_seen": 16,
+   "affected": [
+    {
+     "arm": "A_cheap",
+     "anchor": "SPY260717P00750000",
+     "entry": "2026-06-22",
+     "engine": "-133.60",
+     "independent": "-133.60",
+     "flags": [
+      "ZARAR_AZAMI_RISKI_ASIYOR",
+      "NEGATIF_PAKET_DEGERI"
+     ]
+    },
+    {
+     "arm": "A_cheap",
+     "anchor": "QQQ260717P00740000",
+     "entry": "2026-06-22",
+     "engine": "-123.60",
+     "independent": "-123.60",
+     "flags": [
+      "ZARAR_AZAMI_RISKI_ASIYOR",
+      "NEGATIF_PAKET_DEGERI"
+     ]
+    },
+    {
+     "arm": "A_cheap",
+     "anchor": "SPY260717C00755000",
+     "entry": "2026-07-01",
+     "engine": "-19.20",
+     "independent": null,
+     "flags": [
+      "MOTOR_BILINMEYENI_GERCEKLESMIS_SAYDI"
+     ]
+    },
+    {
+     "arm": "A_cheap",
+     "anchor": "QQQ260717C00748000",
+     "entry": "2026-07-01",
+     "engine": "-93.20",
+     "independent": null,
+     "flags": [
+      "MOTOR_BILINMEYENI_GERCEKLESMIS_SAYDI"
+     ]
+    },
+    {
+     "arm": "A_cheap",
+     "anchor": "AMZN260717C00250000",
+     "entry": "2026-07-01",
+     "engine": "-17.60",
+     "independent": null,
+     "flags": [
+      "MOTOR_BILINMEYENI_GERCEKLESMIS_SAYDI"
+     ]
+    },
+    {
+     "arm": "A_cheap",
+     "anchor": "SPY260717C00750000",
+     "entry": "2026-07-02",
+     "engine": "-2.60",
+     "independent": null,
+     "flags": [
+      "MOTOR_BILINMEYENI_GERCEKLESMIS_SAYDI"
+     ]
+    },
+    {
+     "arm": "A_cheap",
+     "anchor": "QQQ260724P00710000",
+     "entry": "2026-07-08",
+     "engine": "-32.60",
+     "independent": null,
+     "flags": [
+      "MOTOR_BILINMEYENI_GERCEKLESMIS_SAYDI"
+     ]
+    },
+    {
+     "arm": "A_cheap",
+     "anchor": "SPY260724C00758000",
+     "entry": "2026-07-10",
+     "engine": "-19.60",
+     "independent": null,
+     "flags": [
+      "MOTOR_BILINMEYENI_GERCEKLESMIS_SAYDI"
+     ]
+    },
+    {
+     "arm": "A_cheap",
+     "anchor": "QQQ260814C00735000",
+     "entry": "2026-07-15",
+     "engine": "-73.60",
+     "independent": "-73.60",
+     "flags": [
+      "ZARAR_AZAMI_RISKI_ASIYOR",
+      "NEGATIF_PAKET_DEGERI"
+     ]
+    },
+    {
+     "arm": "B_rich",
+     "anchor": "SPY260821P00750000",
+     "entry": "2026-07-17",
+     "engine": "-141.60",
+     "independent": "-141.60",
+     "flags": [
+      "ZARAR_AZAMI_RISKI_ASIYOR",
+      "NEGATIF_PAKET_DEGERI"
+     ]
+    },
+    {
+     "arm": "B_rich",
+     "anchor": "SPY260807P00745000",
+     "entry": "2026-07-22",
+     "engine": "-11.20",
+     "independent": null,
+     "flags": [
+      "NEGATIF_PAKET_DEGERI",
+      "MOTOR_BILINMEYENI_GERCEKLESMIS_SAYDI"
+     ]
+    },
+    {
+     "arm": "B_rich",
+     "anchor": "QQQ260807P00690000",
+     "entry": "2026-07-22",
+     "engine": "-204.60",
+     "independent": null,
+     "flags": [
+      "NEGATIF_PAKET_DEGERI",
+      "MOTOR_BILINMEYENI_GERCEKLESMIS_SAYDI"
+     ]
+    },
+    {
+     "arm": "B_rich",
+     "anchor": "SPY260821P00735000",
+     "entry": "2026-07-30",
+     "engine": "-69.20",
+     "independent": "-69.20",
+     "flags": [
+      "NEGATIF_PAKET_DEGERI"
+     ]
+    },
+    {
+     "arm": "B_rich",
+     "anchor": "QQQ260814P00685000",
+     "entry": "2026-07-31",
+     "engine": "-92.60",
+     "independent": null,
+     "flags": [
+      "NEGATIF_PAKET_DEGERI",
+      "MOTOR_BILINMEYENI_GERCEKLESMIS_SAYDI"
+     ]
+    },
+    {
+     "arm": "A_cheap",
+     "anchor": "SPY260821C00775000",
+     "entry": "2026-08-06",
+     "engine": "-15.60",
+     "independent": null,
+     "flags": [
+      "MOTOR_BILINMEYENI_GERCEKLESMIS_SAYDI"
+     ]
+    },
+    {
+     "arm": "A_cheap",
+     "anchor": "QQQ260821P00700000",
+     "entry": "2026-08-06",
+     "engine": "-53.20",
+     "independent": null,
+     "flags": [
+      "MOTOR_BILINMEYENI_GERCEKLESMIS_SAYDI"
+     ]
+    },
+    {
+     "arm": "A_cheap",
+     "anchor": "AAPL260821C00320000",
+     "entry": "2026-08-06",
+     "engine": "-67.60",
+     "independent": null,
+     "flags": [
+      "MOTOR_BILINMEYENI_GERCEKLESMIS_SAYDI"
+     ]
+    },
+    {
+     "arm": "A_cheap",
+     "anchor": "AAPL260821C00320000",
+     "entry": "2026-08-07",
+     "engine": "-70.60",
+     "independent": null,
+     "flags": [
+      "MOTOR_BILINMEYENI_GERCEKLESMIS_SAYDI"
+     ]
+    },
+    {
+     "arm": "A_cheap",
+     "anchor": "NVDA260821C00230000",
+     "entry": "2026-08-07",
+     "engine": "-58.60",
+     "independent": null,
+     "flags": [
+      "MOTOR_BILINMEYENI_GERCEKLESMIS_SAYDI"
+     ]
+    },
+    {
+     "arm": "A_cheap",
+     "anchor": "AMZN260828C00275000",
+     "entry": "2026-08-12",
+     "engine": "-76.60",
+     "independent": null,
+     "flags": [
+      "MOTOR_BILINMEYENI_GERCEKLESMIS_SAYDI"
+     ]
+    },
+    {
+     "arm": "A_cheap",
+     "anchor": "QQQ260911P00705000",
+     "entry": "2026-08-20",
+     "engine": "-62.60",
+     "independent": "-62.60",
+     "flags": [
+      "ZARAR_AZAMI_RISKI_ASIYOR",
+      "NEGATIF_PAKET_DEGERI"
+     ]
+    },
+    {
+     "arm": "B_rich",
+     "anchor": "SPY260930P00754000",
+     "entry": "2026-08-26",
+     "engine": "-403.80",
+     "independent": "-403.80",
+     "flags": [
+      "ZARAR_AZAMI_RISKI_ASIYOR",
+      "NEGATIF_PAKET_DEGERI"
+     ]
+    },
+    {
+     "arm": "A_cheap",
+     "anchor": "QQQ260918P00700000",
+     "entry": "2026-08-26",
+     "engine": "-75.20",
+     "independent": "-75.20",
+     "flags": [
+      "NEGATIF_PAKET_DEGERI"
+     ]
+    },
+    {
+     "arm": "A_cheap",
+     "anchor": "GOOGL260918C00360000",
+     "entry": "2026-08-26",
+     "engine": "-70.60",
+     "independent": "-70.60",
+     "flags": [
+      "NEGATIF_PAKET_DEGERI"
+     ]
+    },
+    {
+     "arm": "B_rich",
+     "anchor": "SPY261016P00755000",
+     "entry": "2026-08-27",
+     "engine": "-43.80",
+     "independent": "-43.80",
+     "flags": [
+      "NEGATIF_PAKET_DEGERI"
+     ]
+    },
+    {
+     "arm": "B_rich",
+     "anchor": "SPY261016P00765000",
+     "entry": "2026-08-28",
+     "engine": "-23.20",
+     "independent": "-23.20",
+     "flags": [
+      "NEGATIF_PAKET_DEGERI"
+     ]
+    },
+    {
+     "arm": "B_rich",
+     "anchor": "SPY260930P00754000",
+     "entry": "2026-08-31",
+     "engine": "-25.80",
+     "independent": "-25.80",
+     "flags": [
+      "NEGATIF_PAKET_DEGERI"
+     ]
+    },
+    {
+     "arm": "B_rich",
+     "anchor": "SPY260918P00760000",
+     "entry": "2026-09-01",
+     "engine": "-33.20",
+     "independent": null,
+     "flags": [
+      "NEGATIF_PAKET_DEGERI",
+      "MOTOR_BILINMEYENI_GERCEKLESMIS_SAYDI"
+     ]
+    },
+    {
+     "arm": "A_cheap",
+     "anchor": "NVDA260918C00225000",
+     "entry": "2026-09-01",
+     "engine": "28.40",
+     "independent": null,
+     "flags": [
+      "MOTOR_BILINMEYENI_GERCEKLESMIS_SAYDI"
+     ]
+    },
+    {
+     "arm": "B_rich",
+     "anchor": "SPY260918P00765000",
+     "entry": "2026-09-03",
+     "engine": "6.80",
+     "independent": null,
+     "flags": [
+      "MOTOR_BILINMEYENI_GERCEKLESMIS_SAYDI"
+     ]
+    },
+    {
+     "arm": "B_rich",
+     "anchor": "SPY260918C00779000",
+     "entry": "2026-09-04",
+     "engine": "-39.20",
+     "independent": null,
+     "flags": [
+      "MOTOR_BILINMEYENI_GERCEKLESMIS_SAYDI"
+     ]
+    },
+    {
+     "arm": "B_rich",
+     "anchor": "AAPL260918C00330000",
+     "entry": "2026-09-04",
+     "engine": "-54.60",
+     "independent": null,
+     "flags": [
+      "MOTOR_BILINMEYENI_GERCEKLESMIS_SAYDI"
+     ]
+    },
+    {
+     "arm": "B_rich",
+     "anchor": "GOOGL260918C00350000",
+     "entry": "2026-09-04",
+     "engine": "-42.60",
+     "independent": null,
+     "flags": [
+      "MOTOR_BILINMEYENI_GERCEKLESMIS_SAYDI"
+     ]
+    }
+   ]
+  }
+ },
+ "trades": [
+  {
+   "arm": "A_cheap",
+   "ticker": "SPY",
+   "anchor": "SPY260731P00750000",
+   "structure": "bear_put_debit",
+   "info_time": {
+    "flow_session_D": "2026-07-02",
+    "known": "D hacmi/zinciri D+1'de yayimlanmis; giris D+1 kapanisi = 2026-07-06"
+   },
+   "entry_session": "2026-07-06",
+   "entry_source": "artifacts/options-alpha-v1/harvest/2026-07-06/SPY.json",
+   "legs": [
+    {
+     "leg": "SPY260731P00750000",
+     "side": "long",
+     "bid": "8.39",
+     "ask": "8.43",
+     "used": "ask 8.43",
+     "strike": "750",
+     "expires": "2026-07-31"
+    },
+    {
+     "leg": "SPY260731P00749000",
+     "side": "short",
+     "bid": "8.04",
+     "ask": "8.08",
+     "used": "bid 8.04",
+     "strike": "749",
+     "expires": "2026-07-31"
+    }
+   ],
+   "quantity": 2,
+   "multiplier": 100,
+   "raw_debit_per_share": "0.39",
+   "debit_after_slippage": "0.40",
+   "engine_entry_debit": "0.40",
+   "entry_debit_agrees": true,
+   "commission_round_trip_usd": "5.20",
+   "max_loss_usd": "85.20",
+   "hold": [
+    {
+     "day": "2026-07-07",
+     "source": "artifacts/options-alpha-v1/harvest/2026-07-07/SPY.json",
+     "quotes": {
+      "SPY260731P00750000": {
+       "bid": "10.16",
+       "ask": "10.21"
+      },
+      "SPY260731P00749000": {
+       "bid": "9.75",
+       "ask": "9.80"
+      }
+     },
+     "closable_value": "0.36",
+     "missing_legs": []
+    },
+    {
+     "day": "2026-07-08",
+     "source": "artifacts/options-alpha-v1/harvest/2026-07-08/SPY.json",
+     "quotes": {
+      "SPY260731P00750000": {
+       "bid": "11.58",
+       "ask": "11.64"
+      },
+      "SPY260731P00749000": {
+       "bid": "11.12",
+       "ask": "11.18"
+      }
+     },
+     "closable_value": "0.40",
+     "missing_legs": []
+    },
+    {
+     "day": "2026-07-09",
+     "source": "artifacts/options-alpha-v1/harvest/2026-07-09/SPY.json",
+     "quotes": {
+      "SPY260731P00750000": {
+       "bid": "7.90",
+       "ask": "7.94"
+      },
+      "SPY260731P00749000": {
+       "bid": "7.55",
+       "ask": "7.59"
+      }
+     },
+     "closable_value": "0.31",
+     "missing_legs": []
+    },
+    {
+     "day": "2026-07-10",
+     "source": "artifacts/options-alpha-v1/harvest/2026-07-10/SPY.json",
+     "quotes": {
+      "SPY260731P00750000": {
+       "bid": "6.15",
+       "ask": "6.19"
+      },
+      "SPY260731P00749000": {
+       "bid": "5.85",
+       "ask": "5.89"
+      }
+     },
+     "closable_value": "0.26",
+     "missing_legs": []
+    },
+    {
+     "day": "2026-07-13",
+     "source": "artifacts/options-alpha-v1/harvest/2026-07-13/SPY.json",
+     "quotes": {
+      "SPY260731P00750000": {
+       "bid": "9.13",
+       "ask": "9.18"
+      },
+      "SPY260731P00749000": {
+       "bid": "8.74",
+       "ask": "8.79"
+      }
+     },
+     "closable_value": "0.34",
+     "missing_legs": []
+    }
+   ],
+   "independent_time_only": {
+    "status": "REALISED",
+    "exit_day": "2026-07-13",
+    "exit_value": "0.34",
+    "pnl_usd": "-17.20"
+   },
+   "engine_time_only": {
+    "reason": "time",
+    "pnl_usd": "-17.20",
+    "return_on_risk": -0.20187793427230047,
+    "held": 5,
+    "unpriced_days": 0
+   },
+   "pnl_agrees": true,
+   "flags": []
+  },
+  {
+   "arm": "A_cheap",
+   "ticker": "AMZN",
+   "anchor": "AMZN260918C00270000",
+   "structure": "bull_call_debit",
+   "info_time": {
+    "flow_session_D": "2026-08-21",
+    "known": "D hacmi/zinciri D+1'de yayimlanmis; giris D+1 kapanisi = 2026-08-24"
+   },
+   "entry_session": "2026-08-24",
+   "entry_source": "artifacts/options-alpha-v1/harvest/2026-08-24/AMZN.json",
+   "legs": [
+    {
+     "leg": "AMZN260918C00270000",
+     "side": "long",
+     "bid": "4.95",
+     "ask": "5.05",
+     "used": "ask 5.05",
+     "strike": "270",
+     "expires": "2026-09-18"
+    },
+    {
+     "leg": "AMZN260918C00272500",
+     "side": "short",
+     "bid": "4.10",
+     "ask": "4.35",
+     "used": "bid 4.10",
+     "strike": "272.5",
+     "expires": "2026-09-18"
+    }
+   ],
+   "quantity": 1,
+   "multiplier": 100,
+   "raw_debit_per_share": "0.95",
+   "debit_after_slippage": "0.97",
+   "engine_entry_debit": "0.97",
+   "entry_debit_agrees": true,
+   "commission_round_trip_usd": "2.60",
+   "max_loss_usd": "99.60",
+   "hold": [
+    {
+     "day": "2026-08-25",
+     "source": "artifacts/options-alpha-v1/harvest/2026-08-25/AMZN.json",
+     "quotes": {
+      "AMZN260918C00270000": {
+       "bid": "4.20",
+       "ask": "4.30"
+      },
+      "AMZN260918C00272500": {
+       "bid": "3.45",
+       "ask": "3.60"
+      }
+     },
+     "closable_value": "0.60",
+     "missing_legs": []
+    },
+    {
+     "day": "2026-08-26",
+     "source": "artifacts/options-alpha-v1/harvest/2026-08-26/AMZN.json",
+     "quotes": {
+      "AMZN260918C00270000": {
+       "bid": "3.75",
+       "ask": "3.90"
+      },
+      "AMZN260918C00272500": {
+       "bid": "3.05",
+       "ask": "3.20"
+      }
+     },
+     "closable_value": "0.55",
+     "missing_legs": []
+    },
+    {
+     "day": "2026-08-27",
+     "source": "artifacts/options-alpha-v1/harvest/2026-08-27/AMZN.json",
+     "quotes": {
+      "AMZN260918C00270000": {
+       "bid": "2.32",
+       "ask": "2.42"
+      },
+      "AMZN260918C00272500": {
+       "bid": "1.87",
+       "ask": "1.98"
+      }
+     },
+     "closable_value": "0.34",
+     "missing_legs": []
+    },
+    {
+     "day": "2026-08-28",
+     "source": "artifacts/options-alpha-v1/harvest/2026-08-28/AMZN.json",
+     "quotes": {
+      "AMZN260918C00270000": {
+       "bid": "5.65",
+       "ask": "5.80"
+      },
+      "AMZN260918C00272500": {
+       "bid": "4.65",
+       "ask": "4.85"
+      }
+     },
+     "closable_value": "0.80",
+     "missing_legs": []
+    },
+    {
+     "day": "2026-08-31",
+     "source": "artifacts/options-alpha-v1/harvest/2026-08-31/AMZN.json",
+     "quotes": {
+      "AMZN260918C00270000": {
+       "bid": "2.72",
+       "ask": "2.89"
+      },
+      "AMZN260918C00272500": {
+       "bid": "2.10",
+       "ask": "2.30"
+      }
+     },
+     "closable_value": "0.42",
+     "missing_legs": []
+    }
+   ],
+   "independent_time_only": {
+    "status": "REALISED",
+    "exit_day": "2026-08-31",
+    "exit_value": "0.42",
+    "pnl_usd": "-57.60"
+   },
+   "engine_time_only": {
+    "reason": "time",
+    "pnl_usd": "-57.60",
+    "return_on_risk": -0.5783132530120482,
+    "held": 5,
+    "unpriced_days": 0
+   },
+   "pnl_agrees": true,
+   "flags": []
+  },
+  {
+   "arm": "A_cheap",
+   "ticker": "AAPL",
+   "anchor": "AAPL260821C00320000",
+   "structure": "bull_call_debit",
+   "info_time": {
+    "flow_session_D": "2026-08-05",
+    "known": "D hacmi/zinciri D+1'de yayimlanmis; giris D+1 kapanisi = 2026-08-06"
+   },
+   "entry_session": "2026-08-06",
+   "entry_source": "artifacts/options-alpha-v1/harvest/2026-08-06/AAPL.json",
+   "legs": [
+    {
+     "leg": "AAPL260821C00320000",
+     "side": "long",
+     "bid": "3.30",
+     "ask": "3.40",
+     "used": "ask 3.40",
+     "strike": "320",
+     "expires": "2026-08-21"
+    },
+    {
+     "leg": "AAPL260821C00322500",
+     "side": "short",
+     "bid": "2.60",
+     "ask": "2.98",
+     "used": "bid 2.60",
+     "strike": "322.5",
+     "expires": "2026-08-21"
+    }
+   ],
+   "quantity": 1,
+   "multiplier": 100,
+   "raw_debit_per_share": "0.80",
+   "debit_after_slippage": "0.82",
+   "engine_entry_debit": "0.82",
+   "entry_debit_agrees": true,
+   "commission_round_trip_usd": "2.60",
+   "max_loss_usd": "84.60",
+   "hold": [
+    {
+     "day": "2026-08-07",
+     "source": "artifacts/options-alpha-v1/harvest/2026-08-07/AAPL.json",
+     "quotes": {
+      "AAPL260821C00320000": {
+       "bid": "3.00",
+       "ask": "3.15"
+      },
+      "AAPL260821C00322500": {
+       "bid": "2.32",
+       "ask": "2.44"
+      }
+     },
+     "closable_value": "0.56",
+     "missing_legs": []
+    },
+    {
+     "day": "2026-08-10",
+     "source": "artifacts/options-alpha-v1/harvest/2026-08-10/AAPL.json",
+     "quotes": {
+      "AAPL260821C00320000": {
+       "bid": "1.39",
+       "ask": "1.45"
+      },
+      "AAPL260821C00322500": {
+       "bid": "1.00",
+       "ask": "1.06"
+      }
+     },
+     "closable_value": "0.33",
+     "missing_legs": []
+    },
+    {
+     "day": "2026-08-11",
+     "source": "artifacts/options-alpha-v1/harvest/2026-08-11/AAPL.json",
+     "quotes": {
+      "AAPL260821C00320000": {
+       "bid": "0.68",
+       "ask": "0.72"
+      },
+      "AAPL260821C00322500": {
+       "bid": "0.47",
+       "ask": "0.51"
+      }
+     },
+     "closable_value": "0.17",
+     "missing_legs": []
+    },
+    {
+     "day": "2026-08-12",
+     "source": "artifacts/options-alpha-v1/harvest/2026-08-12/AAPL.json",
+     "quotes": {},
+     "closable_value": null,
+     "missing_legs": [
+      "AAPL260821C00320000",
+      "AAPL260821C00322500"
+     ]
+    },
+    {
+     "day": "2026-08-13",
+     "source": "artifacts/options-alpha-v1/harvest/2026-08-13/AAPL.json",
+     "quotes": {},
+     "closable_value": null,
+     "missing_legs": [
+      "AAPL260821C00320000",
+      "AAPL260821C00322500"
+     ]
+    }
+   ],
+   "independent_time_only": {
+    "status": "UNKNOWN",
+    "pnl_usd": null,
+    "why": "5. seansta en az bir bacagin kotasyonu yok"
+   },
+   "engine_time_only": {
+    "reason": "time",
+    "pnl_usd": "-67.60",
+    "return_on_risk": -0.7990543735224587,
+    "held": 5,
+    "unpriced_days": 2
+   },
+   "pnl_agrees": false,
+   "flags": [
+    "MOTOR_BILINMEYENI_GERCEKLESMIS_SAYDI: 5. gun fiyatsiz, motor onceki gunu 'time' diye yazdi"
+   ]
+  },
+  {
+   "arm": "A_cheap",
+   "ticker": "NVDA",
+   "anchor": "NVDA260918C00230000",
+   "structure": "bull_call_debit",
+   "info_time": {
+    "flow_session_D": "2026-08-28",
+    "known": "D hacmi/zinciri D+1'de yayimlanmis; giris D+1 kapanisi = 2026-08-31"
+   },
+   "entry_session": "2026-08-31",
+   "entry_source": "artifacts/options-alpha-v1/harvest/2026-08-31/NVDA.json",
+   "legs": [
+    {
+     "leg": "NVDA260918C00230000",
+     "side": "long",
+     "bid": "2.34",
+     "ask": "2.72",
+     "used": "ask 2.72",
+     "strike": "230",
+     "expires": "2026-09-18"
+    },
+    {
+     "leg": "NVDA260918C00232500",
+     "side": "short",
+     "bid": "1.85",
+     "ask": "2.19",
+     "used": "bid 1.85",
+     "strike": "232.5",
+     "expires": "2026-09-18"
+    }
+   ],
+   "quantity": 1,
+   "multiplier": 100,
+   "raw_debit_per_share": "0.87",
+   "debit_after_slippage": "0.89",
+   "engine_entry_debit": "0.89",
+   "entry_debit_agrees": true,
+   "commission_round_trip_usd": "2.60",
+   "max_loss_usd": "91.60",
+   "hold": [
+    {
+     "day": "2026-09-01",
+     "source": "artifacts/options-alpha-v1/harvest/2026-09-01/NVDA.json",
+     "quotes": {
+      "NVDA260918C00230000": {
+       "bid": "1.67",
+       "ask": "1.70"
+      },
+      "NVDA260918C00232500": {
+       "bid": "1.24",
+       "ask": "1.28"
+      }
+     },
+     "closable_value": "0.39",
+     "missing_legs": []
+    },
+    {
+     "day": "2026-09-02",
+     "source": "artifacts/options-alpha-v1/harvest/2026-09-02/NVDA.json",
+     "quotes": {
+      "NVDA260918C00230000": {
+       "bid": "3.65",
+       "ask": "3.75"
+      },
+      "NVDA260918C00232500": {
+       "bid": "2.85",
+       "ask": "2.92"
+      }
+     },
+     "closable_value": "0.73",
+     "missing_legs": []
+    },
+    {
+     "day": "2026-09-03",
+     "source": "artifacts/options-alpha-v1/harvest/2026-09-03/NVDA.json",
+     "quotes": {
+      "NVDA260918C00230000": {
+       "bid": "5.30",
+       "ask": "5.40"
+      },
+      "NVDA260918C00232500": {
+       "bid": "4.20",
+       "ask": "4.30"
+      }
+     },
+     "closable_value": "1.00",
+     "missing_legs": []
+    },
+    {
+     "day": "2026-09-04",
+     "source": "artifacts/options-alpha-v1/harvest/2026-09-04/NVDA.json",
+     "quotes": {
+      "NVDA260918C00230000": {
+       "bid": "5.90",
+       "ask": "6.10"
+      },
+      "NVDA260918C00232500": {
+       "bid": "4.70",
+       "ask": "4.85"
+      }
+     },
+     "closable_value": "1.05",
+     "missing_legs": []
+    },
+    {
+     "day": "2026-09-08",
+     "source": "artifacts/options-alpha-v1/harvest/2026-09-08/NVDA.json",
+     "quotes": {
+      "NVDA260918C00230000": {
+       "bid": "3.30",
+       "ask": "3.35"
+      },
+      "NVDA260918C00232500": {
+       "bid": "2.46",
+       "ask": "2.52"
+      }
+     },
+     "closable_value": "0.78",
+     "missing_legs": []
+    }
+   ],
+   "independent_time_only": {
+    "status": "REALISED",
+    "exit_day": "2026-09-08",
+    "exit_value": "0.78",
+    "pnl_usd": "-13.60"
+   },
+   "engine_time_only": {
+    "reason": "time",
+    "pnl_usd": "-13.60",
+    "return_on_risk": -0.14847161572052403,
+    "held": 5,
+    "unpriced_days": 0
+   },
+   "pnl_agrees": true,
+   "flags": []
+  },
+  {
+   "arm": "A_cheap",
+   "ticker": "SPY",
+   "anchor": "SPY260717C00750000",
+   "structure": "bull_call_debit",
+   "info_time": {
+    "flow_session_D": "2026-07-01",
+    "known": "D hacmi/zinciri D+1'de yayimlanmis; giris D+1 kapanisi = 2026-07-02"
+   },
+   "entry_session": "2026-07-02",
+   "entry_source": "artifacts/options-alpha-v1/harvest/2026-07-02/SPY.json",
+   "legs": [
+    {
+     "leg": "SPY260717C00750000",
+     "side": "long",
+     "bid": "4.82",
+     "ask": "4.85",
+     "used": "ask 4.85",
+     "strike": "750",
+     "expires": "2026-07-17"
+    },
+    {
+     "leg": "SPY260717C00751000",
+     "side": "short",
+     "bid": "4.36",
+     "ask": "4.39",
+     "used": "bid 4.36",
+     "strike": "751",
+     "expires": "2026-07-17"
+    }
+   ],
+   "quantity": 1,
+   "multiplier": 100,
+   "raw_debit_per_share": "0.49",
+   "debit_after_slippage": "0.50",
+   "engine_entry_debit": "0.50",
+   "entry_debit_agrees": true,
+   "commission_round_trip_usd": "2.60",
+   "max_loss_usd": "52.60",
+   "hold": [
+    {
+     "day": "2026-07-06",
+     "source": "artifacts/options-alpha-v1/harvest/2026-07-06/SPY.json",
+     "quotes": {
+      "SPY260717C00750000": {
+       "bid": "7.29",
+       "ask": "7.42"
+      },
+      "SPY260717C00751000": {
+       "bid": "6.58",
+       "ask": "6.84"
+      }
+     },
+     "closable_value": "0.45",
+     "missing_legs": []
+    },
+    {
+     "day": "2026-07-07",
+     "source": "artifacts/options-alpha-v1/harvest/2026-07-07/SPY.json",
+     "quotes": {
+      "SPY260717C00750000": {
+       "bid": "4.89",
+       "ask": "4.92"
+      },
+      "SPY260717C00751000": {
+       "bid": "4.36",
+       "ask": "4.39"
+      }
+     },
+     "closable_value": "0.50",
+     "missing_legs": []
+    },
+    {
+     "day": "2026-07-08",
+     "source": "artifacts/options-alpha-v1/harvest/2026-07-08/SPY.json",
+     "quotes": {},
+     "closable_value": null,
+     "missing_legs": [
+      "SPY260717C00750000",
+      "SPY260717C00751000"
+     ]
+    },
+    {
+     "day": "2026-07-09",
+     "source": "artifacts/options-alpha-v1/harvest/2026-07-09/SPY.json",
+     "quotes": {},
+     "closable_value": null,
+     "missing_legs": [
+      "SPY260717C00750000",
+      "SPY260717C00751000"
+     ]
+    },
+    {
+     "day": "2026-07-10",
+     "source": "artifacts/options-alpha-v1/harvest/2026-07-10/SPY.json",
+     "quotes": {},
+     "closable_value": null,
+     "missing_legs": [
+      "SPY260717C00750000",
+      "SPY260717C00751000"
+     ]
+    }
+   ],
+   "independent_time_only": {
+    "status": "UNKNOWN",
+    "pnl_usd": null,
+    "why": "5. seansta en az bir bacagin kotasyonu yok"
+   },
+   "engine_time_only": {
+    "reason": "time",
+    "pnl_usd": "-2.60",
+    "return_on_risk": -0.049429657794676805,
+    "held": 5,
+    "unpriced_days": 3
+   },
+   "pnl_agrees": false,
+   "flags": [
+    "MOTOR_BILINMEYENI_GERCEKLESMIS_SAYDI: 5. gun fiyatsiz, motor onceki gunu 'time' diye yazdi"
+   ]
+  },
+  {
+   "arm": "B_rich",
+   "ticker": "SPY",
+   "anchor": "SPY260918C00779000",
+   "structure": "bull_call_debit",
+   "info_time": {
+    "flow_session_D": "2026-09-03",
+    "known": "D hacmi/zinciri D+1'de yayimlanmis; giris D+1 kapanisi = 2026-09-04"
+   },
+   "entry_session": "2026-09-04",
+   "entry_source": "artifacts/options-alpha-v1/harvest/2026-09-04/SPY.json",
+   "legs": [
+    {
+     "leg": "SPY260918C00779000",
+     "side": "long",
+     "bid": "2.43",
+     "ask": "2.45",
+     "used": "ask 2.45",
+     "strike": "779",
+     "expires": "2026-09-18"
+    },
+    {
+     "leg": "SPY260918C00780000",
+     "side": "short",
+     "bid": "2.12",
+     "ask": "2.15",
+     "used": "bid 2.12",
+     "strike": "780",
+     "expires": "2026-09-18"
+    }
+   ],
+   "quantity": 2,
+   "multiplier": 100,
+   "raw_debit_per_share": "0.33",
+   "debit_after_slippage": "0.34",
+   "engine_entry_debit": "0.34",
+   "entry_debit_agrees": true,
+   "commission_round_trip_usd": "5.20",
+   "max_loss_usd": "73.20",
+   "hold": [
+    {
+     "day": "2026-09-08",
+     "source": "artifacts/options-alpha-v1/harvest/2026-09-08/SPY.json",
+     "quotes": {
+      "SPY260918C00779000": {
+       "bid": "1.19",
+       "ask": "1.20"
+      },
+      "SPY260918C00780000": {
+       "bid": "1.00",
+       "ask": "1.02"
+      }
+     },
+     "closable_value": "0.17",
+     "missing_legs": []
+    },
+    {
+     "day": "2026-09-09",
+     "source": "artifacts/options-alpha-v1/harvest/2026-09-09/SPY.json",
+     "quotes": {},
+     "closable_value": null,
+     "missing_legs": [
+      "SPY260918C00779000",
+      "SPY260918C00780000"
+     ]
+    },
+    {
+     "day": "2026-09-10",
+     "source": "artifacts/options-alpha-v1/harvest/2026-09-10/SPY.json",
+     "quotes": {},
+     "closable_value": null,
+     "missing_legs": [
+      "SPY260918C00779000",
+      "SPY260918C00780000"
+     ]
+    },
+    {
+     "day": "2026-09-11",
+     "source": "artifacts/options-alpha-v1/harvest/2026-09-11/SPY.json",
+     "quotes": {},
+     "closable_value": null,
+     "missing_legs": [
+      "SPY260918C00779000",
+      "SPY260918C00780000"
+     ]
+    },
+    {
+     "day": "2026-09-14",
+     "source": "artifacts/options-alpha-v1/harvest/2026-09-14/SPY.json",
+     "quotes": {},
+     "closable_value": null,
+     "missing_legs": [
+      "SPY260918C00779000",
+      "SPY260918C00780000"
+     ]
+    }
+   ],
+   "independent_time_only": {
+    "status": "UNKNOWN",
+    "pnl_usd": null,
+    "why": "5. seansta en az bir bacagin kotasyonu yok"
+   },
+   "engine_time_only": {
+    "reason": "time",
+    "pnl_usd": "-39.20",
+    "return_on_risk": -0.5355191256830601,
+    "held": 5,
+    "unpriced_days": 4
+   },
+   "pnl_agrees": false,
+   "flags": [
+    "MOTOR_BILINMEYENI_GERCEKLESMIS_SAYDI: 5. gun fiyatsiz, motor onceki gunu 'time' diye yazdi"
+   ]
+  },
+  {
+   "arm": "B_rich",
+   "ticker": "SPY",
+   "anchor": "SPY260918P00760000",
+   "structure": "bear_put_debit",
+   "info_time": {
+    "flow_session_D": "2026-08-31",
+    "known": "D hacmi/zinciri D+1'de yayimlanmis; giris D+1 kapanisi = 2026-09-01"
+   },
+   "entry_session": "2026-09-01",
+   "entry_source": "artifacts/options-alpha-v1/harvest/2026-09-01/SPY.json",
+   "legs": [
+    {
+     "leg": "SPY260918P00760000",
+     "side": "long",
+     "bid": "7.92",
+     "ask": "7.95",
+     "used": "ask 7.95",
+     "strike": "760",
+     "expires": "2026-09-18"
+    },
+    {
+     "leg": "SPY260918P00759000",
+     "side": "short",
+     "bid": "7.56",
+     "ask": "7.59",
+     "used": "bid 7.56",
+     "strike": "759",
+     "expires": "2026-09-18"
+    }
+   ],
+   "quantity": 2,
+   "multiplier": 100,
+   "raw_debit_per_share": "0.39",
+   "debit_after_slippage": "0.40",
+   "engine_entry_debit": "0.40",
+   "entry_debit_agrees": true,
+   "commission_round_trip_usd": "5.20",
+   "max_loss_usd": "85.20",
+   "hold": [
+    {
+     "day": "2026-09-02",
+     "source": "artifacts/options-alpha-v1/harvest/2026-09-02/SPY.json",
+     "quotes": {
+      "SPY260918P00760000": {
+       "bid": "5.70",
+       "ask": "6.05"
+      },
+      "SPY260918P00759000": {
+       "bid": "5.43",
+       "ask": "5.76"
+      }
+     },
+     "closable_value": "-0.06",
+     "missing_legs": []
+    },
+    {
+     "day": "2026-09-03",
+     "source": "artifacts/options-alpha-v1/harvest/2026-09-03/SPY.json",
+     "quotes": {
+      "SPY260918P00760000": {
+       "bid": "3.12",
+       "ask": "3.14"
+      },
+      "SPY260918P00759000": {
+       "bid": "2.92",
+       "ask": "2.95"
+      }
+     },
+     "closable_value": "0.17",
+     "missing_legs": []
+    },
+    {
+     "day": "2026-09-04",
+     "source": "artifacts/options-alpha-v1/harvest/2026-09-04/SPY.json",
+     "quotes": {
+      "SPY260918P00760000": {
+       "bid": "3.60",
+       "ask": "3.63"
+      },
+      "SPY260918P00759000": {
+       "bid": "3.38",
+       "ask": "3.39"
+      }
+     },
+     "closable_value": "0.21",
+     "missing_legs": []
+    },
+    {
+     "day": "2026-09-08",
+     "source": "artifacts/options-alpha-v1/harvest/2026-09-08/SPY.json",
+     "quotes": {
+      "SPY260918P00760000": {
+       "bid": "4.63",
+       "ask": "4.66"
+      },
+      "SPY260918P00759000": {
+       "bid": "4.34",
+       "ask": "4.37"
+      }
+     },
+     "closable_value": "0.26",
+     "missing_legs": []
+    },
+    {
+     "day": "2026-09-09",
+     "source": "artifacts/options-alpha-v1/harvest/2026-09-09/SPY.json",
+     "quotes": {},
+     "closable_value": null,
+     "missing_legs": [
+      "SPY260918P00760000",
+      "SPY260918P00759000"
+     ]
+    }
+   ],
+   "independent_time_only": {
+    "status": "UNKNOWN",
+    "pnl_usd": null,
+    "why": "5. seansta en az bir bacagin kotasyonu yok"
+   },
+   "engine_time_only": {
+    "reason": "time",
+    "pnl_usd": "-33.20",
+    "return_on_risk": -0.38967136150234744,
+    "held": 5,
+    "unpriced_days": 1
+   },
+   "pnl_agrees": false,
+   "flags": [
+    "NEGATIF_PAKET_DEGERI: en az bir gun uzun bid < kisa ask",
+    "MOTOR_BILINMEYENI_GERCEKLESMIS_SAYDI: 5. gun fiyatsiz, motor onceki gunu 'time' diye yazdi"
+   ]
+  },
+  {
+   "arm": "B_rich",
+   "ticker": "TSLA",
+   "anchor": "TSLA260911C00370000",
+   "structure": "bull_call_debit",
+   "info_time": {
+    "flow_session_D": "2026-08-24",
+    "known": "D hacmi/zinciri D+1'de yayimlanmis; giris D+1 kapanisi = 2026-08-25"
+   },
+   "entry_session": "2026-08-25",
+   "entry_source": "artifacts/options-alpha-v1/harvest/2026-08-25/TSLA.json",
+   "legs": [
+    {
+     "leg": "TSLA260911C00370000",
+     "side": "long",
+     "bid": "5.30",
+     "ask": "5.40",
+     "used": "ask 5.40",
+     "strike": "370",
+     "expires": "2026-09-11"
+    },
+    {
+     "leg": "TSLA260911C00372500",
+     "side": "short",
+     "bid": "4.70",
+     "ask": "4.80",
+     "used": "bid 4.70",
+     "strike": "372.5",
+     "expires": "2026-09-11"
+    }
+   ],
+   "quantity": 1,
+   "multiplier": 100,
+   "raw_debit_per_share": "0.70",
+   "debit_after_slippage": "0.71",
+   "engine_entry_debit": "0.71",
+   "entry_debit_agrees": true,
+   "commission_round_trip_usd": "2.60",
+   "max_loss_usd": "73.60",
+   "hold": [
+    {
+     "day": "2026-08-26",
+     "source": "artifacts/options-alpha-v1/harvest/2026-08-26/TSLA.json",
+     "quotes": {
+      "TSLA260911C00370000": {
+       "bid": "3.85",
+       "ask": "3.95"
+      },
+      "TSLA260911C00372500": {
+       "bid": "3.40",
+       "ask": "3.50"
+      }
+     },
+     "closable_value": "0.35",
+     "missing_legs": []
+    },
+    {
+     "day": "2026-08-27",
+     "source": "artifacts/options-alpha-v1/harvest/2026-08-27/TSLA.json",
+     "quotes": {
+      "TSLA260911C00370000": {
+       "bid": "5.45",
+       "ask": "5.60"
+      },
+      "TSLA260911C00372500": {
+       "bid": "4.80",
+       "ask": "4.95"
+      }
+     },
+     "closable_value": "0.50",
+     "missing_legs": []
+    },
+    {
+     "day": "2026-08-28",
+     "source": "artifacts/options-alpha-v1/harvest/2026-08-28/TSLA.json",
+     "quotes": {
+      "TSLA260911C00370000": {
+       "bid": "2.95",
+       "ask": "3.05"
+      },
+      "TSLA260911C00372500": {
+       "bid": "2.52",
+       "ask": "2.61"
+      }
+     },
+     "closable_value": "0.34",
+     "missing_legs": []
+    },
+    {
+     "day": "2026-08-31",
+     "source": "artifacts/options-alpha-v1/harvest/2026-08-31/TSLA.json",
+     "quotes": {
+      "TSLA260911C00370000": {
+       "bid": "9.75",
+       "ask": "10.00"
+      },
+      "TSLA260911C00372500": {
+       "bid": "8.65",
+       "ask": "8.90"
+      }
+     },
+     "closable_value": "0.85",
+     "missing_legs": []
+    },
+    {
+     "day": "2026-09-01",
+     "source": "artifacts/options-alpha-v1/harvest/2026-09-01/TSLA.json",
+     "quotes": {
+      "TSLA260911C00370000": {
+       "bid": "4.40",
+       "ask": "4.50"
+      },
+      "TSLA260911C00372500": {
+       "bid": "3.80",
+       "ask": "3.85"
+      }
+     },
+     "closable_value": "0.55",
+     "missing_legs": []
+    }
+   ],
+   "independent_time_only": {
+    "status": "REALISED",
+    "exit_day": "2026-09-01",
+    "exit_value": "0.55",
+    "pnl_usd": "-18.60"
+   },
+   "engine_time_only": {
+    "reason": "time",
+    "pnl_usd": "-18.60",
+    "return_on_risk": -0.25271739130434784,
+    "held": 5,
+    "unpriced_days": 0
+   },
+   "pnl_agrees": true,
+   "flags": []
+  },
+  {
+   "arm": "B_rich",
+   "ticker": "SPY",
+   "anchor": "SPY260930P00754000",
+   "structure": "bear_put_debit",
+   "info_time": {
+    "flow_session_D": "2026-08-28",
+    "known": "D hacmi/zinciri D+1'de yayimlanmis; giris D+1 kapanisi = 2026-08-31"
+   },
+   "entry_session": "2026-08-31",
+   "entry_source": "artifacts/options-alpha-v1/harvest/2026-08-31/SPY.json",
+   "legs": [
+    {
+     "leg": "SPY260930P00754000",
+     "side": "long",
+     "bid": "6.02",
+     "ask": "6.05",
+     "used": "ask 6.05",
+     "strike": "754",
+     "expires": "2026-09-30"
+    },
+    {
+     "leg": "SPY260930P00753000",
+     "side": "short",
+     "bid": "5.80",
+     "ask": "5.83",
+     "used": "bid 5.80",
+     "strike": "753",
+     "expires": "2026-09-30"
+    }
+   ],
+   "quantity": 3,
+   "multiplier": 100,
+   "raw_debit_per_share": "0.25",
+   "debit_after_slippage": "0.26",
+   "engine_entry_debit": "0.26",
+   "entry_debit_agrees": true,
+   "commission_round_trip_usd": "7.80",
+   "max_loss_usd": "85.80",
+   "hold": [
+    {
+     "day": "2026-09-01",
+     "source": "artifacts/options-alpha-v1/harvest/2026-09-01/SPY.json",
+     "quotes": {
+      "SPY260930P00754000": {
+       "bid": "8.30",
+       "ask": "8.34"
+      },
+      "SPY260930P00753000": {
+       "bid": "8.01",
+       "ask": "8.05"
+      }
+     },
+     "closable_value": "0.25",
+     "missing_legs": []
+    },
+    {
+     "day": "2026-09-02",
+     "source": "artifacts/options-alpha-v1/harvest/2026-09-02/SPY.json",
+     "quotes": {
+      "SPY260930P00754000": {
+       "bid": "6.33",
+       "ask": "6.48"
+      },
+      "SPY260930P00753000": {
+       "bid": "5.29",
+       "ask": "7.35"
+      }
+     },
+     "closable_value": "-1.02",
+     "missing_legs": []
+    },
+    {
+     "day": "2026-09-03",
+     "source": "artifacts/options-alpha-v1/harvest/2026-09-03/SPY.json",
+     "quotes": {
+      "SPY260930P00754000": {
+       "bid": "4.09",
+       "ask": "4.11"
+      },
+      "SPY260930P00753000": {
+       "bid": "3.92",
+       "ask": "3.95"
+      }
+     },
+     "closable_value": "0.14",
+     "missing_legs": []
+    },
+    {
+     "day": "2026-09-04",
+     "source": "artifacts/options-alpha-v1/harvest/2026-09-04/SPY.json",
+     "quotes": {
+      "SPY260930P00754000": {
+       "bid": "4.63",
+       "ask": "4.65"
+      },
+      "SPY260930P00753000": {
+       "bid": "4.44",
+       "ask": "4.45"
+      }
+     },
+     "closable_value": "0.18",
+     "missing_legs": []
+    },
+    {
+     "day": "2026-09-08",
+     "source": "artifacts/options-alpha-v1/harvest/2026-09-08/SPY.json",
+     "quotes": {
+      "SPY260930P00754000": {
+       "bid": "5.53",
+       "ask": "5.57"
+      },
+      "SPY260930P00753000": {
+       "bid": "5.30",
+       "ask": "5.33"
+      }
+     },
+     "closable_value": "0.20",
+     "missing_legs": []
+    }
+   ],
+   "independent_time_only": {
+    "status": "REALISED",
+    "exit_day": "2026-09-08",
+    "exit_value": "0.20",
+    "pnl_usd": "-25.80"
+   },
+   "engine_time_only": {
+    "reason": "time",
+    "pnl_usd": "-25.80",
+    "return_on_risk": -0.3006993006993007,
+    "held": 5,
+    "unpriced_days": 0
+   },
+   "pnl_agrees": true,
+   "flags": [
+    "NEGATIF_PAKET_DEGERI: en az bir gun uzun bid < kisa ask"
+   ]
+  },
+  {
+   "arm": "B_rich",
+   "ticker": "QQQ",
+   "anchor": "QQQ260814P00685000",
+   "structure": "bear_put_debit",
+   "info_time": {
+    "flow_session_D": "2026-07-30",
+    "known": "D hacmi/zinciri D+1'de yayimlanmis; giris D+1 kapanisi = 2026-07-31"
+   },
+   "entry_session": "2026-07-31",
+   "entry_source": "artifacts/options-alpha-v1/harvest/2026-07-31/QQQ.json",
+   "legs": [
+    {
+     "leg": "QQQ260814P00685000",
+     "side": "long",
+     "bid": "10.61",
+     "ask": "10.81",
+     "used": "ask 10.81",
+     "strike": "685",
+     "expires": "2026-08-14"
+    },
+    {
+     "leg": "QQQ260814P00684000",
+     "side": "short",
+     "bid": "10.19",
+     "ask": "10.49",
+     "used": "bid 10.19",
+     "strike": "684",
+     "expires": "2026-08-14"
+    }
+   ],
+   "quantity": 1,
+   "multiplier": 100,
+   "raw_debit_per_share": "0.62",
+   "debit_after_slippage": "0.63",
+   "engine_entry_debit": "0.63",
+   "entry_debit_agrees": true,
+   "commission_round_trip_usd": "2.60",
+   "max_loss_usd": "65.60",
+   "hold": [
+    {
+     "day": "2026-08-03",
+     "source": "artifacts/options-alpha-v1/harvest/2026-08-03/QQQ.json",
+     "quotes": {
+      "QQQ260814P00685000": {
+       "bid": "5.00",
+       "ask": "5.09"
+      },
+      "QQQ260814P00684000": {
+       "bid": "4.76",
+       "ask": "4.86"
+      }
+     },
+     "closable_value": "0.14",
+     "missing_legs": []
+    },
+    {
+     "day": "2026-08-04",
+     "source": "artifacts/options-alpha-v1/harvest/2026-08-04/QQQ.json",
+     "quotes": {
+      "QQQ260814P00685000": {
+       "bid": "1.43",
+       "ask": "1.79"
+      },
+      "QQQ260814P00684000": {
+       "bid": "1.30",
+       "ask": "1.70"
+      }
+     },
+     "closable_value": "-0.27",
+     "missing_legs": []
+    },
+    {
+     "day": "2026-08-05",
+     "source": "artifacts/options-alpha-v1/harvest/2026-08-05/QQQ.json",
+     "quotes": {},
+     "closable_value": null,
+     "missing_legs": [
+      "QQQ260814P00685000",
+      "QQQ260814P00684000"
+     ]
+    },
+    {
+     "day": "2026-08-06",
+     "source": "artifacts/options-alpha-v1/harvest/2026-08-06/QQQ.json",
+     "quotes": {},
+     "closable_value": null,
+     "missing_legs": [
+      "QQQ260814P00685000",
+      "QQQ260814P00684000"
+     ]
+    },
+    {
+     "day": "2026-08-07",
+     "source": "artifacts/options-alpha-v1/harvest/2026-08-07/QQQ.json",
+     "quotes": {},
+     "closable_value": null,
+     "missing_legs": [
+      "QQQ260814P00685000",
+      "QQQ260814P00684000"
+     ]
+    }
+   ],
+   "independent_time_only": {
+    "status": "UNKNOWN",
+    "pnl_usd": null,
+    "why": "5. seansta en az bir bacagin kotasyonu yok"
+   },
+   "engine_time_only": {
+    "reason": "time",
+    "pnl_usd": "-92.60",
+    "return_on_risk": -1.4115853658536586,
+    "held": 5,
+    "unpriced_days": 3
+   },
+   "pnl_agrees": false,
+   "flags": [
+    "NEGATIF_PAKET_DEGERI: en az bir gun uzun bid < kisa ask",
+    "MOTOR_BILINMEYENI_GERCEKLESMIS_SAYDI: 5. gun fiyatsiz, motor onceki gunu 'time' diye yazdi"
+   ]
+  }
+ ]
+}

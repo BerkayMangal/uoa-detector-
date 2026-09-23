@@ -1,6 +1,6 @@
 # options-alpha-v1 — mutasyon kanıtı
 
-**Koşum:** 2026-09-23T11:39:51.269349+00:00
+**Koşum:** 2026-09-23T14:18:13.494003+00:00
 
 Her koruma kasten bozuldu ve adı konmuş testin kırmızıya dönmesi beklendi.
 Mutasyondan **sağ çıkan** bir test, testin kendisi hakkında bir bulgudur.

@@ -1,5 +1,7 @@
 # H01 sonucu — REDDEDİLDİ
 
+> **Düzeltme 2026-09-23 (`AUDIT_H10_TRADES.md`).** Bu belgedeki sayılar v1 motorundan. Motor, ufkun son günü fiyatlanamadığında önceki bir günü `time` çıkışı olarak yazıyordu (hasat DTE<10 satırları atıyor). Düzeltilmiş motorla sürümlü yeniden koşum: REJECTED kalıyor (v2: 80 / 78 tamamlanmış yapı; A maliyet sonrası −55,18 $). v1 artefaktı korunuyor; v2 ayrı dosyada.
+
 **Faz 5.24 · options_alpha_v1** · koşum **2026-09-23**
 **Protokol:** `PREREG_H01.md` + `PREREG_H01_ADDENDUM.md`
 **Artefakt:** `artifacts/options-alpha-v1/h01_result.json`
