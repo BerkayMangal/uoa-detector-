@@ -40,6 +40,15 @@ PAGE = (
     "<p>kotasyon yok</p><p>AMA 1 aile aleyhte: Sektor.</p>"
     "</article></body></html>"
 )
+# The option screen (Phase 5.24 M7), which the rail now checks as well. Only two
+# things about it are the rail's business: that the page commits to a data-state
+# instead of rendering an ambiguous blank, and that it still carries the research
+# verdicts. The stub therefore carries exactly those and nothing else.
+OPSIYON_PAGE = (
+    '<html><body><div data-state="ok">'
+    "<table><tr><td>M5b</td><td>REJECTED</td></tr></table>"
+    "</div></body></html>"
+)
 
 
 class _Board(http.server.BaseHTTPRequestHandler):
@@ -54,6 +63,9 @@ class _Board(http.server.BaseHTTPRequestHandler):
             self.send_response(401)
             self.send_header("WWW-Authenticate", 'Basic realm="board"')
             self.end_headers()
+            return
+        if self.path == "/opsiyon":
+            self._send(200, OPSIYON_PAGE.encode())
             return
         self._send(200, PAGE.encode())
 
@@ -131,6 +143,13 @@ def test_environment_credentials_open_the_board(board_url: str, stub_bin: Path) 
     assert "/ without credentials        401" in result.stdout
     assert "/ with credentials           200" in result.stdout
     assert "live render (s)" in result.stdout
+    # The option screen is checked on the same terms, because BLOCKERS.md B1 names
+    # that screen as the thing the missing credentials block: a rail that opens the
+    # board and never opens /opsiyon would close B1 on the wrong evidence.
+    assert "/opsiyon without credentials 401" in result.stdout
+    assert "/opsiyon with credentials    200" in result.stdout
+    assert "/opsiyon state               ok" in result.stdout
+    assert "/opsiyon verdicts            REJECTED gorunuyor" in result.stdout
     # Only check 4 is left without an input, so the run is PARTIAL, not FAIL.
     assert "VERIFY: PARTIAL" in result.stdout
     assert result.returncode == 2

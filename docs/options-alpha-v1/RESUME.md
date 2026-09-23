@@ -88,8 +88,23 @@ Her sonuç bu etiketi taşır. Düşük kaliteyle yüksek güvenli hüküm veril
 
 ## 6. Sıradaki iş
 
-`STATUS.md`'deki ilk **TODO** satırı. Şu an: **M1 — uçtan uca PAPER kartı**.
+`STATUS.md`'deki kilometre taşı tablosu tek doğrudur; bu bölüm onu tekrarlamaz,
+yalnız o an açık olanı işaret eder. **2026-09-23 itibarıyla** M0/M1/M3/M4/M5/M5b/M8
+kapandı, M2 ve M7 kısmen, M6'nın engeli ölçüldü. Açık olanlar:
+
+1. **Açık PAPER pozisyonlarının izlenmesi.** `/opsiyon` ekranı commit'li
+   artefaktları okur; kendisi yeni fiyat çekmez ve açık pozisyonu ilerletmez.
+   Canlı zamanlayıcıya bağlanması yazılmamış koddur, dış engel değil.
+2. **Kalan 10 hipotez ailesi** (`HYPOTHESES.md`). Sıradaki her aile için önce
+   ön-kayıt yazılıp **commit edilir**, sonra koşucu yazılır. H03 ve H01'de bu
+   sıra tutuldu; bozulmaz.
+3. **M2'nin kalan yapıları.** `structures.py` dördünü de fiyatlıyor, ama seçici
+   yalnız çıplak long ve dikey debit üretiyor.
 
 Piyasa kapalıysa akış tamamlanmış bir seans üzerinden tarihli uç noktalarla
 koşulur ve kartta **replay** olarak etiketlenir. Eski bir kartı "şimdi al" gibi
 sunma; gerçek fırsat yoksa güncel fiyat veya kontrat uydurma.
+
+**Hüküm durumu:** bu kapsamda koşan iki araştırma ailesinin ikisi de
+REDDEDİLDİ (`RESULT_H03.md`, `RESULT_H01.md`). Çalışan bir hat var; kanıtlanmış
+bir edge yok. İkisi farklı cümle ve karıştırılmaz.

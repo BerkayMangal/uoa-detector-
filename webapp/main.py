@@ -38,7 +38,7 @@ from starlette.datastructures import Headers
 from starlette.responses import PlainTextResponse
 
 from uoa_detector.sources.market_hours import is_market_open
-from webapp import explanations, gamma, journal, pricing
+from webapp import explanations, gamma, journal, options_board, pricing
 from webapp.board import alfa_page, cards, decision_ledger, fills, outcomes
 from webapp.board.copy_tr import IV_NOT_SELL_VOL
 from webapp.board.evidence import request_for
@@ -421,6 +421,21 @@ def gamma_page(request: Request) -> HTMLResponse:
     return templates.TemplateResponse(
         request, "gamma.html", {"rows": rows, "iv_not_sell_vol": IV_NOT_SELL_VOL, **_EXPLAIN},
     )
+
+
+@app.get("/opsiyon", response_class=HTMLResponse)
+def options_page(request: Request) -> HTMLResponse:
+    """Phase 5.24 M7: the option scope's PAPER cards, outcomes and verdicts.
+
+    Read-only. It renders committed artifacts and decides nothing: no ranking, no
+    promotion, no order. Every research family in this scope has been REJECTED and
+    the screen leads with that rather than burying it.
+    """
+    board = _safe(
+        lambda: options_board.load_board(_BASE.parent),
+        options_board.unreadable("opsiyon artefaktlari okunamadi"),
+    )
+    return templates.TemplateResponse(request, "opsiyon.html", {"board": board, **_EXPLAIN})
 
 
 # ---------------------------------------------------------------------------
