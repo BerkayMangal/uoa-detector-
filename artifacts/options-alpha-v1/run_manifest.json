@@ -1,8 +1,8 @@
 {
   "scope": "options_alpha_v1",
   "phase": "5.24",
-  "generated_at": "2026-09-23T10:18:01.521977+00:00",
-  "base_commit": "210a0f3d5c5deb9a8f3e061360031400e888d081",
+  "generated_at": "2026-09-23T11:01:00.064783+00:00",
+  "base_commit": "3143e121964cc3f07e9a81651cd8185527e7dcf4",
   "note": "base_commit is the branch point; this milestone is not committed yet at write time.",
   "milestones": [
     {
@@ -112,6 +112,110 @@
         "daily_count": "193",
         "daily_limit": "30000"
       }
+    },
+    {
+      "id": "M3",
+      "name": "Exit engine with frozen variants, scored against real subsequent sessions",
+      "status": "DONE",
+      "commands": [
+        "uv run python scripts/options_alpha_replay_card.py --session 2026-09-08 --ticker SPY",
+        "uv run python scripts/options_alpha_score_card.py artifacts/options-alpha-v1/replay/2026-09-08/paper_card_SPY.json"
+      ],
+      "exit_variants_frozen": [
+        "time_only",
+        "time_and_stop",
+        "time_target_stop"
+      ],
+      "tracks": "structure exit value, never the underlying price",
+      "legacy_engine": "untouched; backtest/simple_pnl.py take_profit_or_stop still raises NotImplementedError by design",
+      "code": {
+        "exits": "1d86d200aad745c076507d18d83c5b204f06f2ede40a054c0fe02c5650fcf407",
+        "scorer": "37122060d975dcfeb65aebdc9f2b1c5d23d323a27aaee173f7610ffd5a316945",
+        "runner": "fe02ae91367071c57d31be1f441031830d7c842c0b5d87d9d5906d1763c03e64"
+      },
+      "results": {
+        "SPY": {
+          "card_path": "artifacts/options-alpha-v1/replay/2026-09-08/paper_card_SPY.json",
+          "card_sha256": "beb19a932289b78f58226a151a392a226564509eaf94e7d1e8024a7a46a593af",
+          "outcome_path": "artifacts/options-alpha-v1/replay/2026-09-08/paper_card_SPY_outcome.json",
+          "outcome_sha256": "5fd3a55506f1a02ab45b1c99b074967b12cf655a085cd7dff2fd8925c839b952",
+          "signal_id": "sig_d1ce1ed71d8c9136",
+          "structure": "bull_call_debit",
+          "entry_session": "2026-09-08",
+          "sessions_scored": 11,
+          "price_basis": "per-leg daily NBBO close only; per-leg highs/lows deliberately NOT combined into a package range (different instants)",
+          "exits": {
+            "time_only": {
+              "reason": "time",
+              "exit_day": "2026-09-15",
+              "pnl_usd": "-30.60",
+              "return_on_risk": -0.47368421052631576,
+              "held_trading_days": 5,
+              "ambiguous_same_day_touch": false
+            },
+            "time_and_stop": {
+              "reason": "time",
+              "exit_day": "2026-09-15",
+              "pnl_usd": "-30.60",
+              "return_on_risk": -0.47368421052631576,
+              "held_trading_days": 5,
+              "ambiguous_same_day_touch": false
+            },
+            "time_target_stop": {
+              "reason": "time",
+              "exit_day": "2026-09-15",
+              "pnl_usd": "-30.60",
+              "return_on_risk": -0.47368421052631576,
+              "held_trading_days": 5,
+              "ambiguous_same_day_touch": false
+            }
+          }
+        },
+        "QQQ": {
+          "card_path": "artifacts/options-alpha-v1/replay/2026-09-08/paper_card_QQQ.json",
+          "card_sha256": "b5973a0ba6778ff555f67e7661b7900fda344a6cf99bae786ae687c8cd2056dc",
+          "outcome_path": "artifacts/options-alpha-v1/replay/2026-09-08/paper_card_QQQ_outcome.json",
+          "outcome_sha256": "1765d46704217ffcda47f8fa4f5ad99df6e9ce12ad5ea1746c0ab4c9aae7f9ea",
+          "signal_id": "sig_591e4d839beeb3e4",
+          "structure": "bear_put_debit",
+          "entry_session": "2026-09-08",
+          "sessions_scored": 11,
+          "price_basis": "per-leg daily NBBO close only; per-leg highs/lows deliberately NOT combined into a package range (different instants)",
+          "exits": {
+            "time_only": {
+              "reason": "time",
+              "exit_day": "2026-09-15",
+              "pnl_usd": "-49.20",
+              "return_on_risk": -0.5642201834862385,
+              "held_trading_days": 5,
+              "ambiguous_same_day_touch": false
+            },
+            "time_and_stop": {
+              "reason": "stop",
+              "exit_day": "2026-09-09",
+              "pnl_usd": "-47.20",
+              "return_on_risk": -0.5412844036697247,
+              "held_trading_days": 1,
+              "ambiguous_same_day_touch": false
+            },
+            "time_target_stop": {
+              "reason": "stop",
+              "exit_day": "2026-09-09",
+              "pnl_usd": "-47.20",
+              "return_on_risk": -0.5412844036697247,
+              "held_trading_days": 1,
+              "ambiguous_same_day_touch": false
+            }
+          }
+        }
+      },
+      "headline": "both real positions lost: SPY -30.60 USD (-47.4%), QQQ -47.20 USD (-54.1%) on the stop variants",
+      "defects_found_and_fixed": [
+        "the same-day both-thresholds guard was unreachable: one daily close cannot sit above the target and below the stop at once, so observations now carry an intraday range",
+        "the card's trigger text claimed volume>open-interest even when the fallback pick was used (QQQ 3,008 vs 40,509); it now names the branch and states the condition was NOT met",
+        "per-leg daily highs and lows are deliberately NOT combined into a package range: the two extremes need not be simultaneous"
+      ],
+      "gate": "4280 passed, 52 skipped; mypy --strict clean on 191 files; ruff clean; uv lock consistent"
     }
   ]
 }

@@ -107,10 +107,30 @@ def main() -> int:
     # Stated in advance, not chosen after seeing outcomes: most traded contract
     # whose volume exceeds its open interest.
     fresh = [q for q in eligible if (q.volume or 0) > (q.open_interest or 0)]
-    pool = fresh or eligible
-    anchor = max(pool, key=lambda q: q.volume or 0)
+    used_fresh = bool(fresh)
+    anchor = max(fresh or eligible, key=lambda q: q.volume or 0)
+
+    # The trigger text must describe the branch that actually ran. Claiming
+    # "volume > open interest" on a fallback pick would put a condition on the
+    # card that the contract never met — QQQ on 2026-09-08 did exactly that
+    # (volume 3,008 against open interest 40,509) before this was fixed.
+    if used_fresh:
+        trigger_text = (
+            f"{anchor.option_symbol}: hacim {anchor.volume} > acik pozisyon "
+            f"{anchor.open_interest} (yeni pozisyonlanma), seansin en cok islem goren uygun kontrati"
+        )
+        branch = "hacim>OI olan en cok islem goren kontrat"
+    else:
+        trigger_text = (
+            f"{anchor.option_symbol}: seansin en cok islem goren uygun kontrati "
+            f"(hacim {anchor.volume}, acik pozisyon {anchor.open_interest}). "
+            "YEDEK SECIM: hicbir uygun kontratta hacim acik pozisyonu asmadi, "
+            "yani yeni pozisyonlanma kosulu SAGLANMADI"
+        )
+        branch = "YEDEK: hacim>OI saglayan uygun kontrat yok, en cok islem gorene dusuldu"
+
     print(
-        f"\ntetik: hacim>OI olan en cok islem goren kontrat"
+        f"\ntetik: {branch}"
         f"  -> {anchor.option_symbol}"
         f"  hacim {anchor.volume}  OI {anchor.open_interest}  delta {anchor.delta}"
     )
@@ -133,10 +153,7 @@ def main() -> int:
         settings=settings,
         session=snapshot_session,
         underlying=underlying,
-        trigger=(
-            f"{anchor.option_symbol}: hacim {anchor.volume} > acik pozisyon "
-            f"{anchor.open_interest} (yeni pozisyonlanma), seansin en cok islem goren uygun kontrati"
-        ),
+        trigger=trigger_text,
         counter_argument=(
             "Bu tetigin dogrulanmis bir edge'i YOK. Hat kanitidir, isaret degil. "
             "Hacmin OI'yi asmasi ayni gun acilip kapanan islemle de olusur ve yon soylemez; "

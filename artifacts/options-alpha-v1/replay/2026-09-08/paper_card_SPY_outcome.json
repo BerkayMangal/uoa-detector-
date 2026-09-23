@@ -1,0 +1,83 @@
+{
+  "card": {
+    "signal_id": "sig_d1ce1ed71d8c9136",
+    "opportunity_id": "opp_b2f5de0173d2202f",
+    "hypothesis_id": "H00_pipeline_smoke",
+    "underlying": "SPY",
+    "structure": "bull_call_debit",
+    "session": "2026-09-08",
+    "net_debit_per_share": "0.62",
+    "quantity": 1,
+    "structural_max_loss_usd": "64.60",
+    "max_profit_usd": "35.40",
+    "profile_sha256": "b7886203115d469d72fa8ea1554d2ffea04f9ede237c3cd98d910381ac258f39",
+    "quality_tier": "B"
+  },
+  "scored_at_sessions": [
+    "2026-09-09",
+    "2026-09-10",
+    "2026-09-11",
+    "2026-09-14",
+    "2026-09-15",
+    "2026-09-16",
+    "2026-09-17",
+    "2026-09-18",
+    "2026-09-21",
+    "2026-09-22",
+    "2026-09-23"
+  ],
+  "price_basis": "per-leg daily NBBO close only; per-leg highs/lows deliberately NOT combined into a package range (different instants)",
+  "exits": {
+    "time_only": {
+      "reason": "time",
+      "exit_day": "2026-09-15",
+      "exit_value": "0.34",
+      "pnl_usd": "-30.60",
+      "return_on_risk": -0.47368421052631576,
+      "held_trading_days": 5,
+      "mfe_per_share": "0.47",
+      "mae_per_share": "0.34",
+      "ambiguous_same_day_touch": false,
+      "unpriced_days": 0,
+      "notes": [
+        "stop 0.31/hisse, hedef 1.00/hisse — ikisi de yapinin cikis degerini izler",
+        "gunluk veri: gun ici sira bilinmiyor",
+        "hedef yapinin tavaniyla sinirlandi"
+      ]
+    },
+    "time_and_stop": {
+      "reason": "time",
+      "exit_day": "2026-09-15",
+      "exit_value": "0.34",
+      "pnl_usd": "-30.60",
+      "return_on_risk": -0.47368421052631576,
+      "held_trading_days": 5,
+      "mfe_per_share": "0.47",
+      "mae_per_share": "0.34",
+      "ambiguous_same_day_touch": false,
+      "unpriced_days": 0,
+      "notes": [
+        "stop 0.31/hisse, hedef 1.00/hisse — ikisi de yapinin cikis degerini izler",
+        "gunluk veri: gun ici sira bilinmiyor",
+        "hedef yapinin tavaniyla sinirlandi"
+      ]
+    },
+    "time_target_stop": {
+      "reason": "time",
+      "exit_day": "2026-09-15",
+      "exit_value": "0.34",
+      "pnl_usd": "-30.60",
+      "return_on_risk": -0.47368421052631576,
+      "held_trading_days": 5,
+      "mfe_per_share": "0.47",
+      "mae_per_share": "0.34",
+      "ambiguous_same_day_touch": false,
+      "unpriced_days": 0,
+      "notes": [
+        "stop 0.31/hisse, hedef 1.00/hisse — ikisi de yapinin cikis degerini izler",
+        "gunluk veri: gun ici sira bilinmiyor",
+        "hedef yapinin tavaniyla sinirlandi"
+      ]
+    }
+  }
+}

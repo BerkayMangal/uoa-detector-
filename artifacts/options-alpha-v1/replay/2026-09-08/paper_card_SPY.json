@@ -1,56 +1,56 @@
 {
   "card": {
-    "signal_id": "sig_05113e8fc9bd06b7",
-    "opportunity_id": "opp_df4b52f037c4c3a1",
+    "signal_id": "sig_d1ce1ed71d8c9136",
+    "opportunity_id": "opp_b2f5de0173d2202f",
     "hypothesis_id": "H00_pipeline_smoke",
     "research_status": "RESEARCH_ONLY",
     "opportunity_status": "WATCH",
     "data_origin": "replay",
-    "decision_time": "2026-09-23T11:00:27.236514+00:00",
-    "session": "2026-09-22",
-    "underlying": "QQQ",
+    "decision_time": "2026-09-23T11:00:26.484666+00:00",
+    "session": "2026-09-08",
+    "underlying": "SPY",
     "direction": "up",
     "structure": "bull_call_debit",
     "legs": [
       {
-        "occ_symbol": "QQQ261016C00760000",
+        "occ_symbol": "SPY261009C00768000",
         "right": "call",
-        "strike": "760",
-        "expiry": "2026-10-16",
+        "strike": "768",
+        "expiry": "2026-10-09",
         "multiplier": 100,
         "side": "long",
-        "bid": "8.18",
-        "ask": "8.25",
-        "quote_as_of": "2026-09-22"
+        "bid": "10.45",
+        "ask": "10.50",
+        "quote_as_of": "2026-09-08"
       },
       {
-        "occ_symbol": "QQQ261016C00761000",
+        "occ_symbol": "SPY261009C00769000",
         "right": "call",
-        "strike": "761",
-        "expiry": "2026-10-16",
+        "strike": "769",
+        "expiry": "2026-10-09",
         "multiplier": 100,
         "side": "short",
-        "bid": "7.78",
-        "ask": "7.86",
-        "quote_as_of": "2026-09-22"
+        "bid": "9.89",
+        "ask": "9.94",
+        "quote_as_of": "2026-09-08"
       }
     ],
-    "net_debit_per_share": "0.48",
-    "limit_price": "0.48",
+    "net_debit_per_share": "0.62",
+    "limit_price": "0.62",
     "quantity": 1,
-    "entry_cost_usd": "48.00",
+    "entry_cost_usd": "62.00",
     "commission_usd": "2.60",
-    "structural_max_loss_usd": "50.60",
-    "max_profit_usd": "49.40",
-    "breakeven_underlying": "760.48",
-    "planned_stop_usd": "25.30",
-    "target_usd": "49.40",
-    "target_meaning": "yapinin cikis degeri uzerinden, dayanak fiyati uzerinden degil (+%100 / -%50) — yapinin tavaniyla sinirlandi (istenen 50.60 $ ulasilamaz)",
+    "structural_max_loss_usd": "64.60",
+    "max_profit_usd": "35.40",
+    "breakeven_underlying": "768.62",
+    "planned_stop_usd": "32.30",
+    "target_usd": "35.40",
+    "target_meaning": "yapinin cikis degeri uzerinden, dayanak fiyati uzerinden degil (+%100 / -%50) — yapinin tavaniyla sinirlandi (istenen 64.60 $ ulasilamaz)",
     "max_hold_trading_days": 5,
     "force_close_at_dte": 7,
     "invalidation": "5 islem gunu doldu, vadeye 7 gun kaldi, ya da yapinin cikis degeri stop seviyesine dustu",
-    "trigger": "QQQ261016C00760000: hacim 49974 > acik pozisyon 35550 (yeni pozisyonlanma), seansin en cok islem goren uygun kontrati",
-    "eligibility_reason": "debit %94.3 dustu (esik %20.0)",
+    "trigger": "SPY261009C00768000: hacim 1324 > acik pozisyon 309 (yeni pozisyonlanma), seansin en cok islem goren uygun kontrati",
+    "eligibility_reason": "debit %94.2 dustu (esik %20.0)",
     "counter_argument": "Bu tetigin dogrulanmis bir edge'i YOK. Hat kanitidir, isaret degil. Hacmin OI'yi asmasi ayni gun acilip kapanan islemle de olusur ve yon soylemez; kotasyon gun sonu anlik goruntusu oldugu icin gercek bir giris fiyati vaat etmez.",
     "missing_data": [
       "kotasyon zaman damgasi yok (last_tape_time islem zamanidir)"
@@ -59,9 +59,9 @@
     "profile_sha256": "b7886203115d469d72fa8ea1554d2ffea04f9ede237c3cd98d910381ac258f39",
     "code_version": "3143e12",
     "data_manifest": {
-      "chain_snapshot": "artifacts/options-alpha-v1/replay/2026-09-22/chain_trimmed_QQQ.json",
+      "chain_snapshot": "artifacts/options-alpha-v1/replay/2026-09-08/chain_trimmed_SPY.json",
       "underlying": {},
-      "session": "2026-09-22",
+      "session": "2026-09-08",
       "quality_tier": "B"
     },
     "sources": [
@@ -72,8 +72,8 @@
     "events": []
   },
   "funnel": {
-    "scanned": 1374,
-    "eligible": 97,
+    "scanned": 1170,
+    "eligible": 31,
     "structures_built": 1,
     "priced": 2,
     "passed_cost_gate": 1,
@@ -81,23 +81,23 @@
     "top_drop_reasons": [
       [
         "acik pozisyon yetersiz",
-        767
+        854
       ],
       [
         "hacim yetersiz",
-        172
-      ],
-      [
-        "delta bandi disinda",
-        160
+        197
       ],
       [
         "bid cok dusuk",
-        153
+        47
+      ],
+      [
+        "delta bandi disinda",
+        37
       ],
       [
         "makas cok genis",
-        25
+        4
       ]
     ]
   }

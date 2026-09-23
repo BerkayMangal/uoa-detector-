@@ -6,7 +6,7 @@
     "research_status": "RESEARCH_ONLY",
     "opportunity_status": "WATCH",
     "data_origin": "replay",
-    "decision_time": "2026-09-23T10:16:51.803910+00:00",
+    "decision_time": "2026-09-23T11:00:26.978178+00:00",
     "session": "2026-09-22",
     "underlying": "SPY",
     "direction": "up",
@@ -57,7 +57,7 @@
     ],
     "quality_tier": "B",
     "profile_sha256": "b7886203115d469d72fa8ea1554d2ffea04f9ede237c3cd98d910381ac258f39",
-    "code_version": "210a0f3",
+    "code_version": "3143e12",
     "data_manifest": {
       "chain_snapshot": "artifacts/options-alpha-v1/replay/2026-09-22/chain_trimmed.json",
       "underlying": {

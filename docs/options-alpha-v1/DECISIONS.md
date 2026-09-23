@@ -161,3 +161,56 @@ ulaşılamayacak bir seviyeyi bekle diyordu. Yüzde kuralı (`+%100`) tek başı
 doğru, ama tavanı olan bir yapıya körlemesine uygulanamaz.
 
 **Geri alma.** Yok — bu bir hata düzeltmesi.
+
+---
+
+## D10. Eşik testi gün içi aralığa bakar; belirsiz sıra uydurulmaz
+
+**Karar.** Günlük gözlem `high_value`/`low_value` taşır. Hedef günün yükseğine,
+stop günün düşüğüne karşı sınanır. İkisine de aynı gün dokunulmuşsa sonuç
+**belirsiz** işaretlenir ve **stop** uygulanır.
+
+**Neden.** Koruma önce yalnız kapanışa bakıyordu ve bu hâliyle **hiç
+tetiklenemezdi**: hedef stoptan büyük olduğu için tek bir kapanış değeri aynı
+anda hedefin üstünde ve stopun altında olamaz. Yani §14'ün istediği "sırayı
+uydurma" koruması, çalışamayacak bir kod parçasıydı — bu projenin defalarca
+yakaladığı "kırılamayan nöbetçi" biçiminin bir örneği daha.
+
+Muhafazakâr dalın seçilmesi keyfî değil: günlük veri hangisinin önce olduğunu
+söyleyemez, ve bilinmeyeni kendi lehimize okumak sonucu güzelleştirmektir.
+
+**Geri alma.** Yok — hata düzeltmesi.
+
+---
+
+## D11. Paket gün içi aralığı bacaklardan türetilmez
+
+**Karar.** `/historic` her bacağın günlük yüksek/düşüğünü verse de, paketin gün
+içi aralığı bunlardan hesaplanmaz. Sonuç ölçümü yalnız **kapanış** kullanır.
+
+**Neden.** Uzun bacağın yükseğinden kısa bacağın düşüğünü çıkarmak, paketin
+"olabileceği en iyi değerini" verir — ama o kombinasyon **hiç var olmadı**. İki
+uç aynı ana denk gelmek zorunda değil. Farklı zamanların en iyi iki fiyatını
+birleştirmek yasak; ölçülmemiş bir kazancı ölçülmüş gibi göstermenin en kolay
+yolu budur.
+
+**Bedeli açıkça:** gün içi dokunuşlar görünmez. Motor bu sınırı her sonuca not
+olarak düşüyor, gizlemiyor.
+
+**Geri alma.** Zaman damgalı gün içi kotasyon kaynağı doğrulanırsa aralık gerçek
+gözlemden kurulabilir (`BLOCKERS.md` B2/B3).
+
+---
+
+## D12. Tetik metni hangi dalın çalıştığını söylemek zorunda
+
+**Karar.** Aday seçimi yedek dala düştüğünde kart, koşulun **sağlanmadığını**
+açıkça yazar.
+
+**Neden.** QQQ'da 2026-09-08'de hiçbir uygun kontratta hacim açık pozisyonu
+aşmıyordu (3.008'e karşı 40.509). Kod doğru davranıp en çok işlem görene düştü,
+ama kartın `trigger` alanı yine de "hacim>OI (yeni pozisyonlanma)" yazıyordu.
+Kart, sağlanmamış bir koşulu kanıt gibi taşıyordu — ve bunu bir yıl sonra okuyan
+fark edemezdi.
+
+**Geri alma.** Yok — hata düzeltmesi.
