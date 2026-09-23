@@ -1,7 +1,10 @@
 # options-alpha-v1 — durum
 
-**Faz 5.24** · dal `p71-options-alpha-h01` · taban `main` eb8b766
-**Son güncelleme:** 2026-09-23 15:10Z
+**Faz 5.24** · dal `p76-options-alpha-h10` · taban `main` 3fa530e
+**Son güncelleme:** 2026-09-23 — H10 ön-kaydı donduruluyor
+
+> Bu başlık bir süre bayat kaldı (`p71` / `eb8b766` yazıyordu) ve arada dört PR
+> merge edildi. Doğru olan, `main`'in canlı SHA'sıdır: `curl -s .../health`.
 
 Ana ürün **opsiyon sinyal terminali**. Hisse tarafı yalnız karşılaştırma kolu.
 
