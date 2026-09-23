@@ -1,7 +1,7 @@
 # options-alpha-v1 — durum
 
-**Faz 5.24** · dal `p77-options-alpha-h10-run` · taban `main` 3eccb18
-**Son güncelleme:** 2026-09-23 — H10 koştu
+**Faz 5.24** · dal `p78-options-alpha-h02` · taban `main` 5c7aef9
+**Son güncelleme:** 2026-09-23 — H02 ön-kaydı donduruluyor
 
 > Bu başlık bir süre bayat kaldı (`p71` / `eb8b766` yazıyordu) ve arada dört PR
 > merge edildi. Doğru olan, `main`'in canlı SHA'sıdır: `curl -s .../health`.
