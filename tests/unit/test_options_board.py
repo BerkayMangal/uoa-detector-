@@ -245,3 +245,82 @@ def test_the_screen_never_sells_rejected_research_as_signal(client: TestClient) 
     assert "RESEARCH_ONLY" in body
     # The counter-argument travels with every card and is not an optional footnote.
     assert "Karşı argüman" in body
+
+
+# --- Phase 5.24: corrected verdicts and the live tracker ---------------------
+
+
+def test_a_corrected_verdict_is_shown_with_what_it_replaced(client: TestClient) -> None:
+    """The v2 rerun (AUDIT_H10_TRADES.md) moved H04 from REJECTED to
+    INSUFFICIENT_DATA. The screen shows the new verdict AND the old one."""
+    body = client.get("/opsiyon").text
+    assert "data-corrected" in body
+    assert "v1: REJECTED" in body
+    assert "INSUFFICIENT_DATA" in body
+    assert "M5e" in body  # H02 is on the verdict table
+    assert "tamamı reddedildi" not in body
+
+
+class _Reader:
+    def __init__(self, engine: object) -> None:
+        self.engine = engine
+
+
+def test_a_tracker_that_never_ran_says_so(
+    client: TestClient, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import webapp.main as m
+    from webapp.board.db import make_engine
+
+    monkeypatch.setattr(m, "_BOARD_READER", _Reader(make_engine(f"sqlite:///{tmp_path / 't.db'}")))
+    body = client.get("/opsiyon").text
+    assert 'data-tracker="never-ran"' in body
+
+
+async def test_a_tracked_position_renders_with_its_heartbeat(
+    client: TestClient, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import json as _json
+    from datetime import UTC, date, datetime
+
+    import webapp.main as m
+    from sqlalchemy import insert
+    from webapp.board.daily_close import AlfaDailyClose, ensure_daily_close_tables
+    from webapp.board.db import make_engine
+    from webapp.board.options_paper import run_options_paper
+    from webapp.board.settings import load_board_settings
+
+    engine = make_engine(f"sqlite:///{tmp_path / 't.db'}")
+    ensure_daily_close_tables(engine)
+    with engine.begin() as conn:
+        for d in (22, 23, 24):
+            conn.execute(insert(AlfaDailyClose).values(
+                ticker="SPY", day=date(2026, 9, d), close=1.0, fetched_at=datetime(2026, 9, 24, tzinfo=UTC)))
+    root = tmp_path / "replay" / "2026-09-22"
+    root.mkdir(parents=True)
+    (root / "paper_card_SPY.json").write_text(_json.dumps({"card": {
+        "signal_id": "sig_x", "data_origin": "replay", "hypothesis_id": "H00", "research_status": "RESEARCH_ONLY",
+        "session": "2026-09-22", "underlying": "SPY", "structure": "bull_call_debit",
+        "net_debit_per_share": "0.58", "commission_usd": "2.60", "quantity": 1,
+        "legs": [{"occ_symbol": "L", "side": "long", "strike": "775", "expiry": "2026-10-09"},
+                 {"occ_symbol": "S", "side": "short", "strike": "776", "expiry": "2026-10-09"}],
+    }}))
+
+    class _Client:
+        last_daily_request_count = None
+
+        async def request_json(self, path: str, **_: object) -> dict[str, object]:
+            symbol = path.split("/")[3]
+            price = {"L": ("0.61", "0.70"), "S": ("0.00", "0.03")}[symbol]
+            return {"chains": [{"date": f"2026-09-{d}", "nbbo_bid": price[0], "nbbo_ask": price[1]}
+                               for d in (23, 24)]}
+
+    await run_options_paper(
+        client=_Client(), engine=engine, settings=load_board_settings(),
+        now=datetime(2026, 9, 24, 22, 0, tzinfo=UTC), root=tmp_path / "replay",
+    )
+    monkeypatch.setattr(m, "_BOARD_READER", _Reader(engine))
+    body = client.get("/opsiyon").text
+    assert 'data-tracker="alive"' in body
+    assert 'data-tracked="acik"' in body
+    assert "2026-09-24 &middot; 0.58" in body

@@ -294,7 +294,29 @@
       "profile_sha256": "b7886203115d469d72fa8ea1554d2ffea04f9ede237c3cd98d910381ac258f39",
       "data_quality_tier": "B",
       "headline": "confirmed arm mean -75.31 USD against control -52.57 USD on the frozen primary; REJECTED. Control arm n=7 against confirmed n=134, the imbalance addendum 3 predicted before the run.",
-      "refused": "secondary exit variants favour the confirmed arm (-34.23 vs -46.71) and were NOT promoted to primary; the primary was fixed as time_only before the data was seen"
+      "refused": "secondary exit variants favour the confirmed arm (-34.23 vs -46.71) and were NOT promoted to primary; the primary was fixed as time_only before the data was seen",
+      "correction_v2": {
+        "date": "2026-09-23",
+        "commit": "1b6dbfa",
+        "doc": "docs/options-alpha-v1/AUDIT_H10_TRADES.md",
+        "why": "exit engine booked the last PRICED day as a time exit when the horizon day was unpriced (harvest keeps DTE>=10, forced close at DTE 7); fixed to NO_EXIT_DATA",
+        "result": "artifacts/options-alpha-v1/h03_result_v2.json",
+        "verdict": "REJECTED",
+        "verdict_failed_clauses": [],
+        "arms": {
+          "confirmed": {
+            "n": 134,
+            "n_with_pnl": 96,
+            "mean_pnl_usd": -83.49
+          },
+          "control": {
+            "n": 7,
+            "n_with_pnl": 4,
+            "mean_pnl_usd": -37.15
+          }
+        },
+        "v1_result_kept": "artifacts/options-alpha-v1/h03_result.json"
+      }
     },
     {
       "id": "M8",
@@ -445,7 +467,32 @@
         "the session-block bootstrap that section 7 explicitly requires was not computed at all; computing it is what produced the interval that independently fails the third clause"
       ],
       "structural_fact": "879 structures built, 202 cleared the risk gate; the remaining 677 sized to zero against the 100 USD R. Same capital-scale constraint M5 hit, not a data problem.",
-      "gate": "4280 passed, 52 skipped; mypy --strict clean on 191 source files; ruff clean; uv lock consistent"
+      "gate": "4280 passed, 52 skipped; mypy --strict clean on 191 source files; ruff clean; uv lock consistent",
+      "correction_v2": {
+        "date": "2026-09-23",
+        "commit": "1b6dbfa",
+        "doc": "docs/options-alpha-v1/AUDIT_H10_TRADES.md",
+        "why": "exit engine booked the last PRICED day as a time exit when the horizon day was unpriced (harvest keeps DTE>=10, forced close at DTE 7); fixed to NO_EXIT_DATA",
+        "result": "artifacts/options-alpha-v1/h01_result_v2.json",
+        "verdict": "REJECTED",
+        "verdict_failed_clauses": [
+          "maliyet sonrasi pozitif degil (-55.18 $)",
+          "blok bootstrap araligi sifiri iceriyor"
+        ],
+        "arms": {
+          "high": {
+            "n": 111,
+            "n_with_pnl": 80,
+            "mean_pnl_usd": -55.18
+          },
+          "control": {
+            "n": 91,
+            "n_with_pnl": 78,
+            "mean_pnl_usd": -75.77
+          }
+        },
+        "v1_result_kept": "artifacts/options-alpha-v1/h01_result.json"
+      }
     },
     {
       "id": "M5c",
@@ -571,7 +618,31 @@
       "profile_sha256": "b7886203115d469d72fa8ea1554d2ffea04f9ede237c3cd98d910381ac258f39",
       "data_quality_tier": "B",
       "multiple_testing": "options_alpha_v1 kapsaminda ucuncu aile; toplam ilan edilmis deneme 9 (H03 3 + H01 3 + H04 3). Tek bir ailenin esigi gecmesi dokuz denemelik bir aramada tek basina kanit degildir.",
-      "gate": "4307 passed, 52 skipped; mypy --strict: no issues found in 192 source files; ruff clean; uv lock consistent"
+      "gate": "4307 passed, 52 skipped; mypy --strict: no issues found in 192 source files; ruff clean; uv lock consistent",
+      "correction_v2": {
+        "date": "2026-09-23",
+        "commit": "1b6dbfa",
+        "doc": "docs/options-alpha-v1/AUDIT_H10_TRADES.md",
+        "why": "exit engine booked the last PRICED day as a time exit when the horizon day was unpriced (harvest keeps DTE>=10, forced close at DTE 7); fixed to NO_EXIT_DATA",
+        "result": "artifacts/options-alpha-v1/h04_result_v2.json",
+        "verdict": "INSUFFICIENT_DATA",
+        "verdict_failed_clauses": [
+          "her iki kolda 30 tamamlanmis yapi yok"
+        ],
+        "arms": {
+          "B_already_moved": {
+            "n": 33,
+            "n_with_pnl": 23,
+            "mean_pnl_usd": -53.06
+          },
+          "A_not_moved": {
+            "n": 42,
+            "n_with_pnl": 31,
+            "mean_pnl_usd": -58.68
+          }
+        },
+        "v1_result_kept": "artifacts/options-alpha-v1/h04_result.json"
+      }
     },
     {
       "id": "M5d",
@@ -726,7 +797,60 @@
       "does_not_touch": "Bu aile vol SATMA hakkinda hicbir sey soylemez; docs/edge_to_money.md'nin hukmu degismez.",
       "multiple_testing": "options_alpha_v1 kapsaminda dorduncu KOSAN aile; toplam ilan edilmis deneme 12 (H03 3 + H01 3 + H04 3 + H10 3). H06 kosulmadi, deneme tuketmedi. Tek bir ailenin esigi gecmesi 12 denemelik bir aramada tek basina kanit degildir.",
       "headline": "arm A -49.33 USD against arm B -49.78 USD, a gap of 0.45 USD with interval [-30.88, 37.56] and 0.501 of draws at or below zero. Arm B held 28 records against a floor of 30, so the verdict is INSUFFICIENT_DATA -- and even with the floor met, clauses 2 and 3 would have failed.",
-      "gate": "4307 passed, 52 skipped; mypy --strict: no issues found in 192 source files; ruff clean; uv lock consistent"
+      "gate": "4307 passed, 52 skipped; mypy --strict: no issues found in 192 source files; ruff clean; uv lock consistent",
+      "correction_v2": {
+        "date": "2026-09-23",
+        "commit": "1b6dbfa",
+        "doc": "docs/options-alpha-v1/AUDIT_H10_TRADES.md",
+        "why": "exit engine booked the last PRICED day as a time exit when the horizon day was unpriced (harvest keeps DTE>=10, forced close at DTE 7); fixed to NO_EXIT_DATA",
+        "result": "artifacts/options-alpha-v1/h10_result_v2.json",
+        "verdict": "INSUFFICIENT_DATA",
+        "verdict_failed_clauses": [
+          "her iki kolda 30 tamamlanmis yapi yok"
+        ],
+        "arms": {
+          "A_cheap": {
+            "n": 45,
+            "n_with_pnl": 32,
+            "mean_pnl_usd": -53.79
+          },
+          "B_rich": {
+            "n": 28,
+            "n_with_pnl": 20,
+            "mean_pnl_usd": -46.13
+          }
+        },
+        "v1_result_kept": "artifacts/options-alpha-v1/h10_result.json"
+      }
+    },
+    {
+      "id": "M5e",
+      "name": "H02 run: does repeating unusual volume beat one-off unusual volume",
+      "status": "RAN",
+      "verdict": "REJECTED",
+      "verdict_failed_clauses": [
+        "A kolu maliyet sonrasi pozitif degil (-53.47 $)",
+        "blok bootstrap araligi sifiri iceriyor"
+      ],
+      "protocol": [
+        "docs/options-alpha-v1/PREREG_H02.md"
+      ],
+      "result": "artifacts/options-alpha-v1/h02_result.json",
+      "result_doc": "docs/options-alpha-v1/RESULT_H02.md",
+      "engine": "fixed exit engine (1b6dbfa): unknown exits are NO_EXIT_DATA, not realised",
+      "arms": {
+        "A_repeat": {
+          "n": 88,
+          "n_with_pnl": 67,
+          "mean_pnl_usd": -53.47
+        },
+        "B_one_off": {
+          "n": 76,
+          "n_with_pnl": 57,
+          "mean_pnl_usd": -58.47
+        }
+      },
+      "headline": "A_repeat -53.47 USD (n=67); B_one_off -58.47 USD (n=57); REJECTED"
     }
   ]
 }
