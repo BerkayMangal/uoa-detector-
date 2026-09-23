@@ -1,7 +1,7 @@
 # options-alpha-v1 — durum
 
-**Faz 5.24** · dal `p76-options-alpha-h10` · taban `main` 3fa530e
-**Son güncelleme:** 2026-09-23 — H10 ön-kaydı donduruluyor
+**Faz 5.24** · dal `p77-options-alpha-h10-run` · taban `main` 3eccb18
+**Son güncelleme:** 2026-09-23 — H10 koştu
 
 > Bu başlık bir süre bayat kaldı (`p71` / `eb8b766` yazıyordu) ve arada dört PR
 > merge edildi. Doğru olan, `main`'in canlı SHA'sıdır: `curl -s .../health`.
@@ -22,6 +22,7 @@ Ana ürün **opsiyon sinyal terminali**. Hisse tarafı yalnız karşılaştırma
 | **M5** | İlk aileyi koş ve hükme bağla | **DONE — REDDEDİLDİ** | `RESULT_H03.md` · `h03_result.json` |
 | **M5b** | İkinci aile (bağımsız kol değişkeni) | **DONE — REDDEDİLDİ** | `RESULT_H01.md` · `h01_result.json` |
 | **M5c** | Üçüncü aile (akış öncü mü, tepki mi) | **DONE — REDDEDİLDİ** | `RESULT_H04.md` · `h04_result.json` |
+| **M5d** | Dördüncü aile (prim ucuzken mi alınır) | **KOŞTU — INSUFFICIENT_DATA** | `RESULT_H10.md` · `h10_result.json` |
 | **M6** | Track B replikasyonu | **ENGEL ÖLÇÜLDÜ** | Pencere ~95 seans, şartı 4 çeyrek → kısmi test / yetersiz süre |
 | **M7** | Ayrı opsiyon ekranı + tarayıcı doğrulaması | **KISMEN** | `/opsiyon` kodlandı + test edildi; *gözle* canlı doğrulama B1'e bağlı |
 | **M8** | Mutasyon kanıtı tablosu | **DONE** | `mutation_proof.md` — 7/7 koruma kırmızıya döndü, 0 sağ kalan |
@@ -202,6 +203,54 @@ gerektirmişti.
 
 ---
 
+## M5d — H10 koştu, taban iki kayıt eksik kaldı
+
+**Hipotez:** bir kontratın örtük oynaklığı dayanağın kendi gerçekleşen oynaklığına
+göre **ucuzsa**, onu satın almanın sonraki net P&L'i pahalı olduğu durumdan iyi olur.
+Yön ön-kayıtta sabitlendi: A (ucuz) > B (pahalı).
+
+**Hüküm: INSUFFICIENT_DATA.** §7 her kolda en az 30 yapı istiyordu.
+
+| Kol | n | Ortalama | Medyan | Kazanma | Ort. ucuzluk | Ort. makas |
+|---|---|---|---|---|---|---|
+| A (ucuz, ≤0,90) | **45** | −49,33 $ | −51,60 $ | %2,2 | 0,746 | %2,10 |
+| B (pahalı, ≥1,10) | **28** | −49,78 $ | −40,20 $ | %17,9 | 1,316 | %1,93 |
+
+Taban kapısı üç şartlı merdivenden **önce** gelir; şartlar hiç değerlendirilmedi.
+
+### Zaten gösterilecek bir etki yok
+
+Fark **+0,45 $**, bootstrap aralığı **[−30,88, +37,56]**, farkın ≤0 çıkma oranı
+**0,501** — yazı tura. İki kol da yapı başına ~−49 $. Taban tutsaydı 1. şart 0,45 $
+ile teknik olarak sağlanır, 2. ve 3. şart **düşerdi**; yani hüküm yine REJECTED
+olurdu. Bu bir geçiş senaryosu değil. En kalabalık kovada da (n=28'e 18) B daha iyi.
+
+### Reddedilen üç hamle
+
+Tabanı 28'e çekmek · bandı genişletip B'ye kayıt toplamak · ortalamaları geçerli bir
+karşılaştırma gibi sunmak. Üçü de sonucu gördükten sonra eşik oynatmaktır.
+
+### Güç analizinde modelleme boşluğu (bu kez koşum yakaladı)
+
+Projeksiyon 77,7 / 51,2 demişti, gerçekleşen 45 / 28. Risk kapısı varsayımı
+**doğruydu** (73/309 = %23,6, varsayılan %23); eksik olan **ankraj → kayıt**
+elemesiydi — girişte ankrajın hâlâ listelenmesi, delta taşıması ve hem DTE hem delta
+kovasına düşmesi gerekiyor. Uçtan uca oran %13, varsayılan %23 değil.
+
+H04 ve H06'da güç analizi tasarımı kurtarmıştı; burada eksik kaldı ve bunu koşum
+gösterdi. Betiğin hesabı **değiştirilmedi** (§4b'nin tablosu ona atıf yapıyor ve
+yeniden üretilebilir kalmalı), boşluk docstring'ine not edildi.
+
+### Beklentinin tersi: makas dezavantajı kayboldu
+
+Dondurma öncesi ucuz kol **+0,7 puan** daha geniş makasa düşüyordu ve §4b.1 buna bir
+yorum kuralı bağlamıştı. Gerçekleşen örneklemde fark **+0,17 puan** — kayıtlar
+kova-filtreli bir altküme olduğu için bileşim değişti. Kural teknik olarak
+"muhafazakâr" dalını tetikledi, ama fark 0,45 $ olduğundan taşıdığı ağırlık yok ve
+şişirilmiyor.
+
+---
+
 ## Protokol disiplininin kaydı
 
 H03 dört belgeyle donduruldu ve **dördü de koşumdan önce commit'lendi**:
@@ -249,7 +298,7 @@ QQQ **−47,20 $**.
 
 - Açık PAPER pozisyonları canlı zamanlayıcıda **izlenmiyor**: `/opsiyon` ekranı
   commit'li artefaktları okur, kendisi yeni fiyat çekmez.
-- Kalan 9 hipotez ailesi koşmadı. Bunlardan **H06 ölçüldü ve bilinçli olarak
+- Kalan 8 hipotez ailesi koşmadı. Bunlardan **H06 ölçüldü ve bilinçli olarak
   dondurulmadı**: güç analizi, kol kurgusunun yoğunlaşmayı takvimden ayıramadığını
   gösterdi (tabanı tutan tek yapıda kol A'nın %65–67'si aylık vade; takvim
   çıkarılınca kol B 3–4 gözleme çöküyor). Kayıt: `INFEASIBLE_H06.md`. Hipotez
