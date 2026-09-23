@@ -25,6 +25,18 @@ wider-spread arm, the family cannot separate cheapness from transaction cost, an
 honest move is to refuse the freeze the way H06 was refused rather than to run it and
 report a number nobody can interpret.
 
+**Known gap, found by the run rather than before it (2026-09-23).** The projections
+below multiply arm-assigned ticker-sessions by the risk-gate survival rate alone, and
+that rate was right -- 73 of 309 structures cleared it, 23.6% against the 23% assumed.
+What is missing is the attrition BETWEEN the anchor and the record: at entry the anchor
+must still be listed, still carry a delta, and fall inside both the DTE 14-60 and the
+|delta| 0.25-0.70 buckets. H10 projected 77.7 and 51.2 records and got 45 and 28, so
+the end-to-end rate was about 13%, not 23%, and arm B missed the floor of 30 by two.
+
+The computation here is deliberately NOT changed: `PREREG_H10.md` section 4b cites this
+script's table and it has to stay reproducible. The next family's power analysis should
+model the bucket attrition as well. See `RESULT_H10.md` section 3.
+
 Reads the local harvest plus the committed data/study_f/bars.csv. Spends no quota.
 """
 
