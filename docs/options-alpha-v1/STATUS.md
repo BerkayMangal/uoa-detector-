@@ -1,7 +1,7 @@
 # options-alpha-v1 — durum
 
-**Faz 5.24** · dal `p78-options-alpha-h02` · taban `main` 5c7aef9
-**Son güncelleme:** 2026-09-23 — H02 ön-kaydı donduruluyor
+**Faz 5.24** · dal `p79-options-alpha-h02-run` · taban `main` ce727cd
+**Son güncelleme:** 2026-09-23 — H02 koştu ve reddedildi
 
 > Bu başlık bir süre bayat kaldı (`p71` / `eb8b766` yazıyordu) ve arada dört PR
 > merge edildi. Doğru olan, `main`'in canlı SHA'sıdır: `curl -s .../health`.
@@ -23,9 +23,33 @@ Ana ürün **opsiyon sinyal terminali**. Hisse tarafı yalnız karşılaştırma
 | **M5b** | İkinci aile (bağımsız kol değişkeni) | **DONE — REDDEDİLDİ** | `RESULT_H01.md` · `h01_result.json` |
 | **M5c** | Üçüncü aile (akış öncü mü, tepki mi) | **DONE — REDDEDİLDİ** | `RESULT_H04.md` · `h04_result.json` |
 | **M5d** | Dördüncü aile (prim ucuzken mi alınır) | **KOŞTU — INSUFFICIENT_DATA** | `RESULT_H10.md` · `h10_result.json` |
+| **M5e** | Beşinci aile (tekrarlayan akış) | **DONE — REDDEDİLDİ** | `RESULT_H02.md` · `h02_result.json` |
 | **M6** | Track B replikasyonu | **ENGEL ÖLÇÜLDÜ** | Pencere ~95 seans, şartı 4 çeyrek → kısmi test / yetersiz süre |
 | **M7** | Ayrı opsiyon ekranı + tarayıcı doğrulaması | **KISMEN** | `/opsiyon` kodlandı + test edildi; *gözle* canlı doğrulama B1'e bağlı |
 | **M8** | Mutasyon kanıtı tablosu | **DONE** | `mutation_proof.md` — 7/7 koruma kırmızıya döndü, 0 sağ kalan |
+
+---
+
+## M5e — H02 koştu ve reddedildi
+
+**Hipotez:** aynı kontratta D-1..D-5 içinde en az iki kez daha ≥%90 yüzdelik hacim
+görülmüşse (tekrarlayan), sonraki net P&L tek seferlik olağandışı hacimden iyi olur.
+Aynı-seans eşlemeli, k=5, A ≥ 2 / B = 0, ölü bant {1} — `PREREG_H02.md` (84192d1).
+
+| Kol | Tamamlanmış | Ortalama | Kazanma |
+|---|---|---|---|
+| A — tekrarlayan | **67** | **−53,47 $** | %11,9 |
+| B — tek seferlik | **57** | **−58,47 $** | %3,5 |
+
+Taban tuttu. A > B tuttu (+5,00 $), ama **maliyet sonrası pozitif DÜŞTÜ** ve
+**bootstrap [−20,31 , +27,28] sıfırı içeriyor → DÜŞTÜ**. Likidite şerhi
+tetiklenmedi (A'nın en büyük isim payı %36 < %50), ancak risk kapısı sonrası
+kayıtların %72–86'sı QQQ+SPY. Ayrıntı `RESULT_H02.md`.
+
+**Kapsam notu (v2 motor):** koşan beş ailenin hiçbiri işlenebilirlik şartını
+geçmedi; tüm kollar dahil kol ortalamaları yapı başına −37 $ ile −84 $ arasında
+(−37 $ H03'ün n=4'lük kontrol kolu). H03/H01/H02 REJECTED, H04/H10 INSUFFICIENT_DATA. Sıradaki adım altıncı bir aile değil,
+ortak paydanın (yapı + maliyet + 5 günlük tutma) sorgulanması.
 
 ---
 
