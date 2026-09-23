@@ -118,13 +118,17 @@ def test_the_registry_is_one_ordered_list_built_from_the_profile() -> None:
     jobs = dj.build_registry(_SETTINGS)
     assert [j.name for j in jobs] == [
         "oi_confirm", "catalysts", "gamma_history", "etf_holdings", "daily_close", "delayed",
+        # Phase 5.24 extends the registry by one entry (docs/INDEX.md §7 row 5.24,
+        # "exit monitoring and outcome recording"); FAZ C's entry stays last.
+        "options_paper",
         "outcomes",
     ]
     pre_market = time.fromisoformat(_SETTINGS.opening_closing.job_time_et)
     post_close = time.fromisoformat(_SETTINGS.delayed.job_time_et)
     outcomes = time.fromisoformat(_SETTINGS.outcomes.job_time_et)
     assert [j.et_time for j in jobs] == [
-        pre_market, pre_market, dj.SESSION_OPEN_ET, post_close, post_close, post_close, outcomes,
+        pre_market, pre_market, dj.SESSION_OPEN_ET, post_close, post_close, post_close,
+        outcomes, outcomes,
     ]
     assert all(j.trading_day_only for j in jobs)
     assert len({j.name for j in jobs}) == len(jobs)

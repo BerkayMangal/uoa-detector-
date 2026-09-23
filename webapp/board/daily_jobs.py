@@ -22,6 +22,9 @@ tick, RTH or not.
 6. ``delayed`` — same time: congress, insider, short interest and FTDs.
 7. ``outcomes`` — post-close at ``outcomes.job_time_et``: FAZ C scores every
    decision card against its horizons (``webapp/board/outcome_job.py``).
+8. ``options_paper`` — same time, registered just before ``outcomes`` so that
+   FAZ C's entry stays last: the options PAPER tracker marks every open PAPER
+   card and records its outcome (``webapp/board/options_paper.py``).
 
 Entry 7 is appended by ``build_registry`` itself, not by its caller. The
 refresher runs exactly the tuple this function returns, so a job left out of it
@@ -86,6 +89,7 @@ from webapp.board.db import AlfaBase, session_factory
 from webapp.board.delayed import run_delayed_job
 from webapp.board.etf_holdings import refresh_etf_holdings
 from webapp.board.oi_confirm import FlaggedContract, confirm_open_interest
+from webapp.board.options_paper import OPTIONS_PAPER_JOB_NAME, run_options_paper_job
 from webapp.board.outcome_job import outcome_jobs
 from webapp.board.quotes import dominant_symbol
 from webapp.board.regime import refresh_gamma_history
@@ -324,8 +328,21 @@ def build_registry(settings: BoardSettings) -> tuple[DailyJob, ...]:
         DailyJob(name="delayed", et_time=post_close, run=run_delayed_families),
         # FAZ C's entry, built by the module that owns it so the time and the body
         # have one source. Appended here because the refresher runs this tuple.
+        # Phase 5.24: the options PAPER tracker, on the outcome job's clock time
+        # (the stored SPY close it uses as a calendar is final by then). Placed
+        # before FAZ C's entry, which stays last.
+        DailyJob(
+            name=OPTIONS_PAPER_JOB_NAME,
+            et_time=time.fromisoformat(settings.outcomes.job_time_et),
+            run=_options_paper,
+        ),
         *(_as_daily_job(j) for j in outcome_jobs(settings)),
     )
+
+
+async def _options_paper(ctx: JobContext) -> str:
+    """Where ``JobContext`` is checked against the tracker's Protocol under mypy --strict."""
+    return await run_options_paper_job(ctx)
 
 
 # ---------------------------------------------------------------------------
