@@ -271,7 +271,12 @@ def _price_evidence(d: Decision, benchmark: str) -> str:
     if p.state is not CheckState.CHECKED_FOUND or p.move is None or p.move_atr is None:
         return f"Fiyat verisi eksik: {p.blocker or 'spot/önceki kapanış/ATR yok'}."
     rel = p.relative
-    rel_txt = f", {benchmark}'a göre {rel * 100:+.2f}%" if rel is not None else f", {benchmark} karşılaştırması yok"
+    if d.ticker.upper() == benchmark.upper():
+        rel_txt = f" ({benchmark} karşılaştırma ölçütünün kendisi)"
+    elif rel is not None:
+        rel_txt = f", {benchmark}'a göre {rel * 100:+.2f}%"
+    else:
+        rel_txt = f", {benchmark} karşılaştırması yok (aynı seans ve taze fiyat gerekir)"
     return (
         f"Spot {_px(p.spot)} ({_et(p.spot_fetched_at, d.session)}), önceki kapanış {_px(p.prev_close)} "
         f"({p.prev_close_day:%d.%m} günü): {p.move * 100:+.2f}% = {p.move_atr:+.2f} ATR "

@@ -518,3 +518,16 @@ def test_lifespan_starts_the_live_alpha_thread_with_the_live_database(monkeypatc
     with TestClient(m.app) as client:
         assert client.get("/health").status_code == 200
     assert started == ["sqlite:///live-thread.db"]
+
+
+def test_premarket_view_names_todays_session_not_tomorrow(
+    app_with_scan: Any, monkeypatch: pytest.MonkeyPatch, engine: Engine,
+) -> None:
+    from fastapi.testclient import TestClient
+
+    premarket = datetime(2026, 9, 24, 11, 0, tzinfo=UTC)
+    _cycle(engine, FakeUW(), premarket)
+    monkeypatch.setattr(app_with_scan, "_now", lambda: premarket + timedelta(minutes=1))
+    body = TestClient(app_with_scan.app, headers=set_web_auth(monkeypatch)).get("/").text
+    assert "Bugünkü seans 2026-09-24 09:30 ET'de açılır" in body
+    assert "Sonraki seans" not in body
