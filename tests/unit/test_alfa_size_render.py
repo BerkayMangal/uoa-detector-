@@ -73,7 +73,7 @@ def _cell(row_html: str, attribute: str) -> str | None:
 
 
 def test_the_size_cell_shows_one_lot_and_the_risk_bucket_line(client: TestClient) -> None:
-    rows = _rows(client.get("/", params={"gate": "off"}).text)
+    rows = _rows(client.get("/alfa", params={"gate": "off"}).text)
     assert set(rows) == {"CHP", "EXP", "NOQ"}
     assert _cell(rows["CHP"], "data-size-lot") == "1 lot $41 · sermayenin %0.41 kadarı"
     assert _cell(rows["CHP"], "data-size-bucket") == (
@@ -84,7 +84,7 @@ def test_the_size_cell_shows_one_lot_and_the_risk_bucket_line(client: TestClient
 
 
 def test_zero_lots_is_shown_not_hidden(client: TestClient) -> None:
-    row = _rows(client.get("/", params={"gate": "off"}).text)["EXP"]
+    row = _rows(client.get("/alfa", params={"gate": "off"}).text)["EXP"]
     assert _cell(row, "data-size-lot") == "1 lot $205 · sermayenin %2.05 kadarı"
     assert _cell(row, "data-size-bucket") == (
         "Profil risk kovası: STANDARD_UOA, max_r 0.5 → 0.5 × R = $50 → 0 lot"  # noqa: RUF001
@@ -93,7 +93,7 @@ def test_zero_lots_is_shown_not_hidden(client: TestClient) -> None:
 
 
 def test_a_row_without_a_quote_reads_unknown(client: TestClient) -> None:
-    row = _rows(client.get("/", params={"gate": "off"}).text)["NOQ"]
+    row = _rows(client.get("/alfa", params={"gate": "off"}).text)["NOQ"]
     assert _cell(row, "data-size-lot") == SIZE_COPY["lot_unknown"]
     assert _cell(row, "data-size-bucket") == (
         "Profil risk kovası: STANDARD_UOA, max_r 0.5 → 0.5 × R = $50 → lot sayısı bilinmiyor"  # noqa: RUF001
@@ -103,7 +103,7 @@ def test_a_row_without_a_quote_reads_unknown(client: TestClient) -> None:
 
 
 def test_a_priced_row_keeps_its_quote_age_on_the_size_cell(client: TestClient) -> None:
-    row = _rows(client.get("/", params={"gate": "off"}).text)["CHP"]
+    row = _rows(client.get("/alfa", params={"gate": "off"}).text)["CHP"]
     age = _cell(row, "data-size-quote-age")
     assert age is not None
     assert re.fullmatch(r"kotasyon \d+ sn önce alındı", age)
@@ -118,7 +118,7 @@ def test_the_size_cell_marks_a_default_only_while_the_owner_has_not_confirmed(
     nothing. What still needs pinning is the disclosure: an unconfirmed capital
     figure must say so on the cell that spends it.
     """
-    rows = _rows(client.get("/", params={"gate": "off"}).text)
+    rows = _rows(client.get("/alfa", params={"gate": "off"}).text)
     assert _cell(rows["CHP"], "data-size-lot") is not None
     assert _cell(rows["CHP"], "data-size-default") is None
 
@@ -128,12 +128,12 @@ def test_the_size_cell_marks_a_default_only_while_the_owner_has_not_confirmed(
         update={"sizing": _SETTINGS.sizing.model_copy(update={"values_confirmed_by_owner": False})},
     )
     monkeypatch.setattr(m, "_board_settings", lambda: unconfirmed)
-    rows = _rows(client.get("/", params={"gate": "off"}).text)
+    rows = _rows(client.get("/alfa", params={"gate": "off"}).text)
     assert _cell(rows["CHP"], "data-size-default") == "(varsayılan değer)"
 
 
 def test_the_max_r_disclosure_lives_only_in_the_audit_block(client: TestClient) -> None:
-    body = client.get("/", params={"gate": "off"}).text
+    body = client.get("/alfa", params={"gate": "off"}).text
     outside = _AUDIT.sub("", body)
     assert "max_r satırın" not in html.unescape(outside)
     for ticker, row in _rows(body).items():
@@ -145,7 +145,7 @@ def test_the_max_r_disclosure_lives_only_in_the_audit_block(client: TestClient) 
 
 def test_the_size_cell_adds_no_forbidden_words(client: TestClient) -> None:
     for gate in ({}, {"gate": "off"}):
-        body = client.get("/", params=gate).text
+        body = client.get("/alfa", params=gate).text
         assert forbidden_words(html.unescape(body)) == []
 
 
@@ -160,7 +160,7 @@ def test_the_size_render_makes_zero_unusual_whales_calls(
         raise AssertionError(msg)
 
     monkeypatch.setattr(UnusualWhalesClient, "request_json", _no_uw)
-    response = client.get("/", params={"gate": "off"})
+    response = client.get("/alfa", params={"gate": "off"})
     assert response.status_code == 200
     assert "data-size-lot" in response.text
     assert calls == []

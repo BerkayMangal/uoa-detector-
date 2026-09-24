@@ -97,7 +97,7 @@ def _cell(row_html: str, attribute: str) -> str | None:
 
 
 def test_each_verdict_band_renders_with_its_line(client: TestClient) -> None:
-    rows = _rows(client.get("/", params={"gate": "off"}).text)
+    rows = _rows(client.get("/alfa", params={"gate": "off"}).text)
     assert _cell(rows["MAK"], "data-chase-verdict") == "hâlâ makul"
     assert _cell(rows["MAK"], "data-chase-line") == (
         "baskı $1.50 → şimdi $1.60 (ask), %6.7 yukarıda; hisse baskıdan beri %+0.6"
@@ -116,7 +116,7 @@ def test_each_verdict_band_renders_with_its_line(client: TestClient) -> None:
 
 
 def test_a_row_without_a_quote_reads_kotasyon_yok(client: TestClient) -> None:
-    row = _rows(client.get("/", params={"gate": "off"}).text)["KOT"]
+    row = _rows(client.get("/alfa", params={"gate": "off"}).text)["KOT"]
     assert _cell(row, "data-chase-verdict") == "kotasyon yok"
     assert _cell(row, "data-chase-line") == (
         "baskı $1.50 → işlem yapılabilir kotasyon yok; hisse baskıdan beri %+0.6"
@@ -125,7 +125,7 @@ def test_a_row_without_a_quote_reads_kotasyon_yok(client: TestClient) -> None:
 
 
 def test_the_flow_context_renders_next_to_the_verdict(client: TestClient) -> None:
-    rows = _rows(client.get("/", params={"gate": "off"}).text)
+    rows = _rows(client.get("/alfa", params={"gate": "off"}).text)
     assert _cell(rows["MAK"], "data-chase-flow") == "akış baskıdan beri sürüyor"
     assert _cell(rows["SAT"], "data-chase-flow") == "akış baskıdan beri döndü"  # sold: row is aşağı
     assert _cell(rows["KOT"], "data-chase-flow") == "akış baskıdan beri: bilinmiyor"
@@ -134,13 +134,13 @@ def test_the_flow_context_renders_next_to_the_verdict(client: TestClient) -> Non
 
 
 def test_a_sold_option_row_says_the_verdict_is_ask_based(client: TestClient) -> None:
-    rows = _rows(client.get("/", params={"gate": "off"}).text)
+    rows = _rows(client.get("/alfa", params={"gate": "off"}).text)
     assert _cell(rows["SAT"], "data-chase-sold") == CHASE_COPY["sold"]
     assert "data-chase-sold" not in rows["MAK"]
 
 
 def test_geç_kaldın_becomes_the_mandatory_counter_argument(client: TestClient) -> None:
-    rows = _rows(client.get("/", params={"gate": "off"}).text)
+    rows = _rows(client.get("/alfa", params={"gate": "off"}).text)
     assert _cell(rows["GEC"], "data-counter") == "AMA kovalama hükmü: geç kaldın."
     # A row with no counter-argument names the chase check among what was looked at.
     checked = _cell(rows["MAK"], "data-checked")
@@ -149,7 +149,7 @@ def test_geç_kaldın_becomes_the_mandatory_counter_argument(client: TestClient)
 
 
 def test_the_chase_line_adds_no_forbidden_words_and_leaks_no_score(client: TestClient) -> None:
-    body = client.get("/", params={"gate": "off"}).text
+    body = client.get("/alfa", params={"gate": "off"}).text
     assert forbidden_words(html.unescape(body)) == []
     outside = _AUDIT.sub("", body)
     for spec in _ROWS:
@@ -166,7 +166,7 @@ def test_a_failed_since_print_read_leaves_the_context_unknown(
         raise RuntimeError(msg)
 
     monkeypatch.setattr(page_module, "read_net_premium_since_many", _broken)
-    rows = _rows(client.get("/", params={"gate": "off"}).text)
+    rows = _rows(client.get("/alfa", params={"gate": "off"}).text)
     assert _cell(rows["MAK"], "data-chase-flow") == "akış baskıdan beri: bilinmiyor"
     assert _cell(rows["MAK"], "data-chase-verdict") == "hâlâ makul"  # the verdict still stands
 
@@ -182,7 +182,7 @@ def test_the_chase_render_makes_zero_unusual_whales_calls(
         raise AssertionError(msg)
 
     monkeypatch.setattr(UnusualWhalesClient, "request_json", _no_uw)
-    response = client.get("/", params={"gate": "off"})
+    response = client.get("/alfa", params={"gate": "off"})
     assert response.status_code == 200
     assert "data-chase-line" in response.text
     assert calls == []

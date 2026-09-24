@@ -18,11 +18,13 @@
   <header class="border-b border-gray-800 px-6 pt-4">
     <div class="flex items-baseline gap-4 flex-wrap">
       <h1 class="text-2xl font-bold text-white">UOA Screener</h1>
-      <span class="text-sm text-gray-500">Unusual options flow you review by hand &mdash;
-        <span class="text-gray-400">a screening tool, not a buy signal. It never auto-trades.</span></span>
+      {% block tagline %}<span class="text-sm text-gray-500">Unusual options flow you review by hand &mdash;
+        <span class="text-gray-400">a screening tool, not a buy signal. It never auto-trades.</span></span>{% endblock %}
     </div>
     <nav class="flex gap-1 mt-4 -mb-px text-sm font-medium">
-      <a href="/" class="px-4 py-2 rounded-t-lg border-b-2 {{ 'border-emerald-500 text-white bg-gray-900/60' if path == '/' or path.startswith('/alfa') else 'border-transparent text-gray-400 hover:text-gray-200' }}">Alfa Board</a>
+      {# Phase 5.25: "/" is the live recommendation screen; the Alfa Board moved to /alfa. #}
+      <a href="/" class="px-4 py-2 rounded-t-lg border-b-2 {{ 'border-emerald-500 text-white bg-gray-900/60' if path == '/' or path.startswith('/canli') else 'border-transparent text-gray-400 hover:text-gray-200' }}">Bugün</a>
+      <a href="/alfa" class="px-4 py-2 rounded-t-lg border-b-2 {{ 'border-emerald-500 text-white bg-gray-900/60' if path.startswith('/alfa') else 'border-transparent text-gray-400 hover:text-gray-200' }}">Alfa Board</a>
       <a href="/gamma" class="px-4 py-2 rounded-t-lg border-b-2 {{ 'border-emerald-500 text-white bg-gray-900/60' if path.startswith('/gamma') else 'border-transparent text-gray-400 hover:text-gray-200' }}">Gamma &amp; vol</a>
       <a href="/journal" class="px-4 py-2 rounded-t-lg border-b-2 {{ 'border-emerald-500 text-white bg-gray-900/60' if path.startswith('/journal') else 'border-transparent text-gray-400 hover:text-gray-200' }}">Trade journal</a>
       {# Phase 5.2.C2a: the pass ledger. The card page (/kart) belongs to it, so it lights up too. #}

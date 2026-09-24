@@ -101,7 +101,7 @@ def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[TestClie
 
 
 def test_rendered_cost_cells_are_never_negative_or_a_zero_entry(client: TestClient) -> None:
-    rows = _rows(client.get("/", params={"gate": "off"}).text)
+    rows = _rows(client.get("/alfa", params={"gate": "off"}).text)
     assert set(rows) == {"CRS", "ZZZ"}
     for ticker, row in rows.items():
         # The chip strip, bounded by its OWN markup. This used to slice from

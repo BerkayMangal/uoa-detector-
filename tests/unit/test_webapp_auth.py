@@ -122,7 +122,7 @@ def test_malformed_authorization_is_401(
     client: TestClient, monkeypatch: pytest.MonkeyPatch, authorization: str,
 ) -> None:
     _configure(monkeypatch)
-    r = client.get("/", headers={"Authorization": authorization})
+    r = client.get("/alfa", headers={"Authorization": authorization})
     assert r.status_code == 401
     assert r.headers["www-authenticate"] == _CHALLENGE
 
@@ -189,10 +189,10 @@ def test_credentials_never_logged(
 ) -> None:
     caplog.set_level(logging.DEBUG)
     _configure(monkeypatch)
-    client.get("/", headers=_WRONG["wrong password"])
-    client.get("/", headers=_CORRECT)
+    client.get("/alfa", headers=_WRONG["wrong password"])
+    client.get("/alfa", headers=_CORRECT)
     _apply_env(monkeypatch, {"WEB_AUTH_USER": TEST_USER})
-    client.get("/", headers=_CORRECT)
+    client.get("/alfa", headers=_CORRECT)
     for secret in (TEST_USER, TEST_PASSWORD, "not-the-pass"):
         assert secret not in caplog.text
 

@@ -46,6 +46,9 @@ from webapp.board.refresher import board_refresh_loop
 from webapp.board.settings import BoardSettings, load_board_settings
 from webapp.board.signals import BoardSignalReader
 from webapp.gamma_live import gamma_refresh_loop
+from webapp.live_alpha import page as live_page
+from webapp.live_alpha import store as live_store
+from webapp.live_alpha.job import live_alpha_loop
 from webapp.repo import RunInfo, SignalRepo
 from webapp.vol_board import VolBoardRow, build_vol_board, vol_board_summary
 from webapp.worker import live_config_from_env, run_live_worker
@@ -117,6 +120,11 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
         )))
         # Phase 5.2.PERF10: the default board view, prebuilt off the request path.
         tasks.append(asyncio.create_task(_supervise(_board_prerender_loop, "board-prerender")))
+        # Phase 5.25: the live recommendation engine behind "/" (its own UW client).
+        tasks.append(asyncio.create_task(_supervise(
+            lambda: live_alpha_loop(database_url=config["database_url"]),  # type: ignore[arg-type]
+            "live-alpha",
+        )))
     try:
         yield
     finally:
@@ -444,6 +452,125 @@ def options_page(request: Request) -> HTMLResponse:
     return templates.TemplateResponse(
         request, "opsiyon.html", {"board": board, "tracker": tracker, **_EXPLAIN},
     )
+
+
+# ---------------------------------------------------------------------------
+# Live Alpha v1 (Phase 5.25): "/" — Bugünün Fırsatları
+# ---------------------------------------------------------------------------
+
+_LIVE_OK = {
+    "izle": "İzlemeye alındı.",
+    "pas": "Pas kaydedildi.",
+    "paper": "PAPER takibi başlatıldı; simüle giriş tetik ve taze fiyatı bekler.",
+    "paper_var": "Bu fırsatın zaten bir PAPER kaydı var.",
+    "manuel": "Kendi işlemin kaydedildi (PAPER'dan ayrı).",
+    "yok": "Bu fırsat son taramada yok; kayıt yapılmadı.",
+}
+
+
+@app.get("/", response_class=HTMLResponse)
+def live_home(request: Request, ok: str = "") -> HTMLResponse:
+    """The live recommendation screen. One read of the newest scan snapshot; no UW call."""
+    view = live_page.build_view(_board_reader().engine, _now())
+    cfg = live_page.settings()
+    reload_seconds = cfg.cycle.live_seconds if view.mode == "LIVE" else cfg.cycle.closed_seconds
+    return templates.TemplateResponse(
+        request, "live.html",
+        {"v": view, "ok": _LIVE_OK.get(ok, ""), "reload_seconds": reload_seconds},
+    )
+
+
+@app.get("/canli/{opportunity_id}", response_class=HTMLResponse)
+def live_history(request: Request, opportunity_id: str) -> HTMLResponse:
+    engine = _board_reader().engine
+    live_page.ensure_ready(engine)
+    return templates.TemplateResponse(
+        request, "live_history.html",
+        {
+            "opportunity_id": opportunity_id,
+            "recs": live_store.recs_for(engine, opportunity_id),
+            "events": live_store.events_for(engine, opportunity_id),
+        },
+    )
+
+
+def _live_refuse_foreign(request: Request) -> PlainTextResponse | None:
+    if not _same_origin(request):
+        return PlainTextResponse("cross-origin request refused", status_code=403)
+    return None
+
+
+@app.post("/canli/{action}", response_model=None)
+def live_action(
+    request: Request,
+    action: str,
+    opportunity_id: str = Form(...),
+    rec_id: str = Form(""),
+    instrument: str = Form("stock"),
+    side: str = Form("buy"),
+    quantity: float = Form(0.0),
+    price: float = Form(0.0),
+    note: str = Form(""),
+) -> RedirectResponse | PlainTextResponse:
+    """Owner actions on a card: watch, pass, start PAPER, record a manual fill."""
+    refused = _live_refuse_foreign(request)
+    if refused is not None:
+        return refused
+    if action not in ("izle", "pas", "paper", "manuel"):
+        return PlainTextResponse("unknown action", status_code=404)
+    engine = _board_reader().engine
+    live_page.ensure_ready(engine)
+    card = live_page.card_from_latest_scan(engine, opportunity_id)
+    if card is None:
+        return RedirectResponse("/?ok=yok", status_code=303)
+    now = _now()
+    policy = str(card.get("policy_version", ""))
+    if action in ("izle", "pas"):
+        live_store.append_event(
+            engine, at=now, opportunity_id=opportunity_id, kind=f"owner_{action}", actor="owner",
+            policy_version=policy, detail={"rec_id": rec_id or card.get("rec_id")},
+        )
+        return RedirectResponse(f"/?ok={action}", status_code=303)
+    if action == "manuel":
+        if quantity <= 0 or price <= 0 or side not in ("buy", "sell"):
+            return PlainTextResponse("quantity and price must be positive", status_code=400)
+        live_store.add_manual(engine, live_store.LiveManual(
+            manual_id=live_store.new_id(), at=now, opportunity_id=opportunity_id,
+            rec_id=rec_id or card.get("rec_id"), ticker=str(card.get("ticker", "")),
+            instrument=instrument[:40], side=side, quantity=quantity, price=price, note=note[:500],
+        ))
+        live_store.append_event(
+            engine, at=now, opportunity_id=opportunity_id, kind="manual_fill", actor="owner",
+            policy_version=policy,
+            detail={"instrument": instrument[:40], "side": side, "quantity": quantity, "price": price},
+        )
+        return RedirectResponse("/?ok=manuel", status_code=303)
+    # action == "paper": the owner starts PAPER tracking for a card (one per opportunity)
+    stock_plan = card.get("stock_plan")
+    preferred = str((card.get("instrument") or {}).get("preferred", "none"))
+    if stock_plan is None or card.get("recommendation") not in ("BUY", "CONDITIONAL_BUY", "BEARISH_SETUP"):
+        return PlainTextResponse("this card has no plan to track", status_code=400)
+    if preferred == "none":
+        preferred = "stock" if card.get("direction") == "up" else "none"
+    if preferred == "none":
+        return PlainTextResponse("no executable instrument for this card", status_code=400)
+    structure = next((o for o in card.get("options", []) if o.get("kind") == preferred), None)
+    created = live_store.create_paper(engine, live_store.LivePaper(
+        paper_id=live_store.new_id(), opportunity_id=opportunity_id,
+        rec_id=rec_id or str(card.get("rec_id") or ""), ticker=str(card.get("ticker", "")),
+        direction=str(card.get("direction", "up")), instrument=preferred,
+        plan_json=live_store.dumps({
+            "instrument": preferred, "stock_plan": stock_plan, "structure": structure,
+            "decision_as_of": card.get("decision_as_of"), "policy_version": policy, "started_by": "owner",
+        }),
+        state="PAPER_PENDING", created_at=now,
+    ))
+    if created:
+        live_store.append_event(
+            engine, at=now, opportunity_id=opportunity_id, kind="paper_pending", actor="owner",
+            policy_version=policy, detail={"instrument": preferred},
+        )
+    return RedirectResponse(f"/?ok={'paper' if created else 'paper_var'}", status_code=303)
 
 
 # ---------------------------------------------------------------------------
@@ -899,7 +1026,6 @@ async def _board_prerender_loop() -> None:
         await asyncio.sleep(_board_settings().refresh.cadence_seconds)
 
 
-@app.get("/", response_class=HTMLResponse)
 @app.get("/alfa", response_class=HTMLResponse)
 def alfa_board(request: Request, run: str = "", gate: str = "", pas: str = "") -> HTMLResponse:
     """The Alfa Board: one row per (ticker, side-aware direction) over the whole selected run.
@@ -1001,7 +1127,7 @@ def alfa_card(
     if gate == alfa_page.GATE_OFF_PARAM:
         params["gate"] = alfa_page.GATE_OFF_PARAM
     # The target is built here, never from a client value: no open redirect.
-    return RedirectResponse(f"/?{urlencode(params)}", status_code=303)
+    return RedirectResponse(f"/alfa?{urlencode(params)}", status_code=303)
 
 
 # ---------------------------------------------------------------------------

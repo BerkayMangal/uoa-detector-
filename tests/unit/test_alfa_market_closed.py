@@ -108,12 +108,12 @@ def test_the_rendered_page_shows_the_closed_state_on_a_saturday(
     client, module = next(gen)
     try:
         monkeypatch.setattr(module, "_now", lambda: _SATURDAY)
-        closed = client.get("/").text
+        closed = client.get("/alfa").text
         assert 'data-state="market-closed"' in closed
         assert "Piyasa kapalı" in closed
 
         monkeypatch.setattr(module, "_now", lambda: _WEDNESDAY_RTH)
-        during = client.get("/").text
+        during = client.get("/alfa").text
         assert 'data-state="market-closed"' not in during
         assert "Piyasa kapalı" not in during
     finally:

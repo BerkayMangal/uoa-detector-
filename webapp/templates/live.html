@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+{# Live Alpha v1 (registry 5.25): "Bugünün Fırsatları". Renders the newest alfa_live_scan
+   snapshot only; every sentence on a card was built by uoa_detector.live_alpha.decide from
+   source fields and deterministic arithmetic. The old no-advice rule does not apply to this
+   screen (docs/live-alpha-v1/PRODUCT_OVERRIDE.md); it still applies to /alfa and the rest. #}
+{% block tagline %}<span class="text-sm text-gray-500">Canlı öneri ekranı &mdash;
+  <span class="text-gray-400">deneysel kurallar, ölçülmüş avantaj yok. Emir göndermez; işlemi sen kendi brokerında yaparsın.</span></span>{% endblock %}
+{% block content %}
+{% set tones = {"green": "border-emerald-500 bg-emerald-950/30", "amber": "border-amber-500 bg-amber-950/20", "red": "border-rose-500 bg-rose-950/20", "gray": "border-gray-700 bg-gray-900/40"} %}
+{% set badge = {"green": "bg-emerald-600 text-white", "amber": "bg-amber-500 text-black", "red": "bg-rose-600 text-white", "gray": "bg-gray-700 text-gray-100"} %}
+<section id="live-alpha" lang="tr" class="max-w-6xl">
+  <div class="flex items-baseline gap-3 flex-wrap mb-1">
+    <h2 class="text-2xl font-bold text-white">Bugünün Fırsatları</h2>
+    <span class="text-sm px-2 py-0.5 rounded {{ 'bg-emerald-800 text-emerald-100' if v.mode == 'LIVE' else 'bg-gray-700 text-gray-200' }}">{{ v.mode_text }}</span>
+    <span class="text-sm text-gray-400">{{ v.now_et }} · {{ v.now_tr }}</span>
+  </div>
+  {% if ok %}<p class="text-sm text-emerald-400 mb-2" data-ok>{{ ok }}</p>{% endif %}
+  {% if v.has_scan %}
+  <p class="text-sm text-gray-400 mb-3">
+    Son tarama {{ v.scan_age_seconds }} sn önce ({{ v.session.get('et_now', '') }}{% if v.session.get('reason') %}, {{ v.session.reason }}{% endif %}).
+    Akış kaydı: {{ v.flow_run or '—' }}, son baskı {{ v.flow_last_print[11:16] if v.flow_last_print else '—' }} UTC.
+    {% if v.session.get('next_session') and v.mode != 'LIVE' %}Sonraki seans: {{ v.session.next_session }}.{% endif %}
+  </p>
+  {% if v.scan_stale %}<p class="rounded border border-amber-600 bg-amber-950/40 px-3 py-2 text-amber-200 text-sm mb-3" data-stale>Tarama bayat: son döngü beklenenden eski. Kartlardaki giriş hazırlığı geri çekildi; iş durumu en altta.</p>{% endif %}
+  {% if v.status != 'ok' and v.status_text %}<p class="rounded border border-amber-700 px-3 py-2 text-amber-200 text-sm mb-3" data-degraded>{{ v.status_text }}</p>{% endif %}
+  {% else %}
+  <p class="rounded border border-amber-600 px-3 py-2 text-amber-200 mb-3" data-noscan>{{ v.status_text }} Sayfayı birkaç dakika sonra yenile.</p>
+  {% endif %}
+
+  <p class="text-lg text-white font-semibold mb-4" data-summary>{{ v.summary }}</p>
+
+  {% for c in v.actionable %}{% set d = c.data %}
+  <article class="border-l-4 {{ tones[c.tone] }} rounded-r-lg p-4 mb-4" data-card="{{ d.ticker }}" data-rec="{{ d.recommendation }}" data-ready="{{ d.readiness }}">
+    <div class="flex items-baseline gap-3 flex-wrap">
+      <h3 class="text-xl font-bold text-white">{{ d.ticker }}</h3>
+      <span class="text-sm font-bold px-2 py-0.5 rounded {{ badge[c.tone] }}">{{ c.label }}</span>
+      <span class="text-xs text-gray-400">{{ c.readiness_text }} · {{ d.path }} · {{ d.evidence_status }}</span>
+      {% if c.tracking %}<span class="text-xs px-2 py-0.5 rounded bg-sky-900 text-sky-100">{{ c.tracking }}</span>{% endif %}
+    </div>
+    <p class="text-xs text-gray-500 mt-1">As-of: {{ d.decision_as_of[:16].replace('T', ' ') }} UTC · karar anında seans {{ d.market_mode }}</p>
+    {% if c.withdrawn %}<p class="text-sm text-amber-300 mt-2" data-withdrawn>{{ c.withdrawn }}</p>{% endif %}
+    <p class="text-base text-white mt-2"><b>Görüş:</b> {{ d.headline }}</p>
+    <p class="text-sm text-gray-300 mt-1"><b>Neden bugün:</b> {{ d.why_today }}</p>
+    {% if d.blockers %}<p class="text-sm text-amber-200 mt-1"><b>Engel:</b> {{ d.blockers | join('; ') }}</p>{% endif %}
+    <dl class="mt-3 grid gap-2 text-sm">
+      <div><dt class="font-semibold text-gray-200">Opsiyon kanıtı</dt><dd class="text-gray-300">{{ d.option_evidence }}</dd></div>
+      <div><dt class="font-semibold text-gray-200">Haber/katalizör</dt><dd class="text-gray-300">{{ d.news_evidence }}</dd></div>
+      <div><dt class="font-semibold text-gray-200">Fiyat/tema</dt><dd class="text-gray-300">{{ d.price_evidence }}</dd></div>
+      <div><dt class="font-semibold text-gray-200">Hisse planı</dt><dd class="text-gray-300">{{ d.stock_plan_text }}</dd></div>
+      <div><dt class="font-semibold text-gray-200">Opsiyon alternatifi</dt><dd class="text-gray-300 break-words">{{ d.option_text }}</dd></div>
+      <div><dt class="font-semibold text-gray-200">Araç tercihi</dt><dd class="text-gray-300">{{ d.instrument.preferred }} — {{ d.instrument.reason }}</dd></div>
+      <div><dt class="font-semibold text-gray-200">Tezi bozan durum</dt><dd class="text-gray-300">{{ d.invalidation }}</dd></div>
+      <div><dt class="font-semibold text-gray-200">En önemli karşı argüman</dt><dd class="text-gray-300">{{ d.counter_argument }}</dd></div>
+      <div><dt class="font-semibold text-gray-200">Doğrulama</dt><dd class="text-gray-400">{{ d.validation_text }}</dd></div>
+    </dl>
+    <details class="mt-2 text-xs text-gray-400"><summary class="cursor-pointer">Kaynaklar ve boyutlar</summary>
+      <ul class="list-disc ml-5 mt-1">{% for s in d.sources %}<li>{{ s }}</li>{% endfor %}</ul>
+      <p class="mt-1">{% for k, val in d.dimensions.items() %}{{ k }}: {{ val }}{% if not loop.last %} · {% endif %}{% endfor %}</p>
+      <p class="mt-1">Kayıt: {{ d.rec_id or '—' }} · profil {{ d.profile_sha256[:12] }} · <a class="underline" href="/canli/{{ d.opportunity_id | urlencode }}">kayıt geçmişi</a></p>
+    </details>
+    <div class="flex flex-wrap gap-2 mt-3 text-sm">
+      {% for act, txt in [("izle", "İzlemeye al"), ("pas", "Pas geç"), ("paper", "PAPER başlat")] %}
+      <form method="post" action="/canli/{{ act }}"><input type="hidden" name="opportunity_id" value="{{ d.opportunity_id }}"><input type="hidden" name="rec_id" value="{{ d.rec_id or '' }}"><button class="rounded bg-gray-800 hover:bg-gray-700 px-3 py-1" type="submit">{{ txt }}</button></form>
+      {% endfor %}
+      <details><summary class="cursor-pointer rounded bg-gray-800 px-3 py-1 inline-block">Kendi işlemimi kaydet</summary>
+        <form method="post" action="/canli/manuel" class="mt-2 flex flex-wrap gap-2 items-end">
+          <input type="hidden" name="opportunity_id" value="{{ d.opportunity_id }}"><input type="hidden" name="rec_id" value="{{ d.rec_id or '' }}">
+          <label>Araç <input name="instrument" value="{{ d.instrument.preferred if d.instrument.preferred != 'none' else 'stock' }}" class="bg-gray-900 border border-gray-700 px-1 w-40"></label>
+          <label>Yön <select name="side" class="bg-gray-900 border border-gray-700"><option value="buy">alış</option><option value="sell">satış</option></select></label>
+          <label>Adet <input name="quantity" type="number" step="any" required class="bg-gray-900 border border-gray-700 px-1 w-20"></label>
+          <label>Fiyat <input name="price" type="number" step="any" required class="bg-gray-900 border border-gray-700 px-1 w-24"></label>
+          <label>Not <input name="note" class="bg-gray-900 border border-gray-700 px-1 w-40"></label>
+          <button class="rounded bg-emerald-700 px-3 py-1" type="submit">Kaydet</button>
+        </form></details>
+    </div>
+  </article>
+  {% endfor %}
+
+  {% if v.watching %}
+  <h3 class="text-lg font-semibold text-white mt-6 mb-2">İzlenen adaylar (henüz işlem görüşü yok)</h3>
+  <div class="grid gap-2 md:grid-cols-2">
+    {% for c in v.watching %}{% set d = c.data %}
+    <div class="border border-gray-800 rounded p-3 text-sm" data-watch="{{ d.ticker }}">
+      <p class="text-white"><b>{{ d.ticker }}</b> — İZLE: {{ d.blockers | join('; ') }}</p>
+      <p class="text-gray-400 mt-1">{{ d.option_evidence }}</p>
+      <p class="text-gray-500 mt-1">{{ d.price_evidence }}</p>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <h3 class="text-lg font-semibold text-white mt-6 mb-2">PAPER izleme (simülasyon, gerçek hesap değil)</h3>
+  <p class="text-sm text-gray-400 mb-2">Açık {{ v.paper_stats.open }} · kapanmış {{ v.paper_stats.closed }} · dolmayan {{ v.paper_stats.unfilled }} · maliyet sonrası toplam ${{ '%.2f' | format(v.paper_stats.pnl_usd) }} ({{ v.paper_stats.wins }} kazanç). Küçük örneklem; başarı oranı çıkarılmaz.</p>
+  {% if v.papers_open or v.papers_closed %}
+  <table class="text-sm w-full"><thead class="text-gray-400 text-left"><tr><th>Hisse</th><th>Araç</th><th>Durum</th><th>Giriş</th><th>Stop/Hedef</th><th>Son değer</th><th>Çıkış</th><th>P&amp;L</th></tr></thead><tbody>
+  {% for p in v.papers_open + v.papers_closed %}
+  <tr class="border-t border-gray-800" data-paper="{{ p.ticker }}"><td>{{ p.ticker }}</td><td>{{ p.instrument }}</td><td>{{ p.state_text }}</td><td>{{ p.entry_price or '—' }}{% if p.quantity %} × {{ p.quantity }}{% endif %}</td><td>{{ p.stop }} / {{ p.target }}</td><td>{{ p.last_mark or '—' }}</td><td>{{ p.exit_price or '—' }} {{ p.exit_reason or '' }}</td><td>{{ p.pnl_usd if p.pnl_usd is not none else '—' }}</td></tr>
+  {% endfor %}</tbody></table>
+  {% else %}<p class="text-sm text-gray-500">Henüz PAPER pozisyonu yok. Bir ALIM kartı hazır olduğunda simüle giriş tetik ve taze fiyatla açılır.</p>{% endif %}
+  {% if v.manuals %}
+  <h4 class="text-sm font-semibold text-white mt-4">Kendi işlemlerim (MANUAL_FILL, PAPER'dan ayrı)</h4>
+  <ul class="text-sm text-gray-300">{% for m in v.manuals %}<li>{{ m.at }} {{ m.ticker }} {{ m.instrument }} {{ m.side }} {{ m.quantity }} @ {{ m.price }} {{ m.note }}</li>{% endfor %}</ul>
+  {% endif %}
+
+  <h3 class="text-lg font-semibold text-white mt-6 mb-2">Tarama hunisi ve teknik durum</h3>
+  <p class="text-sm text-gray-300" data-funnel>
+    taranan {{ v.funnel.get('taranan', 0) }} → akış uygun {{ v.funnel.get('akış_uygun', 0) }} → fiyat verisi uygun {{ v.funnel.get('fiyat_uygun', 0) }} → plan {{ v.funnel.get('plan', 0) }} → giriş hazır {{ v.funnel.get('giriş_hazır', 0) }}
+  </p>
+  <p class="text-xs text-gray-500 mt-1">Evren (yalnız bu isimler taranıyor, piyasanın tamamı değil): {{ v.universe | join(', ') or '—' }}.
+    Spot yaşı (sn): {% for t, a in v.spot_age.items() %}{{ t }} {{ a }}{% if not loop.last %}, {% endif %}{% endfor %}.
+    Bu döngü UW isteği: {{ v.requests.get('reserved', 0) }} (red {{ v.requests.get('refused', 0) }}, günlük tavan {{ v.requests.get('cap', '—') }}).
+    {% if v.news_failed %}Haber kontrol edilemedi: {{ v.news_failed | join(', ') }}.{% endif %}
+    Politika {{ v.policy_version }}.</p>
+  <p class="text-xs text-gray-500 mt-1">İş kalp atışı: {% for b in v.beats %}{{ b.at }} {{ b.status }}{% if not loop.last %} · {% endif %}{% else %}kayıt yok{% endfor %}</p>
+  <p class="text-xs text-gray-500 mt-3">Yayın modları: LIVE_ANALYSIS gerçek güncel veriden öneridir; PAPER_TRACKING otomatik simülasyondur; MANUAL_FILL senin kaydındır; BROKER_EXECUTION kapalıdır. Eski araştırma ekranları: <a class="underline" href="/alfa">Alfa Board</a>, <a class="underline" href="/opsiyon">Opsiyon</a>.</p>
+</section>
+<script>setTimeout(function () { window.location.reload(); }, {{ reload_seconds * 1000 }});</script>
+{% endblock %}

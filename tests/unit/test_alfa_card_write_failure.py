@@ -104,7 +104,7 @@ def test_a_read_only_page_still_gets_the_generic_error_page(
         raise RuntimeError(msg)
 
     monkeypatch.setattr(m, "_build_board_page", _fail)
-    response = _browser(m, monkeypatch).get("/")
+    response = _browser(m, monkeypatch).get("/alfa")
     assert response.status_code == 500
     assert "Temporarily unavailable" in response.text
     assert cards.CARD_COPY["write_failed"] not in response.text

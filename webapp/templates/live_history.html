@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block tagline %}<span class="text-sm text-gray-500">Kayıt geçmişi &mdash; değişmez karar kayıtları ve sonraki olaylar.</span>{% endblock %}
+{% block content %}
+<section id="live-history" lang="tr" class="max-w-5xl">
+  <h2 class="text-xl font-bold text-white mb-1">{{ opportunity_id }}</h2>
+  <p class="text-sm text-gray-400 mb-4">Her karar değişikliği yeni bir kayıttır; eski kayıt yerinde kalır. <a class="underline" href="/">Bugüne dön</a></p>
+  {% for r in recs %}
+  <div class="border border-gray-800 rounded p-3 mb-3 text-sm" data-rec-row="{{ r.rec_id }}">
+    <p class="text-white"><b>{{ r.created_at }}</b> — {{ r.recommendation }} / {{ r.readiness }} ({{ r.path }}){% if r.supersedes %} · önceki kayıt {{ r.supersedes[:8] }}{% endif %}</p>
+    <p class="text-gray-300 mt-1">{{ r.card.headline }}</p>
+    <p class="text-gray-500 mt-1">{{ r.card.stock_plan_text }}</p>
+  </div>
+  {% else %}<p class="text-gray-400">Bu fırsat için kayıt yok.</p>{% endfor %}
+  <h3 class="text-lg font-semibold text-white mt-4 mb-2">Olaylar</h3>
+  <ul class="text-sm text-gray-300">
+  {% for e in events %}<li>{{ e.at }} · {{ e.kind }} · {{ e.actor }} · {{ e.detail }}</li>{% else %}<li class="text-gray-500">Olay yok.</li>{% endfor %}
+  </ul>
+</section>
+{% endblock %}

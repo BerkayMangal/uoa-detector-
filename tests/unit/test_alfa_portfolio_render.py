@@ -125,7 +125,7 @@ def _strip(body: str) -> str:
 
 
 def test_the_capital_header_states_the_open_premium_at_risk(client: TestClient) -> None:
-    strip = _strip(client.get("/").text)
+    strip = _strip(client.get("/alfa").text)
     # Phase 5.2.B-fix2 (D10, review FB-H2): 2 x $4.10 x 100 = $820 of a $10,000 default
     # capital. The AMD leg expired on 25.06.2026, so its $200 entry premium is no longer
     # counted as premium at risk; the header discloses it instead of dropping it.
@@ -146,7 +146,7 @@ def test_unconfirmed_owner_values_mark_the_capital_header(
         update={"sizing": _SETTINGS.sizing.model_copy(update={"values_confirmed_by_owner": False})},
     )
     monkeypatch.setattr(m, "_board_settings", lambda: unconfirmed)
-    body = client.get("/").text
+    body = client.get("/alfa").text
     # Phase 5.2.B-fix2 (D10, review FB-H2): the expired AMD leg left the at-risk sum.
     assert _cell(_strip(body), "data-capital") == (
         "Açıktaki prim riski: $820 · sermayenin %8.2 (varsayılan değer)"
@@ -169,14 +169,14 @@ def test_a_failed_journal_read_renders_no_capital_header() -> None:
 
 
 def test_the_badge_renders_only_on_the_matching_row(client: TestClient) -> None:
-    rows = _rows(client.get("/", params={"gate": "off"}).text)
+    rows = _rows(client.get("/alfa", params={"gate": "off"}).text)
     assert _cell(rows["NVDA"], "data-overlap-badge") == "zaten bu bahittesin"
     assert _cell(rows["AMD"], "data-overlap-badge") == "zaten bu bahittesin"
     assert "data-overlap-badge" not in rows["SPY"]
 
 
 def test_the_matching_trade_is_shown_and_an_expired_one_is_marked(client: TestClient) -> None:
-    rows = _rows(client.get("/", params={"gate": "off"}).text)
+    rows = _rows(client.get("/alfa", params={"gate": "off"}).text)
     assert _cell(rows["NVDA"], "data-overlap-detail") == (
         "Eşleşen açık işlem: NVDA call 220 16.10.2026 · 2 kontrat @ $4.10"
     )
@@ -192,14 +192,14 @@ def test_the_matching_trade_is_shown_and_an_expired_one_is_marked(client: TestCl
 
 
 def test_the_strong_cluster_names_its_etf_and_holdings_date(client: TestClient) -> None:
-    strip = _strip(client.get("/").text)
+    strip = _strip(client.get("/alfa").text)
     assert _cell(strip, 'data-cluster="SMH"') == (
         "Tek bahis: AMD, NVDA (SMH 11.09.2026 tarihli; her biri ≥ %3)"
     )
 
 
 def test_the_weak_sector_link_is_shown_but_never_merged(client: TestClient) -> None:
-    strip = _strip(client.get("/").text)
+    strip = _strip(client.get("/alfa").text)
     assert _cell(strip, "data-sector-link") == (
         "Aynı sektör (zayıf bağ, kümeye katılmaz): AMD, NVDA · Technology"
     )
@@ -214,7 +214,7 @@ def test_the_weak_sector_link_is_shown_but_never_merged(client: TestClient) -> N
 
 
 def test_the_strip_renders_outside_every_row_and_adds_no_family(client: TestClient) -> None:
-    body = client.get("/").text
+    body = client.get("/alfa").text
     assert body.index("data-portfolio>") < body.index("<article")
     assert "data-family" not in _strip(body)
     for article in body.split("<article")[1:]:
@@ -224,7 +224,7 @@ def test_the_strip_renders_outside_every_row_and_adds_no_family(client: TestClie
 def test_the_overlap_never_changes_a_row_reading(client: TestClient) -> None:
     import webapp.main as m
 
-    with_journal = _rows(client.get("/", params={"gate": "off"}).text)
+    with_journal = _rows(client.get("/alfa", params={"gate": "off"}).text)
     # The same board with no journal, holdings or sector source behind it.
     monkeypatch_free = build_alfa_page([], m._board_settings(), now=_NOW)
     assert monkeypatch_free.capital is None
@@ -241,7 +241,7 @@ def test_the_overlap_never_changes_a_row_reading(client: TestClient) -> None:
 
 def test_the_strip_adds_no_forbidden_words(client: TestClient) -> None:
     for gate in ({}, {"gate": "off"}):
-        body = client.get("/", params=gate).text
+        body = client.get("/alfa", params=gate).text
         assert forbidden_words(html.unescape(body)) == []
 
 
@@ -256,7 +256,7 @@ def test_the_portfolio_render_makes_zero_unusual_whales_calls(
         raise AssertionError(msg)
 
     monkeypatch.setattr(UnusualWhalesClient, "request_json", _no_uw)
-    response = client.get("/")
+    response = client.get("/alfa")
     assert response.status_code == 200
     assert "data-capital" in response.text
     assert calls == []

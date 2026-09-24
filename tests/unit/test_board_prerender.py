@@ -52,7 +52,7 @@ def test_fresh_prebuilt_view_is_served_without_rebuilding(
     _prime(m, monkeypatch, age_seconds=42)
     calls: list[tuple[str, str, str]] = []
     monkeypatch.setattr(m, "_board_context", _counting_builder(m, calls))
-    for path in ("/", "/alfa"):
+    for path in ("/alfa",):
         response = seeded.get(path)
         assert response.status_code == 200
         assert 'id="board-prebuilt"' in response.text
@@ -69,7 +69,7 @@ def test_stale_prebuilt_view_is_rebuilt(
     _prime(m, monkeypatch, age_seconds=max_age + 1)
     calls: list[tuple[str, str, str]] = []
     monkeypatch.setattr(m, "_board_context", _counting_builder(m, calls))
-    response = seeded.get("/")
+    response = seeded.get("/alfa")
     assert response.status_code == 200
     assert 'id="board-prebuilt"' not in response.text
     assert calls == [("", "", "")]
@@ -83,7 +83,7 @@ def test_boundary_age_is_still_served(
     _prime(m, monkeypatch, age_seconds=m._prerender_max_age_seconds())
     calls: list[tuple[str, str, str]] = []
     monkeypatch.setattr(m, "_board_context", _counting_builder(m, calls))
-    assert seeded.get("/").status_code == 200
+    assert seeded.get("/alfa").status_code == 200
     assert calls == []
 
 
@@ -96,7 +96,7 @@ def test_parameters_bypass_the_prebuilt_view(
     calls: list[tuple[str, str, str]] = []
     monkeypatch.setattr(m, "_board_context", _counting_builder(m, calls))
     for query in ("?gate=off", "?run=live-2026-09-15", "?pas=nope"):
-        response = seeded.get("/" + query)
+        response = seeded.get("/alfa" + query)
         assert response.status_code == 200
         assert 'id="board-prebuilt"' not in response.text
     assert [c for c in calls if c != ("", "", "")] == [
@@ -112,7 +112,7 @@ def test_no_prebuilt_view_builds_on_request(
     monkeypatch.setattr(m, "_PRERENDERED", None)
     calls: list[tuple[str, str, str]] = []
     monkeypatch.setattr(m, "_board_context", _counting_builder(m, calls))
-    assert seeded.get("/").status_code == 200
+    assert seeded.get("/alfa").status_code == 200
     assert calls == [("", "", "")]
 
 
@@ -124,7 +124,7 @@ def test_clock_running_backwards_rebuilds(
     _prime(m, monkeypatch, age_seconds=-5)
     calls: list[tuple[str, str, str]] = []
     monkeypatch.setattr(m, "_board_context", _counting_builder(m, calls))
-    assert seeded.get("/").status_code == 200
+    assert seeded.get("/alfa").status_code == 200
     assert calls == [("", "", "")]
 
 

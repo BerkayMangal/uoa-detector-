@@ -88,6 +88,15 @@ _APPEND_ONLY_TABLES: Final = {
     "alfa_opt_paper_mark",       # the closable value a session actually had
     "alfa_opt_paper_outcome",    # how a PAPER card resolved, written once
     "alfa_opt_paper_heartbeat",  # proof the job ran; a lost row erases that proof
+    # Phase 5.25 Live Alpha: forward evidence of the live recommendation policy.
+    "alfa_live_scan",            # the snapshot the page showed at that moment
+    "alfa_live_rec",             # an immutable recommendation record
+    "alfa_live_news",            # a headline as first seen (first_seen_at is ours, not UW's)
+    "alfa_live_news_check",      # what each headlines call produced, failures included
+    "alfa_live_paper",           # one PAPER position per opportunity (state moves only forward)
+    "alfa_live_event",           # every state change, with actor and policy version
+    "alfa_live_manual",          # the owner's own fills
+    "alfa_live_heartbeat",       # proof the live job ran
 }
 
 # Rebuildable: refreshed market data or fetch bookkeeping. A row lost here is

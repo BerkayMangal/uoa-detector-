@@ -101,7 +101,7 @@ def _cell(row_html: str, attribute: str) -> str | None:
 
 
 def test_the_line_compares_the_break_even_with_the_straddle(client: TestClient) -> None:
-    row = _rows(client.get("/", params={"gate": "off"}).text)["MOV"]
+    row = _rows(client.get("/alfa", params={"gate": "off"}).text)["MOV"]
     # (100 + 0.41) / 99 - 1 = 1.42%; (1.05 + 0.95) / 99 = 2.02%.
     assert _cell(row, "data-move-text") == (
         "Başabaş için %1.4 gerekir · ATM straddle bu vadeye %2.0 fiyatlıyor"
@@ -111,12 +111,12 @@ def test_the_line_compares_the_break_even_with_the_straddle(client: TestClient) 
 
 
 def test_the_atm_row_shows_its_age(client: TestClient) -> None:
-    row = _rows(client.get("/", params={"gate": "off"}).text)["MOV"]
+    row = _rows(client.get("/alfa", params={"gate": "off"}).text)["MOV"]
     assert _cell(row, "data-move-age") == "ATM satırı 41 sn önce alındı"
 
 
 def test_without_two_sided_atm_quotes_the_fallback_is_labelled(client: TestClient) -> None:
-    row = _rows(client.get("/", params={"gate": "off"}).text)["IVF"]
+    row = _rows(client.get("/alfa", params={"gate": "off"}).text)["IVF"]
     text = _cell(row, "data-move-text")
     assert text is not None
     assert text.startswith("Başabaş için %1.4 gerekir · IV tahmini (straddle değil) bu vadeye %")
@@ -124,14 +124,14 @@ def test_without_two_sided_atm_quotes_the_fallback_is_labelled(client: TestClien
 
 
 def test_a_nearest_expiry_substitution_is_disclosed(client: TestClient) -> None:
-    row = _rows(client.get("/", params={"gate": "off"}).text)["NXT"]
+    row = _rows(client.get("/alfa", params={"gate": "off"}).text)["NXT"]
     disclosure = _cell(row, "data-move-disclosure")
     assert disclosure is not None
     assert disclosure.startswith("en yakın ATM vadesi 25.09 (bu vade yok) · ")
 
 
 def test_without_an_atm_row_both_halves_read_unknown(client: TestClient) -> None:
-    row = _rows(client.get("/", params={"gate": "off"}).text)["NOA"]
+    row = _rows(client.get("/alfa", params={"gate": "off"}).text)["NOA"]
     assert _cell(row, "data-move-text") == (
         "Başabaş için gereken hareket: bilinmiyor · ATM straddle: bilinmiyor"
     )
@@ -140,7 +140,7 @@ def test_without_an_atm_row_both_halves_read_unknown(client: TestClient) -> None
 
 
 def test_the_move_line_states_no_probability(client: TestClient) -> None:
-    body = html.unescape(client.get("/", params={"gate": "off"}).text)
+    body = html.unescape(client.get("/alfa", params={"gate": "off"}).text)
     for row in _rows(body).values():
         line = _cell(row, "data-move-text") or ""
         for banned in ("olasılık", "ihtimal", "beklenen"):
@@ -149,7 +149,7 @@ def test_the_move_line_states_no_probability(client: TestClient) -> None:
 
 
 def test_the_move_line_leaks_no_score(client: TestClient) -> None:
-    body = client.get("/", params={"gate": "off"}).text
+    body = client.get("/alfa", params={"gate": "off"}).text
     outside = _AUDIT.sub("", body)
     for spec in _ROWS:
         assert f"{spec.score:.2f}" not in outside, spec.ticker
@@ -165,7 +165,7 @@ def test_a_failed_atm_read_reads_unknown_and_never_breaks_the_page(
         raise RuntimeError(msg)
 
     monkeypatch.setattr(page_module, "read_board_atm", _broken)
-    body = client.get("/", params={"gate": "off"}).text
+    body = client.get("/alfa", params={"gate": "off"}).text
     assert body.count('data-move="unknown"') == len(_ROWS)
     assert "ATM straddle: bilinmiyor" in html.unescape(body)
 
@@ -181,7 +181,7 @@ def test_the_move_render_makes_zero_unusual_whales_calls(
         raise AssertionError(msg)
 
     monkeypatch.setattr(UnusualWhalesClient, "request_json", _no_uw)
-    response = client.get("/", params={"gate": "off"})
+    response = client.get("/alfa", params={"gate": "off"})
     assert response.status_code == 200
     assert "data-move-text" in response.text
     assert calls == []

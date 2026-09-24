@@ -147,7 +147,7 @@ def _cell(row_html: str, attribute: str) -> str | None:
 
 
 def _board(client: TestClient) -> dict[str, str]:
-    return _rows(client.get("/", params={"gate": "off"}).text)
+    return _rows(client.get("/alfa", params={"gate": "off"}).text)
 
 
 def _fold(row_html: str) -> str:
@@ -371,7 +371,7 @@ def test_an_open_market_still_refuses_a_stale_quote(client: TestClient) -> None:
 
 def test_the_spot_frame_adds_no_forbidden_words(client: TestClient) -> None:
     for gate in ({}, {"gate": "off"}):
-        body = client.get("/", params=gate).text
+        body = client.get("/alfa", params=gate).text
         assert forbidden_words(html.unescape(body)) == []
 
 
@@ -394,7 +394,7 @@ def test_the_spot_render_makes_zero_unusual_whales_calls(
         raise AssertionError(msg)
 
     monkeypatch.setattr(UnusualWhalesClient, "request_json", _no_uw)
-    response = client.get("/", params={"gate": "off"})
+    response = client.get("/alfa", params={"gate": "off"})
     assert response.status_code == 200
     assert "data-spot-entry" in response.text
     assert calls == []

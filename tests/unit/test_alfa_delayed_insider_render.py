@@ -151,7 +151,7 @@ def board(tmp_path: Any, monkeypatch: pytest.MonkeyPatch) -> Iterator[tuple[Engi
 def test_both_shipped_families_render_in_order(board: tuple[Engine, TestClient]) -> None:
     engine, client = board
     _seed_delayed(engine)
-    row = _rows_of(client.get("/").text)["AAA"]
+    row = _rows_of(client.get("/alfa").text)["AAA"]
     assert RENDERED_FAMILIES[:2] == ("congress", "insider")  # later commits append families
     assert re.findall(r'data-delayed-family="(\w+)"', row)[:2] == ["congress", "insider"]
     assert "İçeriden" in _text(row)
@@ -162,7 +162,7 @@ def test_an_insider_item_carries_its_filing_date_filer_side_size_flags_and_outco
 ) -> None:
     engine, client = board
     _seed_delayed(engine)
-    row = _rows_of(client.get("/").text)["AAA"]
+    row = _rows_of(client.get("/alfa").text)["AAA"]
     insider = row[row.index('data-delayed-family="insider"'):]
     text = _text(insider)
 
@@ -186,9 +186,9 @@ def test_adding_the_family_changes_nothing_outside_the_bucket(
     board: tuple[Engine, TestClient],
 ) -> None:
     engine, client = board
-    before = client.get("/").text
+    before = client.get("/alfa").text
     _seed_delayed(engine)
-    after = client.get("/").text
+    after = client.get("/alfa").text
 
     assert "data-delayed-item=" not in before
     assert _without_delayed(before) == _without_delayed(after)
@@ -199,12 +199,12 @@ def test_adding_the_family_changes_nothing_outside_the_bucket(
 
 def test_an_unfetched_insider_family_reads_bilinmiyor(board: tuple[Engine, TestClient]) -> None:
     engine, client = board
-    body = client.get("/").text
+    body = client.get("/alfa").text
     assert body.count('data-delayed-family="insider"') == len(_ROWS)
     assert body.count('data-delayed-state="never_fetched"') == len(_ROWS) * len(RENDERED_FAMILIES)
 
     _seed_delayed(engine)
-    rows = _rows_of(client.get("/").text)
+    rows = _rows_of(client.get("/alfa").text)
     bbb = rows["BBB"][rows["BBB"].index('data-delayed-family="insider"'):]
     assert 'data-delayed-state="empty"' in bbb  # the source answered with nothing
     assert "kayıt yok — kaynak yanıt verdi" in _text(bbb)
@@ -215,7 +215,7 @@ def test_the_insider_size_line_is_generated_copy_and_the_filer_name_is_vendor_da
 ) -> None:
     engine, client = board
     _seed_delayed(engine)
-    assert client.get("/").status_code == 200
+    assert client.get("/alfa").status_code == 200
 
     panels = load_delayed_panels(engine, ["AAA"], today=_TODAY, settings=_SETTINGS.delayed)
     insider = next(f for f in panels["AAA"].families if f.family == "insider")

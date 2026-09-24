@@ -106,7 +106,7 @@ def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[TestClie
 
 
 def test_legacy_score_values_stay_inside_the_audit_block(client: TestClient) -> None:
-    body = client.get("/", params={"gate": "off"}).text
+    body = client.get("/alfa", params={"gate": "off"}).text
     row = _rows(body)["LEG"]
     outside = _AUDIT.sub("", row)
     titles = [html.unescape(t) for t in re.findall(r'title="([^"]*)"', outside)]
@@ -119,7 +119,7 @@ def test_legacy_score_values_stay_inside_the_audit_block(client: TestClient) -> 
     assert "Sektör: 0.70" in _visible(audit)
 
 
-@pytest.mark.parametrize("path", ["/", "/alfa"])
+@pytest.mark.parametrize("path", ["/alfa"])  # 5.25: the vol board lives on /alfa; "/" is the live screen
 def test_vol_board_move_is_labelled_as_implied_not_expected(client: TestClient, path: str) -> None:
     text = _visible(client.get(path).text)
     assert "IV-implied 1\u03c3 move" in text

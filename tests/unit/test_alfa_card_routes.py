@@ -306,7 +306,7 @@ def test_pas_returns_to_the_board_with_a_confirmation_naming_the_card(
     location = response.headers["location"]
     parts = urlsplit(location)
     params = dict(parse_qsl(parts.query))
-    assert parts.path == "/"
+    assert parts.path == "/alfa"  # 5.25: the board moved from "/" to "/alfa"
     assert params["run"] == _RUN
     assert params["gate"] == "off"  # the owner's gate state survives the round trip
 
@@ -318,7 +318,7 @@ def test_pas_returns_to_the_board_with_a_confirmation_naming_the_card(
     assert cards.pas_recorded_text(card) in _visible(body)
 
     # A made-up card id claims nothing was written.
-    forged = client.get("/", params={"pas": "no-such-card"}).text
+    forged = client.get("/alfa", params={"pas": "no-such-card"}).text
     assert 'data-state="card-recorded"' not in forged
 
 
@@ -395,7 +395,7 @@ def test_every_row_carries_both_buttons_outside_the_audit_block(
     board: tuple[TestClient, ModuleType],
 ) -> None:
     client, _m = board
-    body = client.get("/", params={"gate": "off"}).text
+    body = client.get("/alfa", params={"gate": "off"}).text
     rows = _ROW_RE.findall(body)
     assert len(rows) == 2
     for row in rows:
@@ -449,7 +449,7 @@ def test_the_card_routes_make_zero_unusual_whales_calls(
     monkeypatch.setattr(UnusualWhalesClient, "request_json", _no_uw)
     monkeypatch.setattr(httpx, "get", _no_http)
 
-    assert client.get("/").status_code == 200
+    assert client.get("/alfa").status_code == 200
     for decision in ("pas", "log"):
         assert _press(client, decision).status_code == 303
     assert calls == []

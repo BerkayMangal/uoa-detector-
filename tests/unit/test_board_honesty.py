@@ -82,8 +82,8 @@ _SETTINGS = load_board_settings(_REPO / "profiles" / "board_v1.yaml")
 _CUTOFF = load_spread_cutoff_pct(_REPO / "profiles" / "v5_default.yaml")
 _RUN = "live-2026-09-15"
 _TS = datetime(2026, 9, 15, 14, 0, tzinfo=UTC)
-_BOARD_PAGES = ("/", "/alfa")
-_ALL_PAGES = ("/", "/alfa", "/gamma")
+_BOARD_PAGES = ("/alfa",)  # 5.25: "/" is the live recommendation screen (PRODUCT_OVERRIDE)
+_ALL_PAGES = ("/alfa", "/gamma")  # 5.25: "/" left this guard with the product override
 _CONFIRMING = {
     "dealer_gamma": "full_short_and_proximate",
     "dark_pool": "confirmed_match",
@@ -257,21 +257,24 @@ def _text(fragment: str) -> str:
 # ---------------------------------------------------------------------------
 
 
-def test_root_serves_the_board_and_alfa_is_an_alias(seeded: TestClient) -> None:
+def test_board_moved_to_alfa_and_root_is_the_live_screen(seeded: TestClient) -> None:
+    """5.2.A7 served the board at "/"; the 5.25 product override (docs/live-alpha-v1/
+    PRODUCT_OVERRIDE.md) gives "/" to the live recommendation screen. The board itself
+    is unchanged at "/alfa", and this honesty guard still covers it there."""
+    board = seeded.get("/alfa")
     root = seeded.get("/")
-    alias = seeded.get("/alfa")
-    assert root.status_code == alias.status_code == 200
-    assert 'id="alfa-board"' in root.text and 'id="alfa-board"' in alias.text
-    assert list(_rows(root.text)) == list(_rows(alias.text)) == _GATE_ON_ORDER
-    assert 'action="/" data-form="gate"' in root.text
-    assert 'action="/alfa" data-form="gate"' in alias.text
-    assert '<a href="/" ' in root.text
-    assert ">Screener<" not in root.text
-    assert 'href="/alfa"' not in root.text
+    assert board.status_code == root.status_code == 200
+    assert 'id="alfa-board"' in board.text
+    assert list(_rows(board.text)) == _GATE_ON_ORDER
+    assert 'action="/alfa" data-form="gate"' in board.text
+    assert '<a href="/alfa" ' in board.text and '<a href="/" ' in board.text
+    assert ">Screener<" not in board.text
+    assert 'id="alfa-board"' not in root.text
+    assert 'id="live-alpha"' in root.text
 
 
 def test_per_print_cards_score_controls_and_conviction_are_gone(seeded: TestClient) -> None:
-    body = seeded.get("/", params={"sort": "score", "min_score": "0.5", "ticker": "AAA", "label": "SWEEP_UOA"}).text
+    body = seeded.get("/alfa", params={"sort": "score", "min_score": "0.5", "ticker": "AAA", "label": "SWEEP_UOA"}).text
     assert list(_rows(body)) == _GATE_ON_ORDER  # the old score sort and filters are ignored
     for removed in (
         "Notable flow", 'name="sort"', 'name="min_score"', 'name="ticker"', 'name="label"',
@@ -336,7 +339,7 @@ def test_r_ev2_the_score_is_never_a_sort_key() -> None:
 
 
 def test_r_un1_unknown_and_out_of_scope_are_dashed_uncounted_and_not_clean(seeded: TestClient) -> None:
-    rows = _rows(seeded.get("/", params={"gate": "off"}).text)
+    rows = _rows(seeded.get("/alfa", params={"gate": "off"}).text)
     for ticker, row in rows.items():
         chips = _CHIP.findall(row)
         assert len(chips) == len(_SETTINGS.evidence.counted_families), ticker
@@ -359,10 +362,10 @@ def test_r_un2_strong_is_refused_at_render_with_three_or_more_unknowns(
     board: Callable[..., TestClient], monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     client = board()
-    plain = _rows(client.get("/").text)
+    plain = _rows(client.get("/alfa").text)
     assert f'data-strength="strong">{STRONG_LABEL}<' in plain["AAA"]  # one unknown family
     monkeypatch.setattr(evidence_module, "classify_strength", lambda counts, settings: "strong")
-    forced = _rows(client.get("/").text)
+    forced = _rows(client.get("/alfa").text)
     for ticker in ("CCC", "DDD", "SPY"):  # five or six unknown families
         assert STRONG_LABEL not in forced[ticker], ticker
         assert 'data-strength="strong"' not in forced[ticker], ticker
@@ -394,7 +397,7 @@ def test_r_ca1_every_row_has_ama_or_the_explicit_fallback(seeded: TestClient, pa
 
 
 def test_r_ca2_the_bear_column_matches_the_bull_column(seeded: TestClient) -> None:
-    for ticker, row in _rows(seeded.get("/").text).items():
+    for ticker, row in _rows(seeded.get("/alfa").text).items():
         bull = re.search(r'<div class="([^"]*)" data-case="bull">', row)
         bear = re.search(r'<div class="([^"]*)" data-case="bear">', row)
         grid = re.search(r'<div class="([^"]*)" data-cases>', row)
@@ -409,7 +412,7 @@ def test_r_ca2_the_bear_column_matches_the_bull_column(seeded: TestClient) -> No
 
 
 def test_r_co1_cost_uses_ask_bid_and_commission_never_mid(seeded: TestClient) -> None:
-    rows = _rows(seeded.get("/").text)
+    rows = _rows(seeded.get("/alfa").text)
     commission = _SETTINGS.cost.commission_per_contract_usd
     bid, ask = _ROWS[0].quote  # type: ignore[misc]
     assert f"data-round-trip>${(ask - bid) * 100 + 2 * commission:.2f}<" in rows["AAA"]
@@ -426,7 +429,7 @@ def test_r_co2_no_live_price_wording(seeded: TestClient, path: str) -> None:
 
 
 def test_r_co2_every_quote_shows_its_age(seeded: TestClient) -> None:
-    rows = _rows(seeded.get("/", params={"gate": "off"}).text)
+    rows = _rows(seeded.get("/alfa", params={"gate": "off"}).text)
     priced = sorted(t for t, row in rows.items() if "data-bid-ask" in row)
     assert priced == ["AAA", "BBB", "DDD"]
     for ticker in priced:
@@ -442,7 +445,7 @@ def test_r_co2_every_quote_shows_its_age(seeded: TestClient) -> None:
 
 def test_r_iv1_on_every_iv_surface_with_and_without_rows(board: Callable[..., TestClient]) -> None:
     with_rows = board()
-    root = html.unescape(with_rows.get("/").text)
+    root = html.unescape(with_rows.get("/alfa").text)
     assert "TSLA" in root and "IV-rank" in root  # IV richness is on the page
     for path in _ALL_PAGES:
         assert IV_NOT_SELL_VOL in html.unescape(with_rows.get(path).text), path
@@ -461,7 +464,7 @@ def test_r_em1_a_clean_candidate_suppresses_the_banner(seeded: TestClient) -> No
         body = seeded.get(path).text
         assert NO_CLEAN_CANDIDATE not in body
         assert 'data-state="no-clean-candidate"' not in body
-    body = seeded.get("/").text
+    body = seeded.get("/alfa").text
     assert re.search(r'data-ticker="AAA" data-direction="up" data-clean-candidate="true"', body)
     assert len(re.findall(r'data-clean-candidate="true"', body)) == 1
 

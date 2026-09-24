@@ -115,7 +115,7 @@ def _chip_classes(band: str, key: str) -> str:
 
 
 def test_the_band_renders_one_sentence(client: TestClient) -> None:
-    band = _band(client.get("/").text)
+    band = _band(client.get("/alfa").text)
     sentence = re.search(r"data-regime-sentence>([^<]*)<", band)
     assert sentence is not None
     assert html.unescape(sentence.group(1)) == " · ".join((
@@ -128,7 +128,7 @@ def test_the_band_renders_one_sentence(client: TestClient) -> None:
 
 
 def test_the_gamma_chips_carry_the_percentile_and_the_base_rate(client: TestClient) -> None:
-    band = _band(client.get("/").text)
+    band = _band(client.get("/alfa").text)
     spy = _chip(band, "gamma:SPY")
     assert spy.startswith("SPY kısa gamma: -$18.9B/%1 · 1 yıllık yüzdelik %33 (15.09 itibarıyla)")
     assert "son 1 yılın 4/6 gününde kısa gamma" in spy
@@ -136,21 +136,21 @@ def test_the_gamma_chips_carry_the_percentile_and_the_base_rate(client: TestClie
 
 
 def test_the_flip_is_labelled_and_carries_its_distance_from_spot(client: TestClient) -> None:
-    band = _band(client.get("/").text)
+    band = _band(client.get("/alfa").text)
     assert _chip(band, "flip:SPY").startswith(
         "SPY en yakın strike işaret değişimi 762.53 (spottan %+0.7)",
     )
 
 
 def test_the_vix_curve_is_out_of_scope_and_the_spot_is_marked_derived(client: TestClient) -> None:
-    band = _band(client.get("/").text)
+    band = _band(client.get("/alfa").text)
     assert _chip(band, "vix_curve").startswith("VIX vade yapısı: kapsam-dışı (volatilite eklentisi yok)")
     assert "border-dashed" in _chip_classes(band, "vix_curve")
     assert _chip(band, "vix_spot").startswith("VIX ≈ 17.5 (türetilmiş)")
 
 
 def test_the_iv_term_chip_renders_with_the_r_iv1_sentence(client: TestClient) -> None:
-    band = _band(client.get("/").text)
+    band = _band(client.get("/alfa").text)
     assert _chip(band, "curve").startswith("SPY IV vadesi contango (IV31G %14.2 · IV94G %15.7)")
     note = re.search(r"data-regime-iv1>([^<]*)<", band)
     assert note is not None
@@ -158,7 +158,7 @@ def test_the_iv_term_chip_renders_with_the_r_iv1_sentence(client: TestClient) ->
 
 
 def test_every_chip_shows_the_age_of_its_source(client: TestClient) -> None:
-    band = _band(client.get("/").text)
+    band = _band(client.get("/alfa").text)
     ages = [html.unescape(a) for a in re.findall(r"data-regime-age>([^<]*)<", band)]
     assert ages, "no source age rendered"
     assert all(re.fullmatch(r"\d+ sn önce alındı", age) for age in ages), ages
@@ -167,7 +167,7 @@ def test_every_chip_shows_the_age_of_its_source(client: TestClient) -> None:
 
 
 def test_the_tripwires_render_with_their_values_and_status(client: TestClient) -> None:
-    band = _band(client.get("/").text)
+    band = _band(client.get("/alfa").text)
     head = re.search(r"data-tripwire-head>([^<]*)<", band)
     assert head is not None
     assert html.unescape(head.group(1)) == "fikrimi ne değiştirir"
@@ -261,12 +261,12 @@ async def test_a_failed_regime_read_still_renders_the_band_as_unknown() -> None:
 
 def test_the_band_adds_no_forbidden_words(client: TestClient) -> None:
     for gate in ({}, {"gate": "off"}):
-        body = client.get("/", params=gate).text
+        body = client.get("/alfa", params=gate).text
         assert forbidden_words(html.unescape(body)) == []
 
 
 def test_the_band_renders_outside_every_row(client: TestClient) -> None:
-    body = client.get("/").text
+    body = client.get("/alfa").text
     assert body.index("data-regime>") < body.index("<article")
     for article in body.split("<article")[1:]:
         assert "data-regime>" not in article.split("</article>")[0]
@@ -283,7 +283,7 @@ def test_the_band_render_makes_zero_unusual_whales_calls(
         raise AssertionError(msg)
 
     monkeypatch.setattr(UnusualWhalesClient, "request_json", _no_uw)
-    response = client.get("/")
+    response = client.get("/alfa")
     assert response.status_code == 200
     assert "data-regime-sentence" in response.text
     assert calls == []
