@@ -447,3 +447,14 @@ def test_plain_verdicts_say_what_to_do_in_words() -> None:
     assert pullback.plain_action.startswith("BEKLE, KOVALAMA — $101.00 altına geri gelirse al")
     avoid = build_card(_eval(price=_price(spot=98.0)), (), "", S)
     assert avoid.plain_action.startswith("ALMA")
+
+
+def test_top_contracts_split_a_contract_that_was_bought_and_sold() -> None:
+    # live 2026-09-24: META 750C was bought and sold; the list summed both under the last side
+    chain = "META261009C00750000"
+    prints = [
+        _print(1, ticker="META", chain=chain, side="at_ask", premium="5000000", seconds=0),
+        _print(2, ticker="META", chain=chain, side="at_bid", premium="3000000", seconds=600),
+    ]
+    top = summarise("META", "r", prints, S.flow).top_contracts
+    assert top == ((chain, 5000000.0, "up"), (chain, 3000000.0, "down"))
