@@ -110,7 +110,7 @@ def _cell(fragment: str, attribute: str) -> str | None:
 
 
 def _rendered(client: TestClient, ticker: str) -> dict[str, str | None]:
-    row = _row(client.get("/", params={"gate": "off"}).text, ticker)
+    row = _row(client.get("/alfa", params={"gate": "off"}).text, ticker)
     return {name: _cell(row, f"data-spot-{name}") for name in _SPOT_CELLS}
 
 

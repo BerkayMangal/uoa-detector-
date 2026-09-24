@@ -50,7 +50,7 @@ def test_every_route_renders(client: TestClient, path: str) -> None:
 
 
 def test_empty_dashboard_shows_empty_state(client: TestClient) -> None:
-    body = client.get("/").text
+    body = client.get("/alfa").text
     # Phase 5.2.A7 (D10): "/" is the Alfa Board. This fixture creates no signal
     # table, so the board says it could not read the prints: never an empty,
     # clean-looking board, and never "Bugün temiz aday yok".

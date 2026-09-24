@@ -30,7 +30,7 @@ def _body(monkeypatch, gamma: dict[str, object]) -> str:
 
     monkeypatch.setattr(m, "_gamma", lambda: _G())
     monkeypatch.setattr(m, "_repo", lambda: _R())
-    return authed_client(m.app, monkeypatch).get("/").text
+    return authed_client(m.app, monkeypatch).get("/alfa").text
 
 
 def test_dashboard_renders_vol_board(monkeypatch) -> None:

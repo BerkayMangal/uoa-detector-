@@ -1,0 +1,93 @@
+# Live Alpha v1 policy profile (registry 5.25, docs/phase-5.25-live-alpha-acceptance.md).
+#
+# Every number below is a DESIGN CHOICE made on economic and data grounds on
+# 2026-09-24, before the policy published a single view. None of them is a fitted
+# optimum, and none may be tuned after seeing forward results (D4): a change is a
+# new policy_version with its own forward record.
+policy_version: live_alpha_v1
+
+calendar:
+  timezone: America/New_York
+  premarket_open: "04:00"
+  regular_open: "09:30"
+  regular_close: "16:00"
+  early_close: "13:00"
+  # NYSE full-day closures and 13:00 ET early closes. A date in a year not listed
+  # makes the session DEGRADED ("takvim bilinmiyor") instead of guessing.
+  years: [2026, 2027]
+  holidays:
+    - 2026-01-01
+    - 2026-01-19
+    - 2026-02-16
+    - 2026-04-03
+    - 2026-05-25
+    - 2026-06-19
+    - 2026-07-03
+    - 2026-09-07
+    - 2026-11-26
+    - 2026-12-25
+    - 2027-01-01
+    - 2027-01-18
+    - 2027-02-15
+    - 2027-03-26
+    - 2027-05-31
+    - 2027-06-18
+    - 2027-07-05
+    - 2027-09-06
+    - 2027-11-25
+    - 2027-12-24
+  early_closes:
+    - 2026-11-27
+    - 2026-12-24
+    - 2027-11-26
+
+flow:
+  dedupe_seconds: 60                  # same option_chain within a minute = one print (one sweep)
+  min_directional_premium_usd: 250000 # a quarter million in one direction; the worker's floor is 25k per print
+  dominance_min: 0.65                 # direction share of side-aware premium
+  side_aware_share_min: 0.50          # at least half the premium must have a known aggressor side
+  min_distinct_contracts: 2           # one contract alone is one trader's position
+
+price:
+  spot_max_age_seconds: 900           # refresher writes spot every 300 s; three missed cycles = stale
+  confirm_min_atr: 0.10               # price moved at least a tenth of an ATR with the flow
+  chase_max_atr: 1.00                 # more than one ATR from the previous close = do not chase
+  relative_min: 0.005                 # 0.5 % better than SPY on the day for the market-relative path
+  benchmark: SPY
+
+news:
+  window_hours: 36                    # a headline counts as "new" for a day and a half
+  refresh_seconds: 900                # at most one headlines call per ticker per 15 minutes
+  limit: 20                           # headlines requested per call (UW max 100)
+
+stock_plan:
+  stop_atr: 1.5                       # the 5.3 owner decision's ATR stop multiple, reused
+  target_r: 2.0                       # policy take-profit at 2R, labelled as policy, not forecast
+  horizon_sessions: 5
+  r_usd: 100                          # labelled PAPER profile unit risk (old 10k / 1 % assumption), not the owner's account
+  max_notional_usd: 2500              # 25 % of the 10k PAPER profile, as in 5.3
+  slippage_bps: 5                     # PAPER stock fill/exit haircut on the last price
+
+option_plan:
+  min_dte: 14                         # outlives the 5-session horizon with a week to spare
+  max_dte: 45
+  quote_max_age_seconds: 900
+  max_roundtrip_cost_pct: 25          # entry-minus-exit plus commission as % of debit; S01 found narrow spreads at 134 %
+  strike_grid_candidates: [0.5, 1.0, 2.5, 5.0, 10.0]
+  max_symbols_per_request: 40
+
+paper:
+  enabled: true
+
+cycle:
+  live_seconds: 300                   # the board refresher's cadence; spot and quotes change no faster
+  closed_seconds: 1800                # outside the session: rebuild the conditional plan twice an hour
+  max_cards: 7
+
+derived_from:
+  - "phase-3.6 directional UOA confluence (REJECTED, docs/phase-3.6-closeout.md)"
+  - "options_alpha_v1 H01/H02 flow families (REJECTED, docs/options-alpha-v1/FAMILIES.md)"
+design_difference: >-
+  Entry needs fresh price confirmation inside a chase limit plus either a dated
+  news headline or strength against SPY; the default execution path is the stock,
+  and an option only when its measured round-trip cost passes the cost rule.

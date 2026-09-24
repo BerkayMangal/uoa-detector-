@@ -98,7 +98,7 @@ def _cell(row_html: str, attribute: str) -> str | None:
 
 
 def test_a_stale_atm_row_gives_no_break_even_number(client: TestClient) -> None:
-    row = _rows(client.get("/", params={"gate": "off"}).text)["STL"]
+    row = _rows(client.get("/alfa", params={"gate": "off"}).text)["STL"]
     assert _cell(row, "data-move-text") == (
         "Başabaş için gereken hareket: bilinmiyor · ATM straddle: bilinmiyor"
     )
@@ -106,14 +106,14 @@ def test_a_stale_atm_row_gives_no_break_even_number(client: TestClient) -> None:
 
 
 def test_the_stale_row_still_shows_its_age(client: TestClient) -> None:
-    row = _rows(client.get("/", params={"gate": "off"}).text)["STL"]
+    row = _rows(client.get("/alfa", params={"gate": "off"}).text)["STL"]
     age = _cell(row, "data-move-age")
     assert age is not None
     assert age.startswith("ATM satırı 15 dk önce alındı")  # why it reads unknown
 
 
 def test_the_cutoff_matches_the_chase_spot_to_the_second(client: TestClient) -> None:
-    rows = _rows(client.get("/", params={"gate": "off"}).text)
+    rows = _rows(client.get("/alfa", params={"gate": "off"}).text)
     # At the cutoff the row is still fresh, exactly as chase.current_spot treats it.
     fresh = _cell(rows["EDG"], "data-move-text")
     assert fresh is not None
@@ -123,7 +123,7 @@ def test_the_cutoff_matches_the_chase_spot_to_the_second(client: TestClient) -> 
 
 
 def test_the_move_and_the_chase_spot_agree_on_one_row(client: TestClient) -> None:
-    rows = _rows(client.get("/", params={"gate": "off"}).text)
+    rows = _rows(client.get("/alfa", params={"gate": "off"}).text)
     stale_chase = _cell(rows["STL"], "data-chase-line")
     assert stale_chase is not None
     assert "hisse hareketi bilinmiyor" in stale_chase  # B3 already refused the same row
@@ -134,7 +134,7 @@ def test_the_move_and_the_chase_spot_agree_on_one_row(client: TestClient) -> Non
 
 def test_the_stale_reading_adds_no_forbidden_words(client: TestClient) -> None:
     for gate in ({}, {"gate": "off"}):
-        body = client.get("/", params=gate).text
+        body = client.get("/alfa", params=gate).text
         assert forbidden_words(html.unescape(body)) == []
 
 
@@ -149,7 +149,7 @@ def test_the_stale_render_makes_zero_unusual_whales_calls(
         raise AssertionError(msg)
 
     monkeypatch.setattr(UnusualWhalesClient, "request_json", _no_uw)
-    response = client.get("/", params={"gate": "off"})
+    response = client.get("/alfa", params={"gate": "off"})
     assert response.status_code == 200
     assert "data-move-text" in response.text
     assert calls == []

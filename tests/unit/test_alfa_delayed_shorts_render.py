@@ -152,7 +152,7 @@ def _family(row: str, family: str) -> str:
 def test_all_four_shipped_families_render_in_order(board: tuple[Engine, TestClient]) -> None:
     engine, client = board
     _seed_delayed(engine)
-    row = _rows_of(client.get("/").text)["AAA"]
+    row = _rows_of(client.get("/alfa").text)["AAA"]
     assert RENDERED_FAMILIES == ("congress", "insider", "short_interest", "ftd")
     assert re.findall(r'data-delayed-family="(\w+)"', row) == list(RENDERED_FAMILIES)
     assert [
@@ -165,7 +165,7 @@ def test_short_interest_is_labelled_as_of_with_a_today_minus_as_of_delay(
 ) -> None:
     engine, client = board
     _seed_delayed(engine)
-    short = _text(_family(_rows_of(client.get("/").text)["AAA"], "short_interest"))
+    short = _text(_family(_rows_of(client.get("/alfa").text)["AAA"], "short_interest"))
 
     assert "itibarıyla tarihi 2026-08-31" in short
     assert "bugün - itibarıyla tarihi = 15 gün (kaynakta bildirim tarihi yok)" in short
@@ -181,7 +181,7 @@ def test_ftd_is_collapsed_into_one_line_with_the_newest_days_listed(
 ) -> None:
     engine, client = board
     _seed_delayed(engine)
-    ftd = _family(_rows_of(client.get("/").text)["AAA"], "ftd")
+    ftd = _family(_rows_of(client.get("/alfa").text)["AAA"], "ftd")
     text = _text(ftd)
 
     assert f"pencerede 8 FTD günü, toplam ≈ ${_FTD_TOTAL_USD}; en yenisi 2026-08-14" in text
@@ -208,14 +208,14 @@ def test_a_day_with_an_unusable_amount_is_disclosed_never_counted_as_zero() -> N
 
 def test_an_unfetched_shorts_family_reads_bilinmiyor(board: tuple[Engine, TestClient]) -> None:
     engine, client = board
-    body = client.get("/").text
+    body = client.get("/alfa").text
     for family in ("short_interest", "ftd"):
         assert body.count(f'data-delayed-family="{family}"') == len(_ROWS)
     assert body.count('data-delayed-state="never_fetched"') == len(_ROWS) * len(RENDERED_FAMILIES)
     assert "data-delayed-summary" not in body  # nothing to collapse, so nothing is claimed
 
     _seed_delayed(engine)
-    bbb = _rows_of(client.get("/").text)["BBB"]
+    bbb = _rows_of(client.get("/alfa").text)["BBB"]
     assert 'data-delayed-state="empty"' in _family(bbb, "ftd")
     assert "kayıt yok — kaynak yanıt verdi" in _text(_family(bbb, "short_interest"))
 
@@ -224,9 +224,9 @@ def test_adding_the_shorts_families_changes_nothing_outside_the_bucket(
     board: tuple[Engine, TestClient],
 ) -> None:
     engine, client = board
-    before = client.get("/").text
+    before = client.get("/alfa").text
     _seed_delayed(engine)
-    after = client.get("/").text
+    after = client.get("/alfa").text
 
     assert "data-delayed-item=" not in before
     assert _without_delayed(before) == _without_delayed(after)
@@ -238,7 +238,7 @@ def test_adding_the_shorts_families_changes_nothing_outside_the_bucket(
 def test_every_generated_shorts_string_is_clean(board: tuple[Engine, TestClient]) -> None:
     engine, client = board
     _seed_delayed(engine)
-    assert client.get("/").status_code == 200
+    assert client.get("/alfa").status_code == 200
 
     panels = load_delayed_panels(engine, ["AAA"], today=_TODAY, settings=_DELAYED)
     generated: list[str] = []

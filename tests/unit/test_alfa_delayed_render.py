@@ -265,11 +265,11 @@ def test_delayed_rows_change_nothing_outside_their_bucket(
     board: tuple[Engine, TestClient],
 ) -> None:
     engine, client = board
-    before = client.get("/").text
+    before = client.get("/alfa").text
     assert NO_CLEAN_CANDIDATE in before  # R-EM1: no row qualifies, in both passes
 
     _seed_delayed(engine)
-    after = client.get("/").text
+    after = client.get("/alfa").text
 
     assert "data-delayed-item=" not in before
     assert "data-delayed-item=" in after
@@ -280,9 +280,9 @@ def test_counts_strength_clean_flags_banner_ama_and_order_are_identical(
     board: tuple[Engine, TestClient],
 ) -> None:
     engine, client = board
-    before = client.get("/").text
+    before = client.get("/alfa").text
     _seed_delayed(engine)
-    after = client.get("/").text
+    after = client.get("/alfa").text
 
     def facts(body: str) -> dict[str, Any]:
         rows = _rows_of(body)
@@ -310,7 +310,7 @@ def test_the_bucket_is_a_sibling_of_the_audit_block_not_nested_in_it(
 ) -> None:
     engine, client = board
     _seed_delayed(engine)
-    row = _rows_of(client.get("/").text)["AAA"]
+    row = _rows_of(client.get("/alfa").text)["AAA"]
     audit = re.search(r"<details[^>]*data-audit[^>]*>.*?</details>", row, re.S)
     assert audit is not None
     assert "data-delayed" not in audit.group(0)
@@ -326,7 +326,7 @@ def test_a_fresh_database_reads_bilinmiyor_and_never_an_empty_clean_block(
     board: tuple[Engine, TestClient],
 ) -> None:
     _engine, client = board
-    body = client.get("/").text
+    body = client.get("/alfa").text
     assert body.count('data-delayed-state="never_fetched"') == len(_ROWS) * len(RENDERED_FAMILIES)
     assert "bilinmiyor — bu aile hiç çekilmedi" in html.unescape(body)
     assert "kayıt yok" not in html.unescape(body)
@@ -336,7 +336,7 @@ def test_a_fresh_database_reads_bilinmiyor_and_never_an_empty_clean_block(
 def test_a_fetched_family_with_no_rows_reads_kayit_yok(board: tuple[Engine, TestClient]) -> None:
     engine, client = board
     _seed_delayed(engine)
-    rows = _rows_of(client.get("/").text)
+    rows = _rows_of(client.get("/alfa").text)
     assert 'data-delayed-state="empty"' in rows["BBB"]  # the source answered with nothing
     assert "kayıt yok — kaynak yanıt verdi" in _text(rows["BBB"])
     assert 'data-delayed-state="items"' in rows["AAA"]
@@ -348,7 +348,7 @@ def test_items_show_the_filing_date_delay_flags_and_outcome(
 ) -> None:
     engine, client = board
     _seed_delayed(engine)
-    aaa = _text(_rows_of(client.get("/").text)["AAA"])
+    aaa = _text(_rows_of(client.get("/alfa").text)["AAA"])
     assert "ek kanıt (gecikmeli)" in aaa
     assert "gecikmeli veri: kanıt sayımına, güç etiketine ve karşı argümana girmez" in aaa
     assert "bildirim tarihi 2026-09-11" in aaa
@@ -368,7 +368,7 @@ def test_a_politician_named_al_green_renders_escaped_and_never_raises(
 ) -> None:
     engine, client = board
     _seed_delayed(engine)
-    response = client.get("/")
+    response = client.get("/alfa")
     assert response.status_code == 200
     aaa = _rows_of(response.text)["AAA"]
 
@@ -386,7 +386,7 @@ def test_generated_delayed_copy_stays_clean_with_vendor_names_on_the_page(
 ) -> None:
     engine, client = board
     _seed_delayed(engine)
-    body = client.get("/").text
+    body = client.get("/alfa").text
 
     # The render-level scan excludes the vendor spans (rule 16); everything else is generated.
     assert forbidden_words(html.unescape(_VENDOR_SPAN.sub("", body))) == []
@@ -417,7 +417,7 @@ def test_a_failed_delayed_read_renders_unknown_not_an_empty_bucket(
         raise RuntimeError(msg)
 
     monkeypatch.setattr(page_module, "load_delayed_panels", _boom)
-    body = client.get("/").text
+    body = client.get("/alfa").text
     assert body.count('data-delayed-state="unreadable"') == len(_ROWS) * len(RENDERED_FAMILIES)
     assert "gecikmeli ek kanıt okunamadı; bu, kayıt yok demek değil" in html.unescape(body)
     assert "data-delayed-item=" not in body

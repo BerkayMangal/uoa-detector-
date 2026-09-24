@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Literal
@@ -110,3 +111,23 @@ def build_enriched(
         sweep_classification=sweep,
         **extra,
     )
+
+
+@pytest.fixture(autouse=True)
+def _no_live_alpha_thread(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Phase 5.25: the webapp lifespan starts the Live Alpha job on a daemon thread with
+    its own UW client. A test that enters the lifespan with a live config must never
+    start that real job (it would outlive the test and call the network); tests that
+    exercise the job call ``run_cycle`` directly."""
+    try:
+        import webapp.main as m
+    except Exception:
+        return
+    monkeypatch.setattr(m, "_start_live_alpha_thread", lambda database_url: None)
+
+    async def _idle() -> None:
+        # Phase 5.2.PERF10: the board prerender loop would read the default database
+        # in the background of every lifespan test; tests of it call the pieces directly.
+        await asyncio.Event().wait()
+
+    monkeypatch.setattr(m, "_board_prerender_loop", _idle)

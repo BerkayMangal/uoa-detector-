@@ -20,8 +20,11 @@ import base64
 import binascii
 import contextlib
 import logging
+import math
 import os
 import secrets
+import threading
+import time
 from contextvars import ContextVar
 from datetime import UTC, datetime
 from pathlib import Path
@@ -46,6 +49,10 @@ from webapp.board.refresher import board_refresh_loop
 from webapp.board.settings import BoardSettings, load_board_settings
 from webapp.board.signals import BoardSignalReader
 from webapp.gamma_live import gamma_refresh_loop
+from webapp.live_alpha import job as live_job
+from webapp.live_alpha import page as live_page
+from webapp.live_alpha import store as live_store
+from webapp.live_alpha.job import live_alpha_loop
 from webapp.repo import RunInfo, SignalRepo
 from webapp.vol_board import VolBoardRow, build_vol_board, vol_board_summary
 from webapp.worker import live_config_from_env, run_live_worker
@@ -78,6 +85,31 @@ async def _supervise(make_coro: object, name: str) -> None:
         else:
             _logger.warning("%s exited unexpectedly; restarting in 30s", name)
         await asyncio.sleep(30)
+
+
+_LIVE_ALPHA_THREAD: threading.Thread | None = None
+
+
+def _live_alpha_thread_main(database_url: str) -> None:
+    """Run the Live Alpha loop forever on this thread's own event loop; restart on a crash."""
+    while True:
+        try:
+            asyncio.run(live_alpha_loop(database_url=database_url))
+        except Exception:
+            _logger.exception("live-alpha crashed; restarting in 30s")
+        else:
+            _logger.warning("live-alpha exited unexpectedly; restarting in 30s")
+        time.sleep(30)
+
+
+def _start_live_alpha_thread(database_url: str) -> None:
+    global _LIVE_ALPHA_THREAD
+    if _LIVE_ALPHA_THREAD is not None and _LIVE_ALPHA_THREAD.is_alive():
+        return
+    _LIVE_ALPHA_THREAD = threading.Thread(
+        target=_live_alpha_thread_main, args=(database_url,), name="live-alpha", daemon=True,
+    )
+    _LIVE_ALPHA_THREAD.start()
 
 
 @contextlib.asynccontextmanager
@@ -117,6 +149,10 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
         )))
         # Phase 5.2.PERF10: the default board view, prebuilt off the request path.
         tasks.append(asyncio.create_task(_supervise(_board_prerender_loop, "board-prerender")))
+        # Phase 5.25: the live recommendation engine behind "/". It runs on its own
+        # thread and event loop (with its own UW client and engine), so its synchronous
+        # database reads can never stall the web server's loop.
+        _start_live_alpha_thread(str(config["database_url"]))
     try:
         yield
     finally:
@@ -447,6 +483,126 @@ def options_page(request: Request) -> HTMLResponse:
 
 
 # ---------------------------------------------------------------------------
+# Live Alpha v1 (Phase 5.25): "/" — Bugünün Fırsatları
+# ---------------------------------------------------------------------------
+
+_LIVE_OK = {
+    "izle": "İzlemeye alındı.",
+    "pas": "Pas kaydedildi.",
+    "paper": "PAPER takibi başlatıldı; simüle giriş tetik ve taze fiyatı bekler.",
+    "paper_var": "Bu fırsatın zaten bir PAPER kaydı var.",
+    "manuel": "Kendi işlemin kaydedildi (PAPER'dan ayrı).",
+    "yok": "Bu fırsat son taramada yok; kayıt yapılmadı.",
+}
+
+
+@app.get("/", response_class=HTMLResponse)
+def live_home(request: Request, ok: str = "") -> HTMLResponse:
+    """The live recommendation screen. One read of the newest scan snapshot; no UW call."""
+    view = live_page.build_view(_board_reader().engine, _now())
+    cfg = live_page.settings()
+    reload_seconds = cfg.cycle.live_seconds if view.mode == "LIVE" else cfg.cycle.closed_seconds
+    return templates.TemplateResponse(
+        request, "live.html",
+        {"v": view, "ok": _LIVE_OK.get(ok, ""), "reload_seconds": reload_seconds},
+    )
+
+
+@app.get("/canli/{opportunity_id}", response_class=HTMLResponse)
+def live_history(request: Request, opportunity_id: str) -> HTMLResponse:
+    engine = _board_reader().engine
+    live_page.ensure_ready(engine)
+    return templates.TemplateResponse(
+        request, "live_history.html",
+        {
+            "opportunity_id": opportunity_id,
+            "recs": live_store.recs_for(engine, opportunity_id),
+            "events": live_store.events_for(engine, opportunity_id),
+        },
+    )
+
+
+def _live_refuse_foreign(request: Request) -> PlainTextResponse | None:
+    if not _same_origin(request):
+        return PlainTextResponse("cross-origin request refused", status_code=403)
+    return None
+
+
+@app.post("/canli/{action}", response_model=None)
+def live_action(
+    request: Request,
+    action: str,
+    opportunity_id: str = Form(...),
+    rec_id: str = Form(""),
+    instrument: str = Form("stock"),
+    side: str = Form("buy"),
+    quantity: float = Form(0.0),
+    price: float = Form(0.0),
+    note: str = Form(""),
+) -> RedirectResponse | PlainTextResponse:
+    """Owner actions on a card: watch, pass, start PAPER, record a manual fill."""
+    refused = _live_refuse_foreign(request)
+    if refused is not None:
+        return refused
+    if action not in ("izle", "pas", "paper", "manuel"):
+        return PlainTextResponse("unknown action", status_code=404)
+    engine = _board_reader().engine
+    live_page.ensure_ready(engine)
+    card = live_page.card_from_latest_scan(engine, opportunity_id)
+    if card is None:
+        return RedirectResponse("/?ok=yok", status_code=303)
+    now = _now()
+    policy = str(card.get("policy_version", ""))
+    if action in ("izle", "pas"):
+        live_store.append_event(
+            engine, at=now, opportunity_id=opportunity_id, kind=f"owner_{action}", actor="owner",
+            policy_version=policy, detail={"rec_id": rec_id or card.get("rec_id")},
+        )
+        return RedirectResponse(f"/?ok={action}", status_code=303)
+    if action == "manuel":
+        if not (math.isfinite(quantity) and math.isfinite(price)) or quantity <= 0 or price <= 0 or side not in ("buy", "sell"):
+            return PlainTextResponse("quantity and price must be positive", status_code=400)
+        live_store.add_manual(engine, live_store.LiveManual(
+            manual_id=live_store.new_id(), at=now, opportunity_id=opportunity_id,
+            rec_id=rec_id or card.get("rec_id"), ticker=str(card.get("ticker", "")),
+            instrument=instrument[:40], side=side, quantity=quantity, price=price, note=note[:500],
+        ))
+        live_store.append_event(
+            engine, at=now, opportunity_id=opportunity_id, kind="manual_fill", actor="owner",
+            policy_version=policy,
+            detail={"instrument": instrument[:40], "side": side, "quantity": quantity, "price": price},
+        )
+        return RedirectResponse("/?ok=manuel", status_code=303)
+    # action == "paper": the owner starts PAPER tracking for a card (one per opportunity)
+    stock_plan = card.get("stock_plan")
+    preferred = str((card.get("instrument") or {}).get("preferred", "none"))
+    if stock_plan is None or card.get("recommendation") not in ("BUY", "CONDITIONAL_BUY", "BEARISH_SETUP"):
+        return PlainTextResponse("this card has no plan to track", status_code=400)
+    if preferred == "none":
+        preferred = "stock" if card.get("direction") == "up" else "none"
+    if preferred == "none":
+        return PlainTextResponse("no executable instrument for this card", status_code=400)
+    structure = next((o for o in card.get("options", []) if o.get("kind") == preferred), None)
+    created = live_store.create_paper(engine, live_store.LivePaper(
+        paper_id=live_store.new_id(), opportunity_id=opportunity_id,
+        rec_id=rec_id or str(card.get("rec_id") or ""), ticker=str(card.get("ticker", "")),
+        direction=str(card.get("direction", "up")), instrument=preferred,
+        plan_json=live_store.dumps({
+            "instrument": preferred, "stock_plan": stock_plan, "structure": structure,
+            "decision_as_of": card.get("decision_as_of"), "policy_version": policy, "started_by": "owner",
+            "fill_session": live_page.fill_session(now),
+        }),
+        state="PAPER_PENDING", created_at=now,
+    ))
+    if created:
+        live_store.append_event(
+            engine, at=now, opportunity_id=opportunity_id, kind="paper_pending", actor="owner",
+            policy_version=policy, detail={"instrument": preferred},
+        )
+    return RedirectResponse(f"/?ok={'paper' if created else 'paper_var'}", status_code=303)
+
+
+# ---------------------------------------------------------------------------
 # Alfa Board (Phase 5.2): GET / since A7, GET /alfa kept as an alias (decision P12)
 # ---------------------------------------------------------------------------
 
@@ -497,6 +653,7 @@ def _load_board_profiles() -> None:
     files are checked on every start rather than on the first page request.
     """
     global _BOARD_SETTINGS, _SPREAD_CUTOFF_PCT, _LEGACY_SCORES
+    live_page.settings()  # Phase 5.25: the live policy profile fails startup, not the first page
     settings = load_board_settings()
     cutoff = alfa_page.load_spread_cutoff_pct()
     legacy = alfa_page.load_live_legacy_scores()
@@ -899,7 +1056,6 @@ async def _board_prerender_loop() -> None:
         await asyncio.sleep(_board_settings().refresh.cadence_seconds)
 
 
-@app.get("/", response_class=HTMLResponse)
 @app.get("/alfa", response_class=HTMLResponse)
 def alfa_board(request: Request, run: str = "", gate: str = "", pas: str = "") -> HTMLResponse:
     """The Alfa Board: one row per (ticker, side-aware direction) over the whole selected run.
@@ -1001,7 +1157,7 @@ def alfa_card(
     if gate == alfa_page.GATE_OFF_PARAM:
         params["gate"] = alfa_page.GATE_OFF_PARAM
     # The target is built here, never from a client value: no open redirect.
-    return RedirectResponse(f"/?{urlencode(params)}", status_code=303)
+    return RedirectResponse(f"/alfa?{urlencode(params)}", status_code=303)
 
 
 # ---------------------------------------------------------------------------
@@ -1259,7 +1415,7 @@ def alfa_fill(
 
 
 @app.get("/health")
-def health() -> dict[str, str | bool]:
+def health() -> dict[str, object]:
     """Liveness, plus the commit this instance is running.
 
     Phase 5.2.RAIL2: a deploy check must be able to prove WHICH build answered,
@@ -1267,4 +1423,10 @@ def health() -> dict[str, str | bool]:
     value is a public commit id, never a secret.
     """
     sha = os.environ.get("RAILWAY_GIT_COMMIT_SHA", "")
-    return {"ok": True, "sha": sha[:7] if sha else "unknown"}
+    # Phase 5.25: the live recommendation job's last cycle (in memory; no database read here).
+    # The key is present only once the job has cycled, so a process without the job
+    # answers exactly as before (tests/unit/test_health_sha.py).
+    body: dict[str, object] = {"ok": True, "sha": sha[:7] if sha else "unknown"}
+    if live_job.LAST_CYCLE:
+        body["live_alpha"] = dict(live_job.LAST_CYCLE)
+    return body

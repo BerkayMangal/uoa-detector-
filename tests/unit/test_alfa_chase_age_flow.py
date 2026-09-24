@@ -110,7 +110,7 @@ def _cell(row_html: str, attribute: str) -> str | None:
 
 
 def test_the_chase_cell_shows_the_age_of_the_quote_it_prices(client: TestClient) -> None:
-    row = _rows(client.get("/", params={"gate": "off"}).text)["SUR"]
+    row = _rows(client.get("/alfa", params={"gate": "off"}).text)["SUR"]
     line = _cell(row, "data-chase-line")
     assert line is not None and "şimdi $1.60 (ask)" in line
     age = _cell(row, "data-chase-quote-age")
@@ -119,7 +119,7 @@ def test_the_chase_cell_shows_the_age_of_the_quote_it_prices(client: TestClient)
 
 
 def test_the_chip_attributes_still_resolve_to_the_chip(client: TestClient) -> None:
-    row = _rows(client.get("/", params={"gate": "off"}).text)["SUR"]
+    row = _rows(client.get("/alfa", params={"gate": "off"}).text)["SUR"]
     # The chase age is namespaced, so a first-match regex for the chip's own age is unaffected.
     first = re.search(r"data-quote-age>([^<]*)<", row)
     assert first is not None
@@ -146,14 +146,14 @@ def test_the_three_contract_labels_are_unchanged() -> None:
 
 
 def test_the_rows_tell_a_flat_tape_from_a_missing_one(client: TestClient) -> None:
-    rows = _rows(client.get("/", params={"gate": "off"}).text)
+    rows = _rows(client.get("/alfa", params={"gate": "off"}).text)
     assert _cell(rows["FLT"], "data-chase-flow") == "akış baskıdan beri: ölçüldü, yön göstermiyor"
     assert _cell(rows["NOR"], "data-chase-flow") == "akış baskıdan beri: bilinmiyor"
     assert _cell(rows["SUR"], "data-chase-flow") == "akış baskıdan beri sürüyor"
 
 
 def test_the_flow_reading_never_moves_the_verdict(client: TestClient) -> None:
-    rows = _rows(client.get("/", params={"gate": "off"}).text)
+    rows = _rows(client.get("/alfa", params={"gate": "off"}).text)
     verdicts = {ticker: _cell(row, "data-chase-verdict") for ticker, row in rows.items()}
     assert set(verdicts.values()) == {VERDICT_LABELS["reasonable"]}
 
@@ -161,7 +161,7 @@ def test_the_flow_reading_never_moves_the_verdict(client: TestClient) -> None:
 def test_the_new_flow_label_is_clean(client: TestClient) -> None:
     assert ensure_clean(FLOW_LABELS["flat"]) == FLOW_LABELS["flat"]
     for gate in ({}, {"gate": "off"}):
-        body = client.get("/", params=gate).text
+        body = client.get("/alfa", params=gate).text
         assert forbidden_words(html.unescape(body)) == []
 
 
@@ -176,7 +176,7 @@ def test_the_chase_render_makes_zero_unusual_whales_calls(
         raise AssertionError(msg)
 
     monkeypatch.setattr(UnusualWhalesClient, "request_json", _no_uw)
-    response = client.get("/", params={"gate": "off"})
+    response = client.get("/alfa", params={"gate": "off"})
     assert response.status_code == 200
     assert "data-chase-quote-age" in response.text
     assert calls == []

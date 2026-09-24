@@ -132,7 +132,7 @@ def _family(row_html: str, family: str) -> str:
 
 
 def test_each_confirmation_state_renders_its_frozen_label(client: TestClient) -> None:
-    rows = _rows(client.get("/", params={"gate": "off"}).text)
+    rows = _rows(client.get("/alfa", params={"gate": "off"}).text)
     assert _cell(rows["ACI"], "data-oi-label") == STATUS_LABELS["acilis"] == "açılış (T+1 OI teyitli)"
     assert _cell(rows["KAP"], "data-oi-label") == STATUS_LABELS["kapanis"] == "kapanış (T+1 OI düştü)"
     assert _cell(rows["BEK"], "data-oi-label") == "henüz doğrulanmadı"
@@ -142,7 +142,7 @@ def test_each_confirmation_state_renders_its_frozen_label(client: TestClient) ->
 
 
 def test_the_open_interest_family_follows_the_confirmation(client: TestClient) -> None:
-    rows = _rows(client.get("/", params={"gate": "off"}).text)
+    rows = _rows(client.get("/alfa", params={"gate": "off"}).text)
     assert _family(rows["ACI"], "open_interest") == "Açık pozisyon: lehte"
     assert _family(rows["KAP"], "open_interest") == "Açık pozisyon: aleyhte"
     assert _family(rows["BEK"], "open_interest").startswith("Açık pozisyon: bilinmiyor (T+1 bekleniyor)")
@@ -150,7 +150,7 @@ def test_the_open_interest_family_follows_the_confirmation(client: TestClient) -
 
 
 def test_an_unconfirmed_or_out_of_scope_reading_is_dashed_and_dimmed(client: TestClient) -> None:
-    rows = _rows(client.get("/", params={"gate": "off"}).text)
+    rows = _rows(client.get("/alfa", params={"gate": "off"}).text)
     for ticker in ("BEK", "VAD"):
         label = re.search(r'<span class="([^"]*)"\s+data-oi-label>', rows[ticker])
         assert label is not None, ticker
@@ -169,7 +169,7 @@ def test_an_unconfirmed_or_out_of_scope_reading_is_dashed_and_dimmed(client: Tes
 def test_a_catalyst_inside_the_window_renders_and_a_never_fetched_source_reads_unknown(
     client: TestClient,
 ) -> None:
-    rows = _rows(client.get("/", params={"gate": "off"}).text)
+    rows = _rows(client.get("/alfa", params={"gate": "off"}).text)
     kat = _cell(rows["KAT"], 'data-catalyst="var"')
     assert kat is not None
     assert kat.startswith("Vade içinde katalizör: Kazanç: 17.09 kapanış sonrası")
@@ -181,12 +181,12 @@ def test_a_catalyst_inside_the_window_renders_and_a_never_fetched_source_reads_u
 
 
 def test_a_catalyst_in_the_window_is_the_mandatory_counter_argument(client: TestClient) -> None:
-    rows = _rows(client.get("/", params={"gate": "off"}).text)
+    rows = _rows(client.get("/alfa", params={"gate": "off"}).text)
     assert _cell(rows["KAT"], "<p data-counter") == "AMA vade içinde katalizör var: Kazanç."
 
 
 def test_the_fallback_checked_list_names_the_catalyst_check(client: TestClient) -> None:
-    row = _rows(client.get("/", params={"gate": "off"}).text)["ACI"]
+    row = _rows(client.get("/alfa", params={"gate": "off"}).text)["ACI"]
     counter = _cell(row, "<p data-counter")
     assert counter == "Bariz bir karşı argüman bulunamadı — bu bir onay değildir"
     checked = _cell(row, "<p data-checked")
@@ -202,7 +202,7 @@ def test_the_fallback_checked_list_names_the_catalyst_check(client: TestClient) 
 
 
 def test_the_m22_note_lives_only_in_the_audit_block(client: TestClient) -> None:
-    body = client.get("/", params={"gate": "off"}).text
+    body = client.get("/alfa", params={"gate": "off"}).text
     outside = _AUDIT.sub("", body)
     assert M22_MAY_DIFFER not in html.unescape(outside)
     for ticker, row in _rows(body).items():
@@ -211,7 +211,7 @@ def test_the_m22_note_lives_only_in_the_audit_block(client: TestClient) -> None:
 
 
 def test_the_score_never_leaves_the_audit_block(client: TestClient) -> None:
-    body = client.get("/", params={"gate": "off"}).text
+    body = client.get("/alfa", params={"gate": "off"}).text
     outside = _AUDIT.sub("", body)
     for spec in _ROWS:
         assert f"{spec.score:.2f}" not in outside, spec.ticker
@@ -219,7 +219,7 @@ def test_the_score_never_leaves_the_audit_block(client: TestClient) -> None:
 
 def test_the_opening_line_adds_no_forbidden_words(client: TestClient) -> None:
     for gate in ({}, {"gate": "off"}):
-        body = client.get("/", params=gate).text
+        body = client.get("/alfa", params=gate).text
         assert forbidden_words(html.unescape(body)) == []
 
 
@@ -234,7 +234,7 @@ def test_the_opening_render_makes_zero_unusual_whales_calls(
         raise AssertionError(msg)
 
     monkeypatch.setattr(UnusualWhalesClient, "request_json", _no_uw)
-    response = client.get("/", params={"gate": "off"})
+    response = client.get("/alfa", params={"gate": "off"})
     assert response.status_code == 200
     assert "data-oi-label" in response.text
     assert calls == []

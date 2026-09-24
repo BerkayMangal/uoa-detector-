@@ -101,7 +101,7 @@ def _cell(row_html: str, attribute: str) -> str | None:
 
 
 def test_an_unread_chip_renders_unknown_not_no_catalyst(client: TestClient) -> None:
-    rows = _rows(client.get("/", params={"gate": "off"}).text)
+    rows = _rows(client.get("/alfa", params={"gate": "off"}).text)
     unknown = _cell(rows["UNK"], 'data-catalyst="bilinmiyor"')
     # Its earnings and FDA sources were never fetched; the macro calendar is market-wide,
     # so that part alone is a real "yok". One unknown part is enough: the count is not a zero.
@@ -110,13 +110,13 @@ def test_an_unread_chip_renders_unknown_not_no_catalyst(client: TestClient) -> N
 
 
 def test_a_fetched_source_with_nothing_scheduled_still_reads_no(client: TestClient) -> None:
-    rows = _rows(client.get("/", params={"gate": "off"}).text)
+    rows = _rows(client.get("/alfa", params={"gate": "off"}).text)
     none_found = _cell(rows["KNO"], 'data-catalyst="yok"')
     assert none_found == "Vade içinde katalizör: Kazanç: yok · FDA: yok · Makro: yok"
 
 
 def test_the_checked_list_says_unknown_for_an_unread_chip(client: TestClient) -> None:
-    rows = _rows(client.get("/", params={"gate": "off"}).text)
+    rows = _rows(client.get("/alfa", params={"gate": "off"}).text)
     unread = _cell(rows["UNK"], "<p data-checked")
     assert unread is not None
     assert "vade içi katalizör (bilinmiyor)" in unread
@@ -170,5 +170,5 @@ def test_the_unknown_check_label_is_frozen_and_clean() -> None:
 
 def test_the_catalyst_reading_adds_no_forbidden_words(client: TestClient) -> None:
     for gate in ({}, {"gate": "off"}):
-        body = client.get("/", params=gate).text
+        body = client.get("/alfa", params=gate).text
         assert forbidden_words(html.unescape(body)) == []

@@ -249,7 +249,7 @@ def _states(body: str) -> list[str]:
 
 
 def test_gamma_only_row_does_not_suppress_the_banner(board: Callable[..., TestClient]) -> None:
-    body = board([_GMO], now=_TS + timedelta(hours=1)).get("/").text
+    body = board([_GMO], now=_TS + timedelta(hours=1)).get("/alfa").text
     row = _rows(body)["GMO"]
     assert 'data-clean-candidate="false"' in body
     assert "no-clean-candidate" in _states(body)
@@ -261,7 +261,7 @@ def test_gamma_only_row_does_not_suppress_the_banner(board: Callable[..., TestCl
 
 
 def test_a_past_run_is_dated_not_today(board: Callable[..., TestClient]) -> None:
-    body = html.unescape(board([_GMO], now=_TS + timedelta(days=16)).get("/").text)
+    body = html.unescape(board([_GMO], now=_TS + timedelta(days=16)).get("/alfa").text)
     assert "no-clean-candidate" in _states(body)
     assert "2026-09-15 seansında temiz aday yok" in body
     assert NO_CLEAN_CANDIDATE not in body
@@ -275,7 +275,7 @@ def test_a_failed_evidence_or_quote_read_shows_the_unread_state(
 
     client = board([_GMO], now=_TS + timedelta(hours=1))
     monkeypatch.setattr(page_module, failing, _failing_source)
-    body = client.get("/").text
+    body = client.get("/alfa").text
     states = _states(body)
     assert "no-clean-candidate" not in states
     assert "clean-candidate-unread" in states
