@@ -19,7 +19,8 @@
   <p class="text-sm text-gray-400 mb-3">
     Son tarama {{ v.scan_age_seconds }} sn önce ({{ v.session.get('et_now', '') }}{% if v.session.get('reason') %}, {{ v.session.reason }}{% endif %}).
     Akış kaydı: {{ v.flow_run or '—' }}, son baskı {{ v.flow_last_print[11:16] if v.flow_last_print else '—' }} UTC.
-    {% if v.session.get('next_session') and v.mode != 'LIVE' %}Sonraki seans: {{ v.session.next_session }}.{% endif %}
+    {% if v.mode == 'PREMARKET' and v.session.get('session_date') %}Bugünkü seans {{ v.session.session_date }} 09:30 ET'de açılır{% if v.session.get('close_et') and v.session.close_et != '16:00' %}, erken kapanış {{ v.session.close_et }} ET{% endif %}.
+    {% elif v.session.get('next_session') and v.mode != 'LIVE' %}Sonraki seans: {{ v.session.next_session }}.{% endif %}
   </p>
   {% if v.scan_stale %}<p class="rounded border border-amber-600 bg-amber-950/40 px-3 py-2 text-amber-200 text-sm mb-3" data-stale>Tarama bayat: son döngü beklenenden eski. Kartlardaki giriş hazırlığı geri çekildi; iş durumu en altta.</p>{% endif %}
   {% if v.status != 'ok' and v.status_text %}<p class="rounded border border-amber-700 px-3 py-2 text-amber-200 text-sm mb-3" data-degraded>{{ v.status_text }}</p>{% endif %}

@@ -417,3 +417,12 @@ def test_not_current_flow_is_never_ready() -> None:
     d = evaluate(_flow(), _price(), _news(), classify(LIVE_NOW, S.calendar), LIVE_NOW, S,  # type: ignore[arg-type]
                  flow_current=False)
     assert d.readiness is Readiness.TRIGGER_PENDING and d.recommendation is Recommendation.CONDITIONAL_BUY
+
+
+def test_benchmark_card_does_not_compare_spy_with_itself() -> None:
+    spy = replace(_price(), ticker="SPY")
+    flow = summarise("SPY", "r", [replace(p, ticker="SPY") for p in _qualifying_up()], S.flow)
+    d = evaluate(flow, spy, _news(CheckState.CHECKED_NONE), classify(LIVE_NOW, S.calendar), LIVE_NOW, S)
+    card = build_card(d, (), "", S)
+    assert "karşılaştırma ölçütünün kendisi" in card.price_evidence
+    assert "SPY'a göre" not in card.price_evidence
