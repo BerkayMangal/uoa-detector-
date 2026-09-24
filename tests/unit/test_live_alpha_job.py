@@ -357,3 +357,164 @@ def test_unknown_opportunity_writes_nothing(app_with_scan: Any, monkeypatch: pyt
 def test_snapshot_json_round_trips(engine: Engine) -> None:
     row = _cycle(engine, FakeUW(), T0)
     assert json.loads(store.dumps(row.snapshot))["cards"][0]["ticker"] == "NVDA"
+
+
+@pytest.mark.parametrize(
+    ("error", "state", "fragment"),
+    [
+        ("auth", "failed", "yetki"),
+        ("notfound", "failed", "404"),
+        ("daily", "failed", "günlük istek limiti"),
+        ("shape", "failed", "beklenmeyen yanıt"),
+    ],
+)
+def test_news_error_states(engine: Engine, error: str, state: str, fragment: str) -> None:
+    from webapp.live_alpha import uw
+
+    from uoa_detector.sources.unusual_whales.client import (
+        UnusualWhalesAuthError,
+        UnusualWhalesDailyLimitError,
+        UnusualWhalesNotFoundError,
+    )
+
+    class _Client:
+        last_daily_request_count = None
+
+        async def request_json(self, path: str, *, params: dict[str, Any] | None = None, method: str = "GET") -> dict[str, Any]:
+            if error == "auth":
+                raise UnusualWhalesAuthError("401")
+            if error == "notfound":
+                raise UnusualWhalesNotFoundError("404", status_code=404)
+            if error == "daily":
+                raise UnusualWhalesDailyLimitError("limit")
+            return {"rows": []}
+
+    budget = uw.Budget(engine=engine, day=date(2026, 9, 24), cap=100, client=_Client())
+    check = asyncio.run(uw.news_for(engine, _Client(), budget, "NVDA", T0, refresh_seconds=900, limit=20))
+    assert check.state.value == state and fragment in check.detail
+    assert check.items == ()
+    assert budget.reserved == 1      # the reservation is spent even when the call failed
+
+
+# ---------------------------------------------------------------------------
+# Review 2026-09-24 regressions
+# ---------------------------------------------------------------------------
+
+
+def test_yesterdays_flow_never_makes_an_entry_ready(engine: Engine) -> None:
+    next_day = datetime(2026, 9, 25, 15, 0, tzinfo=UTC)
+    _move_spot(engine, 100.0, next_day - timedelta(seconds=60))
+    row = _cycle(engine, FakeUW(), next_day)
+    assert row.snapshot["flow_current"] is False
+    nvda = row.snapshot["cards"][0]
+    assert nvda["readiness"] != "READY" and nvda["recommendation"] != "BUY"
+    assert any("bugünkü seansa ait değil" in b for b in nvda["blockers"])
+    assert store.papers(engine) == []
+
+
+def test_stale_spy_is_not_used_for_relative_strength(engine: Engine) -> None:
+    from webapp.live_alpha import inputs
+
+    with engine.begin() as c:
+        c.execute(update(AlfaAtm).where(AlfaAtm.ticker == "SPY").values(fetched_at=T0 - timedelta(hours=2)))
+    prices = inputs.price_contexts(engine, ["NVDA"], "SPY", atr_period=14, atr_min_sessions=20,
+                                   max_age_seconds=900)
+    assert prices["NVDA"].benchmark_move is None and prices["NVDA"].relative is None
+
+
+def test_headline_without_ticker_tags_is_not_the_tickers_news() -> None:
+    from webapp.live_alpha.uw import parse_headlines
+
+    payload = {"data": [{"created_at": "2026-09-24T13:00:00Z", "headline": "Markets rally", "source": "X",
+                         "tickers": []}]}
+    assert parse_headlines(payload, "NVDA", T0) == []
+
+
+def test_pending_paper_does_not_fill_below_the_stop(engine: Engine) -> None:
+    client = FakeUW()
+    _cycle(engine, client, T0)
+    _move_spot(engine, 96.5, T0 + timedelta(minutes=4))     # below the 97 stop
+    _cycle(engine, client, T0 + timedelta(minutes=5))
+    assert store.papers(engine)[0].state == "PAPER_PENDING"
+
+
+def test_open_stock_paper_exits_from_daily_bars_when_spot_is_stale(engine: Engine) -> None:
+    client = FakeUW()
+    _cycle(engine, client, T0)
+    _move_spot(engine, 100.5, T0 + timedelta(minutes=4))
+    _cycle(engine, client, T0 + timedelta(minutes=5))
+    assert store.papers(engine)[0].state == "PAPER_OPEN"
+    # Fri 25 Sep: one bar that crossed BOTH the 97 stop and the 106 target -> the stop wins,
+    # and it gapped open below the stop -> exit at the open (96.0), not at 97.
+    with Session(engine) as s:
+        s.add(AlfaDailyBar(ticker="NVDA", day=date(2026, 9, 25), open=96.0, high=107.0, low=95.0, close=100.0,
+                           fetched_at=T0))
+        s.commit()
+    monday = datetime(2026, 9, 28, 15, 0, tzinfo=UTC)          # the spot is still the stale Thursday value
+    _cycle(engine, client, monday)
+    paper = store.papers(engine)[0]
+    assert paper.state == "CLOSED_SIMULATED" and paper.exit_reason.startswith("stop (günlük bar")
+    assert paper.exit_price == round(96.0 * 0.9995, 4)
+
+
+def test_exit_signal_is_sticky_then_unresolved_without_a_price(engine: Engine) -> None:
+    from webapp.live_alpha import job
+
+    paper = store.LivePaper(
+        paper_id="p1", opportunity_id="2026-09-24:NVDA:up", rec_id="r1", ticker="NVDA", direction="up",
+        instrument="long_call",
+        plan_json=store.dumps({"instrument": "long_call", "fill_session": "2026-09-24",
+                               "stock_plan": {"stop": 97.0, "target": 106.0, "chase_limit": 101.0, "shares": 25},
+                               "structure": {"kind": "long_call", "multiplier": 100, "commission_usd": 1.3,
+                                             "legs": [{"option_symbol": "NVDA261016C00100000", "right": "call",
+                                                       "strike": 100.0, "expiry": "2026-10-16", "is_long": True}]}}),
+        state="PAPER_OPEN", created_at=T0, entry_at=T0, entry_price=2.0, quantity=1,
+    )
+    store.create_paper(engine, paper)
+
+    class _NoQuotes(FakeUW):
+        async def request_json(self, path: str, *, params: dict[str, Any] | None = None, method: str = "GET") -> dict[str, Any]:
+            if path.endswith("/option-contracts"):
+                return {"data": []}
+            return await super().request_json(path, params=params, method=method)
+
+    client = _NoQuotes()
+    _move_spot(engine, 96.0, T0 + timedelta(minutes=4))       # stop crossed, no option quote
+    _cycle(engine, client, T0 + timedelta(minutes=5))
+    got = next(p for p in store.papers(engine) if p.paper_id == "p1")
+    assert got.state == "EXIT_SIGNALLED" and got.exit_reason == "stop"
+    _move_spot(engine, 100.0, T0 + timedelta(minutes=9))      # the bounce must not revive it
+    _cycle(engine, client, T0 + timedelta(minutes=10))
+    got = next(p for p in store.papers(engine) if p.paper_id == "p1")
+    assert got.state == "EXIT_SIGNALLED" and got.exit_reason == "stop"
+    friday = datetime(2026, 9, 25, 15, 0, tzinfo=UTC)
+    _cycle(engine, client, friday)
+    got = next(p for p in store.papers(engine) if p.paper_id == "p1")
+    assert got.state == "UNRESOLVED" and got.pnl_usd is None and got.exit_price is None
+    assert job.PAPER_ACTIVE and "UNRESOLVED" not in job.PAPER_ACTIVE
+
+
+def test_health_shows_the_last_cycle_once_the_job_has_run(monkeypatch: pytest.MonkeyPatch) -> None:
+    from webapp.live_alpha import job
+    from webapp.main import health
+
+    monkeypatch.setattr(job, "LAST_CYCLE", {"at": "2026-09-24T15:00:00+00:00", "status": "ok", "mode": "LIVE", "cards": 3})
+    body = health()
+    assert body["live_alpha"] == {"at": "2026-09-24T15:00:00+00:00", "status": "ok", "mode": "LIVE", "cards": 3}
+
+
+def test_lifespan_starts_the_live_alpha_thread_with_the_live_database(monkeypatch: pytest.MonkeyPatch) -> None:
+    import webapp.main as m
+    from fastapi.testclient import TestClient
+
+    from tests.unit.test_alfa_refresher_lifespan import _forever, _live_config
+
+    started: list[str] = []
+    monkeypatch.setattr(m, "live_config_from_env", lambda: _live_config("sqlite:///live-thread.db"))
+    monkeypatch.setattr(m, "run_live_worker", _forever)
+    monkeypatch.setattr(m, "gamma_refresh_loop", _forever)
+    monkeypatch.setattr(m, "board_refresh_loop", _forever)
+    monkeypatch.setattr(m, "_start_live_alpha_thread", started.append)
+    with TestClient(m.app) as client:
+        assert client.get("/health").status_code == 200
+    assert started == ["sqlite:///live-thread.db"]

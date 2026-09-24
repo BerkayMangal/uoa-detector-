@@ -395,3 +395,25 @@ def test_bearish_card_without_an_executable_put_is_not_ready() -> None:
                          date(2026, 9, 24), S.option_plan, COSTS, 100)
     card = build_card(d, (pending,), "", S)  # type: ignore[arg-type]
     assert card.readiness is not Readiness.READY
+
+
+def test_buy_with_no_executable_instrument_is_not_ready() -> None:
+    # spot 3000: one share is above the 2500 PAPER notional cap -> 0 shares; no option either
+    price = PriceContext(
+        ticker="NVDA", spot=3000.0, spot_fetched_at=LIVE_NOW - timedelta(seconds=60), prev_close=2990.0,
+        prev_close_day=date(2026, 9, 23), atr=20.0, atr_sessions=30, benchmark_move=0.0,
+        state=CheckState.CHECKED_FOUND,
+    )
+    d = _eval(price=price)
+    assert d.recommendation is Recommendation.BUY and d.readiness is Readiness.READY  # type: ignore[attr-defined]
+    card = build_card(d, (), "yok", S)  # type: ignore[arg-type]
+    assert card.readiness is not Readiness.READY
+    assert card.instrument.preferred == "none"
+    assert any("uygulanabilir araç yok" in b for b in card.blockers)
+    assert "none" not in card.headline
+
+
+def test_not_current_flow_is_never_ready() -> None:
+    d = evaluate(_flow(), _price(), _news(), classify(LIVE_NOW, S.calendar), LIVE_NOW, S,  # type: ignore[arg-type]
+                 flow_current=False)
+    assert d.readiness is Readiness.TRIGGER_PENDING and d.recommendation is Recommendation.CONDITIONAL_BUY

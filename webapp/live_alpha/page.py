@@ -230,6 +230,16 @@ def build_view(engine: Engine, now: datetime) -> LiveView:
     )
 
 
+def fill_session(now: datetime) -> str | None:
+    """The session an owner-started PAPER may fill in: today if live, else the next one."""
+    session = classify(now, settings().calendar)
+    if session.mode is MarketMode.LIVE and session.session_date is not None:
+        return session.session_date.isoformat()
+    if session.mode is MarketMode.PREMARKET and session.session_date is not None:
+        return session.session_date.isoformat()
+    return session.next_session.isoformat() if session.next_session else None
+
+
 def card_from_latest_scan(engine: Engine, opportunity_id: str) -> dict[str, Any] | None:
     scan = store.latest_scan(engine)
     if scan is None:

@@ -20,8 +20,11 @@ import base64
 import binascii
 import contextlib
 import logging
+import math
 import os
 import secrets
+import threading
+import time
 from contextvars import ContextVar
 from datetime import UTC, datetime
 from pathlib import Path
@@ -46,6 +49,7 @@ from webapp.board.refresher import board_refresh_loop
 from webapp.board.settings import BoardSettings, load_board_settings
 from webapp.board.signals import BoardSignalReader
 from webapp.gamma_live import gamma_refresh_loop
+from webapp.live_alpha import job as live_job
 from webapp.live_alpha import page as live_page
 from webapp.live_alpha import store as live_store
 from webapp.live_alpha.job import live_alpha_loop
@@ -81,6 +85,31 @@ async def _supervise(make_coro: object, name: str) -> None:
         else:
             _logger.warning("%s exited unexpectedly; restarting in 30s", name)
         await asyncio.sleep(30)
+
+
+_LIVE_ALPHA_THREAD: threading.Thread | None = None
+
+
+def _live_alpha_thread_main(database_url: str) -> None:
+    """Run the Live Alpha loop forever on this thread's own event loop; restart on a crash."""
+    while True:
+        try:
+            asyncio.run(live_alpha_loop(database_url=database_url))
+        except Exception:
+            _logger.exception("live-alpha crashed; restarting in 30s")
+        else:
+            _logger.warning("live-alpha exited unexpectedly; restarting in 30s")
+        time.sleep(30)
+
+
+def _start_live_alpha_thread(database_url: str) -> None:
+    global _LIVE_ALPHA_THREAD
+    if _LIVE_ALPHA_THREAD is not None and _LIVE_ALPHA_THREAD.is_alive():
+        return
+    _LIVE_ALPHA_THREAD = threading.Thread(
+        target=_live_alpha_thread_main, args=(database_url,), name="live-alpha", daemon=True,
+    )
+    _LIVE_ALPHA_THREAD.start()
 
 
 @contextlib.asynccontextmanager
@@ -120,11 +149,10 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
         )))
         # Phase 5.2.PERF10: the default board view, prebuilt off the request path.
         tasks.append(asyncio.create_task(_supervise(_board_prerender_loop, "board-prerender")))
-        # Phase 5.25: the live recommendation engine behind "/" (its own UW client).
-        tasks.append(asyncio.create_task(_supervise(
-            lambda: live_alpha_loop(database_url=config["database_url"]),  # type: ignore[arg-type]
-            "live-alpha",
-        )))
+        # Phase 5.25: the live recommendation engine behind "/". It runs on its own
+        # thread and event loop (with its own UW client and engine), so its synchronous
+        # database reads can never stall the web server's loop.
+        _start_live_alpha_thread(str(config["database_url"]))
     try:
         yield
     finally:
@@ -532,7 +560,7 @@ def live_action(
         )
         return RedirectResponse(f"/?ok={action}", status_code=303)
     if action == "manuel":
-        if quantity <= 0 or price <= 0 or side not in ("buy", "sell"):
+        if not (math.isfinite(quantity) and math.isfinite(price)) or quantity <= 0 or price <= 0 or side not in ("buy", "sell"):
             return PlainTextResponse("quantity and price must be positive", status_code=400)
         live_store.add_manual(engine, live_store.LiveManual(
             manual_id=live_store.new_id(), at=now, opportunity_id=opportunity_id,
@@ -562,6 +590,7 @@ def live_action(
         plan_json=live_store.dumps({
             "instrument": preferred, "stock_plan": stock_plan, "structure": structure,
             "decision_as_of": card.get("decision_as_of"), "policy_version": policy, "started_by": "owner",
+            "fill_session": live_page.fill_session(now),
         }),
         state="PAPER_PENDING", created_at=now,
     ))
@@ -624,6 +653,7 @@ def _load_board_profiles() -> None:
     files are checked on every start rather than on the first page request.
     """
     global _BOARD_SETTINGS, _SPREAD_CUTOFF_PCT, _LEGACY_SCORES
+    live_page.settings()  # Phase 5.25: the live policy profile fails startup, not the first page
     settings = load_board_settings()
     cutoff = alfa_page.load_spread_cutoff_pct()
     legacy = alfa_page.load_live_legacy_scores()
@@ -1385,7 +1415,7 @@ def alfa_fill(
 
 
 @app.get("/health")
-def health() -> dict[str, str | bool]:
+def health() -> dict[str, object]:
     """Liveness, plus the commit this instance is running.
 
     Phase 5.2.RAIL2: a deploy check must be able to prove WHICH build answered,
@@ -1393,4 +1423,10 @@ def health() -> dict[str, str | bool]:
     value is a public commit id, never a secret.
     """
     sha = os.environ.get("RAILWAY_GIT_COMMIT_SHA", "")
-    return {"ok": True, "sha": sha[:7] if sha else "unknown"}
+    # Phase 5.25: the live recommendation job's last cycle (in memory; no database read here).
+    # The key is present only once the job has cycled, so a process without the job
+    # answers exactly as before (tests/unit/test_health_sha.py).
+    body: dict[str, object] = {"ok": True, "sha": sha[:7] if sha else "unknown"}
+    if live_job.LAST_CYCLE:
+        body["live_alpha"] = dict(live_job.LAST_CYCLE)
+    return body

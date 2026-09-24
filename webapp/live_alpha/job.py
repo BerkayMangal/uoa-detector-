@@ -49,6 +49,7 @@ from uoa_detector.live_alpha.option_plan import (
 from uoa_detector.live_alpha.settings import LiveAlphaSettings, load_live_alpha_settings
 from uoa_detector.options_alpha.settings import OptionsAlphaSettings
 from uoa_detector.options_alpha.settings import load_settings as load_options_settings
+from webapp.board.daily_close import load_bars_by_ticker
 from webapp.board.settings import BoardSettings
 from webapp.live_alpha import inputs, store, uw
 from webapp.live_alpha.uw import Budget, ContractSpec, JsonClient
@@ -65,6 +66,11 @@ _ET = ZoneInfo("America/New_York")
 _REPO_OPTIONS_PROFILE = "profiles/options_alpha_v1.yaml"
 
 PAPER_ACTIVE = (Tracking.PAPER_PENDING.value, Tracking.PAPER_OPEN.value, Tracking.EXIT_SIGNALLED.value)
+
+# The last cycle's outcome, in memory, for the open /health answer: time, status, mode and
+# counts only — no ticker, no price, no key. Railway's healthcheck only gates deploy
+# activation; this is what lets anyone see the job is still cycling.
+LAST_CYCLE: dict[str, object] = {}
 
 
 @dataclass
@@ -191,6 +197,8 @@ def _paper_plan(card: Card) -> dict[str, Any]:
         "structure": to_jsonable(structure) if structure is not None else None,
         "decision_as_of": card.decision_as_of.isoformat(),
         "policy_version": card.policy_version,
+        # the one session in which this PAPER may fill; after it, the pending position expires
+        "fill_session": card.opportunity_id.split(":", 1)[0],
     }
 
 
@@ -263,34 +271,71 @@ def _event(ctx: CycleContext, paper: store.LivePaper, kind: str, detail: dict[st
     )
 
 
+def _bar_exit(
+    up: bool, stop: float, target: float, entry_day: Any, bars: Sequence[Any], horizon: int, ctx: CycleContext,
+) -> tuple[str, float] | None:
+    """Exit from completed daily bars when no fresh spot exists (master prompt §15).
+
+    Only sessions strictly after the entry day are read (the entry day's intrabar
+    order is unknown). When one bar crosses both levels the STOP is taken, never the
+    target. A gap through a level exits at the open, not at the level.
+    """
+    today = ctx.session.session_date or ctx.session.et_now.date()
+    held = 0
+    for bar in bars:
+        if bar.day <= entry_day or bar.day >= today:
+            continue
+        if bar.low is None or bar.high is None or bar.open is None or bar.close is None:
+            return None     # a gap in the bars: do not guess across it
+        held += 1
+        hit_stop = bar.low <= stop if up else bar.high >= stop
+        hit_target = bar.high >= target if up else bar.low <= target
+        if hit_stop:
+            price = min(bar.open, stop) if up else max(bar.open, stop)
+            return f"stop (günlük bar {bar.day:%d.%m})", price
+        if hit_target:
+            price = max(bar.open, target) if up else min(bar.open, target)
+            return f"hedef (günlük bar {bar.day:%d.%m})", price
+        if held >= horizon:
+            return f"süre doldu ({held} seans, günlük kapanış {bar.day:%d.%m})", bar.close
+    return None
+
+
 async def track_papers(
     ctx: CycleContext, prices: dict[str, PriceContext], flows: dict[str, FlowSummary],
 ) -> dict[str, int]:
     counts = {"filled": 0, "closed": 0, "expired": 0, "unresolved": 0, "exit_signalled": 0}
     bps = ctx.settings.stock_plan.slippage_bps / 10_000
-    for paper in store.papers(ctx.engine, list(PAPER_ACTIVE)):
+    active = store.papers(ctx.engine, list(PAPER_ACTIVE))
+    bars_by_ticker = load_bars_by_ticker(ctx.engine, sorted({p.ticker for p in active})) if active else {}
+    today = ctx.session.session_date
+    for paper in active:
         plan: dict[str, Any] = json.loads(paper.plan_json)
         sp = plan.get("stock_plan") or {}
-        spot = _fresh_spot(prices.get(paper.ticker), ctx)
-        opp_day = paper.opportunity_id.split(":", 1)[0]
+        price = prices.get(paper.ticker)
+        spot = _fresh_spot(price, ctx)
         is_stock = paper.instrument == "stock"
         up = paper.direction == "up"
+        stop = float(sp.get("stop", 0.0))
+        target = float(sp.get("target", 0.0))
 
         if paper.state == Tracking.PAPER_PENDING.value:
-            if ctx.session.session_date is not None and opp_day < ctx.session.session_date.isoformat():
+            fill_session = str(plan.get("fill_session") or paper.opportunity_id.split(":", 1)[0])
+            if today is not None and fill_session < today.isoformat():
                 if store.move_paper(ctx.engine, paper.paper_id, paper.state, state=Tracking.CLOSED_SIMULATED.value,
-                                    exit_at=ctx.now, exit_reason="dolmadı: tetik o seansta gelmedi"):
+                                    exit_at=ctx.now, exit_reason=f"dolmadı: tetik {fill_session} seansında gelmedi"):
                     counts["expired"] += 1
-                    _event(ctx, paper, "paper_expired", {"reason": "tetik o seansta gelmedi"})
+                    _event(ctx, paper, "paper_expired", {"reason": f"tetik {fill_session} seansında gelmedi"})
                 continue
-            if spot is None:
+            if spot is None or price is None or today is None or fill_session != today.isoformat():
                 continue
-            seen_at = prices[paper.ticker].spot_fetched_at if paper.ticker in prices else None
+            seen_at = price.spot_fetched_at
             if seen_at is None or seen_at <= inputs.as_utc(paper.created_at):
                 continue   # a fill needs a price observed AFTER the recommendation was published
             limit = float(sp.get("chase_limit", 0.0))
             inside = spot <= limit if up else spot >= limit
-            if not inside:
+            above_stop = spot > stop if up else spot < stop
+            if not (inside and above_stop):
                 continue
             if is_stock:
                 qty = int(sp.get("shares", 0))
@@ -313,23 +358,28 @@ async def track_papers(
                                                   "basis": "uzun bacak ask, kısa bacak bid, %2 gecikme payı"})
             continue
 
-        # PAPER_OPEN or EXIT_SIGNALLED
-        stop = float(sp.get("stop", 0.0))
-        target = float(sp.get("target", 0.0))
-        reason = ""
-        if spot is not None:
+        # PAPER_OPEN or EXIT_SIGNALLED. An exit signal is sticky: once given, its reason stands
+        # and the position closes at the first available price, never re-opened by a bounce.
+        entry_day = inputs.as_utc(paper.entry_at).astimezone(_ET).date() if paper.entry_at else None
+        reason = paper.exit_reason if paper.state == Tracking.EXIT_SIGNALLED.value and paper.exit_reason else ""
+        bar_exit: tuple[str, float] | None = None
+        if not reason and spot is not None:
             if (up and spot <= stop) or (not up and spot >= stop):
                 reason = "stop"
             elif (up and spot >= target) or (not up and spot <= target):
                 reason = "hedef"
+        if not reason and spot is None and entry_day is not None:
+            bar_exit = _bar_exit(up, stop, target, entry_day, bars_by_ticker.get(paper.ticker, ()),
+                                 ctx.settings.stock_plan.horizon_sessions, ctx)
+            if bar_exit is not None:
+                reason = bar_exit[0]
         flow = flows.get(paper.ticker)
         if not reason and flow is not None:
             d, _ = qualifying_direction(flow, ctx.settings.flow)
             if d is not None and d != paper.direction:
                 reason = "tez bozuldu: karşı yönde akış eşikleri geçti"
-        if not reason and paper.entry_at is not None and ctx.session.session_date is not None:
-            held = sessions_between(inputs.as_utc(paper.entry_at).astimezone(_ET).date(),
-                                    ctx.session.session_date, ctx.settings.calendar)
+        if not reason and entry_day is not None and today is not None:
+            held = sessions_between(entry_day, today, ctx.settings.calendar)
             if held is not None and held >= ctx.settings.stock_plan.horizon_sessions:
                 reason = f"süre doldu ({held} seans)"
         exit_price: float | None = None
@@ -337,6 +387,8 @@ async def track_papers(
             if spot is not None:
                 exit_price = round(spot * (1 - bps if up else 1 + bps), 4)
                 store.move_paper(ctx.engine, paper.paper_id, paper.state, last_mark=spot, last_mark_at=ctx.now)
+            elif bar_exit is not None:
+                exit_price = round(bar_exit[1] * (1 - bps if up else 1 + bps), 4)
         elif reason or ctx.session.mode is MarketMode.LIVE:
             view = await _structure_now(paper, plan, ctx)
             if (
@@ -348,11 +400,20 @@ async def track_papers(
         if not reason:
             continue
         if exit_price is None:
-            if paper.state != Tracking.EXIT_SIGNALLED.value and store.move_paper(
-                ctx.engine, paper.paper_id, paper.state, state=Tracking.EXIT_SIGNALLED.value, exit_reason=reason,
-            ):
-                counts["exit_signalled"] += 1
-                _event(ctx, paper, "exit_signalled", {"reason": reason, "note": "çıkış fiyatı yok; çözülmedi"})
+            if paper.state != Tracking.EXIT_SIGNALLED.value:
+                if store.move_paper(ctx.engine, paper.paper_id, paper.state, state=Tracking.EXIT_SIGNALLED.value,
+                                    exit_reason=reason, exit_at=ctx.now):
+                    counts["exit_signalled"] += 1
+                    _event(ctx, paper, "exit_signalled", {"reason": reason, "note": "çıkış fiyatı yok; çözülmedi"})
+            elif paper.exit_at is not None and today is not None:
+                signalled_day = inputs.as_utc(paper.exit_at).astimezone(_ET).date()
+                if signalled_day < today and store.move_paper(
+                    ctx.engine, paper.paper_id, paper.state, state=Tracking.UNRESOLVED.value,
+                ):
+                    counts["unresolved"] += 1
+                    _event(ctx, paper, "unresolved", {
+                        "reason": reason, "note": "çıkış sinyalinden sonraki seansta da çıkış fiyatı yok",
+                    })
             continue
         entry = float(paper.entry_price or 0.0)
         qty = int(paper.quantity or 0)
@@ -415,9 +476,17 @@ async def run_cycle(
     prints = inputs.flow_prints(reader, run_id)
     tickers = tickers_in(prints)
     flows = {t: summarise(t, run_id, prints, settings.flow) for t in tickers}
+    paper_tickers = [p.ticker for p in store.papers(engine, list(PAPER_ACTIVE))]
     prices = inputs.price_contexts(
-        engine, tickers, settings.price.benchmark,
+        engine, [*tickers, *paper_tickers], settings.price.benchmark,
         atr_period=board.spot.atr_period, atr_min_sessions=board.spot.atr_min_sessions,
+        max_age_seconds=settings.price.spot_max_age_seconds,
+    )
+    today = session.session_date
+    flow_current = (
+        today is not None
+        and run_id == f"{inputs.LIVE_RUN_PREFIX}{today.isoformat()}"
+        and last_print_ts.astimezone(_ET).date() == today
     )
     expiries = inputs.listed_expiries(engine, tickers)
 
@@ -431,7 +500,10 @@ async def run_cycle(
         news[t] = await uw.news_for(engine, client, budget, t, now,
                                     refresh_seconds=settings.news.refresh_seconds, limit=settings.news.limit)
 
-    decisions = [evaluate(flows[t], prices[t], news[t], session, now, settings) for t in tickers]
+    decisions = [
+        evaluate(flows[t], prices[t], news[t], session, now, settings, flow_current=flow_current)
+        for t in tickers
+    ]
     cards: list[Card] = []
     for d in decisions:
         structures: tuple[OptionStructureView, ...] = ()
@@ -461,6 +533,7 @@ async def run_cycle(
     snapshot.update({
         "flow_run": run_id,
         "flow_last_print": last_print_ts.isoformat(),
+        "flow_current": flow_current,
         "universe": tickers,
         "cards": [to_jsonable(c) | {"rec_id": rec_ids.get(c.opportunity_id)} for c in cards],
         "funnel": funnel,
@@ -529,6 +602,11 @@ async def live_alpha_loop(
         except Exception:
             _logger.exception("live alpha heartbeat write failed")
         _logger.warning("live alpha cycle: status=%s %s", status, detail)
+        LAST_CYCLE.clear()
+        LAST_CYCLE.update({
+            "at": now.isoformat(timespec="seconds"), "status": status,
+            "mode": detail.get("mode"), "cards": detail.get("cards"),
+        })
         cycles += 1
         if max_cycles is not None and cycles >= max_cycles:
             return

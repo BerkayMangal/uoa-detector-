@@ -122,8 +122,15 @@ def evaluate(
     session: Session,
     now: datetime,
     settings: LiveAlphaSettings,
+    *,
+    flow_current: bool = True,
 ) -> Decision:
-    """Apply paths P1–P4 in their fixed order (contract §5)."""
+    """Apply paths P1–P4 in their fixed order (contract §5).
+
+    ``flow_current`` is False when the flow run is not today's session run (the
+    worker has not written a print yet today, or is down). Such flow can still
+    describe a thesis, but it can never make an entry READY.
+    """
     ps = settings.price
     fresh = fresh_news_items(news, now, settings.news.window_hours)
     direction, flow_why = qualifying_direction(flow, settings.flow)
@@ -154,11 +161,14 @@ def evaluate(
         timing.append(f"piyasa {session.mode.value} ({session.reason}); giriş yalnız canlı seansta")
     elif not fresh_spot:
         timing.append("fiyat bayat; taze fiyat gelmeden giriş yok")
+    if live and not flow_current:
+        timing.append(f"akış kaydı ({flow.run_id}) bugünkü seansa ait değil; bugünün akışı gelmeden giriş yok")
+    entry_ok = live and fresh_spot and flow_current
 
     if direction == "down":
         if move_atr <= -ps.confirm_min_atr:
             plan = build_stock_plan("down", price, ps, settings.stock_plan)
-            ready = Readiness.READY if (live and fresh_spot) else Readiness.TRIGGER_PENDING
+            ready = Readiness.READY if entry_ok else Readiness.TRIGGER_PENDING
             return _done("down", Recommendation.BEARISH_SETUP, ready, Path.P4_BEARISH, timing, plan, True)
         return _done(
             "down", Recommendation.WATCH, Readiness.INVALID, Path.NONE,
@@ -200,7 +210,7 @@ def evaluate(
             plan, True,
         )
     plan = build_stock_plan("up", price, ps, settings.stock_plan)
-    if live and fresh_spot:
+    if entry_ok:
         return _done("up", Recommendation.BUY, Readiness.READY, thesis, [], plan, True)
     return _done("up", Recommendation.CONDITIONAL_BUY, Readiness.TRIGGER_PENDING, thesis, timing, plan, True)
 
@@ -227,7 +237,7 @@ def _et(ts: datetime | None, session: Session) -> str:
 def _option_evidence(d: Decision) -> str:
     f = d.flow
     parts = [
-        f"Bu seans ({f.run_id}) {f.prints_deduped} tekil baskı ({f.prints_raw} ham): "
+        f"Akış kaydı {f.run_id}: {f.prints_deduped} tekil baskı ({f.prints_raw} ham): "
         f"yukarı {_usd(f.premium_up)}, aşağı {_usd(f.premium_down)}, tarafı bilinmeyen {_usd(f.premium_side_unknown)}",
         f"{DIR_TR[d.direction]} payı %{f.share(d.direction) * 100:.0f}, {f.distinct_contracts} farklı kontrat",
     ]
@@ -355,7 +365,9 @@ def _counter(d: Decision) -> str:
 def _headline(d: Decision, instrument: InstrumentChoice) -> str:
     s = d.stock_plan
     t = d.ticker
-    via = "hisse" if instrument.preferred == "stock" else kind_tr(instrument.preferred)
+    via = {"stock": "hisse", "none": "uygulanabilir araç yok"}.get(
+        instrument.preferred, kind_tr(instrument.preferred),
+    )
     if d.recommendation is Recommendation.BUY and s is not None:
         return (
             f"{t} için {_px(s.chase_limit)} üstüne kovalamadan alım görüşü (referans {_px(s.entry_ref)}); "
@@ -369,7 +381,7 @@ def _headline(d: Decision, instrument: InstrumentChoice) -> str:
             f"bölgesindeyse; tez {_px(s.stop)} altında bozulur."
         )
     if d.recommendation is Recommendation.BEARISH_SETUP:
-        return f"{t} için alımdan kaçın; aşağı yönlü kurulum — {via if via != 'hisse' else 'opsiyon uygun değil'}."
+        return f"{t} için alımdan kaçın; aşağı yönlü kurulum — {via}."
     if d.recommendation is Recommendation.AVOID:
         return f"{t} için alımdan kaçın: akış ile fiyat çelişiyor."
     return f"{t} izlemede: {d.blockers[0] if d.blockers else 'koşullar tamamlanmadı'}."
@@ -403,15 +415,17 @@ def build_card(
     else:
         instrument = choose_instrument(structures, settings.option_plan, stock_available=stock_ok)
     ready = d.readiness
+    blockers = list(d.blockers)
     if (
-        d.recommendation is Recommendation.BEARISH_SETUP
+        d.recommendation in (Recommendation.BUY, Recommendation.BEARISH_SETUP)
         and instrument.preferred == "none"
         and ready is Readiness.READY
     ):
-        # A bearish view with no executable put structure is a view, not an entry.
+        # A view with no executable instrument is a view, not an entry: never a green READY.
         ready = next(
-            (v.readiness for v in structures if v.readiness is not Readiness.READY), Readiness.INVALID,
+            (v.readiness for v in structures if v.readiness is not Readiness.READY), Readiness.RISK_BLOCKED,
         )
+        blockers.append(f"uygulanabilir araç yok: {instrument.reason}")
     window = settings.news.window_hours
     rel = d.price.relative
     dims = {
@@ -435,7 +449,7 @@ def build_card(
         sources.append("UW /api/stock/{t}/option-contracts (NBBO; borsa kotasyon zamanı yok, alındığı an gösterilir)")
     rank_premium = d.flow.premium_up if d.direction == "up" else d.flow.premium_down
     return Card(
-        opportunity_id=f"{d.session.session_date or d.decided_at.date()}:{d.ticker}:{d.direction}",
+        opportunity_id=f"{d.session.session_date or d.session.et_now.date()}:{d.ticker}:{d.direction}",
         ticker=d.ticker,
         direction=d.direction,
         recommendation=d.recommendation,
@@ -461,7 +475,7 @@ def build_card(
             f"Türetildiği reddedilmiş çalışmalar: {'; '.join(settings.derived_from)}. "
             f"Fark: {settings.design_difference}"
         ),
-        blockers=d.blockers,
+        blockers=tuple(blockers),
         sources=tuple(sources),
         derived_from=settings.derived_from,
         policy_version=settings.policy_version,

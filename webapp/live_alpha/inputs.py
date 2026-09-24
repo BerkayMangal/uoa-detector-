@@ -178,20 +178,36 @@ def price_contexts(
     *,
     atr_period: int,
     atr_min_sessions: int,
+    max_age_seconds: int,
 ) -> dict[str, PriceContext]:
+    """Price context per ticker; the benchmark move is used only when it is comparable.
+
+    Comparable means: the benchmark spot belongs to the same session as the ticker's
+    spot and was fetched within ``max_age_seconds`` of it. A stale or other-day SPY
+    move is never set against today's stock move (review 2026-09-24, HIGH 3).
+    """
     symbols = sorted({t.upper() for t in tickers} | {benchmark.upper()})
     spots = latest_spots(engine, symbols)
     bars = load_bars_by_ticker(engine, symbols)
+    bench_spot = spots.get(benchmark.upper())
     bench = price_context(
-        benchmark.upper(), spots.get(benchmark.upper()), bars.get(benchmark.upper(), ()), None,
+        benchmark.upper(), bench_spot, bars.get(benchmark.upper(), ()), None,
         atr_period=atr_period, atr_min_sessions=atr_min_sessions,
     )
-    bench_move = bench.move
+
+    def _bench_move_for(spot: SpotRead | None) -> float | None:
+        if spot is None or bench_spot is None or bench.move is None:
+            return None
+        if _session_date(spot) != _session_date(bench_spot):
+            return None
+        if abs((spot.fetched_at - bench_spot.fetched_at).total_seconds()) > max_age_seconds:
+            return None
+        return bench.move
+
     return {
         t: price_context(
-            t, spots.get(t), bars.get(t, ()), bench_move,
+            t, spots.get(t), bars.get(t, ()), _bench_move_for(spots.get(t)),
             atr_period=atr_period, atr_min_sessions=atr_min_sessions,
         )
         for t in symbols
     }
-

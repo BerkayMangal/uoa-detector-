@@ -113,8 +113,8 @@ def parse_headlines(payload: object, ticker: str, now: datetime) -> list[NewsIte
         if not isinstance(headline, str) or not headline.strip() or created is None:
             continue
         tickers = tuple(str(t).upper() for t in (row.get("tickers") or []) if t)
-        if tickers and want not in tickers:
-            continue   # a headline that does not name the ticker is not this ticker's news
+        if want not in tickers:
+            continue   # a headline that does not name the ticker (or names none) is not its news
         source = str(row.get("source") or "kaynak belirtilmemiş")
         sentiment = row.get("sentiment")
         out.append(NewsItem(
@@ -227,7 +227,7 @@ async def news_for(
         state, detail = CheckState.FAILED, "UW günlük istek limiti"
         payload = None
     except UnusualWhalesNotFoundError:
-        state, detail, payload = CheckState.CHECKED_NONE, "UW 404/422: veri yok", {"data": []}
+        state, detail, payload = CheckState.FAILED, "UW 404/422: istek reddedildi", None
     except UnusualWhalesAuthError as exc:
         state, detail, payload = CheckState.FAILED, f"UW yetki/istek hatası ({type(exc).__name__})", None
     except UnusualWhalesRateLimitError:
