@@ -297,7 +297,11 @@ def test_root_renders_the_card(app_with_scan: Any, monkeypatch: pytest.MonkeyPat
     assert 'id="live-alpha"' in body and "Bugünün Fırsatları" in body
     assert 'data-card="NVDA" data-rec="BUY" data-ready="READY"' in body
     assert "ALIM" in body and "Tezi bozan durum" in body and "En önemli karşı argüman" in body
-    assert "Bugün öne çıkan alım: NVDA." in body
+    assert "Şimdi alınabilir: NVDA." in body
+    # plain Turkish first: action with prices, then the reason in everyday words
+    assert "AL — $100.00 civarından, en fazla $101.00&#39;e kadar." in body
+    assert "Zarar-kes $97.00, hedef $106.00" in body
+    assert "yükselişe oynuyor" in body and "NVDA wins a data-center contract" in body
     assert "data-withdrawn" not in body
 
 
@@ -308,7 +312,7 @@ def test_stale_snapshot_withdraws_the_green_buy(app_with_scan: Any, monkeypatch:
     client = TestClient(app_with_scan.app, headers=set_web_auth(monkeypatch))
     body = client.get("/").text
     assert "data-stale" in body and "data-withdrawn" in body
-    assert "Bugün öne çıkan alım" not in body
+    assert "Şimdi alınabilir" not in body
 
 
 def test_closed_market_view_withdraws_ready_entries(app_with_scan: Any, monkeypatch: pytest.MonkeyPatch) -> None:

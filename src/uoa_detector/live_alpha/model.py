@@ -291,6 +291,8 @@ class Card:
     profile_sha256: str
     rank_key: tuple[int, float] = (0, 0.0)
     dimensions: dict[str, str] = field(default_factory=dict)
+    plain_action: str = ""     # what to do, in everyday Turkish
+    plain_reason: str = ""     # the one reason, in everyday Turkish
 
 
 # ---------------------------------------------------------------------------

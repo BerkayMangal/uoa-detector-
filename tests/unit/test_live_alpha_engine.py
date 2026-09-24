@@ -426,3 +426,24 @@ def test_benchmark_card_does_not_compare_spy_with_itself() -> None:
     card = build_card(d, (), "", S)
     assert "karşılaştırma ölçütünün kendisi" in card.price_evidence
     assert "SPY'a göre" not in card.price_evidence
+
+
+def test_dominance_just_below_the_cutoff_does_not_read_as_equal() -> None:
+    # 64.6 % up: rounding to whole percent would print "%65 (< %65)"
+    prints = [_print(1, premium="200000"), _print(2, premium="123000"), _print(3, option_type="put", premium="177000")]
+    d, why = qualifying_direction(summarise("NVDA", "r", prints, S.flow), S.flow)
+    assert d is None and "%64.6 (< %65)" in why
+
+
+def test_plain_verdicts_say_what_to_do_in_words() -> None:
+    buy = build_card(_eval(), (), "", S)
+    assert buy.plain_action.startswith("AL — $100.00 civarından, en fazla $101.00'e kadar")
+    assert "yükselişe oynuyor" in buy.plain_reason
+    mixed = [_print(1), _print(2), _print(3), _print(4, option_type="put", premium="250000")]
+    watch = build_card(_eval(flow=summarise("NVDA", "r", mixed, S.flow)), (), "", S)
+    assert watch.plain_action.startswith("BEKLE")
+    assert "ikiye bölünmüş" in watch.plain_reason and "300 bin $" in watch.plain_reason
+    pullback = build_card(_eval(price=_price(spot=102.0)), (), "", S)
+    assert pullback.plain_action.startswith("BEKLE, KOVALAMA — $101.00 altına geri gelirse al")
+    avoid = build_card(_eval(price=_price(spot=98.0)), (), "", S)
+    assert avoid.plain_action.startswith("ALMA")

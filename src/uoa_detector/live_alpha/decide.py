@@ -38,6 +38,7 @@ from uoa_detector.live_alpha.model import (
     StockPlan,
 )
 from uoa_detector.live_alpha.option_plan import choose_instrument, kind_tr
+from uoa_detector.live_alpha.plain import verdict
 from uoa_detector.live_alpha.stock_plan import build_stock_plan, chase_limit
 
 if TYPE_CHECKING:
@@ -453,6 +454,7 @@ def build_card(
     if structures:
         sources.append("UW /api/stock/{t}/option-contracts (NBBO; borsa kotasyon zamanı yok, alındığı an gösterilir)")
     rank_premium = d.flow.premium_up if d.direction == "up" else d.flow.premium_down
+    plain_action, plain_reason = verdict(d, instrument, settings, ready=ready is Readiness.READY)
     return Card(
         opportunity_id=f"{d.session.session_date or d.session.et_now.date()}:{d.ticker}:{d.direction}",
         ticker=d.ticker,
@@ -487,6 +489,8 @@ def build_card(
         profile_sha256=settings.profile_sha256,
         rank_key=(RANK[d.recommendation], rank_premium),
         dimensions=dims,
+        plain_action=plain_action,
+        plain_reason=plain_reason,
     )
 
 
