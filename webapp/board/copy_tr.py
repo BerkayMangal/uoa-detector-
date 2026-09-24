@@ -33,3 +33,7 @@ GATE_LABEL: Final = "Alabileceklerimi göster"
 
 # R-UN2: the strength label that is forbidden with too many unknowns.
 STRONG_LABEL: Final = "Güçlü"
+
+# Phase 5.2.PERF10: the board's default view is prebuilt in the background; the page
+# says how old that build is, so quote ages on it are read against the right clock.
+PREBUILT_AGE: Final = "Bu görünüm {age} sn önce arka planda hazırlandı; fiyat yaşları o ana göredir."

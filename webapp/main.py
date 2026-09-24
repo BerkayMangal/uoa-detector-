@@ -39,7 +39,7 @@ from starlette.responses import PlainTextResponse
 
 from uoa_detector.sources.market_hours import is_market_open
 from webapp import explanations, gamma, journal, options_board, pricing
-from webapp.board import alfa_page, cards, decision_ledger, fills, options_paper, outcomes
+from webapp.board import alfa_page, cards, copy_tr, decision_ledger, fills, options_paper, outcomes
 from webapp.board.copy_tr import IV_NOT_SELL_VOL
 from webapp.board.evidence import request_for
 from webapp.board.refresher import board_refresh_loop
@@ -115,6 +115,8 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
             ),
             "board-refresh",
         )))
+        # Phase 5.2.PERF10: the default board view, prebuilt off the request path.
+        tasks.append(asyncio.create_task(_supervise(_board_prerender_loop, "board-prerender")))
     try:
         yield
     finally:
@@ -787,20 +789,13 @@ def _write_decision_card(
     )
 
 
-@app.get("/", response_class=HTMLResponse)
-@app.get("/alfa", response_class=HTMLResponse)
-def alfa_board(request: Request, run: str = "", gate: str = "", pas: str = "") -> HTMLResponse:
-    """The Alfa Board: one row per (ticker, side-aware direction) over the whole selected run.
+def _board_context(run: str, gate: str, pas: str) -> dict[str, Any]:
+    """Everything ``alfa.html`` renders except the request: the slow, database-bound half.
 
-    Served at ``GET /`` since Phase 5.2.A7; ``GET /alfa`` stays as an alias
-    (decision P12). Reads the database only; no Unusual Whales call (contract
-    §4.1). A failed read renders an explicit "could not read" state, never an
-    empty board. The cost gate ``Alabileceklerimi göster`` is on unless
-    ``gate=off`` (§5 A2). Each row carries its evidence strip, reason and
-    counter-argument; the combined score is only in the row's audit block
-    (§5 A4-A6). ``Bugün temiz aday yok`` renders when no row is a clean
-    candidate (R-EM1). The vol-premium board stays as a section, with the
-    R-IV1 sentence (§5 A7).
+    Split out of the route in Phase 5.2.PERF10 so the default view can be built in
+    the background (``_board_prerender_loop``) and served from memory. Production
+    measured 10-29 s for this half on 2026-09-23/24 (40+ queries at ~0.25 s each on
+    the shared pool); owners closed the tab before it answered (HTTP 499).
     """
     _t0 = perf_counter()
     settings = _board_settings()
@@ -832,42 +827,120 @@ def alfa_board(request: Request, run: str = "", gate: str = "", pas: str = "") -
     # really exists — a made-up link must never claim something was written.
     pas_card = _safe(lambda: _card_repo().get_card(pas), None) if pas else None
     _t_vol = perf_counter()
-    _response = templates.TemplateResponse(
-        request,
-        "alfa.html",
-        {
-            "page": page,
-            "runs": runs,
-            "run": active or "",
-            "board_path": request.url.path,
-            # A live run reloads once per board refresh cadence (new prints and quotes).
-            "live_reload_seconds": (
-                settings.refresh.cadence_seconds if current is not None and current.is_live else None
-            ),
-            "vol_board": vol_rows,
-            # The same cutoff the ranking used, as the page states it. It was spelled
-            # out a third time in the template divider (registry REG-3).
-            "vol_rich_iv_rank": round(settings.regime.vol_rich_iv_pct * 100),
-            "vol_summary": vol_board_summary(
-                vol_rows, rich_threshold=settings.regime.vol_rich_iv_pct,
-            ),
-            "vol_structure": explanations.vol_structure,
-            "vol_read": explanations.vol_read,
-            "vol_caveat": explanations.vol_caveat,
-            "pas_card": pas_card,
-            "pas_recorded_text": cards.pas_recorded_text,
-            **alfa_page.template_context(),
-        },
-    )
     # Phase 5.2.PERF3 (temporary): production render time swings between 0.4 s and
     # 9.2 s on identical code, so the stages are timed in production. WARNING, not
     # INFO: application INFO never reaches the Railway deployment log (REG-6).
     _logger.warning(
-        "board timing: runs=%.3f prints=%.3f page=%.3f vol=%.3f render=%.3f total=%.3f rows=%d prints_n=%d",
+        "board timing: runs=%.3f prints=%.3f page=%.3f vol=%.3f total=%.3f rows=%d prints_n=%d",
         _t_runs - _t0, _t_prints - _t_runs, _t_page - _t_prints, _t_vol - _t_page,
-        perf_counter() - _t_vol, perf_counter() - _t0, len(page.rows), page.print_count,
+        perf_counter() - _t0, len(page.rows), page.print_count,
     )
-    return _response
+    return {
+        "page": page,
+        "runs": runs,
+        "run": active or "",
+        # A live run reloads once per board refresh cadence (new prints and quotes).
+        "live_reload_seconds": (
+            settings.refresh.cadence_seconds if current is not None and current.is_live else None
+        ),
+        "vol_board": vol_rows,
+        # The same cutoff the ranking used, as the page states it. It was spelled
+        # out a third time in the template divider (registry REG-3).
+        "vol_rich_iv_rank": round(settings.regime.vol_rich_iv_pct * 100),
+        "vol_summary": vol_board_summary(
+            vol_rows, rich_threshold=settings.regime.vol_rich_iv_pct,
+        ),
+        "vol_structure": explanations.vol_structure,
+        "vol_read": explanations.vol_read,
+        "vol_caveat": explanations.vol_caveat,
+        "pas_card": pas_card,
+        "pas_recorded_text": cards.pas_recorded_text,
+        **alfa_page.template_context(),
+    }
+
+
+# Phase 5.2.PERF10: the default board view (no run, gate or pas parameter), built in
+# the background and served from memory. ``None`` until the first build finishes; a
+# request then falls back to building the view itself, as before.
+_PRERENDERED: tuple[datetime, dict[str, Any]] | None = None
+
+
+def _prerender_max_age_seconds() -> int:
+    """How old a prebuilt view may be and still be served: two refresher cycles.
+
+    The refresher writes new quotes once per ``refresh.cadence_seconds``; a view
+    older than two cycles has missed a write, so the request rebuilds instead.
+    """
+    return 2 * _board_settings().refresh.cadence_seconds
+
+
+def _fresh_prerendered(now: datetime) -> tuple[datetime, dict[str, Any]] | None:
+    cached = _PRERENDERED
+    if cached is None:
+        return None
+    built_at, _ctx = cached
+    age = (now - built_at).total_seconds()
+    if age < 0 or age > _prerender_max_age_seconds():
+        return None
+    return cached
+
+
+async def _board_prerender_loop() -> None:
+    """Rebuild the default board view once per refresher cycle, off the request path."""
+    global _PRERENDERED
+    while True:
+        started = _now()
+        try:
+            ctx = await asyncio.to_thread(_board_context, "", "", "")
+        except Exception:
+            _logger.exception("board prerender failed; requests build the view themselves")
+        else:
+            _PRERENDERED = (started, ctx)
+        await asyncio.sleep(_board_settings().refresh.cadence_seconds)
+
+
+@app.get("/", response_class=HTMLResponse)
+@app.get("/alfa", response_class=HTMLResponse)
+def alfa_board(request: Request, run: str = "", gate: str = "", pas: str = "") -> HTMLResponse:
+    """The Alfa Board: one row per (ticker, side-aware direction) over the whole selected run.
+
+    Served at ``GET /`` since Phase 5.2.A7; ``GET /alfa`` stays as an alias
+    (decision P12). Reads the database only; no Unusual Whales call (contract
+    §4.1). A failed read renders an explicit "could not read" state, never an
+    empty board. The cost gate ``Alabileceklerimi göster`` is on unless
+    ``gate=off`` (§5 A2). Each row carries its evidence strip, reason and
+    counter-argument; the combined score is only in the row's audit block
+    (§5 A4-A6). ``Bugün temiz aday yok`` renders when no row is a clean
+    candidate (R-EM1). The vol-premium board stays as a section, with the
+    R-IV1 sentence (§5 A7).
+
+    Phase 5.2.PERF10: the default view is served from the background build when
+    that build is fresh, and the page says when it was built.
+    """
+    _t0 = perf_counter()
+    now = _now()
+    cached = None if (run or gate or pas) else _fresh_prerendered(now)
+    if cached is not None:
+        built_at, ctx = cached
+        prebuilt_age: int | None = int((now - built_at).total_seconds())
+    else:
+        ctx = _board_context(run, gate, pas)
+        prebuilt_age = None
+    response = templates.TemplateResponse(
+        request,
+        "alfa.html",
+        {
+            **ctx,
+            "board_path": request.url.path,
+            "prebuilt_age_seconds": prebuilt_age,
+            "prebuilt_text": copy_tr.PREBUILT_AGE,
+        },
+    )
+    _logger.warning(
+        "board served: prebuilt=%s total=%.3f",
+        "yes" if cached is not None else "no", perf_counter() - _t0,
+    )
+    return response
 
 
 @app.post("/alfa/card", response_model=None)  # the union of two Response types is not a model
