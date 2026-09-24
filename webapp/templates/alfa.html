@@ -4,6 +4,9 @@
    aggregate.py, tradability.py, evidence.py, narrative.py, penalty_ledger.py, copy_tr.py). #}
 {% block content %}
 <section id="alfa-board" lang="tr">
+  {% if prebuilt_age_seconds is not none %}
+  <p id="board-prebuilt" class="text-xs text-gray-500 mb-2">{{ prebuilt_text.format(age=prebuilt_age_seconds) }}</p>
+  {% endif %}
   <div class="flex items-baseline gap-3 flex-wrap mb-3">
     <h2 class="text-xl font-bold text-white">{{ copy.page_title }}</h2>
     <span class="text-sm text-gray-400">{{ copy.intro }}</span>
