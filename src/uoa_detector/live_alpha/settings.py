@@ -17,7 +17,17 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from ruamel.yaml import YAML
 
 _REPO = pathlib.Path(__file__).resolve().parents[3]
-DEFAULT_PROFILE = _REPO / "profiles" / "live_alpha_v1.yaml"
+
+
+def profile_path(name: str) -> pathlib.Path:
+    """``profiles/<name>`` relative to the working directory, as every other profile
+    reader here resolves it (the app starts from the repo root on Railway); the
+    source-tree location is the fallback for an editable checkout run elsewhere."""
+    local = pathlib.Path("profiles") / name
+    return local if local.exists() else _REPO / "profiles" / name
+
+
+DEFAULT_PROFILE = profile_path("live_alpha_v1.yaml")
 
 
 class _Strict(BaseModel):

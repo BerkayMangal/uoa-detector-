@@ -63,7 +63,6 @@ if TYPE_CHECKING:
 
 _logger = logging.getLogger(__name__)
 _ET = ZoneInfo("America/New_York")
-_REPO_OPTIONS_PROFILE = "profiles/options_alpha_v1.yaml"
 
 PAPER_ACTIVE = (Tracking.PAPER_PENDING.value, Tracking.PAPER_OPEN.value, Tracking.EXIT_SIGNALLED.value)
 
@@ -89,9 +88,9 @@ class CycleContext:
 
 
 def load_costs() -> OptionsAlphaSettings:
-    from uoa_detector.live_alpha.settings import _REPO  # the repo root the profiles live in
+    from uoa_detector.live_alpha.settings import profile_path
 
-    return load_options_settings(_REPO / _REPO_OPTIONS_PROFILE)
+    return load_options_settings(profile_path("options_alpha_v1.yaml"))
 
 
 # ---------------------------------------------------------------------------
