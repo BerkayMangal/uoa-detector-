@@ -134,6 +134,21 @@ def _paper_dict(p: store.LivePaper, now: datetime) -> dict[str, Any]:
     }
 
 
+def _open_tr(session: Any) -> str:
+    """Next regular open in Turkey time, e.g. '16:30 TR' or 'yarın 16:30 TR'."""
+    cfg = settings().calendar
+    day = session.session_date if session.mode is MarketMode.PREMARKET or (
+        session.session_date is not None and session.et_now.time() < cfg.regular_open
+    ) else session.next_session
+    if day is None:
+        return ""
+    open_et = datetime.combine(day, cfg.regular_open, tzinfo=_ET)
+    open_tr = open_et.astimezone(_TR)
+    today_tr = session.et_now.astimezone(_TR).date()
+    prefix = "bugün" if open_tr.date() == today_tr else ("yarın" if (open_tr.date() - today_tr).days == 1 else open_tr.strftime("%d.%m"))
+    return f"{prefix} {open_tr:%H:%M} (TR saati)"
+
+
 def build_view(engine: Engine, now: datetime) -> LiveView:
     ensure_ready(engine)
     cfg = settings()
@@ -200,17 +215,20 @@ def build_view(engine: Engine, now: datetime) -> LiveView:
     actionable = actionable[: cfg.cycle.max_cards]
     buys = [c for c in actionable if c.data["recommendation"] == "BUY" and not c.withdrawn]
     conds = [c for c in actionable if c.data["recommendation"] == "CONDITIONAL_BUY"]
+    open_tr = _open_tr(session_now)
     if buys:
-        summary = "Bugün öne çıkan alım: " + ", ".join(c.data["ticker"] for c in buys) + "."
+        summary = "Şimdi alınabilir: " + ", ".join(c.data["ticker"] for c in buys) + ". Fiyat ve zarar-kes kartta."
     elif conds:
         summary = (
-            "Şu an hazır alım yok; koşullu alım planları: "
+            "Şu an hemen alınacak hisse yok. Şartlı plan var: "
             + ", ".join(c.data["ticker"] for c in conds) + "."
         )
     elif actionable:
-        summary = "Alım önermiyorum; kaçın/aşağı yönlü görüşler aşağıda."
+        summary = "Alınacak hisse yok. Uzak durulacaklar aşağıda."
     else:
-        summary = "Bugün alım önermiyorum: hiçbir hisse akış + fiyat + haber/göreli güç koşullarını birlikte geçmedi."
+        summary = "Şu an alınacak hisse yok. Hiçbir hissede opsiyon parası net bir yöne oynamıyor."
+    if session_now.mode is not MarketMode.LIVE and open_tr:
+        summary += f" Piyasa {open_tr} açılıyor; açıldıktan sonra her 5 dakikada yeniden bakıyorum."
     return LiveView(
         has_scan=True,
         mode_text=MODE_TR.get(session_now.mode.value, session_now.mode.value),

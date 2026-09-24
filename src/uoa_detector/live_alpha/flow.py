@@ -116,7 +116,7 @@ def qualifying_direction(summary: FlowSummary, settings: FlowSettings) -> tuple[
         return None, "bu seansta akış kaydı yok"
     if summary.side_aware_share < settings.side_aware_share_min:
         return None, (
-            f"alım/satım tarafı bilinen prim payı %{summary.side_aware_share * 100:.0f} "
+            f"alım/satım tarafı bilinen prim payı %{summary.side_aware_share * 100:.1f} "
             f"(< %{settings.side_aware_share_min * 100:.0f})"
         )
     for direction in ("up", "down"):
@@ -134,7 +134,7 @@ def qualifying_direction(summary: FlowSummary, settings: FlowSettings) -> tuple[
         return None, f"yönlü prim ${prem:,.0f} (< ${settings.min_directional_premium_usd:,.0f})"
     if summary.share(dominant) < settings.dominance_min:
         return None, (
-            f"yön baskınlığı %{summary.share(dominant) * 100:.0f} "
+            f"yön baskınlığı %{summary.share(dominant) * 100:.1f} "
             f"(< %{settings.dominance_min * 100:.0f}); akış karışık"
         )
     return None, f"yalnız {summary.distinct_contracts} farklı kontrat (< {settings.min_distinct_contracts})"
