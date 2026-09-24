@@ -174,6 +174,7 @@ A new study needs a fresh, non-overlapping window (`docs/next_studies.md`,
 | 2025-05-01 → 2026-04-30 | `data/chain_snapshots/` (251 snapshot dates, 24 tickers), `data/spot_series/` | burned: the 4.x studies and `scripts/edge_validation.py` use all of it | `docs/preregister_D.md` §0; `docs/next_studies.md` rule 1 |
 | 2024-05-01 → 2025-04-30 | `data/chain_snapshots_2024/`, `data/spot_series_2024/` | used by the single pre-registered Study D run (`ba09f92`); not fresh for a later study | `docs/preregister_D.md` §1; `docs/study_D_result.md` |
 | 2026-05-01 onward | forward data | registered as Study D's stricter alternative; underpowered as of 2026-06-24 | `docs/preregister_D.md` §1 |
+| 2026-05-14 → 2026-09-15 | `artifacts/options-alpha-v1/harvest/` (UW option chains, 85 sessions, 10 tickers) | burned: queried by Options Alpha H03/H01/H04/H10/H02, S01 and S02 (the vol premium on Study D's forward window, REJECTED). Forward data from 2026-09-16 on is still fresh | `docs/options-alpha-v1/FAMILIES.md`; `RESULT_S01.md`; `RESULT_S02.md` |
 
 - `docs/next_studies.md` describes the burned panel as "11-month" and
   "Jul-2025–Apr-2026". The inventory in `docs/preregister_D.md` §0 records

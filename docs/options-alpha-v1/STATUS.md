@@ -1,7 +1,7 @@
 # options-alpha-v1 — durum
 
 **Faz 5.24** · dal `p81-options-alpha-families` · taban `main` 222ccdc
-**Son güncelleme:** 2026-09-23 — S01: kayıp tamamen maliyet (MALIYET_BAGLI)
+**Son güncelleme:** 2026-09-24 — S02: vol primi bu pencerede para değil (REDDEDİLDİ)
 
 > Bu başlık bir süre bayat kaldı (`p71` / `eb8b766` yazıyordu) ve arada dört PR
 > merge edildi. Doğru olan, `main`'in canlı SHA'sıdır: `curl -s .../health`.
@@ -26,6 +26,8 @@ Ana ürün **opsiyon sinyal terminali**. Hisse tarafı yalnız karşılaştırma
 | **M5e** | Beşinci aile (tekrarlayan akış) | **DONE — REDDEDİLDİ** | `RESULT_H02.md` · `h02_result.json` |
 | **M5f** | On iki ailenin tek tablosu (v2 motor) | **DONE** | `FAMILIES.md` |
 | **S01** | Ortak kurgunun kayıp ayrıştırması (aile değil, deneme harcamaz) | **DONE — MALIYET_BAGLI** | `RESULT_S01.md` · `s01_result.json` |
+| **S02** | Vol primi, ölçülmüş maliyetle, kısa ATM iron butterfly (1 deneme) | **DONE — REDDEDİLDİ** | `RESULT_S02.md` · `s02_result.json` |
+| **SON** | Sonuç raporu — sade dille, tüm testler | **DONE** | `SONUC_RAPORU.md` |
 | **M6** | Track B replikasyonu | **ENGEL ÖLÇÜLDÜ** | Pencere ~95 seans, şartı 4 çeyrek → kısmi test / yetersiz süre |
 | **M7** | Ayrı opsiyon ekranı + tarayıcı doğrulaması | **KISMEN** | `/opsiyon` kodlandı + test edildi; *gözle* canlı doğrulama B1'e bağlı |
 | **M8** | Mutasyon kanıtı tablosu | **DONE** | `mutation_proof.md` — 7/7 koruma kırmızıya döndü, 0 sağ kalan |
@@ -52,6 +54,16 @@ kayıtların %72–86'sı QQQ+SPY. Ayrıntı `RESULT_H02.md`.
 geçmedi; tüm kollar dahil kol ortalamaları yapı başına −37 $ ile −84 $ arasında
 (−37 $ H03'ün n=4'lük kontrol kolu). H03/H01/H02 REJECTED, H04/H10 INSUFFICIENT_DATA. Sıradaki adım altıncı bir aile değil,
 ortak paydanın (yapı + maliyet + 5 günlük tutma) sorgulanması.
+
+---
+
+## S02 — vol primi para olarak: REDDEDİLDİ
+
+Kısa ATM iron butterfly, 16 çakışmasız tarih × 10 isim, 5 gün tutma, ölçülmüş
+makas + %2 gecikme + komisyon. Ortalama RoR **−%9,7**, tarih-blok %95
+**[−%15,1 , −%5,3]**, iki yarı da negatif. Mid'de satıcının kazandığı prim
+**−16 $** (sıfır civarı): bu pencerede 5 günlük vol primi yoktu (gerçekleşen/örtük
+≈ 0,97). Sıfır maliyette bile −%0,5. Ayrıntı `RESULT_S02.md`.
 
 ---
 
