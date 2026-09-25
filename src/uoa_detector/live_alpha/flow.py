@@ -74,7 +74,9 @@ def summarise(
     merged = dedupe(raw, settings.dedupe_seconds)
     up = down = unknown = 0.0
     by_contract: dict[str, float] = defaultdict(float)
-    contract_dir: dict[str, str] = {}
+    # premium per (contract, side): one contract bought AND sold is two lines, never one
+    # line summing both sides under whichever side printed last (live 2026-09-24, META 750C)
+    by_side: dict[tuple[str, str], float] = defaultdict(float)
     largest = 0.0
     largest_contract: str | None = None
     for p in merged:
@@ -88,10 +90,10 @@ def summarise(
             unknown += prem
         key = contract_key(p)
         by_contract[key] += prem
-        contract_dir[key] = d or "?"
+        by_side[(key, d or "?")] += prem
         if prem > largest:
             largest, largest_contract = prem, key
-    top = sorted(by_contract.items(), key=lambda kv: kv[1], reverse=True)[:3]
+    top = sorted(by_side.items(), key=lambda kv: kv[1], reverse=True)[:3]
     return FlowSummary(
         ticker=ticker.upper(),
         run_id=run_id,
@@ -105,7 +107,7 @@ def summarise(
         last_ts=merged[-1].ts if merged else None,
         largest_premium=largest,
         largest_contract=largest_contract,
-        top_contracts=tuple((k, v, contract_dir[k]) for k, v in top),
+        top_contracts=tuple((k, v, side) for (k, side), v in top),
         strikes_seen=tuple(sorted({float(p.strike) for p in raw})),
     )
 
