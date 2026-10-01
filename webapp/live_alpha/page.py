@@ -107,6 +107,8 @@ class LiveView:
     spot_age: dict[str, int] = field(default_factory=dict)
     news_failed: list[str] = field(default_factory=list)
     policy_version: str = ""
+    board: list[dict[str, Any]] = field(default_factory=list)
+    open_tr: str = ""
 
 
 def _tone(rec: str, readiness: str) -> str:
@@ -245,7 +247,24 @@ def build_view(engine: Engine, now: datetime) -> LiveView:
         papers_open=papers_open, papers_closed=papers_closed, paper_stats=paper_stats,
         manuals=manual_rows, beats=beats, spot_age=snap.get("spot_age_seconds", {}),
         news_failed=snap.get("news_failed", []), policy_version=snap.get("policy_version", cfg.policy_version),
+        open_tr=open_tr,
+        board=_board_view(snap.get("board", []), entries_withdrawn=stale or session_now.mode is not MarketMode.LIVE),
     )
+
+
+def _board_view(rows: list[dict[str, Any]], *, entries_withdrawn: bool) -> list[dict[str, Any]]:
+    """A green 'AL' on the board never outlives the live session or a fresh scan."""
+    out = []
+    for r in rows:
+        r = dict(r)
+        if entries_withdrawn and r.get("verdict_tone") == "green":
+            r["verdict"] = "BEKLE"
+            r["verdict_tone"] = "gray"
+            r["verdict_reason"] = "Piyasa açık değil ya da tarama eski; giriş yeniden değerlendirilecek. " + str(
+                r.get("verdict_reason", ""),
+            )
+        out.append(r)
+    return out
 
 
 def fill_session(now: datetime) -> str | None:

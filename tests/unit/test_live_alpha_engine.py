@@ -458,3 +458,12 @@ def test_top_contracts_split_a_contract_that_was_bought_and_sold() -> None:
     ]
     top = summarise("META", "r", prints, S.flow).top_contracts
     assert top == ((chain, 5000000.0, "up"), (chain, 3000000.0, "down"))
+
+
+def test_open_time_in_turkey_follows_us_dst() -> None:
+    from webapp.live_alpha import page
+
+    summer = classify(datetime(2026, 10, 30, 11, 0, tzinfo=UTC), S.calendar)   # EDT
+    winter = classify(datetime(2026, 11, 2, 12, 0, tzinfo=UTC), S.calendar)    # EST
+    assert page._open_tr(summer) == "bugün 16:30 (TR saati)"
+    assert page._open_tr(winter) == "bugün 17:30 (TR saati)"

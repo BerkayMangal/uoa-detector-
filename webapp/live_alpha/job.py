@@ -51,6 +51,7 @@ from uoa_detector.options_alpha.settings import OptionsAlphaSettings
 from uoa_detector.options_alpha.settings import load_settings as load_options_settings
 from webapp.board.daily_close import load_bars_by_ticker
 from webapp.board.settings import BoardSettings
+from webapp.live_alpha import board as live_board
 from webapp.live_alpha import inputs, store, uw
 from webapp.live_alpha.uw import Budget, ContractSpec, JsonClient
 
@@ -447,9 +448,45 @@ def _session_view(session: Session, now: datetime) -> dict[str, Any]:
     }
 
 
+def _verdicts(cards: Sequence[Card]) -> dict[str, tuple[str, str, str]]:
+    """Per ticker: (short word, plain reason, tone) for the board's last column."""
+    out: dict[str, tuple[str, str, str]] = {}
+    for c in cards:
+        if c.ticker in out:
+            continue
+        word = (c.plain_action or c.headline).split(" — ", 1)[0].rstrip(".")
+        tone = (
+            "green" if c.recommendation is Recommendation.BUY and c.readiness is Readiness.READY
+            else "amber" if c.recommendation in (Recommendation.BUY, Recommendation.CONDITIONAL_BUY)
+            else "red" if c.recommendation in (Recommendation.AVOID, Recommendation.BEARISH_SETUP)
+            else "gray"
+        )
+        out[c.ticker] = (word, c.plain_reason, tone)
+    return out
+
+
+def _board_rows(
+    engine: Engine, tickers: Sequence[str], run_id: str, now: datetime, session: Session,
+    flows: dict[str, FlowSummary], prices: dict[str, PriceContext], cards: Sequence[Card],
+    gamma_source: Callable[[], dict[str, Any]] | None,
+) -> list[dict[str, Any]]:
+    """The 'Hisse panosu' rows. Display only; any failure leaves the board out, never the cycle."""
+    try:
+        cfg = live_board.load_board_settings()
+        today = session.et_now.date()
+        pace = live_board.flow_pace(engine, tickers, run_id, now, cfg)
+        moves = live_board.expected_moves(engine, tickers, today, cfg)
+        gamma = gamma_source() if gamma_source is not None else {}
+        return live_board.build_rows(tickers, flows, prices, pace, moves, gamma, _verdicts(cards), today, cfg)
+    except Exception:
+        _logger.exception("live alpha board rows failed; the cards are unaffected")
+        return []
+
+
 async def run_cycle(
     engine: Engine, reader: BoardSignalReader, client: JsonClient, settings: LiveAlphaSettings,
     board: BoardSettings, costs: OptionsAlphaSettings, now: datetime,
+    gamma_source: Callable[[], dict[str, Any]] | None = None,
 ) -> store.ScanRow:
     t0 = perf_counter()
     session = classify(now, settings.calendar)
@@ -529,7 +566,9 @@ async def run_cycle(
     spot_ages = {
         t: int((now - p.spot_fetched_at).total_seconds()) for t, p in prices.items() if p.spot_fetched_at is not None
     }
+    board_rows = _board_rows(engine, tickers, run_id, now, session, flows, prices, cards, gamma_source)
     snapshot.update({
+        "board": board_rows,
         "flow_run": run_id,
         "flow_last_print": last_print_ts.isoformat(),
         "flow_current": flow_current,
@@ -574,6 +613,9 @@ async def live_alpha_loop(
     store.ensure_live_tables(engine)
     ensure_quota_tables(engine)
     reader = BoardSignalReader(engine=engine)
+    from webapp.gamma import GammaRepo
+
+    gamma_repo = GammaRepo(database_url)
     if client_factory is not None:
         client = client_factory()
     else:
@@ -589,7 +631,8 @@ async def live_alpha_loop(
         now = now_fn()
         status, detail = "ok", {}
         try:
-            row = await run_cycle(engine, reader, client, settings, board, costs, now)
+            row = await run_cycle(engine, reader, client, settings, board, costs, now,
+                                  gamma_source=gamma_repo.latest)
             status = row.status
             detail = {"scan_id": row.scan_id, "cards": len(row.snapshot.get("cards", [])),
                       "requests": row.snapshot.get("requests"), "mode": row.market_mode}

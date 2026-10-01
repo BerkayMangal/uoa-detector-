@@ -533,5 +533,19 @@ def test_premarket_view_names_todays_session_not_tomorrow(
     _cycle(engine, FakeUW(), premarket)
     monkeypatch.setattr(app_with_scan, "_now", lambda: premarket + timedelta(minutes=1))
     body = TestClient(app_with_scan.app, headers=set_web_auth(monkeypatch)).get("/").text
-    assert "Bugünkü seans 2026-09-24 09:30 ET'de açılır" in body
-    assert "Sonraki seans" not in body
+    assert "piyasa bugün 16:30 (TR saati) açılır" in body   # EDT: 09:30 ET = 16:30 TR
+    assert "yarın" not in body.split("data-summary", 1)[0]
+
+
+def test_board_table_renders_and_closed_market_withdraws_green(
+    app_with_scan: Any, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from fastapi.testclient import TestClient
+
+    client = TestClient(app_with_scan.app, headers=set_web_auth(monkeypatch))
+    body = client.get("/").text
+    assert 'data-board-row="NVDA"' in body and "Hisse panosu" in body
+    monkeypatch.setattr(app_with_scan, "_now", lambda: datetime(2026, 9, 24, 20, 5, tzinfo=UTC))
+    closed = client.get("/").text
+    row = closed.split('data-board-row="NVDA"', 1)[1].split("</tr>", 1)[0]
+    assert "BEKLE" in row and "Piyasa açık değil" in row

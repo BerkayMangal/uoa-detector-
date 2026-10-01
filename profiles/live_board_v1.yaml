@@ -1,0 +1,12 @@
+# Live board display profile (registry 5.25, display only). These cutoffs only choose a
+# WORD on the "Hisse panosu" table (pahalı / ucuz / yoğun); they never change a decision.
+# Decision thresholds live in live_alpha_v1.yaml and are not touched here (D4, D8).
+board_version: live_board_v1
+iv_rich_rank: 0.70          # IV rank at or above this reads "pahalı"
+iv_cheap_rank: 0.30         # at or below reads "ucuz"
+flow_busy_multiple: 2.0     # today's prints at least this many times the normal reads "yoğun"
+flow_quiet_multiple: 0.5    # at most this reads "sakin"
+flow_history_sessions: 10   # prior live sessions behind "normal" (median, same time of day)
+flow_min_history: 3         # fewer prior sessions than this: no multiple is shown
+move_min_dte: 5             # expected move uses the first stored expiry at least this far out
+earnings_warn_days: 14      # earnings within this many days are flagged on the row
