@@ -7,9 +7,20 @@ provider holds one cache instance configured with its TTL from
 
 The cache uses a monotonic clock so wall-clock jumps don't expire
 entries early. Concurrent ``get_or_fetch`` calls for the same key
-share a single in-flight loader via ``asyncio.Lock`` per key —
-prevents the thundering-herd effect when many stages query the
-same value at once.
+share a single in-flight loader task — prevents the thundering-herd
+effect when many stages query the same value at once.
+
+decision (the loader survives a cancelled waiter):
+  Every stage wraps its provider call in ``asyncio.wait_for`` (D7), so a
+  slow fetch is cancelled at the stage timeout. When the loader ran inside
+  the waiter's own task, that cancellation killed the fetch before it could
+  be cached, and the next event started the same fetch from zero: a fetch
+  slower than the stage timeout could never complete, so the axis scored
+  neutral forever (live 2026-10-05: M25 peer flow timed out on every cycle
+  for NVDA, AMD, MSFT, AMZN and AAPL). The loader now runs in its own task
+  that caches its own result, and waiters ``shield`` it. A timed-out waiter
+  therefore leaves the fetch running and the next caller finds it cached or
+  joins it mid-flight.
 
 Design notes:
   - Values are stored by reference (no copy). Callers must treat
@@ -50,18 +61,37 @@ class TTLCache(Generic[T]):
 
     ttl_seconds: int
     _entries: dict[Hashable, _Entry[T]] = field(default_factory=dict)
-    _locks: dict[Hashable, asyncio.Lock] = field(default_factory=dict)
+    _inflight: dict[Hashable, asyncio.Task[T]] = field(default_factory=dict)
 
     @property
     def enabled(self) -> bool:
         return self.ttl_seconds > 0
 
-    def _get_lock(self, key: Hashable) -> asyncio.Lock:
-        lock = self._locks.get(key)
-        if lock is None:
-            lock = asyncio.Lock()
-            self._locks[key] = lock
-        return lock
+    def _start(self, key: Hashable, loader: Callable[[], Awaitable[T]]) -> asyncio.Task[T]:
+        """The one running loader for ``key``, started if there is none."""
+        task = self._inflight.get(key)
+        if task is not None and not task.done():
+            return task
+
+        async def _load_and_store() -> T:
+            value = await loader()
+            self._entries[key] = _Entry(
+                value=value,
+                expires_at=time_module.monotonic() + float(self.ttl_seconds),
+            )
+            return value
+
+        def _done(finished: asyncio.Task[T]) -> None:
+            # Free the slot, and read any exception so a failed load whose
+            # waiters all timed out is not reported as "never retrieved".
+            self._inflight.pop(key, None)
+            if not finished.cancelled():
+                finished.exception()
+
+        task = asyncio.ensure_future(_load_and_store())
+        self._inflight[key] = task
+        task.add_done_callback(_done)
+        return task
 
     async def get_or_fetch(
         self,
@@ -72,8 +102,9 @@ class TTLCache(Generic[T]):
         """Return cached value, or call ``loader()`` and cache its result.
 
         ``loader`` is awaited at most once per (key, TTL window) — a
-        second concurrent caller for the same key blocks on the
-        in-flight loader rather than firing a duplicate request.
+        second concurrent caller for the same key joins the in-flight
+        loader rather than firing a duplicate request. Cancelling this
+        call (a stage timeout) does not cancel the loader.
         """
         if not self.enabled:
             return await loader()
@@ -84,20 +115,7 @@ class TTLCache(Generic[T]):
         if entry is not None and entry.expires_at > now:
             return entry.value
 
-        # Slow path: load (with per-key lock to dedupe concurrent loads).
-        lock = self._get_lock(key)
-        async with lock:
-            # Re-check under lock — another waiter may have populated.
-            now = time_module.monotonic()
-            entry = self._entries.get(key)
-            if entry is not None and entry.expires_at > now:
-                return entry.value
-            value = await loader()
-            self._entries[key] = _Entry(
-                value=value,
-                expires_at=now + float(self.ttl_seconds),
-            )
-            return value
+        return await asyncio.shield(self._start(key, loader))
 
     def invalidate(self, key: Hashable) -> None:
         """Drop a single cached entry (operator escape hatch)."""

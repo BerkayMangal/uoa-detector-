@@ -66,6 +66,16 @@ decision (delay warning is telemetry-only, not score branch):
   delay_warning_minutes from event_ts. Score is unchanged;
   warning surfaces in last_execution_metadata + log.
 
+  Phase 5.25.11 hotfix: the warning measured the LARGEST qualifying
+  print's age, not the latest one's, contradicting the decision
+  above. The largest print inside a 60-minute lookback is older
+  than 5 minutes almost every time, so the warning fired on
+  nearly every event and said nothing about feed delay (live
+  2026-10-05: 25-56 minutes old on AMD, AMZN, META and MSFT,
+  every cycle). It now measures the newest qualifying print,
+  which is what 'DP data delayed' asks. The score branches and
+  the largest-print selection are untouched.
+
 decision (sets has_dark_pool_confirmation only on confirmed_match):
   The boolean field flips True only when score reaches
   confirmed_match_score (default 1.0). Direction-unclear (0.5)
@@ -170,10 +180,13 @@ class DarkPoolStage:
         if score == m26.confirmed_match_score:
             event.has_dark_pool_confirmation = True
 
-        # Delay warning telemetry (acceptance doc edge case)
+        # Delay warning telemetry (acceptance doc edge case). Measured on the
+        # newest qualifying print: "is the feed behind?", not "is the biggest
+        # print in the lookback window old?" (it almost always is).
+        newest = _newest_qualifying(prints=prints, settings=m26)
         delay_warning = "no"
-        if largest is not None:
-            delay = (event_ts - largest.when).total_seconds() / 60.0
+        if newest is not None:
+            delay = (event_ts - newest.when).total_seconds() / 60.0
             if delay > m26.delay_warning_minutes:
                 _logger.warning(
                     "m26: largest qualifying DP print for %s is %.1f "
@@ -195,6 +208,21 @@ class DarkPoolStage:
                 largest.side_estimate
             )
         return event
+
+
+def _newest_qualifying(
+    *,
+    prints: Sequence[DarkPoolPrint],
+    settings: M26Settings,
+) -> DarkPoolPrint | None:
+    """The most recent print at or above ``min_print_size_usd``, or None."""
+    qualifying = [
+        p for p in prints
+        if int(p.price) * p.size >= settings.min_print_size_usd
+    ]
+    if not qualifying:
+        return None
+    return max(qualifying, key=lambda p: p.when)
 
 
 def _score_from_prints(

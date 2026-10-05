@@ -159,3 +159,50 @@ async def test_loader_exception_not_cached() -> None:
     v = await cache.get_or_fetch("k", loader=loader)
     assert v == 100
     assert attempts == 2
+
+
+@pytest.mark.asyncio
+async def test_timed_out_waiter_leaves_the_loader_running() -> None:
+    """A stage timeout must not kill the fetch (live 2026-10-05, M25).
+
+    Every stage wraps its provider call in ``asyncio.wait_for`` (D7). When the
+    loader ran inside the waiter's task, that cancellation discarded the
+    in-flight fetch, so a fetch slower than the stage timeout could never
+    finish: every event restarted it and the axis scored neutral forever.
+    """
+    calls = 0
+
+    async def slow_loader() -> int:
+        nonlocal calls
+        calls += 1
+        await asyncio.sleep(0.2)
+        return 7
+
+    cache = TTLCache[int](ttl_seconds=60)
+    # Event 1: gives up after 50 ms, as a stage timeout would.
+    with pytest.raises(asyncio.TimeoutError):
+        await asyncio.wait_for(cache.get_or_fetch("k", loader=slow_loader), timeout=0.05)
+    # The fetch is still running, so event 2 joins it instead of restarting it.
+    assert await asyncio.wait_for(cache.get_or_fetch("k", loader=slow_loader), timeout=1.0) == 7
+    # Event 3 is a plain cache hit.
+    assert await cache.get_or_fetch("k", loader=slow_loader) == 7
+    assert calls == 1
+
+
+@pytest.mark.asyncio
+async def test_a_loader_every_waiter_abandoned_still_caches() -> None:
+    """Nobody is awaiting when the fetch lands; the next caller still gets it."""
+    calls = 0
+
+    async def slow_loader() -> int:
+        nonlocal calls
+        calls += 1
+        await asyncio.sleep(0.05)
+        return 11
+
+    cache = TTLCache[int](ttl_seconds=60)
+    with pytest.raises(asyncio.TimeoutError):
+        await asyncio.wait_for(cache.get_or_fetch("k", loader=slow_loader), timeout=0.01)
+    await asyncio.sleep(0.1)  # the abandoned loader finishes alone
+    assert await cache.get_or_fetch("k", loader=slow_loader) == 11
+    assert calls == 1
