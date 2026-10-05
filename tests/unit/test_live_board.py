@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 from webapp.board.atm import AlfaAtm
 from webapp.live_alpha import board as live_board
 
-from tests.unit.test_live_alpha_job import EXPIRY, RUN, T0, FakeUW, _cycle, _seed
+from tests.unit.test_live_alpha_job import EXPIRY, T0, FakeUW, _cycle, _seed
 from uoa_detector.live_alpha.model import CheckState, PriceContext
 
 if TYPE_CHECKING:
@@ -71,7 +71,7 @@ def test_flow_pace_compares_the_same_time_of_day(engine: Engine) -> None:
         finally:
             st.close()
     # today (seeded run) has 3 NVDA prints before 11:00 ET; prior sessions had 1 by then -> 3x
-    pace = live_board.flow_pace(engine, ["NVDA"], RUN, T0, CFG)["NVDA"]
+    pace = live_board.flow_pace(engine, ["NVDA"], T0, CFG)["NVDA"]
     assert (pace.today, pace.normal, pace.sessions) == (3, 1, 3)
     assert pace.multiple == pytest.approx(3.0)
 
@@ -117,3 +117,33 @@ def test_board_failure_never_breaks_the_cycle(engine: Engine, monkeypatch: pytes
     monkeypatch.setattr(live_board, "flow_pace", _boom)
     row = _cycle(engine, FakeUW(), T0)
     assert row.snapshot["board"] == [] and row.snapshot["cards"][0]["recommendation"] == "BUY"
+
+
+def test_flow_pace_splits_a_run_that_spans_several_days(engine: Engine) -> None:
+    """A live worker that stays up writes days of prints into one run id (worker
+    rollover bug, live 2026-10-05): the pace must still count ET sessions, so
+    yesterday's prints never inflate today's side of the ratio."""
+    from tests.conftest import build_print
+    from uoa_detector.backtest.sqlite_store import SqliteBacktestStore
+    from uoa_detector.calibration import load_default_profile
+    from uoa_detector.domain.events import EnrichedEvent
+    from uoa_detector.domain.labels import LabelDecision, SignalLabel
+    from uoa_detector.domain.risk import PositionSize, RiskBucket
+
+    st = SqliteBacktestStore(str(engine.url), flush_threshold=10)
+    try:
+        # ONE run id, three ET dates: 4 prints before 11:00 ET on each prior day,
+        # and 2 before 11:00 ET today. The run id names the first day only.
+        st.start_run(profile=load_default_profile(), universe_id="live", run_id="live-2026-09-21")
+        for day, n in ((21, 4), (22, 4), (23, 4), (24, 2)):
+            for i in range(n):
+                ts = datetime(2026, 9, day, 14, i, tzinfo=UTC)  # 10:0i ET
+                st.add(EnrichedEvent(print=build_print(event_id=f"s{day}-{i}", ts=ts, ticker="AMD")),
+                       LabelDecision(label=SignalLabel.STANDARD_UOA, reason="t"),
+                       PositionSize(bucket=RiskBucket.STANDARD_UOA, max_r=0.5))
+    finally:
+        st.close()
+    pace = live_board.flow_pace(engine, ["AMD"], T0, CFG)["AMD"]
+    # today is the 2 prints of 2026-09-24, not the run's 14
+    assert (pace.today, pace.normal, pace.sessions) == (2, 4, 3)
+    assert pace.multiple == pytest.approx(0.5)

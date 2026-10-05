@@ -21,7 +21,8 @@ import asyncio
 import contextlib
 import logging
 import os
-from datetime import UTC, datetime
+from collections.abc import Awaitable, Callable
+from datetime import UTC, date, datetime
 from decimal import Decimal
 from pathlib import Path
 
@@ -39,6 +40,10 @@ _logger = logging.getLogger(__name__)
 
 _DEFAULT_PROFILE = Path("profiles/v5_default.yaml")
 _RESTART_BACKOFF_S = 30.0
+# How often the rollover watcher checks the UTC date. The check is a clock read,
+# so a minute is cheap and bounds how long a new day keeps writing into the old
+# run id (UTC midnight is 20:00 ET, after the options close: nothing is split).
+_ROLLOVER_CHECK_S = 60.0
 # Phase 4.42: the live worker commits every signal immediately. The store's
 # default batch of 100 is right for backtests, but live flow is a few signals
 # per minute: with batching, today's run stays invisible (page reads STALE) until
@@ -99,6 +104,24 @@ def live_config_from_env() -> dict[str, object] | None:
     }
 
 
+async def _close_at_utc_rollover(
+    source: UnusualWhalesFlowPollSource,
+    run_day: date,
+    *,
+    now: Callable[[], datetime] = lambda: datetime.now(UTC),
+    sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
+) -> None:
+    """Close the flow source once the UTC date leaves ``run_day``.
+
+    Closing ends the source's stream, which ends ``pipeline.run()``, which lets
+    the worker loop open the new day's run. Without it the run id would stay at
+    the day the worker started and hold every later day's prints.
+    """
+    while now().date() == run_day:
+        await sleep(_ROLLOVER_CHECK_S)
+    await source.close()
+
+
 async def run_live_worker(
     *,
     tickers: list[str],
@@ -117,10 +140,14 @@ async def run_live_worker(
     _logger.info("live worker started: tickers=%s", tickers)
 
     def _ensure_run() -> str:
-        # One run per UTC day, recomputed each iteration so a worker that runs
-        # for days ROLLS OVER at midnight (a fixed start-of-process run_id would
-        # keep dumping later days into the first day's run). On a same-day
-        # restart the run exists -> adopt it (append) rather than collide on PK.
+        # One run per UTC day. ``pipeline.run()`` drains an endless stream and
+        # never returns on its own, so calling this once per process would pin
+        # the run id to the day the worker last restarted and dump every later
+        # day into it (live 2026-10-05: four days in ``live-2026-10-01``, which
+        # made the board read days of flow as "today"). ``_close_at_utc_rollover``
+        # ends the stream at midnight so this runs again for the new day. On a
+        # same-day restart the run exists -> adopt it (append) rather than
+        # collide on PK.
         run_id = f"live-{datetime.now(UTC).date().isoformat()}"
         if store.get_run(run_id) is None:
             store.start_run(
@@ -141,7 +168,7 @@ async def run_live_worker(
             # not kill live ingestion permanently (it would freeze silently
             # while the LIVE badge keeps pulsing).
             try:
-                _ensure_run()
+                run_day = date.fromisoformat(_ensure_run().removeprefix("live-"))
                 client = UnusualWhalesClient(
                     api_key=Credentials().require_unusual_whales_api_key(),
                     settings=profile.data_sources.unusual_whales,
@@ -174,7 +201,19 @@ async def run_live_worker(
                     context=PipelineContext(profile=profile),
                     decision_record_writer=writer,
                 )
-                await pipeline.run()
+                rollover = asyncio.create_task(_close_at_utc_rollover(source, run_day))
+                try:
+                    await pipeline.run()
+                finally:
+                    rollover.cancel()
+                    with contextlib.suppress(asyncio.CancelledError):
+                        await rollover
+                # A normal return means the watcher closed the source at UTC
+                # midnight. Drop this day's client and loop: the next iteration
+                # opens the new day's run.
+                _logger.info("live worker: UTC day %s ended; starting the next run", run_day)
+                await source.close()
+                await client.aclose()
             except asyncio.CancelledError:
                 raise
             except Exception:

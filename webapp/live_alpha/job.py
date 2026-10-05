@@ -474,7 +474,7 @@ def _board_rows(
     try:
         cfg = live_board.load_board_settings()
         today = session.et_now.date()
-        pace = live_board.flow_pace(engine, tickers, run_id, now, cfg)
+        pace = live_board.flow_pace(engine, tickers, now, cfg)
         moves = live_board.expected_moves(engine, tickers, today, cfg)
         gamma = gamma_source() if gamma_source is not None else {}
         return live_board.build_rows(tickers, flows, prices, pace, moves, gamma, _verdicts(cards), today, cfg)
