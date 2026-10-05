@@ -4,8 +4,9 @@ Per ticker:
 - price and today's move (the cycle's price context);
 - where the option money is betting today (the cycle's flow summary);
 - how busy today's flow is against the ticker's own normal: prints so far today
-  versus the median of prior live sessions up to the SAME time of day (a full past
-  day is never compared with a half day);
+  versus the median of prior ET sessions up to the SAME time of day (a full past
+  day is never compared with a half day; sessions are the prints' ET dates, not
+  run ids, because one live run can span several days);
 - the move the options price in: ATM straddle mid / spot for the first stored
   expiry at least ``move_min_dte`` away (``alfa_atm``), with its quote time;
 - whether implied vol is rich or cheap: IV rank from the gamma snapshot;
@@ -20,7 +21,7 @@ import io
 import statistics
 from collections import defaultdict
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import UTC, date, datetime, time, timedelta
 from typing import TYPE_CHECKING, Any
 from zoneinfo import ZoneInfo
 
@@ -79,34 +80,40 @@ class FlowPace:
 
 
 def flow_pace(
-    engine: Engine, tickers: Sequence[str], today_run: str, now: datetime, cfg: BoardSettings,
+    engine: Engine, tickers: Sequence[str], now: datetime, cfg: BoardSettings,
 ) -> dict[str, FlowPace]:
-    """Prints so far today vs the median of prior live sessions up to the same ET time."""
+    """Prints so far today vs the median of prior ET sessions up to the same ET time.
+
+    A session is the ET date of the print, never the run id: one ``live-*`` run
+    can hold several days (a live worker that stays up across a rollover), so a
+    run id does not mark a session. Both sides of the ratio are cut at the same
+    ET time of day, so a part day is never compared with a full one.
+    """
+    et_now = now.astimezone(_ET)
+    cutoff_time, et_today = et_now.time(), et_now.date()
+    # Calendar days behind the wanted session count, with room for weekends and holidays.
+    lookback = timedelta(days=cfg.flow_history_sessions * 2 + 7)
+    window_start = datetime.combine(et_today - lookback, time.min, tzinfo=_ET).astimezone(UTC)
     stmt = (
-        select(SignalRow.run_id)
-        .where(SignalRow.run_id.like(f"{LIVE_RUN_PREFIX}%"))
-        .group_by(SignalRow.run_id)
-        .order_by(SignalRow.run_id.desc())
-        .limit(cfg.flow_history_sessions + 1)
+        select(SignalRow.ticker, SignalRow.ts)
+        .where(SignalRow.run_id.like(f"{LIVE_RUN_PREFIX}%"), SignalRow.ts >= window_start.replace(tzinfo=None))
     )
     with session_factory(engine)() as s:
-        runs = [r for (r,) in s.execute(stmt)]
-        prior = [r for r in runs if r < today_run][: cfg.flow_history_sessions]
-        wanted = [today_run, *prior]
-        rows = s.execute(
-            select(SignalRow.run_id, SignalRow.ticker, SignalRow.ts).where(SignalRow.run_id.in_(wanted)),
-        ).all()
-    cutoff = now.astimezone(_ET).time()
-    counts: dict[tuple[str, str], int] = defaultdict(int)
-    for run_id, ticker, ts in rows:
-        if run_id != today_run and as_utc(ts).astimezone(_ET).time() > cutoff:
+        rows = s.execute(stmt).all()
+    counts: dict[tuple[date, str], int] = defaultdict(int)
+    sessions: set[date] = set()
+    for ticker, ts in rows:
+        et = as_utc(ts).astimezone(_ET)
+        sessions.add(et.date())
+        if et.time() > cutoff_time:
             continue
-        counts[(run_id, ticker.upper())] += 1
+        counts[(et.date(), ticker.upper())] += 1
+    prior = sorted(d for d in sessions if d < et_today)[-cfg.flow_history_sessions :]
     out: dict[str, FlowPace] = {}
     for t in tickers:
-        history = [counts.get((r, t), 0) for r in prior]
+        history = [counts.get((d, t), 0) for d in prior]
         normal = statistics.median(history) if len(history) >= cfg.flow_min_history else None
-        out[t] = FlowPace(today=counts.get((today_run, t), 0), normal=normal, sessions=len(history))
+        out[t] = FlowPace(today=counts.get((et_today, t), 0), normal=normal, sessions=len(history))
     return out
 
 
