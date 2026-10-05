@@ -19,6 +19,10 @@ _LIVE = Session(
     mode=MarketMode.LIVE, reason="test", et_now=datetime(2026, 10, 5, 10, 13),
     session_date=date(2026, 10, 5), close_et=None, next_session=None,
 )
+_PRE = Session(
+    mode=MarketMode.PREMARKET, reason="premarket", et_now=datetime(2026, 10, 6, 8, 0),
+    session_date=date(2026, 10, 6), close_et=None, next_session=None,
+)
 _CLOSED = Session(
     mode=MarketMode.CLOSED, reason="hafta sonu", et_now=datetime(2026, 10, 4, 10, 0),
     session_date=None, close_et=None, next_session=date(2026, 10, 5),
@@ -39,3 +43,14 @@ def test_warning_names_the_last_print_when_the_flow_is_not_today() -> None:
 def test_closed_market_says_last_session_rather_than_warning() -> None:
     snap = {"flow_current": False, "flow_last_print": datetime(2026, 10, 2, 19, 58, tzinfo=UTC).isoformat()}
     assert _flow_warning(snap, _CLOSED).startswith("Piyasa kapalı")
+
+
+def test_premarket_states_the_fact_rather_than_warning() -> None:
+    """The source only polls inside RTH, so before the open there is never
+    today's flow. Berkay reads this page before the open, so it has to read as
+    a plain statement with the levels still usable, not as an alarm."""
+    snap = {"flow_current": False, "flow_last_print": datetime(2026, 10, 5, 19, 58, tzinfo=UTC).isoformat()}
+    text = _flow_warning(snap, _PRE)
+    assert text.startswith("Piyasa henüz açılmadı")
+    assert "son seansa ait" in text
+    assert "güvenme" not in text

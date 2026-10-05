@@ -257,17 +257,27 @@ def build_view(engine: Engine, now: datetime) -> LiveView:
 
 
 def _flow_warning(snap: dict[str, Any], session_now: Session) -> str:
-    """One line when the flow being shown is not this session's.
+    """One line when the flow on screen is not this session's.
 
-    The per-card version of this warning only reaches a card whose flow already
+    The per-card version of this line only reaches a card whose flow already
     picked a direction, so in the case that produced it — days of flow summed
     into one run, every ticker balanced, no direction anywhere — it stayed
     invisible (live 2026-10-05). The page says it regardless of any card.
+
+    Premarket is not a fault: the flow source only polls inside RTH
+    (``is_market_open``), so before the open the newest flow is always the last
+    session's. That reads as a statement of fact, not a warning.
     """
     if snap.get("flow_current", True):
         return ""
     last = str(snap.get("flow_last_print") or "")
     when = last[:16].replace("T", " ") + " UTC" if last else "bilinmiyor"
+    if session_now.mode is MarketMode.PREMARKET:
+        return (
+            "Piyasa henüz açılmadı. Opsiyon akışı yalnız seans içinde geldiği için aşağıdaki akış "
+            f"son seansa ait (en son işlem {when}); seviyeler ve planlar bugünün fiyatıyla. "
+            "Açılıştan sonraki ilk taramada bugünün akışına geçer."
+        )
     if session_now.session_date is None:
         return f"Piyasa kapalı; gösterilen akış son seansa ait (en son işlem {when})."
     return (
