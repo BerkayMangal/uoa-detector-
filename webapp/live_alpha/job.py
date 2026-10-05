@@ -499,17 +499,30 @@ async def run_cycle(
     status = "ok"
     snapshot: dict[str, Any] = {"session": _session_view(session, now), "policy_version": settings.policy_version,
                                 "profile_sha256": settings.profile_sha256}
-    run = inputs.latest_live_run(engine)
-    if run is None:
-        snapshot.update({"status_text": "akış verisi yok: hiçbir live-* run bulunamadı", "cards": [],
-                         "funnel": {}, "flow_run": None})
-        status = "degraded"
-        row = store.ScanRow(scan_id=scan_id, started_at=now, finished_at=datetime.now(UTC),
-                            market_mode=session.mode.value, status=status, run_id=None, snapshot=snapshot)
-        store.write_scan(engine, row, settings.policy_version)
-        return row
-    run_id, last_print_ts = run
-    prints = inputs.flow_prints(reader, run_id)
+    # The session is an ET date, not a run id: a worker restart opens the day's
+    # run mid-session and leaves that morning in the previous run, so today's
+    # flow is read from every run that carries today (live 2026-10-05). With no
+    # session (weekend, holiday) the newest run stands in, as before, and the
+    # page says the flow is not current.
+    today = session.session_date
+    session_runs = inputs.live_session_runs(engine, today) if today is not None else None
+    if session_runs is not None:
+        run_ids, last_print_ts = session_runs
+        session_date = today
+    else:
+        run = inputs.latest_live_run(engine)
+        if run is None:
+            snapshot.update({"status_text": "akış verisi yok: hiçbir live-* run bulunamadı", "cards": [],
+                             "funnel": {}, "flow_run": None})
+            status = "degraded"
+            row = store.ScanRow(scan_id=scan_id, started_at=now, finished_at=datetime.now(UTC),
+                                market_mode=session.mode.value, status=status, run_id=None, snapshot=snapshot)
+            store.write_scan(engine, row, settings.policy_version)
+            return row
+        newest_run, last_print_ts = run
+        run_ids, session_date = (newest_run,), last_print_ts.astimezone(_ET).date()
+    run_id = run_ids[-1]
+    prints = inputs.flow_prints(reader, run_ids, et_date=session_date)
     tickers = tickers_in(prints)
     flows = {t: summarise(t, run_id, prints, settings.flow) for t in tickers}
     paper_tickers = [p.ticker for p in store.papers(engine, list(PAPER_ACTIVE))]
@@ -518,12 +531,8 @@ async def run_cycle(
         atr_period=board.spot.atr_period, atr_min_sessions=board.spot.atr_min_sessions,
         max_age_seconds=settings.price.spot_max_age_seconds,
     )
-    today = session.session_date
-    flow_current = (
-        today is not None
-        and run_id == f"{inputs.LIVE_RUN_PREFIX}{today.isoformat()}"
-        and last_print_ts.astimezone(_ET).date() == today
-    )
+    # Current means today's session is the one being read, whatever run holds it.
+    flow_current = today is not None and session_date == today
     expiries = inputs.listed_expiries(engine, tickers)
 
     news: dict[str, NewsCheck] = {}

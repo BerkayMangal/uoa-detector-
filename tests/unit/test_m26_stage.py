@@ -401,7 +401,7 @@ async def test_no_qualifying_does_not_set_dp_confirmation_flag() -> None:
 
 @pytest.mark.asyncio
 async def test_delay_warning_fires_when_print_too_old() -> None:
-    """Largest qualifying print > 5 min before event → warning telemetry."""
+    """Newest qualifying print > 5 min before event → warning telemetry."""
     # Event at 15:30, print at 15:20 (10 min delay; > 5 min default)
     old_print = _print(
         price=150.0, size=50_000, side="at_or_below_bid",
@@ -474,3 +474,28 @@ async def test_telemetry_round_trips_via_orchestrator() -> None:
     assert entry.metadata["qualifying_print_count"] == "1"
     assert entry.metadata["largest_notional_usd"] == "20000000"  # $20M
     assert entry.metadata["largest_side_estimate"] == "at_or_below_bid"
+
+
+@pytest.mark.asyncio
+async def test_delay_warning_follows_the_newest_print_not_the_largest() -> None:
+    """Phase 5.25.11: an old big print beside a fresh one is not a feed delay.
+
+    Live 2026-10-05 the warning fired on nearly every event ("largest
+    qualifying DP print for MSFT is 56.4 minutes old") because it measured the
+    LARGEST print in a 60-minute lookback, which is old almost by definition.
+    The documented decision measures the LATEST qualifying print.
+    """
+    prints = (
+        _print(price=200.0, size=100_000, side="at_or_below_bid",
+               when=datetime(2024, 1, 15, 14, 40, tzinfo=UTC)),   # biggest, 50 min old
+        _print(price=150.0, size=50_000, side="at_or_below_bid",
+               when=datetime(2024, 1, 15, 15, 28, tzinfo=UTC)),   # newest, 2 min old
+    )
+    stage = DarkPoolStage(provider=_StubProvider(prints=prints))
+    event = _make_event(timestamp=datetime(2024, 1, 15, 15, 30, tzinfo=UTC))
+    await stage.enrich(event, PipelineContext(profile=load_default_profile()))
+    assert stage.last_execution_metadata is not None
+    assert stage.last_execution_metadata["delay_warning_fired"] == "no"
+    # Scoring still uses the largest print, untouched by this fix.
+    assert stage.last_execution_metadata["largest_notional_usd"] == "20000000"
+    assert event.has_dark_pool_confirmation is True

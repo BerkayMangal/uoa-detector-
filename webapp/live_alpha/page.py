@@ -25,6 +25,8 @@ from webapp.live_alpha.inputs import as_utc
 if TYPE_CHECKING:
     from sqlalchemy.engine import Engine
 
+    from uoa_detector.live_alpha.calendar import Session
+
 _TR = ZoneInfo("Europe/Istanbul")
 _ET = ZoneInfo("America/New_York")
 _ready_lock = threading.Lock()
@@ -109,6 +111,7 @@ class LiveView:
     policy_version: str = ""
     board: list[dict[str, Any]] = field(default_factory=list)
     open_tr: str = ""
+    flow_warning: str = ""
 
 
 def _tone(rec: str, readiness: str) -> str:
@@ -248,7 +251,38 @@ def build_view(engine: Engine, now: datetime) -> LiveView:
         manuals=manual_rows, beats=beats, spot_age=snap.get("spot_age_seconds", {}),
         news_failed=snap.get("news_failed", []), policy_version=snap.get("policy_version", cfg.policy_version),
         open_tr=open_tr,
+        flow_warning=_flow_warning(snap, session_now),
         board=_board_view(snap.get("board", []), entries_withdrawn=stale or session_now.mode is not MarketMode.LIVE),
+    )
+
+
+def _flow_warning(snap: dict[str, Any], session_now: Session) -> str:
+    """One line when the flow on screen is not this session's.
+
+    The per-card version of this line only reaches a card whose flow already
+    picked a direction, so in the case that produced it — days of flow summed
+    into one run, every ticker balanced, no direction anywhere — it stayed
+    invisible (live 2026-10-05). The page says it regardless of any card.
+
+    Premarket is not a fault: the flow source only polls inside RTH
+    (``is_market_open``), so before the open the newest flow is always the last
+    session's. That reads as a statement of fact, not a warning.
+    """
+    if snap.get("flow_current", True):
+        return ""
+    last = str(snap.get("flow_last_print") or "")
+    when = last[:16].replace("T", " ") + " UTC" if last else "bilinmiyor"
+    if session_now.mode is MarketMode.PREMARKET:
+        return (
+            "Piyasa henüz açılmadı. Opsiyon akışı yalnız seans içinde geldiği için aşağıdaki akış "
+            f"son seansa ait (en son işlem {when}); seviyeler ve planlar bugünün fiyatıyla. "
+            "Açılıştan sonraki ilk taramada bugünün akışına geçer."
+        )
+    if session_now.session_date is None:
+        return f"Piyasa kapalı; gösterilen akış son seansa ait (en son işlem {when})."
+    return (
+        "Dikkat: gösterilen opsiyon akışı bugünkü seansa ait değil "
+        f"(en son işlem {when}). Bugünün akışı gelene kadar bu sayfadaki yön okumalarına güvenme."
     )
 
 
