@@ -118,40 +118,57 @@ class BoardSignalReader:
 
     def load_run(self, run_id: str) -> list[BoardPrint]:
         """Every parseable print of ``run_id``, oldest first."""
+        return self.load_runs((run_id,))
+
+    def load_runs(self, run_ids: Sequence[str]) -> list[BoardPrint]:
+        """Every parseable print of ``run_ids``, each run oldest first.
+
+        One ET session normally lives in one run, but it can span two when a
+        worker restart opens the day's run mid-session, so a caller reading a
+        session asks for every run that holds it. The caches of all the runs
+        asked for here are kept; anything else is evicted.
+        """
+        wanted = tuple(dict.fromkeys(run_ids))
+        out: list[BoardPrint] = []
         with self._lock:
             if not self._tables_ready:
                 ensure_telemetry_tables(self._engine)
                 self._tables_ready = True
-            cache = self._runs.setdefault(run_id, _RunCache())
-            self._evict(keep=run_id)
+            for run_id in wanted:
+                self._runs.setdefault(run_id, _RunCache())
+            self._evict(keep=wanted)
             with self._sessions() as session:
-                keys: Sequence[str] = session.execute(
-                    select(SignalRow.event_id)
-                    .where(SignalRow.run_id == run_id)
-                    .order_by(SignalRow.ts, SignalRow.event_id),
-                ).scalars().all()
-                self._parse_new_rows(session, run_id, cache, keys)
-                self._join_new_meta(session, run_id, cache, keys)
-            return [
-                BoardPrint(
-                    run_id=run_id,
-                    event_id=key,
-                    signal=cache.signals[key],
-                    meta=cache.meta.get(key),
-                )
-                for key in keys
-                if key in cache.signals
-            ]
+                for run_id in wanted:
+                    cache = self._runs[run_id]
+                    keys: Sequence[str] = session.execute(
+                        select(SignalRow.event_id)
+                        .where(SignalRow.run_id == run_id)
+                        .order_by(SignalRow.ts, SignalRow.event_id),
+                    ).scalars().all()
+                    self._parse_new_rows(session, run_id, cache, keys)
+                    self._join_new_meta(session, run_id, cache, keys)
+                    out.extend(
+                        BoardPrint(
+                            run_id=run_id,
+                            event_id=key,
+                            signal=cache.signals[key],
+                            meta=cache.meta.get(key),
+                        )
+                        for key in keys
+                        if key in cache.signals
+                    )
+        return out
 
     def close(self) -> None:
         if self._owns_engine:
             self._engine.dispose()
 
-    def _evict(self, *, keep: str) -> None:
+    def _evict(self, *, keep: Sequence[str]) -> None:
         live_runs = [rid for rid in self._runs if rid.startswith(_LIVE_PREFIX)]
         newest_live = max(live_runs) if live_runs else None
+        kept = {*keep, newest_live}
         for rid in list(self._runs):
-            if rid not in (keep, newest_live):
+            if rid not in kept:
                 del self._runs[rid]
 
     def _parse_new_rows(

@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import dataclass
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, time, timedelta
 from typing import TYPE_CHECKING
 from zoneinfo import ZoneInfo
 
@@ -55,14 +55,48 @@ def latest_live_run(engine: Engine) -> tuple[str, datetime] | None:
     return run_id, ts
 
 
-def flow_prints(reader: BoardSignalReader, run_id: str) -> list[FlowPrint]:
+def live_session_runs(engine: Engine, et_date: date) -> tuple[tuple[str, ...], datetime] | None:
+    """The ``live-*`` runs holding prints on ``et_date`` (ET), with the newest print's time.
+
+    A session is an ET date, not a run id. One run normally holds exactly one
+    session, but a restart opens the day's run mid-session and leaves that
+    morning in the previous run, so the session is read from every run that
+    carries it. Runs come back oldest first; the last one owns the session's
+    identity (cards, scan rows).
+    """
+    start = datetime.combine(et_date, time.min, tzinfo=_ET).astimezone(UTC)
+    end = start + timedelta(days=1)
+    stmt = (
+        select(SignalRow.run_id, func.max(SignalRow.ts))
+        .where(
+            SignalRow.run_id.like(f"{LIVE_RUN_PREFIX}%"),
+            SignalRow.ts >= start.replace(tzinfo=None),
+            SignalRow.ts < end.replace(tzinfo=None),
+        )
+        .group_by(SignalRow.run_id)
+    )
+    with session_factory(engine)() as s:
+        rows = [(run_id, as_utc(ts)) for run_id, ts in s.execute(stmt) if isinstance(ts, datetime)]
+    if not rows:
+        return None
+    return tuple(sorted(r for r, _ in rows)), max(ts for _, ts in rows)
+
+
+def flow_prints(
+    reader: BoardSignalReader, run_id: str | Sequence[str], *, et_date: date | None = None,
+) -> list[FlowPrint]:
+    """Prints of one run, or of every run of a session when ``et_date`` is given."""
+    run_ids = (run_id,) if isinstance(run_id, str) else tuple(run_id)
     out: list[FlowPrint] = []
-    for bp in reader.load_run(run_id):
+    for bp in reader.load_runs(run_ids):
         sig = bp.signal
+        ts = as_utc(sig.timestamp)
+        if et_date is not None and ts.astimezone(_ET).date() != et_date:
+            continue
         out.append(FlowPrint(
             event_id=bp.event_id,
             ticker=sig.ticker.upper(),
-            ts=as_utc(sig.timestamp),
+            ts=ts,
             option_type=str(sig.option_type),
             strike=sig.strike,
             expiry=sig.expiry,
@@ -70,6 +104,9 @@ def flow_prints(reader: BoardSignalReader, run_id: str) -> list[FlowPrint]:
             fill_side=bp.meta.fill_side if bp.meta is not None else None,
             option_chain=bp.meta.option_chain if bp.meta is not None else None,
         ))
+    # Runs are read one after another, so a session spanning two runs would come
+    # back in run order. Every consumer (dedupe, first_ts/last_ts) reads a tape.
+    out.sort(key=lambda p: (p.ts, p.event_id))
     return out
 
 
