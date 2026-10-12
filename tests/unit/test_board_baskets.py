@@ -254,6 +254,26 @@ def test_a_flat_basket_shows_no_residual() -> None:
     assert all(lag.residual_pct is None for lag in lags.values())
 
 
+def test_a_laggard_cannot_hide_behind_its_own_fall_in_the_group_mean() -> None:
+    """Phase 5.27.2: the flat test is on a name's peers (self excluded), not on the whole group.
+
+    Three names up 4 % and one down 5 % average +1.75 % as a group, under the 2.0 gate, which
+    used to blank the biggest gap on the board. The laggard's peers moved +4 %, so it is measured;
+    a name up 4 % whose own peers average +1.0 % (the laggard drags them) stays flat.
+    """
+    cfg = _cfg(min_basket_move_pct=2.0)
+    closes = {
+        "AAA": _series(_flat_then(104.0)),
+        "BBB": _series(_flat_then(104.0)),
+        "CCC": _series(_flat_then(104.0)),
+        "DDD": _series(_flat_then(95.0)),
+    }
+    lags = basket_lags(cfg.baskets[0], closes, cfg)
+    assert lags["DDD"].state == "measured" and lags["DDD"].lagging is True
+    assert lags["DDD"].residual_pct == pytest.approx(-9.0)
+    assert lags["AAA"].state == "flat_basket" and lags["AAA"].residual_pct is None
+
+
 def test_a_basket_that_fell_is_not_flat() -> None:
     cfg = _cfg(min_basket_move_pct=2.0)
     closes = {

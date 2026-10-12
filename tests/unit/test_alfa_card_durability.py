@@ -97,6 +97,8 @@ _APPEND_ONLY_TABLES: Final = {
     "alfa_live_event",           # every state change, with actor and policy version
     "alfa_live_manual",          # the owner's own fills
     "alfa_live_heartbeat",       # proof the live job ran
+    # Phase 5.27: what the board measured, kept so it can be scored forward.
+    "alfa_lag_record",           # one measured reading per name and ET date, written once
 }
 
 # Rebuildable: refreshed market data or fetch bookkeeping. A row lost here is
@@ -115,6 +117,7 @@ _REBUILDABLE_TABLES: Final = {
     "alfa_etf_holding",     # rebuilt per snapshot
     "alfa_job_run",         # records what ran, not what was observed
     "alfa_uw_quota",        # a request counter; the vendor's own count re-seeds it
+    "alfa_hot_flow",        # Phase 5.27: the market-wide feed's maximum per session; the next reads rebuild it
 }
 
 # The subset carried as model classes, for the identity checks below.

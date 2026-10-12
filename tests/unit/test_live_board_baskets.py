@@ -197,7 +197,7 @@ def test_the_page_shows_the_column_when_a_row_has_a_reading(
     from fastapi.testclient import TestClient
 
     body = TestClient(app_with_scan.app, headers=set_web_auth(monkeypatch)).get("/").text
-    assert "<th class=\"pr-3\">Sepete göre</th>" in body
+    assert "<th class=\"pr-3\">Akranlara göre</th>" in body
     row = body.split('data-board-row="NVDA"', 1)[1].split("</tr>", 1)[0]
     assert "data-basket" in row and "geride: sepete göre %-10.0" in row
 
@@ -209,7 +209,7 @@ def test_the_page_omits_the_column_when_no_row_has_a_reading(
 
     body = TestClient(app_with_scan.app, headers=set_web_auth(monkeypatch)).get("/").text
     assert 'data-board-row="NVDA"' in body  # the board is there
-    assert "Sepete göre" not in body and "data-basket" not in body
+    assert "Akranlara göre" not in body and "data-basket" not in body
 
 
 # ---------------------------------------------------------------------------

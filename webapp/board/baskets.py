@@ -153,12 +153,13 @@ class BasketLag:
     """One ticker's measured position inside its basket over two shared sessions.
 
     ``residual_pct`` is None exactly when ``state`` is not ``"measured"``; the
-    state says which of the contract's §3.4 branches answered.
+    state says which of the contract's §3.4 branches answered. ``no_peers`` is the
+    automatic-peer state for a ticker with too few similar names (5.27 §3.1).
     """
 
     basket_id: str
     basket_name: str
-    state: str  # measured | thin_data | flat_basket
+    state: str  # measured | thin_data | flat_basket | no_peers
     start: date | None
     end: date | None
     window_sessions: int  # sessions actually spanned by the two anchors
@@ -170,6 +171,8 @@ class BasketLag:
     rank: int | None = None  # 1 = strongest priced member of the basket
     lagging: bool = False
     leading: bool = False
+    source: str = "hand"  # hand = a basket from the profile, auto = correlation peers (Phase 5.27)
+    peers: tuple[str, ...] = ()  # the peers an automatic reading was measured against
 
 
 def anchor_dates(
@@ -249,10 +252,6 @@ def basket_lags(
     if priced < cfg.min_members_with_data:
         return {member: shell("thin_data") for member in basket.members}
 
-    basket_mean = sum(returns.values()) / priced
-    if abs(basket_mean) < cfg.min_basket_move_pct:
-        return {**out, **{member: shell("flat_basket") for member in returns}}
-
     # 1 = strongest. Ties share the better rank, and the tie is broken by ticker
     # so the column is stable between renders rather than following dict order.
     ordered = sorted(returns.items(), key=lambda item: (-item[1], item[0]))
@@ -261,6 +260,12 @@ def basket_lags(
     total_return = sum(returns.values())
     for member, own in returns.items():
         peers = (total_return - own) / (priced - 1)
+        # A name cannot lag peers that did not move (contract 5.26 §3.4). The test is on the
+        # peers, self excluded: judging the whole group lets the laggard's own fall drag the
+        # mean under the cutoff and hide the biggest gaps (fixed in 5.27.2).
+        if abs(peers) < cfg.min_basket_move_pct:
+            out[member] = shell("flat_basket")
+            continue
         residual = own - peers
         out[member] = BasketLag(
             basket_id=basket.id, basket_name=basket.name, state="measured",

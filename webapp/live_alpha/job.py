@@ -17,7 +17,7 @@ import hashlib
 import json
 import logging
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from time import perf_counter
 from typing import TYPE_CHECKING, Any
@@ -51,6 +51,9 @@ from uoa_detector.options_alpha.settings import OptionsAlphaSettings
 from uoa_detector.options_alpha.settings import load_settings as load_options_settings
 from webapp.board.baskets import lags_by_ticker, load_basket_settings
 from webapp.board.daily_close import load_bars_by_ticker, load_closes_by_ticker
+from webapp.board.hotlist import load_hot_tickers, load_hotlist_settings
+from webapp.board.lag_record import append_records, records_from
+from webapp.board.peers import auto_lags, load_peer_settings, load_universe_closes
 from webapp.board.settings import BoardSettings
 from webapp.live_alpha import board as live_board
 from webapp.live_alpha import inputs, store, uw
@@ -66,6 +69,8 @@ if TYPE_CHECKING:
 
 _logger = logging.getLogger(__name__)
 _ET = ZoneInfo("America/New_York")
+# Calendar days of stored closes the automatic peers read: 60 sessions plus the anchor window, with room for holidays.
+_PEER_LOOKBACK_DAYS = 150
 
 PAPER_ACTIVE = (Tracking.PAPER_PENDING.value, Tracking.PAPER_OPEN.value, Tracking.EXIT_SIGNALLED.value)
 
@@ -467,21 +472,64 @@ def _verdicts(cards: Sequence[Card]) -> dict[str, tuple[str, str, str]]:
     return out
 
 
-def _basket_lags(engine: Engine) -> dict[str, BasketLag]:
-    """Every basket member's lag, from stored closes. A failure leaves the column out only.
+def _hot_names(engine: Engine, today: date) -> tuple[str, ...]:
+    """The names the hot list is following, for the "sıcak liste" tag. Never raises (5.27 §5)."""
+    try:
+        return load_hot_tickers(engine, today, load_hotlist_settings())
+    except Exception:
+        _logger.warning("hot list unavailable; no row is tagged", exc_info=True)
+        return ()
 
-    Isolated from ``_board_rows`` on purpose: a hand-edited basket file or a missing
-    close table must cost the board one column, never the rows around it (contract §5).
+
+def _hand_basket_members() -> tuple[str, ...]:
+    """Every hand-basket member, or ``()`` when the profile cannot be read (§3.6)."""
+    try:
+        return load_basket_settings().members()
+    except Exception:
+        _logger.warning("basket profile unreadable; no basket rows are added", exc_info=True)
+        return ()
+
+
+def _basket_lags(engine: Engine, tickers: Sequence[str], now: datetime) -> dict[str, BasketLag]:
+    """Each row's measured gap: a hand basket where one exists, automatic peers otherwise.
+
+    Two guarded layers, so a failure costs the column only its own part: an unreadable
+    basket file leaves the hand readings out and also the automatic ones (they borrow its
+    cutoffs); an unreadable peers profile or closes table leaves the automatic ones out.
+    Never raises (contract 5.26 §5, 5.27 §5).
     """
+    out: dict[str, BasketLag] = {}
     try:
         cfg = load_basket_settings()
-        if not cfg.baskets:
-            return {}
-        closes = load_closes_by_ticker(engine, cfg.members())
-        return lags_by_ticker(closes, cfg)
+        if cfg.baskets:
+            out = lags_by_ticker(load_closes_by_ticker(engine, cfg.members()), cfg)
     except Exception:
         _logger.warning("basket lags unavailable; the board is shown without that column", exc_info=True)
         return {}
+    try:
+        # A hand-basket name the closes cannot place yet stays blank: it is not "without peers", its peers are written down.
+        rest = [t for t in tickers if t not in out and cfg.basket_of(t) is None]
+        if rest:
+            closes = load_universe_closes(engine, since=now.date() - timedelta(days=_PEER_LOOKBACK_DAYS))
+            out = {**auto_lags(rest, closes, load_peer_settings(), cfg), **out}
+    except Exception:
+        _logger.warning("automatic peers unavailable; rows without a basket carry no reading", exc_info=True)
+    return out
+
+
+def _record_lags(engine: Engine, today: date, lags: dict[str, BasketLag], now: datetime) -> None:
+    """Keep this cycle's measured readings in ``alfa_lag_record`` (5.27 §3.7). Never raises.
+
+    The record is for scoring later and nothing on the page reads it, so a failure here costs
+    only the record.
+    """
+    try:
+        if not lags:
+            return
+        version = f"{load_basket_settings().basket_version}+{load_peer_settings().peers_version}"
+        append_records(engine, records_from(today, lags, load_basket_settings(), version), now=now)
+    except Exception:
+        _logger.warning("lag record not written", exc_info=True)
 
 
 def _board_rows(
@@ -493,12 +541,17 @@ def _board_rows(
     try:
         cfg = live_board.load_board_settings()
         today = session.et_now.date()
-        pace = live_board.flow_pace(engine, tickers, now, cfg)
-        moves = live_board.expected_moves(engine, tickers, today, cfg)
+        # Hand-basket names get a row even with no print in the shown session (5.27 §3.6):
+        # their flow cells read "no activity" and the lag cell is the reason they are here.
+        rows_for = [*tickers, *(m for m in _hand_basket_members() if m not in tickers)]
+        pace = live_board.flow_pace(engine, rows_for, now, cfg)
+        moves = live_board.expected_moves(engine, rows_for, today, cfg)
         gamma = gamma_source() if gamma_source is not None else {}
+        lags = _basket_lags(engine, rows_for, now)
+        _record_lags(engine, today, lags, now)
         return live_board.build_rows(
-            tickers, flows, prices, pace, moves, gamma, _verdicts(cards), today, cfg,
-            basket=_basket_lags(engine),
+            rows_for, flows, prices, pace, moves, gamma, _verdicts(cards), today, cfg,
+            basket=lags, hot=_hot_names(engine, today),
         )
     except Exception:
         _logger.exception("live alpha board rows failed; the cards are unaffected")

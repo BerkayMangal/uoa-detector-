@@ -122,6 +122,13 @@ from webapp.board.evidence import (
     request_for,
     trade_date_et,
 )
+from webapp.board.hotlist import (
+    HotlistSettings,
+    ensure_hotlist_tables,
+    hot_close_tickers,
+    hot_daily_jobs,
+    refresh_hot_flow,
+)
 from webapp.board.netprem import TapeFetch, ensure_netprem_tables, fetch_net_prem_ticks, upsert_tape
 from webapp.board.oi_confirm import board_state, ensure_oi_confirm_tables, read_board_oi
 from webapp.board.outcomes import ensure_outcome_tables
@@ -917,12 +924,17 @@ async def board_refresh_loop(
     clock: Callable[[], datetime] | None = None,
     sleep: Callable[[float], Awaitable[None]] | None = None,
     close_extra: Callable[[], Sequence[str]] | None = None,
+    hot_flow: HotlistSettings | None = None,
 ) -> None:
     """Refresh quotes, depth, ATM, the tape and ticker info until cancelled. Runs under ``_supervise``.
 
     ``close_extra`` (Phase 5.26) returns tickers that need a daily close and no other job; it is
     read on every tick. ``None`` keeps the loop exactly as it was before baskets existed, and
     ``webapp.main`` is what supplies the basket members.
+
+    ``hot_flow`` (Phase 5.27) switches the hot list on: the pre-open read and the close catch-up
+    join the daily jobs, every market-hours tick reads the market-wide feed once, and the names it
+    has seen get daily closes. ``None`` leaves all of that off.
     """
     profile = load_profile(profile_path)
     settings = load_board_settings(board_profile_path)
@@ -964,6 +976,10 @@ async def board_refresh_loop(
         )
         soft_cap = SoftCap(refresh.daily_request_soft_cap)
         jobs = build_registry(settings)
+        if hot_flow is not None:
+            ensure_hotlist_tables(engine)
+            # In front, so the outcome job stays the last entry of the registry.
+            jobs = (*hot_daily_jobs(hot_flow), *jobs)
         _logger.info(
             "board refresher started (cadence %ss, %d daily jobs)",
             refresh.cadence_seconds, len(jobs),
@@ -984,7 +1000,10 @@ async def board_refresh_loop(
                     client, engine, settings,
                     jobs=jobs, reader=reader, journal=journal, now=now,
                     cap=DailyJobCap(soft_cap, client, now_fn),
-                    close_extra=close_extra() if close_extra is not None else (),
+                    close_extra=(
+                        *(close_extra() if close_extra is not None else ()),
+                        *(hot_close_tickers(engine, now, hot_flow) if hot_flow is not None else ()),
+                    ),
                 )
                 soft_cap.observe(client.last_daily_request_count, now_fn())
                 if open_now:
@@ -993,6 +1012,8 @@ async def board_refresh_loop(
                         reader=reader, journal=journal, soft_cap=soft_cap, clock=now_fn,
                         legacy_scores=legacy_scores,
                     )
+                    if hot_flow is not None:
+                        await refresh_hot_flow(client, engine, hot_flow, now=now_fn())
             except UnusualWhalesDailyLimitError:
                 _logger.warning(
                     "board refresher: UW daily request limit reached; backing off %ss",

@@ -56,7 +56,12 @@ def test_lifespan_starts_the_board_refresher_with_the_live_database(
             client.portal.call(asyncio.sleep, 0.01)  # type: ignore[union-attr]
 
     # Phase 5.26: the loop also receives the basket-member provider, so basket names get a daily close.
-    assert started == [{"database_url": "sqlite:///live.db", "close_extra": m.basket_close_tickers}]
+    # Phase 5.27: and the hot-list profile, which switches the market-wide hot list on.
+    assert started == [{
+        "database_url": "sqlite:///live.db",
+        "close_extra": m.basket_close_tickers,
+        "hot_flow": m.load_hotlist_settings(),
+    }]
 
 
 def test_lifespan_does_not_start_the_board_refresher_without_live_config(

@@ -46,6 +46,8 @@ from webapp.board import alfa_page, cards, copy_tr, decision_ledger, fills, opti
 from webapp.board.baskets import basket_close_tickers, load_basket_settings
 from webapp.board.copy_tr import IV_NOT_SELL_VOL
 from webapp.board.evidence import request_for
+from webapp.board.hotlist import load_hotlist_settings
+from webapp.board.peers import load_peer_settings
 from webapp.board.refresher import board_refresh_loop
 from webapp.board.settings import BoardSettings, load_board_settings
 from webapp.board.signals import BoardSignalReader
@@ -127,11 +129,12 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
     # Opt-in live tasks: only start when LIVE_TICKERS (+ UW key + DB) is set.
     # Otherwise the app just serves stored signals (local dev, sample data).
     config = live_config_from_env()
+    hotlist = load_hotlist_settings()  # Phase 5.27: already validated by _load_board_profiles
     tasks: list[asyncio.Task[None]] = []
     if config is not None:
         _logger.info("starting live worker + gamma refresh for %s", config["tickers"])
         tasks.append(asyncio.create_task(_supervise(
-            lambda: run_live_worker(**config), "live-worker",  # type: ignore[arg-type]
+            lambda: run_live_worker(**config, hotlist=hotlist), "live-worker",  # type: ignore[arg-type]
         )))
         tasks.append(asyncio.create_task(_supervise(
             lambda: gamma_refresh_loop(
@@ -146,6 +149,7 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
             lambda: board_refresh_loop(
                 database_url=config["database_url"],  # type: ignore[arg-type]
                 close_extra=basket_close_tickers,  # Phase 5.26: basket members get a daily close
+                hot_flow=hotlist,  # Phase 5.27: the market-wide hot list and its close universe
             ),
             "board-refresh",
         )))
@@ -657,6 +661,8 @@ def _load_board_profiles() -> None:
     global _BOARD_SETTINGS, _SPREAD_CUTOFF_PCT, _LEGACY_SCORES
     live_page.settings()  # Phase 5.25: the live policy profile fails startup, not the first page
     load_basket_settings()  # Phase 5.26: a malformed basket file fails startup too
+    load_peer_settings()  # Phase 5.27: so do the peers and the hot-list profiles
+    load_hotlist_settings()
     settings = load_board_settings()
     cutoff = alfa_page.load_spread_cutoff_pct()
     legacy = alfa_page.load_live_legacy_scores()

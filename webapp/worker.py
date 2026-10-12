@@ -25,6 +25,8 @@ from collections.abc import Awaitable, Callable
 from datetime import UTC, date, datetime
 from decimal import Decimal
 from pathlib import Path
+from typing import TYPE_CHECKING
+from zoneinfo import ZoneInfo
 
 from uoa_detector.backtest.sqlite_store import SqliteBacktestStore
 from uoa_detector.calibration import load_profile
@@ -34,7 +36,12 @@ from uoa_detector.pipeline.stage import PipelineContext
 from uoa_detector.pipeline.stages import build_live_stage_pipeline
 from uoa_detector.sources.unusual_whales.client import UnusualWhalesClient
 from uoa_detector.sources.unusual_whales.flow_poll import UnusualWhalesFlowPollSource
+from webapp.board.db import make_engine
+from webapp.board.hotlist import HotlistSettings, ensure_hotlist_tables, load_hot_tickers
 from webapp.board.telemetry import AlfaTelemetryWriter
+
+if TYPE_CHECKING:
+    from sqlalchemy.engine import Engine
 
 _logger = logging.getLogger(__name__)
 
@@ -122,6 +129,31 @@ async def _close_at_utc_rollover(
     await source.close()
 
 
+_ET = ZoneInfo("America/New_York")
+
+
+def _poll_list(base: list[str], engine: Engine, hotlist: HotlistSettings) -> Callable[[], list[str]]:
+    """``LIVE_TICKERS`` plus the hot names, read on every poll pass (§3.3).
+
+    A read failure leaves the pass on ``LIVE_TICKERS`` alone: the hot list is an addition,
+    never a dependency of live ingestion.
+    """
+    warned = False
+
+    def provider() -> list[str]:
+        nonlocal warned
+        try:
+            hot = load_hot_tickers(engine, datetime.now(_ET).date(), hotlist)
+        except Exception:
+            if not warned:
+                _logger.warning("hot list unreadable; polling LIVE_TICKERS only", exc_info=True)
+                warned = True
+            hot = ()
+        return [*base, *(t for t in hot if t not in base)]
+
+    return provider
+
+
 async def run_live_worker(
     *,
     tickers: list[str],
@@ -129,6 +161,7 @@ async def run_live_worker(
     poll_interval_s: float = 60.0,
     min_premium: Decimal = Decimal(25000),
     profile_path: Path = _DEFAULT_PROFILE,
+    hotlist: HotlistSettings | None = None,
 ) -> None:
     """Run the live poll→pipeline→Postgres loop until cancelled.
 
@@ -138,6 +171,17 @@ async def run_live_worker(
     profile = load_profile(profile_path)
     store = _open_live_store(database_url)
     _logger.info("live worker started: tickers=%s", tickers)
+    # Phase 5.27: with a hot-list profile the poll follows LIVE_TICKERS plus the names the
+    # market-wide feed says are active. None keeps the fixed list, exactly as before.
+    poll_tickers: Callable[[], list[str]] | None = None
+    hot_engine: Engine | None = None
+    if hotlist is not None:
+        hot_engine = make_engine(database_url)
+        try:
+            ensure_hotlist_tables(hot_engine)
+        except Exception:
+            _logger.warning("hot list table unavailable; polling LIVE_TICKERS only", exc_info=True)
+        poll_tickers = _poll_list(tickers, hot_engine, hotlist)
 
     def _ensure_run() -> str:
         # One run per UTC day. ``pipeline.run()`` drains an endless stream and
@@ -174,7 +218,7 @@ async def run_live_worker(
                     settings=profile.data_sources.unusual_whales,
                 )
                 source = UnusualWhalesFlowPollSource(
-                    client, tickers,
+                    client, poll_tickers if poll_tickers is not None else tickers,
                     poll_interval_s=poll_interval_s, min_premium=min_premium,
                 )
                 # Live UW enrichment (Phase 5.0.5): the screener's stages and
@@ -234,3 +278,6 @@ async def run_live_worker(
     finally:
         with contextlib.suppress(Exception):
             store.close()
+        if hot_engine is not None:
+            with contextlib.suppress(Exception):
+                hot_engine.dispose()

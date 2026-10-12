@@ -68,7 +68,7 @@ class UnusualWhalesFlowPollSource:
     def __init__(
         self,
         client: UnusualWhalesClient,
-        tickers: Iterable[str],
+        tickers: Iterable[str] | Callable[[], Iterable[str]],
         *,
         poll_interval_s: float = 15.0,
         min_premium: Decimal = Decimal(0),
@@ -81,7 +81,16 @@ class UnusualWhalesFlowPollSource:
     ) -> None:
         self.source_id = source_id
         self._client = client
-        self._tickers = [t.upper() for t in tickers]
+        # A callable is read on every pass, so a list that grows while the source runs (the
+        # hot list of Phase 5.27) is followed without restarting the stream. A plain iterable
+        # is fixed at construction, exactly as before.
+        if callable(tickers):
+            self._tickers_fn: Callable[[], Iterable[str]] = tickers
+        else:
+            fixed = [t.upper() for t in tickers]
+            self._tickers_fn = lambda: fixed
+        self._last_tickers: list[str] = []
+        self._polled: set[str] = set()
         self._poll_interval_s = poll_interval_s
         self._min_premium = min_premium
         self._backfill = backfill
@@ -108,13 +117,21 @@ class UnusualWhalesFlowPollSource:
             if not is_market_open(self._now()):
                 await self._sleep(self._closed_market_sleep_s)
                 continue
-            for ticker in self._tickers:
+            for ticker in self._current_tickers():
                 if self._closed:
                     break
+                # The backfill window applies to a ticker's FIRST poll only. Boot-time names
+                # share the boot cutoff; a name that joins later gets the same window measured
+                # from its own first poll, so adding it never floods the run with old alerts.
+                first_for_ticker = ticker not in self._polled
+                ticker_cutoff = (
+                    (cutoff if first_pass else self._now() - self._backfill) if first_for_ticker else None
+                )
                 for record in await self._fetch(ticker):
-                    print_ = self._to_raw_print(ticker, record, cutoff if first_pass else None)
+                    print_ = self._to_raw_print(ticker, record, ticker_cutoff)
                     if print_ is not None:
                         yield print_
+                self._polled.add(ticker)
             first_pass = False
             if len(self._seen) > _SEEN_CAP:
                 self._seen.clear()
@@ -126,6 +143,16 @@ class UnusualWhalesFlowPollSource:
                 await self._sleep(self._daily_limit_backoff_s)
                 continue
             await self._sleep(self._poll_interval_s)
+
+    def _current_tickers(self) -> list[str]:
+        """This pass's tickers: upper-cased, de-duplicated; the last good list if the provider fails."""
+        try:
+            fresh = list(dict.fromkeys(t.strip().upper() for t in self._tickers_fn() if t.strip()))
+        except Exception:
+            _logger.warning("flow poll ticker provider failed; polling the previous list", exc_info=True)
+            return self._last_tickers
+        self._last_tickers = fresh
+        return fresh
 
     async def close(self) -> None:
         self._closed = True

@@ -80,18 +80,18 @@
   {% if v.board %}
   {% set show_basket = (v.board | selectattr('basket') | list | length) > 0 %}
   <h3 class="text-lg font-semibold text-white mt-6 mb-1">Hisse panosu</h3>
-  <p class="text-xs text-gray-500 mb-2">Ölçülmüş bilgi, tahmin değil. "Opsiyonların fiyatladığı hareket": o vadeye kadar piyasanın beklediği ortalama oynaklık (ATM straddle / fiyat). "Akış": bugün bu saate kadarki işlem sayısı, hissenin son seanslardaki aynı saat ortalamasına göre.{% if show_basket %} "Sepete göre": hissenin getirisi eksi elle yazılmış sepetindeki diğer hisselerin ortalama getirisi, aynı iki kapanış arasında. Ölçüm, tahmin değil.{% endif %}</p>
+  <p class="text-xs text-gray-500 mb-2">Ölçülmüş bilgi, tahmin değil. "Opsiyonların fiyatladığı hareket": o vadeye kadar piyasanın beklediği ortalama oynaklık (ATM straddle / fiyat). "Akış": bugün bu saate kadarki işlem sayısı, hissenin son seanslardaki aynı saat ortalamasına göre.{% if show_basket %} "Akranlara göre": hissenin getirisi eksi akranlarının ortalama getirisi, aynı iki kapanış arasında. Akranlar: elle yazılmış bir sepet varsa o, yoksa son 60 seansta bu hisseyle en çok birlikte hareket eden isimler. Ölçüm, tahmin değil.{% endif %} "Sıcak liste": sistemin piyasa genelindeki olağandışı opsiyon akışından kendi seçtiği isimler; canlı takibe otomatik girer.</p>
   <div class="overflow-x-auto">
   <table class="text-sm w-full" data-board>
     <thead class="text-gray-400 text-left text-xs"><tr>
       <th class="py-1 pr-3">Hisse</th><th class="pr-3">Fiyat</th><th class="pr-3">Opsiyon parası nereye</th>
       <th class="pr-3">Akış</th><th class="pr-3">Opsiyonların fiyatladığı hareket</th><th class="pr-3">Opsiyon fiyatları</th>
-      {% if show_basket %}<th class="pr-3">Sepete göre</th>{% endif %}
+      {% if show_basket %}<th class="pr-3">Akranlara göre</th>{% endif %}
       <th class="pr-3">Kazanç tarihi</th><th>Karar</th></tr></thead>
     <tbody>
     {% for r in v.board %}
     <tr class="border-t border-gray-800 align-top" data-board-row="{{ r.ticker }}">
-      <td class="py-2 pr-3 font-bold text-white">{{ r.ticker }}</td>
+      <td class="py-2 pr-3 font-bold text-white">{{ r.ticker }}{% if r.hot %}<div class="text-xs font-normal text-amber-300" data-hot>sıcak liste</div>{% endif %}</td>
       <td class="pr-3 whitespace-nowrap">{% if r.price %}${{ '%.2f' | format(r.price) }}{% else %}—{% endif %}{% if r.move_pct is not none %} <span class="{{ 'text-emerald-400' if r.move_pct >= 0 else 'text-rose-400' }}">{{ '%+.1f' | format(r.move_pct) }}%</span>{% endif %}</td>
       <td class="pr-3 {{ tc[r.bet_tone] }}">{{ r.bet }}</td>
       <td class="pr-3 {{ tc[r.pace_tone] }}">{{ r.pace }}</td>
