@@ -249,10 +249,6 @@ def basket_lags(
     if priced < cfg.min_members_with_data:
         return {member: shell("thin_data") for member in basket.members}
 
-    basket_mean = sum(returns.values()) / priced
-    if abs(basket_mean) < cfg.min_basket_move_pct:
-        return {**out, **{member: shell("flat_basket") for member in returns}}
-
     # 1 = strongest. Ties share the better rank, and the tie is broken by ticker
     # so the column is stable between renders rather than following dict order.
     ordered = sorted(returns.items(), key=lambda item: (-item[1], item[0]))
@@ -261,6 +257,12 @@ def basket_lags(
     total_return = sum(returns.values())
     for member, own in returns.items():
         peers = (total_return - own) / (priced - 1)
+        # A name cannot lag peers that did not move (contract 5.26 §3.4). The test is on the
+        # peers, self excluded: judging the whole group lets the laggard's own fall drag the
+        # mean under the cutoff and hide the biggest gaps (fixed in 5.27.2).
+        if abs(peers) < cfg.min_basket_move_pct:
+            out[member] = shell("flat_basket")
+            continue
         residual = own - peers
         out[member] = BasketLag(
             basket_id=basket.id, basket_name=basket.name, state="measured",
