@@ -1,0 +1,46 @@
+# Peer baskets (registry 5.26, docs/phase-5.26-basket-relative-acceptance.md).
+#
+# THIS FILE IS MEANT TO BE EDITED BY HAND. It is the one place that says which
+# names belong together.
+#
+# A basket is a judgment about what trades together, not a sector label. The
+# vendor's sector is one of eleven coarse buckets and its "peers" are that
+# bucket's top five by market cap, which answers COHR with the largest
+# technology names instead of AAOI and LITE. Worse, that membership is always
+# current-as-of-fetch, so it cannot be used to look back without painting the
+# past with today's information.
+#
+# A basket committed to git carries the date it was written. One written in
+# October cannot have known what happened in June, which is what makes it safe
+# in a later backtest. Edit a basket in place when its membership changes; the
+# commit is the record of when it changed.
+#
+# Every member needs a daily close before it can be compared. The daily-close
+# job covers basket members automatically, one request per name per day, so a
+# name can sit in a basket without being on the live board. A name you also
+# want to watch on the board still goes in LIVE_TICKERS.
+#
+# To add a basket: copy the block below, give it a new id, and list its members.
+
+basket_version: baskets_v1
+
+# How the gap is measured and when a word is shown. These pick display wording
+# and nothing else; no decision reads them. Chosen on the volatility of the
+# names involved before the column was ever rendered, and not to be tuned after
+# seeing how it reads (D4) — a change is a new basket_version.
+window_sessions: 5          # sessions between the two anchor closes
+min_members_with_data: 3    # fewer priced members than this: "yetersiz veri"
+lag_flag_pct: 3.0           # |residual| at or above this gets "geride" / "önde"
+min_basket_move_pct: 2.0    # peers flatter than this: "sepet hareketsiz"
+
+baskets:
+  # Optical networking. Berkay's own example: the group lifts and one name is
+  # left behind. Seed membership — edit it.
+  #
+  # Candidates deliberately left out, add them if you disagree:
+  #   ANET  — switching rather than optics; moves with the datacentre trade
+  #   APLD  — datacentre capacity, not an optical supplier
+  #   NVDA  — drags the whole group's mean toward one mega-cap
+  - id: optical
+    name: Optik ağ
+    members: [AAOI, COHR, LITE, CIEN, FN]

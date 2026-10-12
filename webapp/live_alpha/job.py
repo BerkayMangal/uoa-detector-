@@ -49,7 +49,8 @@ from uoa_detector.live_alpha.option_plan import (
 from uoa_detector.live_alpha.settings import LiveAlphaSettings, load_live_alpha_settings
 from uoa_detector.options_alpha.settings import OptionsAlphaSettings
 from uoa_detector.options_alpha.settings import load_settings as load_options_settings
-from webapp.board.daily_close import load_bars_by_ticker
+from webapp.board.baskets import lags_by_ticker, load_basket_settings
+from webapp.board.daily_close import load_bars_by_ticker, load_closes_by_ticker
 from webapp.board.settings import BoardSettings
 from webapp.live_alpha import board as live_board
 from webapp.live_alpha import inputs, store, uw
@@ -60,6 +61,7 @@ if TYPE_CHECKING:
 
     from sqlalchemy.engine import Engine
 
+    from webapp.board.baskets import BasketLag
     from webapp.board.signals import BoardSignalReader
 
 _logger = logging.getLogger(__name__)
@@ -465,6 +467,23 @@ def _verdicts(cards: Sequence[Card]) -> dict[str, tuple[str, str, str]]:
     return out
 
 
+def _basket_lags(engine: Engine) -> dict[str, BasketLag]:
+    """Every basket member's lag, from stored closes. A failure leaves the column out only.
+
+    Isolated from ``_board_rows`` on purpose: a hand-edited basket file or a missing
+    close table must cost the board one column, never the rows around it (contract §5).
+    """
+    try:
+        cfg = load_basket_settings()
+        if not cfg.baskets:
+            return {}
+        closes = load_closes_by_ticker(engine, cfg.members())
+        return lags_by_ticker(closes, cfg)
+    except Exception:
+        _logger.warning("basket lags unavailable; the board is shown without that column", exc_info=True)
+        return {}
+
+
 def _board_rows(
     engine: Engine, tickers: Sequence[str], run_id: str, now: datetime, session: Session,
     flows: dict[str, FlowSummary], prices: dict[str, PriceContext], cards: Sequence[Card],
@@ -477,7 +496,10 @@ def _board_rows(
         pace = live_board.flow_pace(engine, tickers, now, cfg)
         moves = live_board.expected_moves(engine, tickers, today, cfg)
         gamma = gamma_source() if gamma_source is not None else {}
-        return live_board.build_rows(tickers, flows, prices, pace, moves, gamma, _verdicts(cards), today, cfg)
+        return live_board.build_rows(
+            tickers, flows, prices, pace, moves, gamma, _verdicts(cards), today, cfg,
+            basket=_basket_lags(engine),
+        )
     except Exception:
         _logger.exception("live alpha board rows failed; the cards are unaffected")
         return []

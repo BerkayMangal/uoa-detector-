@@ -916,8 +916,14 @@ async def board_refresh_loop(
     journal_factory: Callable[[str], OpenTrades] | None = None,
     clock: Callable[[], datetime] | None = None,
     sleep: Callable[[float], Awaitable[None]] | None = None,
+    close_extra: Callable[[], Sequence[str]] | None = None,
 ) -> None:
-    """Refresh quotes, depth, ATM, the tape and ticker info until cancelled. Runs under ``_supervise``."""
+    """Refresh quotes, depth, ATM, the tape and ticker info until cancelled. Runs under ``_supervise``.
+
+    ``close_extra`` (Phase 5.26) returns tickers that need a daily close and no other job; it is
+    read on every tick. ``None`` keeps the loop exactly as it was before baskets existed, and
+    ``webapp.main`` is what supplies the basket members.
+    """
     profile = load_profile(profile_path)
     settings = load_board_settings(board_profile_path)
     legacy_scores = LegacyScores.from_profile(profile)
@@ -978,6 +984,7 @@ async def board_refresh_loop(
                     client, engine, settings,
                     jobs=jobs, reader=reader, journal=journal, now=now,
                     cap=DailyJobCap(soft_cap, client, now_fn),
+                    close_extra=close_extra() if close_extra is not None else (),
                 )
                 soft_cap.observe(client.last_daily_request_count, now_fn())
                 if open_now:

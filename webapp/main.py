@@ -43,6 +43,7 @@ from starlette.responses import PlainTextResponse
 from uoa_detector.sources.market_hours import is_market_open
 from webapp import explanations, gamma, journal, options_board, pricing
 from webapp.board import alfa_page, cards, copy_tr, decision_ledger, fills, options_paper, outcomes
+from webapp.board.baskets import basket_close_tickers, load_basket_settings
 from webapp.board.copy_tr import IV_NOT_SELL_VOL
 from webapp.board.evidence import request_for
 from webapp.board.refresher import board_refresh_loop
@@ -144,6 +145,7 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
         tasks.append(asyncio.create_task(_supervise(
             lambda: board_refresh_loop(
                 database_url=config["database_url"],  # type: ignore[arg-type]
+                close_extra=basket_close_tickers,  # Phase 5.26: basket members get a daily close
             ),
             "board-refresh",
         )))
@@ -654,6 +656,7 @@ def _load_board_profiles() -> None:
     """
     global _BOARD_SETTINGS, _SPREAD_CUTOFF_PCT, _LEGACY_SCORES
     live_page.settings()  # Phase 5.25: the live policy profile fails startup, not the first page
+    load_basket_settings()  # Phase 5.26: a malformed basket file fails startup too
     settings = load_board_settings()
     cutoff = alfa_page.load_spread_cutoff_pct()
     legacy = alfa_page.load_live_legacy_scores()
