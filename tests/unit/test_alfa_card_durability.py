@@ -115,6 +115,7 @@ _REBUILDABLE_TABLES: Final = {
     "alfa_etf_holding",     # rebuilt per snapshot
     "alfa_job_run",         # records what ran, not what was observed
     "alfa_uw_quota",        # a request counter; the vendor's own count re-seeds it
+    "alfa_hot_flow",        # Phase 5.27: the market-wide feed's maximum per session; the next reads rebuild it
 }
 
 # The subset carried as model classes, for the identity checks below.

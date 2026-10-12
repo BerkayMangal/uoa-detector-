@@ -17,7 +17,7 @@ import hashlib
 import json
 import logging
 from dataclasses import dataclass, field
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from time import perf_counter
 from typing import TYPE_CHECKING, Any
@@ -51,6 +51,7 @@ from uoa_detector.options_alpha.settings import OptionsAlphaSettings
 from uoa_detector.options_alpha.settings import load_settings as load_options_settings
 from webapp.board.baskets import lags_by_ticker, load_basket_settings
 from webapp.board.daily_close import load_bars_by_ticker, load_closes_by_ticker
+from webapp.board.hotlist import load_hot_tickers, load_hotlist_settings
 from webapp.board.peers import auto_lags, load_peer_settings, load_universe_closes
 from webapp.board.settings import BoardSettings
 from webapp.live_alpha import board as live_board
@@ -470,6 +471,15 @@ def _verdicts(cards: Sequence[Card]) -> dict[str, tuple[str, str, str]]:
     return out
 
 
+def _hot_names(engine: Engine, today: date) -> tuple[str, ...]:
+    """The names the hot list is following, for the "sıcak liste" tag. Never raises (5.27 §5)."""
+    try:
+        return load_hot_tickers(engine, today, load_hotlist_settings())
+    except Exception:
+        _logger.warning("hot list unavailable; no row is tagged", exc_info=True)
+        return ()
+
+
 def _hand_basket_members() -> tuple[str, ...]:
     """Every hand-basket member, or ``()`` when the profile cannot be read (§3.6)."""
     try:
@@ -523,7 +533,7 @@ def _board_rows(
         gamma = gamma_source() if gamma_source is not None else {}
         return live_board.build_rows(
             rows_for, flows, prices, pace, moves, gamma, _verdicts(cards), today, cfg,
-            basket=_basket_lags(engine, rows_for, now),
+            basket=_basket_lags(engine, rows_for, now), hot=_hot_names(engine, today),
         )
     except Exception:
         _logger.exception("live alpha board rows failed; the cards are unaffected")

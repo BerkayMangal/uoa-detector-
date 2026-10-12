@@ -1,0 +1,38 @@
+# Hot list (registry 5.27, docs/phase-5.27-auto-peers-hotlist-acceptance.md).
+#
+# How the system picks hot stocks by itself from the market-wide unusual-flow feed.
+# These choose which names the board follows and which names get daily closes, and
+# nothing else; no decision reads them. Chosen before the feature was ever run and
+# not to be tuned after seeing what it picks (D4) — a change is a new hotlist_version.
+
+hotlist_version: hotlist_v1
+
+# The live poll: how many hot names are added to LIVE_TICKERS, and how much activity
+# a name needs before it counts. The poll costs one request per name per 60 s pass in
+# market hours, so this is the lever on the daily request count.
+poll_top_n: 12
+poll_min_alerts: 2
+
+# The close universe: names seen in this many recent sessions with at least this many
+# alerts get a daily close, so automatic peers have a field to choose from.
+universe_sessions: 20
+universe_min_alerts: 2
+universe_cap: 250
+
+# Market-wide pages (200 alerts each) read per refresh.
+pages_per_tick: 3
+
+# Daily jobs, ET: the pre-open read of the last session's flow, and the catch-up that
+# fetches closes for names that have none yet (at most catchup_max, the 17:00 close job
+# covers the rest).
+job_time_et: "08:30"
+catchup_time_et: "09:00"
+catchup_max: 80
+
+# Index and ETF products have no peers among stocks and would fill the hot slots.
+exclude: [
+  SPX, SPXW, NDX, XSP, RUT, RUTW, VIX, VIXW,
+  SPY, QQQ, IWM, DIA, TQQQ, SQQQ, SPXL, SPXS, SDS, SSO, TNA, TZA, UVXY, VXX, SVXY,
+  XLF, XLE, XLK, XLV, XLY, XLP, XLI, XLU, XLB, XLRE, XLC, SMH, SOXX, SOXL, SOXS,
+  XBI, KRE, XOP, ARKK, KWEB, FXI, EEM, EFA, TLT, HYG, LQD, GLD, SLV, USO, UNG,
+]

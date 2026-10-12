@@ -40,7 +40,7 @@ from webapp.board.db import session_factory
 from webapp.live_alpha.inputs import LIVE_RUN_PREFIX, as_utc
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping, Sequence
+    from collections.abc import Collection, Mapping, Sequence
 
     from sqlalchemy.engine import Engine
 
@@ -205,6 +205,7 @@ def build_rows(
     today: date,
     cfg: BoardSettings,
     basket: Mapping[str, BasketLag] | None = None,
+    hot: Collection[str] = (),
 ) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     for t in tickers:
@@ -244,6 +245,7 @@ def build_rows(
         basket_txt, basket_tone = basket_text(basket.get(t) if basket is not None else None)
         rows.append({
             "ticker": t,
+            "hot": t in hot,
             "price": p.spot if p else None,
             "move_pct": p.move * 100 if p and p.move is not None else None,
             "bet": bet, "bet_tone": bet_tone,
