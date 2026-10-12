@@ -153,12 +153,13 @@ class BasketLag:
     """One ticker's measured position inside its basket over two shared sessions.
 
     ``residual_pct`` is None exactly when ``state`` is not ``"measured"``; the
-    state says which of the contract's §3.4 branches answered.
+    state says which of the contract's §3.4 branches answered. ``no_peers`` is the
+    automatic-peer state for a ticker with too few similar names (5.27 §3.1).
     """
 
     basket_id: str
     basket_name: str
-    state: str  # measured | thin_data | flat_basket
+    state: str  # measured | thin_data | flat_basket | no_peers
     start: date | None
     end: date | None
     window_sessions: int  # sessions actually spanned by the two anchors
@@ -170,6 +171,8 @@ class BasketLag:
     rank: int | None = None  # 1 = strongest priced member of the basket
     lagging: bool = False
     leading: bool = False
+    source: str = "hand"  # hand = a basket from the profile, auto = correlation peers (Phase 5.27)
+    peers: tuple[str, ...] = ()  # the peers an automatic reading was measured against
 
 
 def anchor_dates(

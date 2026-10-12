@@ -80,13 +80,13 @@
   {% if v.board %}
   {% set show_basket = (v.board | selectattr('basket') | list | length) > 0 %}
   <h3 class="text-lg font-semibold text-white mt-6 mb-1">Hisse panosu</h3>
-  <p class="text-xs text-gray-500 mb-2">Ölçülmüş bilgi, tahmin değil. "Opsiyonların fiyatladığı hareket": o vadeye kadar piyasanın beklediği ortalama oynaklık (ATM straddle / fiyat). "Akış": bugün bu saate kadarki işlem sayısı, hissenin son seanslardaki aynı saat ortalamasına göre.{% if show_basket %} "Sepete göre": hissenin getirisi eksi elle yazılmış sepetindeki diğer hisselerin ortalama getirisi, aynı iki kapanış arasında. Ölçüm, tahmin değil.{% endif %}</p>
+  <p class="text-xs text-gray-500 mb-2">Ölçülmüş bilgi, tahmin değil. "Opsiyonların fiyatladığı hareket": o vadeye kadar piyasanın beklediği ortalama oynaklık (ATM straddle / fiyat). "Akış": bugün bu saate kadarki işlem sayısı, hissenin son seanslardaki aynı saat ortalamasına göre.{% if show_basket %} "Akranlara göre": hissenin getirisi eksi akranlarının ortalama getirisi, aynı iki kapanış arasında. Akranlar: elle yazılmış bir sepet varsa o, yoksa son 60 seansta bu hisseyle en çok birlikte hareket eden isimler. Ölçüm, tahmin değil.{% endif %}</p>
   <div class="overflow-x-auto">
   <table class="text-sm w-full" data-board>
     <thead class="text-gray-400 text-left text-xs"><tr>
       <th class="py-1 pr-3">Hisse</th><th class="pr-3">Fiyat</th><th class="pr-3">Opsiyon parası nereye</th>
       <th class="pr-3">Akış</th><th class="pr-3">Opsiyonların fiyatladığı hareket</th><th class="pr-3">Opsiyon fiyatları</th>
-      {% if show_basket %}<th class="pr-3">Sepete göre</th>{% endif %}
+      {% if show_basket %}<th class="pr-3">Akranlara göre</th>{% endif %}
       <th class="pr-3">Kazanç tarihi</th><th>Karar</th></tr></thead>
     <tbody>
     {% for r in v.board %}

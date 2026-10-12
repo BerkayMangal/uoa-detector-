@@ -1,0 +1,19 @@
+# Automatic peers (registry 5.27, docs/phase-5.27-auto-peers-hotlist-acceptance.md).
+#
+# How the system picks, for every ticker on the board, the names that move most
+# like it. These choose which names are compared and nothing else; no decision
+# reads them. They were chosen before the column was ever rendered and are not
+# to be tuned after seeing how it reads (D4) — a change is a new peers_version.
+#
+# The lag cutoffs (window, "geride" threshold, flat group) are not repeated here:
+# they are the ones in profiles/baskets_v1.yaml, so a hand basket and automatic
+# peers are described with the same words.
+
+peers_version: peers_v1
+
+corr_sessions: 60     # proxy sessions the correlation looks back over
+min_overlap: 40       # shared daily returns a pair needs before it can count
+peer_count: 5         # peers kept per ticker
+min_corr: 0.5         # correlation of daily returns in excess of the proxy
+min_peers: 3          # fewer qualifying names than this: "akran bulunamadı"
+market_proxy: SPY     # subtracted from every daily return

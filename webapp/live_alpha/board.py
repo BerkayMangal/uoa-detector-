@@ -163,26 +163,33 @@ def _bet_text(f: FlowSummary | None) -> tuple[str, str]:
 
 
 def basket_text(lag: BasketLag | None) -> tuple[str | None, str]:
-    """The "sepete göre" cell: a measured gap against hand-written peers, never advice.
+    """The lag cell: a measured gap against peers, never advice.
 
-    None when the ticker sits in no basket, so the row says nothing rather than
-    "no data". Every state names its basket and how many of its names were priced,
-    so a thin reading looks thin instead of looking like a clean one (contract §3.3).
+    None when the ticker has no reading at all, so the row says nothing rather than "no data".
+    A hand basket reads "sepete göre", automatic peers "akranlarına göre" and name the peers.
+    Every state says how many of the group's names were priced, so a thin reading looks thin
+    instead of looking like a clean one (contract 5.26 §3.3).
     """
     if lag is None:
         return None, "gray"
+    auto = lag.source == "auto"
+    if lag.state == "no_peers":
+        return "akran bulunamadı · yeterince benzer hareket eden isim yok", "gray"
     coverage = f"{lag.members_priced}/{lag.members_total} isim fiyatlı"
+    group = f"akranlar {', '.join(lag.peers)}" if auto else lag.basket_name
     if lag.state == "thin_data":
-        return f"yetersiz veri · {lag.basket_name} ({coverage})", "gray"
+        return f"yetersiz veri · {group} ({coverage})", "gray"
     if lag.state == "flat_basket":
-        return f"sepet hareketsiz · {lag.basket_name} ({coverage})", "gray"
+        return f"{'akranlar' if auto else 'sepet'} hareketsiz · {group} ({coverage})", "gray"
     assert lag.residual_pct is not None  # state == "measured" always carries one
-    word = "geride" if lag.lagging else ("önde" if lag.leading else "sepetle birlikte")
+    word = "geride" if lag.lagging else ("önde" if lag.leading else ("akranlarla birlikte" if auto else "sepetle birlikte"))
     tone = "amber" if (lag.lagging or lag.leading) else "gray"
     span = f"{lag.start:%d.%m}→{lag.end:%d.%m}" if lag.start and lag.end else f"{lag.window_sessions} seans"
-    rank = f", sepette {lag.rank}. sırada" if lag.rank is not None else ""
+    where = "grupta" if auto else "sepette"
+    rank = f", {where} {lag.rank}. sırada" if lag.rank is not None else ""
+    against = "akranlarına göre" if auto else "sepete göre"
     return (
-        f"{word}: sepete göre %{lag.residual_pct:+.1f} ({lag.basket_name}, {span}{rank}; {coverage})",
+        f"{word}: {against} %{lag.residual_pct:+.1f} ({group}, {span}{rank}; {coverage})",
         tone,
     )
 
