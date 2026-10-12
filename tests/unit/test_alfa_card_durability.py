@@ -97,6 +97,8 @@ _APPEND_ONLY_TABLES: Final = {
     "alfa_live_event",           # every state change, with actor and policy version
     "alfa_live_manual",          # the owner's own fills
     "alfa_live_heartbeat",       # proof the live job ran
+    # Phase 5.27: what the board measured, kept so it can be scored forward.
+    "alfa_lag_record",           # one measured reading per name and ET date, written once
 }
 
 # Rebuildable: refreshed market data or fetch bookkeeping. A row lost here is

@@ -52,6 +52,7 @@ from uoa_detector.options_alpha.settings import load_settings as load_options_se
 from webapp.board.baskets import lags_by_ticker, load_basket_settings
 from webapp.board.daily_close import load_bars_by_ticker, load_closes_by_ticker
 from webapp.board.hotlist import load_hot_tickers, load_hotlist_settings
+from webapp.board.lag_record import append_records, records_from
 from webapp.board.peers import auto_lags, load_peer_settings, load_universe_closes
 from webapp.board.settings import BoardSettings
 from webapp.live_alpha import board as live_board
@@ -516,6 +517,21 @@ def _basket_lags(engine: Engine, tickers: Sequence[str], now: datetime) -> dict[
     return out
 
 
+def _record_lags(engine: Engine, today: date, lags: dict[str, BasketLag], now: datetime) -> None:
+    """Keep this cycle's measured readings in ``alfa_lag_record`` (5.27 §3.7). Never raises.
+
+    The record is for scoring later and nothing on the page reads it, so a failure here costs
+    only the record.
+    """
+    try:
+        if not lags:
+            return
+        version = f"{load_basket_settings().basket_version}+{load_peer_settings().peers_version}"
+        append_records(engine, records_from(today, lags, load_basket_settings(), version), now=now)
+    except Exception:
+        _logger.warning("lag record not written", exc_info=True)
+
+
 def _board_rows(
     engine: Engine, tickers: Sequence[str], run_id: str, now: datetime, session: Session,
     flows: dict[str, FlowSummary], prices: dict[str, PriceContext], cards: Sequence[Card],
@@ -531,9 +547,11 @@ def _board_rows(
         pace = live_board.flow_pace(engine, rows_for, now, cfg)
         moves = live_board.expected_moves(engine, rows_for, today, cfg)
         gamma = gamma_source() if gamma_source is not None else {}
+        lags = _basket_lags(engine, rows_for, now)
+        _record_lags(engine, today, lags, now)
         return live_board.build_rows(
             rows_for, flows, prices, pace, moves, gamma, _verdicts(cards), today, cfg,
-            basket=_basket_lags(engine, rows_for, now), hot=_hot_names(engine, today),
+            basket=lags, hot=_hot_names(engine, today),
         )
     except Exception:
         _logger.exception("live alpha board rows failed; the cards are unaffected")
