@@ -78,13 +78,15 @@
 
   {% set tc = {"green": "text-emerald-400", "amber": "text-amber-300", "red": "text-rose-400", "gray": "text-gray-300"} %}
   {% if v.board %}
+  {% set show_basket = (v.board | selectattr('basket') | list | length) > 0 %}
   <h3 class="text-lg font-semibold text-white mt-6 mb-1">Hisse panosu</h3>
-  <p class="text-xs text-gray-500 mb-2">Ölçülmüş bilgi, tahmin değil. "Opsiyonların fiyatladığı hareket": o vadeye kadar piyasanın beklediği ortalama oynaklık (ATM straddle / fiyat). "Akış": bugün bu saate kadarki işlem sayısı, hissenin son seanslardaki aynı saat ortalamasına göre.</p>
+  <p class="text-xs text-gray-500 mb-2">Ölçülmüş bilgi, tahmin değil. "Opsiyonların fiyatladığı hareket": o vadeye kadar piyasanın beklediği ortalama oynaklık (ATM straddle / fiyat). "Akış": bugün bu saate kadarki işlem sayısı, hissenin son seanslardaki aynı saat ortalamasına göre.{% if show_basket %} "Sepete göre": hissenin getirisi eksi elle yazılmış sepetindeki diğer hisselerin ortalama getirisi, aynı iki kapanış arasında. Ölçüm, tahmin değil.{% endif %}</p>
   <div class="overflow-x-auto">
   <table class="text-sm w-full" data-board>
     <thead class="text-gray-400 text-left text-xs"><tr>
       <th class="py-1 pr-3">Hisse</th><th class="pr-3">Fiyat</th><th class="pr-3">Opsiyon parası nereye</th>
       <th class="pr-3">Akış</th><th class="pr-3">Opsiyonların fiyatladığı hareket</th><th class="pr-3">Opsiyon fiyatları</th>
+      {% if show_basket %}<th class="pr-3">Sepete göre</th>{% endif %}
       <th class="pr-3">Kazanç tarihi</th><th>Karar</th></tr></thead>
     <tbody>
     {% for r in v.board %}
@@ -95,6 +97,7 @@
       <td class="pr-3 {{ tc[r.pace_tone] }}">{{ r.pace }}</td>
       <td class="pr-3">{{ r.implied_move }}</td>
       <td class="pr-3 {{ tc[r.iv_tone] }}">{{ r.iv }}</td>
+      {% if show_basket %}<td class="pr-3 {{ tc[r.basket_tone] }}" data-basket>{{ r.basket if r.basket else '—' }}</td>{% endif %}
       <td class="pr-3 {{ 'text-amber-300 font-semibold' if r.earnings_warn else '' }}">{{ r.earnings }}{% if r.earnings_warn %} ⚠{% endif %}</td>
       <td class="{{ tc[r.verdict_tone] }}"><span class="font-bold">{{ r.verdict }}</span>{% if r.verdict_reason %}<div class="text-xs text-gray-400 max-w-xs">{{ r.verdict_reason }}</div>{% endif %}</td>
     </tr>

@@ -192,6 +192,10 @@ class JobContext:
     now: datetime
     tickers: tuple[str, ...]  # board tickers of the live run plus open journal tickers
     reader: RunReader
+    # Phase 5.26: peer-basket members that need a daily close and nothing else. Kept
+    # apart from ``tickers`` because the delayed families spend four requests per
+    # ticker and the close job one; only the close job reads this.
+    close_extra: tuple[str, ...] = ()
 
 
 class JobRun(Protocol):
@@ -281,7 +285,9 @@ async def run_etf_holdings(ctx: JobContext) -> str:
 
 async def run_daily_closes(ctx: JobContext) -> str:
     """FAZ D: the regular-session closes behind every delayed row's outcome."""
-    result = await run_daily_close_job(ctx.client, ctx.engine, ctx.tickers, now=ctx.now)
+    result = await run_daily_close_job(
+        ctx.client, ctx.engine, (*ctx.tickers, *ctx.close_extra), now=ctx.now,
+    )
     inserted = sum(r.inserted for r in result.tickers)
     return (
         f"tickers={len(result.tickers)} closes={inserted} degraded={len(result.degraded)}"
@@ -706,6 +712,7 @@ async def run_daily_jobs(
     journal: OpenTrades | None,
     now: datetime,
     cap: RequestCap | None = None,
+    close_extra: Sequence[str] = (),
 ) -> JobsReport:
     """Run every due job once, in registry order.
 
@@ -716,6 +723,8 @@ async def run_daily_jobs(
     ``cap`` is the refresher's daily-request soft cap. While it is reached the
     step runs nothing and marks nothing, so every pending job stays due for a
     later tick (contract §4.1; review FB-H1/FB-01).
+
+    ``close_extra`` (Phase 5.26) names tickers that need a daily close and no other job.
     """
     day = et_date(now)
     cadence = settings.refresh.cadence_seconds
@@ -737,7 +746,7 @@ async def run_daily_jobs(
     )
     ctx = JobContext(
         client=client, engine=engine, sessions=session_factory(engine), settings=settings,
-        now=now, tickers=tickers, reader=reader,
+        now=now, tickers=tickers, reader=reader, close_extra=tuple(close_extra),
     )
     ran: list[tuple[str, JobStatus, str]] = []
     for job in pending:

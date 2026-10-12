@@ -10,7 +10,10 @@ Per ticker:
 - the move the options price in: ATM straddle mid / spot for the first stored
   expiry at least ``move_min_dte`` away (``alfa_atm``), with its quote time;
 - whether implied vol is rich or cheap: IV rank from the gamma snapshot;
-- the next earnings date.
+- the next earnings date;
+- Phase 5.26: how far the name sits from its hand-written peer basket over the
+  last ``window_sessions`` sessions (``webapp/board/baskets.py``), shown only for a name
+  that is in a basket.
 
 Every cutoff that picks a word is in ``profiles/live_board_v1.yaml``.
 """
@@ -42,6 +45,7 @@ if TYPE_CHECKING:
     from sqlalchemy.engine import Engine
 
     from uoa_detector.live_alpha.model import FlowSummary, PriceContext
+    from webapp.board.baskets import BasketLag
 
 _ET = ZoneInfo("America/New_York")
 
@@ -158,6 +162,31 @@ def _bet_text(f: FlowSummary | None) -> tuple[str, str]:
     return f"kararsız: ↑{money(f.premium_up)} / ↓{money(f.premium_down)}", "gray"
 
 
+def basket_text(lag: BasketLag | None) -> tuple[str | None, str]:
+    """The "sepete göre" cell: a measured gap against hand-written peers, never advice.
+
+    None when the ticker sits in no basket, so the row says nothing rather than
+    "no data". Every state names its basket and how many of its names were priced,
+    so a thin reading looks thin instead of looking like a clean one (contract §3.3).
+    """
+    if lag is None:
+        return None, "gray"
+    coverage = f"{lag.members_priced}/{lag.members_total} isim fiyatlı"
+    if lag.state == "thin_data":
+        return f"yetersiz veri · {lag.basket_name} ({coverage})", "gray"
+    if lag.state == "flat_basket":
+        return f"sepet hareketsiz · {lag.basket_name} ({coverage})", "gray"
+    assert lag.residual_pct is not None  # state == "measured" always carries one
+    word = "geride" if lag.lagging else ("önde" if lag.leading else "sepetle birlikte")
+    tone = "amber" if (lag.lagging or lag.leading) else "gray"
+    span = f"{lag.start:%d.%m}→{lag.end:%d.%m}" if lag.start and lag.end else f"{lag.window_sessions} seans"
+    rank = f", sepette {lag.rank}. sırada" if lag.rank is not None else ""
+    return (
+        f"{word}: sepete göre %{lag.residual_pct:+.1f} ({lag.basket_name}, {span}{rank}; {coverage})",
+        tone,
+    )
+
+
 def build_rows(
     tickers: Sequence[str],
     flows: Mapping[str, FlowSummary],
@@ -168,6 +197,7 @@ def build_rows(
     verdicts: Mapping[str, tuple[str, str, str]],
     today: date,
     cfg: BoardSettings,
+    basket: Mapping[str, BasketLag] | None = None,
 ) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     for t in tickers:
@@ -204,6 +234,7 @@ def build_rows(
         else:
             earn_txt, earn_warn = "—", False
         label, reason, tone = verdicts.get(t, ("—", "", "gray"))
+        basket_txt, basket_tone = basket_text(basket.get(t) if basket is not None else None)
         rows.append({
             "ticker": t,
             "price": p.spot if p else None,
@@ -214,6 +245,7 @@ def build_rows(
             "move_as_of": mv.fetched_at.astimezone(_ET).strftime("%d.%m %H:%M ET") if mv else None,
             "iv": iv_txt, "iv_tone": iv_tone,
             "earnings": earn_txt, "earnings_warn": earn_warn,
+            "basket": basket_txt, "basket_tone": basket_tone,
             "verdict": label, "verdict_reason": reason, "verdict_tone": tone,
         })
     return rows
