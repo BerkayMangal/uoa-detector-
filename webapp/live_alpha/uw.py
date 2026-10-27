@@ -69,10 +69,10 @@ class Budget:
     refused: int = 0
 
     def take(self, now: datetime) -> bool:
-        observed = getattr(self.client, "last_daily_request_count", None)
+        observed = quota_ledger.observed_for_day(self.client, self.day, now=now)
         got = quota_ledger.reserve(
             self.engine, day=self.day, n=1, cap=self.cap,
-            observed=observed if isinstance(observed, int) else None, now=now,
+            observed=observed, now=now,
         )
         if got.granted:
             self.reserved += 1
