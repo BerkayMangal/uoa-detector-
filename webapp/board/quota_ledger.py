@@ -33,6 +33,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from typing import TYPE_CHECKING, cast
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import Date, DateTime, Integer, case, insert, select, update
 from sqlalchemy.exc import IntegrityError
@@ -66,6 +67,28 @@ class Reservation:
     requested: int
     reserved_after: int
     cap: int
+
+
+def observed_for_day(client: object, day: date, *, now: datetime | None = None) -> int | None:
+    """Never raise today's floor from a native counter observed on another ET day.
+
+    Optional timestamp-less adapters retain the prior conservative semantics.
+    Explicit invalid/unavailable timestamps are unverified and cannot set a floor.
+    """
+    count = getattr(client, "last_daily_request_count", None)
+    if isinstance(count, bool) or not isinstance(count, int) or count < 0:
+        return None
+    if not hasattr(client, "last_daily_request_at"):
+        return count
+    at = client.last_daily_request_at
+    if not isinstance(at, datetime) or at.tzinfo is None:
+        return None
+    moment = now or datetime.now(UTC)
+    if moment.tzinfo is None:
+        return None
+    if at > moment or at.astimezone(ZoneInfo("America/New_York")).date() != day:
+        return None
+    return count
 
 
 def _ensure_row(engine: Engine, day: date, now: datetime) -> None:

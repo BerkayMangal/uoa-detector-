@@ -62,7 +62,7 @@ from uoa_detector.sources.unusual_whales.client import (
 )
 from webapp.board.daily_close import BENCHMARK_TICKER, is_final_close, load_closes_by_ticker
 from webapp.board.db import AlfaBase
-from webapp.board.quota_ledger import ensure_quota_tables, reserve
+from webapp.board.quota_ledger import ensure_quota_tables, observed_for_day, reserve
 
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
@@ -245,16 +245,11 @@ class QuotaRefusedError(Exception):
     """The ledger refused a reservation: stop spending for today."""
 
 
-def _observed(client: JsonClient) -> int | None:
-    value = getattr(client, "last_daily_request_count", None)
-    return value if isinstance(value, int) else None
-
-
 async def _historic(
     client: JsonClient, engine: Engine, symbol: str, *, day: date, cap: int, report: TrackerReport,
 ) -> dict[date, LegQuote] | None:
     """One reserved ``/historic`` fetch. ``None`` when OUR fetch failed (degraded)."""
-    grant = reserve(engine, day=day, n=1, cap=cap, observed=_observed(client))
+    grant = reserve(engine, day=day, n=1, cap=cap, observed=observed_for_day(client, day))
     if not grant.granted:
         report.requests_refused += 1
         raise QuotaRefusedError(f"ledger at {grant.reserved_after}/{grant.cap}")

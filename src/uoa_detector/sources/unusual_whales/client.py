@@ -86,6 +86,7 @@ decision (no built-in cache here):
 from __future__ import annotations
 
 import asyncio
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 import httpx
@@ -235,6 +236,7 @@ class UnusualWhalesClient:
             timeout=httpx.Timeout(connect=5.0, read=30.0, write=5.0, pool=5.0),
         )
         self._last_daily_request_count: int | None = None
+        self._last_daily_request_at: datetime | None = None
 
     @property
     def settings(self) -> UnusualWhalesSettings:
@@ -263,6 +265,12 @@ class UnusualWhalesClient:
             return
         if value >= 0:
             self._last_daily_request_count = value
+            self._last_daily_request_at = datetime.now(UTC)
+
+    @property
+    def last_daily_request_at(self) -> datetime | None:
+        """UTC availability time of the last valid count header; not request time."""
+        return self._last_daily_request_at
 
     @property
     def circuit_breaker(self) -> CircuitBreaker:

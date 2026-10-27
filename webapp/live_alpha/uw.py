@@ -19,6 +19,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
@@ -67,12 +68,16 @@ class Budget:
     client: object
     reserved: int = 0
     refused: int = 0
+    counter_clock: Callable[[], datetime] | None = None
 
     def take(self, now: datetime) -> bool:
-        observed = getattr(self.client, "last_daily_request_count", None)
+        # Market inputs use the scan's event clock. Response counters arrive
+        # later in that scan and must be checked at the actual reservation time.
+        moment = self.counter_clock() if self.counter_clock else datetime.now(UTC)
+        observed = quota_ledger.observed_for_day(self.client, self.day, now=moment)
         got = quota_ledger.reserve(
             self.engine, day=self.day, n=1, cap=self.cap,
-            observed=observed if isinstance(observed, int) else None, now=now,
+            observed=observed, now=now,
         )
         if got.granted:
             self.reserved += 1
