@@ -18,6 +18,11 @@ its unchanged count property. Only a valid nonnegative header updates both;
 missing/malformed/negative headers retain the old observation. Valid 429/404
 headers still count and typed errors/retries remain unchanged.
 
+A second test distinguishes scan event time from actual reservation time: a
+header received DURING a scan must still enforce its cap on later requests in
+that scan. Budget uses an injectable wall observation clock for this check;
+market event-time calculations remain unchanged.
+
 Both reservation consumers use `observed_for_day`: explicit native timestamps
 must match the ledger's requested New York date and cannot be future/naive.
 UTC midnight alone is not an ET-day reset; DST uses ZoneInfo. Timestamp-less
@@ -33,12 +38,12 @@ and unavailable credentials/histories remain explicit limits.
 
 ## Verification
 
-- 11 new cases: stale/future/invalid timestamps, timestamp-less compatibility,
+- 12 new cases: stale/future/invalid timestamps, timestamp-less compatibility,
   ET/UTC/DST boundaries, prior-day reservation recovery, same-day actual cap,
   native valid/zero/bad/missing headers and read-only timestamp, valid daily-limit
   error header/fail-fast behaviour and the options PAPER consumer.
-- Focused 24 tests pass, all existing assertions preserved.
-- Full hermetic gate: 4951 passed / 52 key-gated skips; strict mypy 255 files;
+- Focused 25 tests pass, all existing assertions preserved.
+- Full hermetic gate: 4952 passed / 52 key-gated skips; strict mypy 255 files;
   ruff, lock and diff clean.
 - Both frozen research reports still validate, including tournament's compressed
   grid. No scoring module, configuration or research result changed; score truth

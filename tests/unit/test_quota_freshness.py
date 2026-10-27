@@ -65,7 +65,7 @@ def test_new_day_reserves_but_actual_fresh_high_count_still_refuses(tmp_path: Pa
     client = SimpleNamespace(
         last_daily_request_count=24000, last_daily_request_at=NOW - timedelta(days=1)
     )
-    budget = Budget(e, DAY, 24000, client)
+    budget = Budget(e, DAY, 24000, client, counter_clock=lambda: NOW)
     assert budget.take(NOW) and reserved_on(e, DAY) == 1
     client.last_daily_request_at = NOW
     assert not budget.take(NOW) and reserved_on(e, DAY) == 24000
@@ -142,3 +142,14 @@ async def test_option_paper_consumer_ignores_old_header_without_changing_fresh_c
                 client, e, "NVDA261120C00100000", day=DAY, cap=24000, report=stats
             )
     assert client.calls == 1 and stats.requests_granted == stats.requests_refused == 1
+
+
+def test_header_observed_during_scan_is_current_at_the_later_reservation(tmp_path: Path) -> None:
+    e = make_engine(f"sqlite:///{tmp_path / 'scan-clock.db'}")
+    ensure_quota_tables(e)
+    client = SimpleNamespace(
+        last_daily_request_count=24000, last_daily_request_at=NOW + timedelta(seconds=5)
+    )
+    budget = Budget(e, DAY, 24000, client, counter_clock=lambda: NOW + timedelta(seconds=10))
+    assert not budget.take(NOW)
+    assert reserved_on(e, DAY) == 24000
