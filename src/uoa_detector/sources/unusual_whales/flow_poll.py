@@ -98,6 +98,8 @@ class UnusualWhalesFlowPollSource:
         self._sleep = sleep or asyncio.sleep
         self._seen: set[str] = set()
         self._closed = False
+        self.observation_sink: Callable[[str, list[dict[str, object]], datetime], Awaitable[None]] | None = None
+        self.observation_timeout_s = 5.0  # operational bound; worker supplies the lab profile value
         # Budget guards (Phase 4.28): outside RTH there is no new flow, so
         # polling only burns the UW daily quota; and once UW returns the
         # daily-limit 429, hammering every interval eats the NEXT day's budget
@@ -176,7 +178,16 @@ class UnusualWhalesFlowPollSource:
             _logger.warning("UW flow-alerts fetch failed for %s: %s", ticker, exc)
             return []
         data = resp.get("data") if isinstance(resp, dict) else resp
-        return data if isinstance(data, list) else []
+        if not isinstance(data, list) or any(not isinstance(row, dict) for row in data):
+            _logger.warning("UW flow payload malformed; raw coverage is not advanced")
+            return []
+        records = data if isinstance(data, list) else []
+        if self.observation_sink is not None:
+            try:
+                await asyncio.wait_for(self.observation_sink(ticker, records, self._now()), timeout=self.observation_timeout_s)
+            except Exception:
+                _logger.warning("raw alert archive failed; legacy ingestion continues", exc_info=True)
+        return records
 
     def _to_raw_print(
         self,

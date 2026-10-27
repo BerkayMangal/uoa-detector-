@@ -42,6 +42,9 @@ from starlette.responses import PlainTextResponse
 
 from uoa_detector.sources.market_hours import is_market_open
 from webapp import explanations, gamma, journal, options_board, pricing, seo
+from webapp.alpha_lab import view as lab_view
+from webapp.alpha_lab.archive import STATE as ARCHIVE_STATE
+from webapp.alpha_lab.engine import STATE as LAB_STATE
 from webapp.board import alfa_page, cards, copy_tr, decision_ledger, fills, options_paper, outcomes
 from webapp.board.baskets import basket_close_tickers, load_basket_settings
 from webapp.board.copy_tr import IV_NOT_SELL_VOL
@@ -562,6 +565,11 @@ def live_results_page(request: Request) -> HTMLResponse:
     return templates.TemplateResponse(
         request, "results.html", {"v": live_results.build_results(engine)},
     )
+
+
+@app.get("/laboratuvar", response_class=HTMLResponse)
+def alpha_laboratory(request: Request) -> HTMLResponse:
+    return templates.TemplateResponse(request, "alpha_lab.html", {"v": lab_view.build(_board_reader().engine)})
 
 
 @app.get("/canli/{opportunity_id}", response_class=HTMLResponse)
@@ -1488,4 +1496,8 @@ def health() -> dict[str, object]:
     body: dict[str, object] = {"ok": True, "sha": sha[:7] if sha else "unknown"}
     if live_job.LAST_CYCLE:
         body["live_alpha"] = dict(live_job.LAST_CYCLE)
+    if LAB_STATE:
+        body["alpha_lab"] = dict(LAB_STATE)
+    if ARCHIVE_STATE:
+        body["flow_capture"] = dict(ARCHIVE_STATE)
     return body
