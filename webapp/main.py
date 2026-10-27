@@ -631,10 +631,11 @@ def alpha_laboratory(request: Request) -> HTMLResponse:
 
 @app.get("/stratejiler", response_class=HTMLResponse)
 def strategy_tournament_page(request: Request) -> HTMLResponse:
+    from webapp.robustness.report import view as stress_view
     from webapp.tournament.monitor import view
     from webapp.tournament.settings import settings
 
-    return templates.TemplateResponse(request, "tournament.html", {"v": view(_board_reader().engine, _now()), "families": tuple(settings().thresholds), "min_test_closed": settings().min_test_closed})
+    return templates.TemplateResponse(request, "tournament.html", {"v": view(_board_reader().engine, _now()), "stress": stress_view(), "families": tuple(settings().thresholds), "min_test_closed": settings().min_test_closed})
 
 
 @app.get("/kalibrasyon", response_class=HTMLResponse)

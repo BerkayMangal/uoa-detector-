@@ -1,0 +1,27 @@
+<div class="section-heading"><h2>Kazanç ne kadar dayanıklı?</h2><span>Sabit adayların stres testi</span></div>
+{% if stress %}
+<p class="quiet-copy">{{ stress.portfolio_evaluations }} ek portföy kontrolü; yeni aday seçilmedi. Aynı geçmiş dönemde giriş 1–2 seans daha geciktirildi, maliyet artırıldı, her hisse ve her sinyal ayı ayrı ayrı çıkarıldı. Bu sonuçlar ileri PAPER ölçümünün yerini tutmaz.</p>
+{% for f in stress.families if f.paper_enabled %}
+{% set delayed=f.delay_cost|selectattr('delay','equalto',1)|selectattr('bps','equalto',5)|first %}
+{% set worst=f.omissions.ticker|sort(attribute='metrics.net_usd')|first %}
+<p class="desk-notice"><b>{{ labels.get(f.family,f.family) }}</b>: temel sonuç {{ usd(f.accounting.net_usd) }}; giriş bir seans daha gecikirse {{ usd(delayed.metrics.net_usd) }} ({{ delayed.metrics.closed }} işlem). En iyi 3 kazanç çıkarılınca {{ usd(f.accounting.without_best['3'].net_usd) }} kalıyor. {{ worst.excluded }} sinyalleri çıkarılıp boşalan yerler yeniden dağıtılınca {{ usd(worst.metrics.net_usd) }}.</p>
+{% endfor %}
+{% for f in stress.families %}
+{% set lo=f.omissions.ticker|sort(attribute='metrics.net_usd')|first %}
+{% set hi=f.omissions.ticker|sort(attribute='metrics.net_usd')|last %}
+{% set month=f.omissions.signal_month|sort(attribute='metrics.net_usd')|first %}
+<details class="fold-panel"><summary>{{ labels.get(f.family,f.family) }} · gecikme, maliyet ve yoğunlaşma</summary>
+<p class="quiet-copy">Temel {{ f.accounting.closed }} kapanış, {{ f.accounting.ticker_count }} farklı hisse. En büyük kazanç, toplam pozitif işlem kazançlarının {% if f.accounting.top_win_share_pct is not none %}%{{ '%.1f'|format(f.accounting.top_win_share_pct) }}{% else %}bilinmeyen{% endif %} kısmı. En iyi 1 kazanç çıkarılırsa {{ usd(f.accounting.without_best['1'].net_usd) }}; en iyi 3 çıkarılırsa {{ usd(f.accounting.without_best['3'].net_usd) }}. Bu son iki sayı aynı işlem listesinden çıkarma hesabıdır; yeniden yatırım veya yeni portföy simülasyonu değildir.</p>
+<div class="overflow-x-auto" role="region" aria-label="{{ labels.get(f.family,f.family) }} giriş gecikmesi ve maliyet" tabindex="0"><table class="w-full text-sm"><thead><tr><th>Ek gecikme</th><th>Kayma / yön</th><th>Kapandı</th><th>Net $</th><th>SPY farkı $</th><th>Düşüş</th></tr></thead><tbody>
+{% for x in f.delay_cost %}<tr><td>{{ x.delay }} seans</td><td>{{ '%g'|format(x.bps) }} bp</td><td>{{ x.metrics.closed }}</td><td>{{ usd(x.metrics.net_usd) }}</td><td>{{ usd(x.metrics.excess_usd) }}</td><td>%{{ '%.2f'|format(x.metrics.max_drawdown_pct) }}</td></tr>{% endfor %}
+</tbody></table></div>
+<p class="quiet-copy">Her yönde 5 bp ile {{ stress.excluded_names }} ayrı tek-hisse çıkarma denemesinde net aralık {{ usd(lo.metrics.net_usd) }} ({{ lo.excluded }} hariç) ile {{ usd(hi.metrics.net_usd) }} ({{ hi.excluded }} hariç). Her deneme sıralama, nakit ve boşalan yerleri yeniden hesaplar; eski kârdan bir hisseyi çıkarmakla aynı değildir.</p>
+<p class="quiet-copy">En zayıf sinyal-ayı çıkarma denemesi: {{ month.excluded }} hariç {{ usd(month.metrics.net_usd) }}, {{ month.metrics.closed }} kapanış. O aya ait sinyaller engellenir; daha önce açılıp o ay kapanan işlemler korunur.</p>
+<div class="overflow-x-auto" role="region" aria-label="{{ labels.get(f.family,f.family) }} aylık sinyal grupları" tabindex="0"><table class="w-full text-sm"><thead><tr><th>İlk sinyal ayı</th><th>Kapandı</th><th>Temel net $</th><th>SPY farkı $</th></tr></thead><tbody>{% for g in f.accounting.groups.signal_month %}<tr><td>{{ g.key }}</td><td>{{ g.closed }}</td><td>{{ usd(g.net_usd) }}</td><td>{{ usd(g.excess_usd) }}</td></tr>{% endfor %}</tbody></table></div>
+</details>
+{% endfor %}
+<p class="quiet-copy">Gecikme, normal sonraki açılışa eklenir; ilk sinyal, sıralama ve ATR girdisi korunur. Tutma süresi geciken girişten başlar. Sabit bitiş tarihi nedeniyle işlem sayısı azalabilir. Günlük fiyatlar gerçek açılış spreadini, emir dolumunu veya likiditeyi göstermez; komisyon/vergi hariç. Yeni istatistiksel üstünlük ya da yeni ALIM kuralı üretilmedi.</p>
+<details class="fold-panel"><summary>Stres testi denetim izi</summary><p class="quiet-copy break-all">{{ stress.baseline_reconciliations }} temel portföy eski raporla birebir eşleşti.<br>Stres raporu {{ stress.report_hash }}<br>Profil {{ stress.profile_hash }}<br>Kod {{ stress.code_hash }}<br>Bağlı eski rapor {{ stress.base_report_hash }}<br>Tam kayıt {{ stress.replay_artifact.name }} · {{ stress.replay_artifact.rows }} portföy · {{ stress.replay_artifact.sha256 }}</p></details>
+{% else %}
+<p class="quiet-copy">Ek stres raporu şu an okunamıyor. Mevcut strateji raporu ve PAPER takibi devam ediyor.</p>
+{% endif %}
