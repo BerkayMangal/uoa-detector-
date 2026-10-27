@@ -1,0 +1,61 @@
+version: tournament_v1
+thresholds:
+  relative_recovery: [0, 1, 2, 4]
+  relative_momentum: [0, 1, 2, 4]
+  trend_pullback: [0, 0.25, 0.5, 1]
+  oversold_reversal: [0, 1, 2, 4]
+  range_breakout: [0, 0.25, 0.5, 1]
+  volatility_compression: [0.4, 0.6, 0.8, 1]
+lookbacks: [5, 10, 20]
+volume_gates: [0, 1, 1.5]
+regimes: [any, above_ma20, below_ma20]
+horizons: [1, 3, 5]
+sizing_modes: [equal_cash, atr_budget]
+slots: [2, 4]
+atr_sessions: 14
+volume_sessions: 20
+compression_fast: 5
+compression_slow: 20
+market_ma: 20
+recovery_chase_atr: 1
+breakout_chase_atr: 2
+capital_usd: 10000
+position_usd: 2500
+risk_usd: 100
+risk_atr_multiple: 1.5
+slippage_bps: 5
+sensitivity_bps: [10, 20]
+train_start: 2025-09-18
+folds:
+  - train_end: 2026-01-30
+    start: 2026-02-10
+    end: 2026-03-20
+  - train_end: 2026-03-20
+    start: 2026-03-31
+    end: 2026-05-08
+  - train_end: 2026-05-08
+    start: 2026-05-19
+    end: 2026-06-26
+test_start: 2026-07-08
+test_end: 2026-09-18
+min_train_closed: 30
+min_validation_closed: 30
+min_fold_closed: 5
+min_positive_folds: 2
+min_test_closed: 20
+max_drawdown_pct: 20
+bootstrap_reps: 200
+bootstrap_block_sessions: 5
+bootstrap_seed: 20261027
+bootstrap_percentile: 95
+flow_score_min: 0.4
+flow_count_min: 1
+prospective_start: 2026-10-28
+api_max_age_seconds: 14400
+api_record_limit: 30000
+monitor_seconds: 300
+monitor_timeout_seconds: 30
+display_limit: 100
+arms: [price, flow, flow_gamma, flow_dark, flow_oi, full]
+iv_max_rank: 80
+peer_min_alignment: 0.6

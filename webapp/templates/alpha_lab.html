@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% macro percent(value) %}{% if value is number %}{{ '%+.3f' | format(value) }}{% else %}—{% endif %}{% endmacro %}
 {% block content %}
+<p class="quiet-copy mb-3"><a href="/stratejiler">Strateji masası · altı yaklaşım ve API kolları →</a></p>
 <p class="quiet-copy mb-3"><a href="/kalibrasyon">Kalibrasyon · sabit geçmiş araması ve gelecekte PAPER →</a></p>
 {% set capture_labels = {'capture_warmup':'Veri birikiyor','poll_stale':'Son yoklama eski','poll_gap':'Toplamada boşluk','saturated_page_gap':'API sayfasında kapsama boşluğu','observed_alerts_only':'Gözlenen uyarılar mevcut'} %}
 {% set reasons = {'not_live_session':'Seans açık değil','capture_warmup':'Henüz kesintisiz veri penceresi yok','poll_stale':'Son yoklama eski','poll_gap':'Toplamada boşluk var','saturated_page_gap':'Dolu API sayfası veri atlamış olabilir','ambiguous_flow':'Akışın yönü yeterince güvenilir değil','spot_unavailable_or_stale':'Fiyat yok veya eski','no_recovery_or_chasing':'Toparlanma yok veya fiyat fazla uzaklaştı','no_prior_close_lag_in_rising_group':'Güçlü grupta geride kalma koşulu yok','peer_anchor_coverage':'Akran fiyatları eksik','calendar_unknown':'İleri seans takvimi bilinmiyor'} %}

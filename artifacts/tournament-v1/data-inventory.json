@@ -1,0 +1,323 @@
+{
+  "access_limits": [
+    "UW/Theta/prod DB credentials absent locally",
+    "public Yahoo/Stooq history blocked by proxy HTTP 403",
+    "GitHub Actions secret metadata API denied to integration HTTP 403; no secret values accessed",
+    "production cached API usage deployed without new vendor requests"
+  ],
+  "excluded": [
+    "data/study_g/* reserved; not read",
+    "data/historical/dry-run/* synthetic manifest",
+    "tests/fixtures and /tmp pytest/preview databases synthetic",
+    "empty local/seed trading databases"
+  ],
+  "files": [
+    {
+      "bytes": 7746,
+      "path": "data/earnings_calendar.csv",
+      "role": "backtest-only static snapshot; availability clock not suitable for causal new gates",
+      "sha256": "7b1c7f3f4256271ac088e12ffa274a4714dd2ab3395cd24b4f4a629f6b56c5b2"
+    },
+    {
+      "bytes": 94,
+      "path": "data/medians.csv",
+      "role": "backtest-only static snapshot; availability clock not suitable for causal new gates",
+      "sha256": "36cf73e378dfb34ce21069f9a344a3bb059f6cbcf10888456e470e08b165d340"
+    },
+    {
+      "bytes": 328,
+      "path": "data/medians_bulk.csv",
+      "role": "backtest-only static snapshot; availability clock not suitable for causal new gates",
+      "sha256": "65c6b4ae2c57c259b00cf5d42b594dd08ea5a919e0cf01900a3656b721701965"
+    },
+    {
+      "bytes": 57594,
+      "path": "data/study_e/closes.csv",
+      "role": "close-only panel; no independent next-open/whole-OHLC validation",
+      "sha256": "5f92b0f222ce1100d26280057a777e2812ba90d47799c99f20971953f89ed7d3"
+    },
+    {
+      "bytes": 7082,
+      "path": "data/study_e/flow_daily.csv",
+      "role": "used_exploratory_search_or_overlap",
+      "sha256": "24cb84615424cf1d553b1e82f9ba5ee7f22be14dc1e7a631b14e280be2cf7a5e"
+    },
+    {
+      "bytes": 17118,
+      "path": "data/study_e/null_means.jsonl",
+      "role": "prior research result, not new market data",
+      "sha256": "69016b2c58206514b7f3f739569610de12e13424e824e6f9af02cf55499b952a"
+    },
+    {
+      "bytes": 17102,
+      "path": "data/study_e/null_means_purged.jsonl",
+      "role": "prior research result, not new market data",
+      "sha256": "6a87559c393bdcac0b0fcf056bc5c22a20ee9acf4119e7a5fc0abe347ef77cdb"
+    },
+    {
+      "bytes": 2257,
+      "path": "data/study_f/bars.coverage.csv",
+      "role": "prior_research_or_universe; not additional fresh evidence",
+      "sha256": "33603b3912229d1e4500aab1f3664458644032997df88fafa737316349c9d632"
+    },
+    {
+      "bytes": 1114008,
+      "path": "data/study_f/bars.csv",
+      "role": "used_exploratory_search_or_overlap",
+      "sha256": "ed1f6d8871e900f959793edb8ed7da4b52a1502da3c7974e2279e74e6a7205ca"
+    },
+    {
+      "bytes": 235461,
+      "path": "data/study_f/null_forward.jsonl",
+      "role": "prior_research_or_universe; not additional fresh evidence",
+      "sha256": "1dfbff148baa56352403b6c659039cb8a85f50a055b099c5bdf0a3bc9eea1260"
+    },
+    {
+      "bytes": 233971,
+      "path": "data/study_f/null_idio.jsonl",
+      "role": "prior_research_or_universe; not additional fresh evidence",
+      "sha256": "2df4cde4e662a0f791c64e3f65c952de8a4c1494694933ada8eb9e53effa11a2"
+    },
+    {
+      "bytes": 2439,
+      "path": "data/study_f/shap_forward_h1.json",
+      "role": "prior_research_or_universe; not additional fresh evidence",
+      "sha256": "4564d8f8bbaa6d11a1cd49fe23ebfb5a89ce0a762464bab53c6ec4591ebad460"
+    },
+    {
+      "bytes": 2424,
+      "path": "data/study_f/shap_forward_h5.json",
+      "role": "prior_research_or_universe; not additional fresh evidence",
+      "sha256": "4dfdd68b71e3788d82502062b3e76d4f1202ec753d82aa6a584e5b58f6c8536e"
+    },
+    {
+      "bytes": 2379,
+      "path": "data/study_f/shap_idio_h5.json",
+      "role": "prior_research_or_universe; not additional fresh evidence",
+      "sha256": "dbb07b25acddc31be2473961b9227d019bbd7c8c4b8526cca83fe837ead45251"
+    },
+    {
+      "bytes": 326,
+      "path": "data/study_f/universe.txt",
+      "role": "prior_research_or_universe; not additional fresh evidence",
+      "sha256": "ec7636b9f2e04dd6f23bb3b1bb9cbb012402a3094d82859ff02ac462f523030d"
+    },
+    {
+      "bytes": 1055,
+      "path": "data/universes/_bulk_all.csv",
+      "role": "universe configuration, not market observations",
+      "sha256": "76198c3696a7513724a7a42a7fd7637a0a873fdc8c7df52e53d1ad650161d079"
+    },
+    {
+      "bytes": 717,
+      "path": "data/universes/tier1_anchor.csv",
+      "role": "universe configuration, not market observations",
+      "sha256": "a4254453c1869246a4a2da05c17fb81cee8b1545a61c93ebc2fef91b74c0cac8"
+    },
+    {
+      "bytes": 377,
+      "path": "data/universes/tier1_reduced.csv",
+      "role": "universe configuration, not market observations",
+      "sha256": "7ac44f7a76fcb7df031f47af552dbc75c742a6603aab0b99dbd07c07bb57ac2c"
+    },
+    {
+      "bytes": 2111,
+      "path": "data/universes/tier2_starter.csv",
+      "role": "universe configuration, not market observations",
+      "sha256": "e31f811c8a226a4c7eddcd73d5daca0cdf086810517d101258781affa444dce0"
+    },
+    {
+      "bytes": 753,
+      "path": "data/universes/tier2_top15.csv",
+      "role": "universe configuration, not market observations",
+      "sha256": "20442c7b0d6ee53e56b9a0a5d5f8d8e2517299d0efc38d2cb780feb824315d99"
+    },
+    {
+      "bytes": 4704,
+      "path": "artifacts/options-alpha-v1/capability_matrix.json",
+      "role": "prior option experiment/capability/sparse replay; not a complete option-price history",
+      "sha256": "d1d6ad83a7c074d69eb36f01c9536d1defc3db50ac7aedb9b47ebdac580b68b3"
+    },
+    {
+      "bytes": 201434,
+      "path": "artifacts/options-alpha-v1/h01_result.json",
+      "role": "prior option experiment/capability/sparse replay; not a complete option-price history",
+      "sha256": "c609fe8b914ee1b93601880b05c399213298fdfab718e6ccdadba5a7b358cde1"
+    },
+    {
+      "bytes": 200708,
+      "path": "artifacts/options-alpha-v1/h01_result_v2.json",
+      "role": "prior option experiment/capability/sparse replay; not a complete option-price history",
+      "sha256": "8dbcca73f0ff03d8e84b3c60452bd8eef3cc2f7204e09c41450194191ba4e6fa"
+    },
+    {
+      "bytes": 186100,
+      "path": "artifacts/options-alpha-v1/h02_result.json",
+      "role": "prior option experiment/capability/sparse replay; not a complete option-price history",
+      "sha256": "ffd9ee0daab6626a385c9879e591ec7c1ba90f4a73853d64dde05a50f5485fef"
+    },
+    {
+      "bytes": 141261,
+      "path": "artifacts/options-alpha-v1/h03_result.json",
+      "role": "prior option experiment/capability/sparse replay; not a complete option-price history",
+      "sha256": "ce2fb5bcd275cb01717e96b08747017a3b00dd760b5de38be1c15b79b740bc82"
+    },
+    {
+      "bytes": 140581,
+      "path": "artifacts/options-alpha-v1/h03_result_v2.json",
+      "role": "prior option experiment/capability/sparse replay; not a complete option-price history",
+      "sha256": "f20c08ae2e0932498ddc7255f695ef9ff38816fa9338e8b926fa5880c5eb158d"
+    },
+    {
+      "bytes": 79312,
+      "path": "artifacts/options-alpha-v1/h04_result.json",
+      "role": "prior option experiment/capability/sparse replay; not a complete option-price history",
+      "sha256": "88c4f456e0d148ade587efce5552977c71d346d4470a1d8afd2afeeea9fa51cb"
+    },
+    {
+      "bytes": 78860,
+      "path": "artifacts/options-alpha-v1/h04_result_v2.json",
+      "role": "prior option experiment/capability/sparse replay; not a complete option-price history",
+      "sha256": "d7fae2262e60f614ce8898e808804b188afeb47eb1e98135be1491145c75fbe8"
+    },
+    {
+      "bytes": 83214,
+      "path": "artifacts/options-alpha-v1/h10_result.json",
+      "role": "prior option experiment/capability/sparse replay; not a complete option-price history",
+      "sha256": "ba490f0be29b15796c6f5d450bb8aa14b649fb0d83d9306c6619bce7de797f19"
+    },
+    {
+      "bytes": 82921,
+      "path": "artifacts/options-alpha-v1/h10_result_v2.json",
+      "role": "prior option experiment/capability/sparse replay; not a complete option-price history",
+      "sha256": "8a45c540a69c215c773db8f856d09aa2b05dc01a01360cc8d6c4a0b3c88847f8"
+    },
+    {
+      "bytes": 39112,
+      "path": "artifacts/options-alpha-v1/h10_trade_audit.json",
+      "role": "prior option experiment/capability/sparse replay; not a complete option-price history",
+      "sha256": "32bb9c1057932395976802b1a9c17b7ab1259525d98b968449e0cec3143ec919"
+    },
+    {
+      "bytes": 34573,
+      "path": "artifacts/options-alpha-v1/h10_trade_audit_v2.json",
+      "role": "prior option experiment/capability/sparse replay; not a complete option-price history",
+      "sha256": "fe3df7ffa366929b2127983270a350b9de21d2d4da30d32e386061706147a4df"
+    },
+    {
+      "bytes": 1423,
+      "path": "artifacts/options-alpha-v1/mutation_proof.md",
+      "role": "prior option experiment/capability/sparse replay; not a complete option-price history",
+      "sha256": "0872659dfcdc5adae9a150008cdfaa1838db38609e816854b9c00a1211f51ee3"
+    },
+    {
+      "bytes": 481455,
+      "path": "artifacts/options-alpha-v1/replay/2026-09-08/chain_trimmed_QQQ.json",
+      "role": "prior option experiment/capability/sparse replay; not a complete option-price history",
+      "sha256": "ff2bffb66bc671ee42069f7bfd023fd63346f7766fc666252bb7244c2686e91f"
+    },
+    {
+      "bytes": 500884,
+      "path": "artifacts/options-alpha-v1/replay/2026-09-08/chain_trimmed_SPY.json",
+      "role": "prior option experiment/capability/sparse replay; not a complete option-price history",
+      "sha256": "104c83bfd9a98e9673ea95480871dc4a9a5304e6cd2536318ac60e5e9fe39848"
+    },
+    {
+      "bytes": 3252,
+      "path": "artifacts/options-alpha-v1/replay/2026-09-08/paper_card_QQQ.json",
+      "role": "prior option experiment/capability/sparse replay; not a complete option-price history",
+      "sha256": "b5973a0ba6778ff555f67e7661b7900fda344a6cf99bae786ae687c8cd2056dc"
+    },
+    {
+      "bytes": 2523,
+      "path": "artifacts/options-alpha-v1/replay/2026-09-08/paper_card_QQQ_outcome.json",
+      "role": "prior option experiment/capability/sparse replay; not a complete option-price history",
+      "sha256": "1765d46704217ffcda47f8fa4f5ad99df6e9ce12ad5ea1746c0ab4c9aae7f9ea"
+    },
+    {
+      "bytes": 3221,
+      "path": "artifacts/options-alpha-v1/replay/2026-09-08/paper_card_SPY.json",
+      "role": "prior option experiment/capability/sparse replay; not a complete option-price history",
+      "sha256": "beb19a932289b78f58226a151a392a226564509eaf94e7d1e8024a7a46a593af"
+    },
+    {
+      "bytes": 2514,
+      "path": "artifacts/options-alpha-v1/replay/2026-09-08/paper_card_SPY_outcome.json",
+      "role": "prior option experiment/capability/sparse replay; not a complete option-price history",
+      "sha256": "5fd3a55506f1a02ab45b1c99b074967b12cf655a085cd7dff2fd8925c839b952"
+    },
+    {
+      "bytes": 493265,
+      "path": "artifacts/options-alpha-v1/replay/2026-09-22/chain_trimmed.json",
+      "role": "prior option experiment/capability/sparse replay; not a complete option-price history",
+      "sha256": "db1bc7a354d9b3c06f65e91b43109d08fc0df41e180de8faa87248fce54a9991"
+    },
+    {
+      "bytes": 188260,
+      "path": "artifacts/options-alpha-v1/replay/2026-09-22/chain_trimmed_AAPL.json",
+      "role": "prior option experiment/capability/sparse replay; not a complete option-price history",
+      "sha256": "29a1fc77c854d7df82049518deb958b679131c5569b46d0dfd36f1e5184cf4a7"
+    },
+    {
+      "bytes": 407813,
+      "path": "artifacts/options-alpha-v1/replay/2026-09-22/chain_trimmed_AMD.json",
+      "role": "prior option experiment/capability/sparse replay; not a complete option-price history",
+      "sha256": "93adebdc5678d0ea6948e8f8fd97c3bf7440361f9308e9ce82f26ece027f8f6b"
+    },
+    {
+      "bytes": 208478,
+      "path": "artifacts/options-alpha-v1/replay/2026-09-22/chain_trimmed_NVDA.json",
+      "role": "prior option experiment/capability/sparse replay; not a complete option-price history",
+      "sha256": "f29629cb360755f6587f9f47a78bc37b94659ff0219e075baedaeccd89676be0"
+    },
+    {
+      "bytes": 602347,
+      "path": "artifacts/options-alpha-v1/replay/2026-09-22/chain_trimmed_QQQ.json",
+      "role": "prior option experiment/capability/sparse replay; not a complete option-price history",
+      "sha256": "3bbbf5c473fa58942c1d1048c7b67c7c320b34e46982fe319fb4330822ffd971"
+    },
+    {
+      "bytes": 295472,
+      "path": "artifacts/options-alpha-v1/replay/2026-09-22/chain_trimmed_TSLA.json",
+      "role": "prior option experiment/capability/sparse replay; not a complete option-price history",
+      "sha256": "913d76914bdb749fb28f5798e29203d9d5d3ab0f592b86ecf77a766eead59d67"
+    },
+    {
+      "bytes": 3225,
+      "path": "artifacts/options-alpha-v1/replay/2026-09-22/paper_card_QQQ.json",
+      "role": "prior option experiment/capability/sparse replay; not a complete option-price history",
+      "sha256": "155f223d7a532ce27fc6eaf8b9dce2a732f8aaf277abc0cb234e821cf9520d80"
+    },
+    {
+      "bytes": 3495,
+      "path": "artifacts/options-alpha-v1/replay/2026-09-22/paper_card_SPY.json",
+      "role": "prior option experiment/capability/sparse replay; not a complete option-price history",
+      "sha256": "b09ffc183d141e7e908b80fb004dc2eec6573da56bbb442d61f99791d3a945f5"
+    },
+    {
+      "bytes": 65639,
+      "path": "artifacts/options-alpha-v1/replay/2026-09-22/screener_candidates.json",
+      "role": "prior option experiment/capability/sparse replay; not a complete option-price history",
+      "sha256": "364c3c123188a87886020c20675cc3a6716102cf3f897f079ac341ae563f08fd"
+    },
+    {
+      "bytes": 217,
+      "path": "artifacts/options-alpha-v1/replay/2026-09-22/underlying.json",
+      "role": "prior option experiment/capability/sparse replay; not a complete option-price history",
+      "sha256": "db7f1c8d800e9736d2becea9a93157b073754b672c04dbd5e11df700258f7766"
+    },
+    {
+      "bytes": 35713,
+      "path": "artifacts/options-alpha-v1/run_manifest.json",
+      "role": "prior option experiment/capability/sparse replay; not a complete option-price history",
+      "sha256": "1b6b4d7eddd4c5f608888e9306937185961c51f7eafcd41d626b3f7e8a99d211"
+    },
+    {
+      "bytes": 13221,
+      "path": "artifacts/options-alpha-v1/tracker_e2e.json",
+      "role": "prior option experiment/capability/sparse replay; not a complete option-price history",
+      "sha256": "857583d52caaef6591b9aa623f4c64a024ff883f1e9bec0e542cf3b001e44b85"
+    }
+  ],
+  "report_hash": "82c3f27f34fb63b41c4645b1f467cdc06d13d1c99b561a17a963dfb7a9b42404"
+}

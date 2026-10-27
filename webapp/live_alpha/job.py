@@ -64,6 +64,8 @@ from webapp.live_alpha import board as live_board
 from webapp.live_alpha import inputs, store, uw
 from webapp.live_alpha.diagnostics import news_counts, news_message
 from webapp.live_alpha.uw import Budget, ContractSpec, JsonClient
+from webapp.tournament.monitor import STATE as TOURNAMENT_STATE
+from webapp.tournament.monitor import run as run_tournament
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable, Sequence
@@ -732,6 +734,7 @@ async def live_alpha_loop(
             await run_shadow(engine, row, now_fn())
             await run_desk(engine, row, now_fn())
             await run_calibration(engine, now_fn())
+            await run_tournament(engine, now_fn())
             status = row.status
             detail = {"scan_id": row.scan_id, "cards": len(row.snapshot.get("cards", [])),
                       "requests": row.snapshot.get("requests"), "mode": row.market_mode,
@@ -755,6 +758,8 @@ async def live_alpha_loop(
             LAST_CYCLE["desk_status"] = DESK_STATE.get("status")
         if CALIBRATION_STATE:
             LAST_CYCLE["calibration_status"] = CALIBRATION_STATE.get("status")
+        if TOURNAMENT_STATE:
+            LAST_CYCLE["tournament_status"] = TOURNAMENT_STATE.get("status")
         cycles += 1
         if max_cycles is not None and cycles >= max_cycles:
             return
