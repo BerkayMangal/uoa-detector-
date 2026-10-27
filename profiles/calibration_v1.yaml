@@ -1,0 +1,41 @@
+version: calibration_v1
+lookbacks: [5, 10, 20]
+min_lag_pp: [0, 1, 2, 4]
+min_recovery_atr: [0, 0.25, 0.5, 1]
+min_volume_ratio: [0, 1, 1.5, 2]
+regimes: [any, positive, above_ma20]
+max_chase_atr: [0.5, 1, 2]
+atr_sessions: 14
+volume_sessions: 20
+market_ma_sessions: 20
+primary_sessions: 3
+secondary_sessions: [1, 5]
+capital_usd: 10000
+position_usd: 2500
+max_positions: 8
+slippage_bps: 5
+sensitivity_bps: [10, 20]
+min_closed: 30
+max_drawdown_pct: 20
+train_start: 2025-09-18
+train_end: 2026-03-19
+validation_start: 2026-03-30
+validation_end: 2026-06-18
+test_start: 2026-06-30
+test_end: 2026-09-18
+prospective_start: 2026-10-28
+monitor_timeout_seconds: 15
+monitor_interval_seconds: 300
+display_limit: 100
+historical_holidays_2025:
+  - 2025-01-01
+  - 2025-01-09
+  - 2025-01-20
+  - 2025-02-17
+  - 2025-04-18
+  - 2025-05-26
+  - 2025-06-19
+  - 2025-07-04
+  - 2025-09-01
+  - 2025-11-27
+  - 2025-12-25

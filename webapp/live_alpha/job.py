@@ -56,6 +56,7 @@ from webapp.board.hotlist import load_hot_tickers, load_hotlist_settings
 from webapp.board.lag_record import append_records, records_from
 from webapp.board.peers import auto_lags, load_peer_settings, load_universe_closes
 from webapp.board.settings import BoardSettings
+from webapp.calibration.monitor import run as run_calibration
 from webapp.desk.capture import STATE as DESK_STATE
 from webapp.desk.capture import run as run_desk
 from webapp.live_alpha import board as live_board
@@ -729,6 +730,7 @@ async def live_alpha_loop(
                                   gamma_source=gamma_repo.latest)
             await run_shadow(engine, row, now_fn())
             await run_desk(engine, row, now_fn())
+            await run_calibration(engine, now_fn())
             status = row.status
             detail = {"scan_id": row.scan_id, "cards": len(row.snapshot.get("cards", [])),
                       "requests": row.snapshot.get("requests"), "mode": row.market_mode,

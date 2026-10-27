@@ -345,6 +345,17 @@ async def _refresh_ticker(
         if is_final_close(bar.day, now)
     ]
     _store_bars(factory, ticker, bars, fetched_at=now.astimezone(UTC))
+    # Separate append-only research capture from the SAME already-paid payload.
+    # Import at the adapter boundary to avoid a startup dependency cycle.
+    try:
+        from webapp.calibration.storage import capture_payload
+
+        with factory() as research_session:
+            bound = research_session.get_bind()
+            if isinstance(bound, Engine):
+                capture_payload(bound, ticker, payload.get("data"), now)
+    except Exception:
+        _logger.exception("calibration side capture unavailable; daily closes preserved")
     closes, ambiguous = _unique_positive_closes(regular_session_closes(payload.get("data")))
     if not closes:
         return DailyCloseTickerResult(ticker=ticker, status="no_data", ambiguous_days=ambiguous)
