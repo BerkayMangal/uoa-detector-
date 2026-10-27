@@ -26,6 +26,7 @@ import secrets
 import threading
 import time
 from contextvars import ContextVar
+from dataclasses import asdict
 from datetime import UTC, datetime
 from pathlib import Path
 from time import perf_counter
@@ -107,11 +108,23 @@ _LIVE_ALPHA_THREAD: threading.Thread | None = None
 def _live_alpha_thread_main(database_url: str) -> None:
     """Run the Live Alpha loop forever on this thread's own event loop; restart on a crash."""
     while True:
+        live_job.LAST_CYCLE.clear()
+        live_job.LAST_CYCLE.update(at=datetime.now(UTC).isoformat(), status="starting", mode=None, cards=None)
         try:
             asyncio.run(live_alpha_loop(database_url=database_url))
-        except Exception:
+        except Exception as exc:
+            from webapp.live_alpha.cycle_status import safe_failure
+
+            live_job.LAST_CYCLE.clear()
+            live_job.LAST_CYCLE.update(at=datetime.now(UTC).isoformat(), status="failed", mode=None,
+                                      cards=None, failure=asdict(safe_failure(exc, "startup")))
             _logger.exception("live-alpha crashed; restarting in 30s")
         else:
+            from webapp.live_alpha.cycle_status import safe_failure
+
+            live_job.LAST_CYCLE.clear()
+            live_job.LAST_CYCLE.update(at=datetime.now(UTC).isoformat(), status="failed", mode=None,
+                                      cards=None, failure=asdict(safe_failure(RuntimeError(), "startup")))
             _logger.warning("live-alpha exited unexpectedly; restarting in 30s")
         time.sleep(30)
 

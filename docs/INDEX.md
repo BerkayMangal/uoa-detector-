@@ -245,6 +245,7 @@ A new study needs a fresh, non-overlapping window (`docs/next_studies.md`,
 | 5.39 | **Forward data readiness** — distinguish missing/stale data, incomplete history, no qualifying setup and pre-open publication availability; private detailed diagnostics and safe aggregate health summary, independent of scan failure. Contract: `docs/phase-5.39-data-readiness-acceptance.md`; delivery: `docs/phase-5.39-closeout.md`. |
 | 5.40 | **Failed-cycle recovery diagnostics** — safe stage/category/code-location hints and existing-live-cadence retry after failed closed scans. Frozen policies and quota caps unchanged. Contract: `docs/phase-5.40-cycle-recovery-acceptance.md`; delivery: `docs/phase-5.40-closeout.md`. |
 | 5.41 | **Database connection health** — safe SQLSTATE/disconnect evidence and pre-ping before pooled connection reuse; no transaction replay or data reset. Contract: `docs/phase-5.41-database-health-acceptance.md`; delivery: `docs/phase-5.41-closeout.md`. |
+| 5.42 | **Startup failure visibility** — starting/crashed state before first cycle with sanitized failure hints; existing restart policy, profiles and data preserved. Contract: `docs/phase-5.42-startup-visibility-acceptance.md`; delivery: `docs/phase-5.42-closeout.md`. |
 
 Detail for the 5.10–5.19 candidates:
 - **Falsification gates (D8).** `src/uoa_detector/backtest/falsification.py:79-81`
