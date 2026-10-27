@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from collections import Counter
 from collections.abc import Sequence
 from dataclasses import asdict
 from datetime import datetime, timedelta
@@ -96,6 +97,8 @@ def observe(
     history = readers.price_history(engine, tickers, now, cfg)
     audits: list[dict[str, Any]] = []
     cohorts: list[dict[str, Any]] = []
+    exclusions: Counter[str] = Counter()
+    quality: Counter[str] = Counter()
     eligible = treated = 0
     for ticker in tickers:
         reasons: list[str] = []
@@ -150,6 +153,8 @@ def observe(
         ):
             reasons.append("calendar_unknown")
         arm = "excluded" if reasons else "flow" if flow.qualified else "control"
+        exclusions.update(reasons)
+        quality.update({name: getattr(flow, name) for name in ("multileg", "invalid", "conflicts", "unknown_flags")})
         payload: dict[str, Any] = {
             "policy": cfg.policy_version,
             "profile_hash": cfg.profile_hash,
@@ -227,6 +232,8 @@ def observe(
         "candidates": len(tickers),
         "eligible_this_cycle": eligible,
         "flow_this_cycle": treated,
+        "excluded_by_reason": dict(exclusions),
+        "flow_quality_counts": dict(quality),
         **progress,
     }
     db.append(

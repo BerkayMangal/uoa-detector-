@@ -58,6 +58,7 @@ from webapp.board.peers import auto_lags, load_peer_settings, load_universe_clos
 from webapp.board.settings import BoardSettings
 from webapp.live_alpha import board as live_board
 from webapp.live_alpha import inputs, store, uw
+from webapp.live_alpha.diagnostics import news_counts, news_message
 from webapp.live_alpha.uw import Budget, ContractSpec, JsonClient
 
 if TYPE_CHECKING:
@@ -646,6 +647,7 @@ async def run_cycle(
                            and c.recommendation in (Recommendation.BUY, Recommendation.BEARISH_SETUP)),
     }
     news_failed = [t for t, n in news.items() if n.state is CheckState.FAILED]
+    news_errors = news_counts(news.values())
     if news_failed:
         status = "degraded"
     spot_ages = {
@@ -663,9 +665,10 @@ async def run_cycle(
         "paper": {"opened": opened, **paper_counts},
         "requests": {"reserved": budget.reserved, "refused": budget.refused, "cap": budget.cap},
         "news_failed": news_failed,
+        "news_errors": news_errors,
         "spot_age_seconds": spot_ages,
         "timing_seconds": round(perf_counter() - t0, 2),
-        "status_text": "" if status == "ok" else f"haber kontrol edilemedi: {', '.join(news_failed)}",
+        "status_text": "" if status == "ok" else news_message(news_errors),
     })
     row = store.ScanRow(scan_id=scan_id, started_at=now, finished_at=datetime.now(UTC),
                         market_mode=session.mode.value, status=status, run_id=run_id, snapshot=snapshot)
@@ -721,7 +724,8 @@ async def live_alpha_loop(
             await run_shadow(engine, row, now_fn())
             status = row.status
             detail = {"scan_id": row.scan_id, "cards": len(row.snapshot.get("cards", [])),
-                      "requests": row.snapshot.get("requests"), "mode": row.market_mode}
+                      "requests": row.snapshot.get("requests"), "mode": row.market_mode,
+                      "news_errors": row.snapshot.get("news_errors", {})}
         except Exception as exc:
             _logger.exception("live alpha cycle failed")
             status, detail = "failed", {"error": type(exc).__name__, "message": str(exc)[:300]}
@@ -735,6 +739,8 @@ async def live_alpha_loop(
             "at": now.isoformat(timespec="seconds"), "status": status,
             "mode": detail.get("mode"), "cards": detail.get("cards"),
         })
+        if detail.get("news_errors"):
+            LAST_CYCLE["news_errors"] = detail["news_errors"]
         cycles += 1
         if max_cycles is not None and cycles >= max_cycles:
             return
