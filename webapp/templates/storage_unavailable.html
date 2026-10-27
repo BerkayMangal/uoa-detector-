@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="max-w-xl mx-auto mt-16">
+  <p class="eyebrow">ÇALIŞMA MASASI / ERİŞİM DURUMU</p>
+  <h1>{{ 'Kayıt durumu doğrulanamıyor' if uncertain else 'Veriye şu an erişilemiyor' }}</h1>
+  {% if uncertain %}
+  <p class="desk-notice" role="status">İşlemin veritabanına kaydedilip kaydedilmediğini doğrulayamıyoruz. İstek otomatik olarak tekrar gönderilmedi.</p>
+  <p class="quiet-copy">Bağlantı döndüğünde ilgili kaydı İşlemlerim, Pozisyonlarım veya Karar defterinden kontrol edin. Aynı işlemi yeniden göndermeden önce kayıt durumunu doğrulayın.</p>
+  {% else %}
+  <p class="desk-notice" role="status">Bu ekranın güncel verisi doğrulanamıyor. Canlı sinyalleri ve PAPER sonuçlarını güncel kabul etmeyin.</p>
+  <p class="quiet-copy">Veritabanı erişiminin yeniden sağlanması gerekiyor. Daha sonra kontrol edebilirsiniz.</p>
+  {% endif %}
+  <p class="quiet-copy"><a href="/">Ana sayfayı yeniden kontrol et →</a></p>
+</div>
+{% endblock %}

@@ -35,10 +35,11 @@ from urllib.parse import urlencode, urlsplit
 from zoneinfo import ZoneInfo
 
 from fastapi import FastAPI, Form, Request
-from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import Table, event
 from sqlalchemy.engine import Engine
+from sqlalchemy.exc import OperationalError
 from starlette.datastructures import Headers
 from starlette.responses import PlainTextResponse
 
@@ -330,6 +331,27 @@ def live_alert_script() -> FileResponse:
 @app.get("/assets/live-desk.js", include_in_schema=False)
 def live_desk_script() -> FileResponse:
     return FileResponse(_BASE / "static" / "live-desk.js", media_type="text/javascript")
+
+
+@app.exception_handler(OperationalError)
+async def _database_unavailable(request: Request, exc: OperationalError) -> Response:
+    _logger.error("database operation unavailable on %s", request.url.path,
+                  exc_info=(type(exc), exc, exc.__traceback__))
+    uncertain = request.method not in ("GET", "HEAD", "OPTIONS")
+    headers = {"X-Robots-Tag": "noindex, nofollow, nosnippet", "Cache-Control": "private, no-store"}
+    if request.url.path.startswith("/api/"):
+        return JSONResponse({"error": "database_unavailable",
+                             "outcome": "unknown" if uncertain else "unavailable"},
+                            status_code=503, headers=headers)
+    try:
+        return templates.TemplateResponse(request, "storage_unavailable.html", {"uncertain": uncertain},
+                                          status_code=503, headers=headers)
+    except Exception:
+        message = ("Kaydın tamamlandığını doğrulayamıyoruz. Tekrar göndermeden önce kayıtları kontrol edin."
+                   if uncertain else "Veritabanına şu an erişilemiyor. Güncel veriler doğrulanamıyor.")
+        return HTMLResponse(f'<!doctype html><html lang="tr"><title>Veritabanı erişimi</title>'
+                            f'<h1>Veritabanı erişimi</h1><p>{message}</p><a href="/">Ana sayfa</a></html>',
+                            status_code=503, headers=headers)
 
 
 @app.exception_handler(Exception)
