@@ -38,7 +38,8 @@ feature PR. No strategy, calibration or upstream data changes.
 - Existing auth matrix retains all assertions, excluding only the explicitly
   authorized public GETs (371 existing auth cases passed).
 - Chromium desktop (1440 px) and phone (390 px): no document overflow, no script
-  errors, no external asset requests. Search/hot/lag/empty states and cost folds
+  errors, no external asset requests. Expanded PAPER/evidence/cost tables stay
+  within the mobile page width. Search/hot/lag/empty states and cost folds
   exercised. Clock advanced beyond expiry while editing a manual fill: input
   preserved, entry withdrawn, PAPER button disabled, ready count reset.
 - Axe WCAG 2 A/AA and 2.1 AA scan: zero reported violations on `/` and `/hakkinda`.

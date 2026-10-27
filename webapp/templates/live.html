@@ -13,7 +13,7 @@
   </div>
   {% if ok %}<p class="text-sm text-emerald-400 mb-2" data-ok>{{ ok }}</p>{% endif %}
   {% if v.has_scan %}
-  <p class="text-sm text-gray-500 mb-3">Son güncelleme {{ (v.scan_age_seconds // 60) if v.scan_age_seconds else 0 }} dk önce{% if v.mode != 'LIVE' and v.open_tr %} · piyasa {{ v.open_tr }} açılır{% endif %}{% if v.session.get('close_et') and v.session.close_et != '16:00' %} · erken kapanış {{ v.session.close_et }} ET{% endif %}.</p>
+  <p class="text-sm text-gray-500 mb-3">Son güncelleme <span id="scan-age">{{ (v.scan_age_seconds // 60) if v.scan_age_seconds else 0 }}</span> dk önce{% if v.mode != 'LIVE' and v.open_tr %} · piyasa {{ v.open_tr }} açılır{% endif %}{% if v.session.get('close_et') and v.session.close_et != '16:00' %} · erken kapanış {{ v.session.close_et }} ET{% endif %}.</p>
   {% if v.scan_stale %}<p class="desk-notice" data-stale>Tarama bayat: son döngü beklenenden eski. Kartlardaki giriş hazırlığı geri çekildi; iş durumu en altta.</p>{% endif %}
   {% if v.status != 'ok' and v.status_text %}<p class="desk-notice" data-degraded>{{ v.status_text }}</p>{% endif %}
   {% else %}
@@ -129,10 +129,10 @@
   <h3 class="sr-only">Önerilerin sonucu (PAPER: simülasyon, gerçek para değil)</h3>
   <p class="text-sm text-gray-400 mb-2">Açık/bekleyen {{ v.paper_stats.open }} · fiyatlanmış kapanış {{ v.paper_stats.closed }} · dolmayan {{ v.paper_stats.unfilled }} · belirsiz {{ v.paper_stats.unknown }} · model maliyetleri sonrası toplam {% if v.paper_stats.pnl_usd is not none %}${{ '%.2f' | format(v.paper_stats.pnl_usd) }}{% else %}bilinmiyor{% endif %} ({{ v.paper_stats.wins }} kazanç). Tüm geçmiş; aşağıda son 20 kapalı kayıt. <a class="underline" href="/sonuclar">Ayrıntılı sonuçlar</a>. Küçük örneklem; başarı oranı çıkarılmaz.</p>
   {% if v.papers_open or v.papers_closed %}
-  <table class="text-sm w-full"><thead class="text-gray-400 text-left"><tr><th>Hisse</th><th>Araç</th><th>Durum</th><th>Giriş</th><th>Stop/Hedef</th><th>Son değer</th><th>Çıkış</th><th>P&amp;L</th></tr></thead><tbody>
+  <div class="overflow-x-auto"><table class="text-sm w-full"><thead class="text-gray-400 text-left"><tr><th>Hisse</th><th>Araç</th><th>Durum</th><th>Giriş</th><th>Stop/Hedef</th><th>Son değer</th><th>Çıkış</th><th>P&amp;L</th></tr></thead><tbody>
   {% for p in v.papers_open + v.papers_closed %}
   <tr class="border-t border-gray-800" data-paper="{{ p.ticker }}"><td>{{ p.ticker }}</td><td>{{ p.instrument }}</td><td>{{ p.state_text }}</td><td>{{ p.entry_price or '—' }}{% if p.quantity %} × {{ p.quantity }}{% endif %}</td><td>{{ p.stop }} / {{ p.target }}</td><td>{{ p.last_mark or '—' }}</td><td>{{ p.exit_price or '—' }} {{ p.exit_reason or '' }}</td><td>{{ p.pnl_usd if p.pnl_usd is not none else '—' }}</td></tr>
-  {% endfor %}</tbody></table>
+  {% endfor %}</tbody></table></div>
   {% else %}<p class="text-sm text-gray-500">Henüz PAPER pozisyonu yok. Bir ALIM kartı hazır olduğunda simüle giriş tetik ve taze fiyatla açılır.</p>{% endif %}
   {% if v.manuals %}
   <h4 class="text-sm font-semibold text-white mt-4">Kendi işlemlerim (MANUAL_FILL, PAPER'dan ayrı)</h4>
@@ -182,6 +182,17 @@
   let editing = false;
   document.querySelectorAll('form input, form select').forEach(function (input) { input.addEventListener('input', function () { editing = true; }); });
   const deadline = Date.now() + {{ v.entry_ttl_seconds }} * 1000;
+  const renderedAt = Date.now();
+  function updateDataAge() {
+    const age = {{ v.scan_age_seconds or 0 }} + (Date.now() - renderedAt) / 1000;
+    const label = document.getElementById('scan-age');
+    if (label) label.textContent = String(Math.floor(age / 60));
+    if (label && age > {{ reload_seconds * 3 }} && !document.getElementById('client-age-warning')) {
+      const warning = document.createElement('p'); warning.id = 'client-age-warning'; warning.className = 'desk-notice'; warning.setAttribute('role', 'alert');
+      warning.textContent = 'Veriler eskidi. Güncel fiyat ve kararlar için sayfayı yenile; yazdığın form korunmak için otomatik yenileme duraklatıldı.';
+      document.querySelector('.desk-heading').after(warning);
+    }
+  }
   function withdrawExpiredEntries() {
     if (Date.now() < deadline) return;
     document.querySelectorAll('.plan-card[data-ready="READY"]').forEach(function (card) {
@@ -203,7 +214,9 @@
   }
   withdrawExpiredEntries();
   setInterval(withdrawExpiredEntries, 1000);
+  setInterval(updateDataAge, 1000);
   document.addEventListener('visibilitychange', withdrawExpiredEntries);
+  document.addEventListener('visibilitychange', updateDataAge);
   setInterval(function () { if (!editing && focus === 'all' && !(search && search.value) && document.visibilityState === 'visible') window.location.reload(); }, {{ reload_seconds * 1000 }});
 })();
 </script>
