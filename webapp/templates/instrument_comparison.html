@@ -7,7 +7,7 @@
   <p class="text-xs text-gray-400 mt-1">Karar anındaki plan · risk bütçesi {{ money(d.stock_plan.r_usd if d.stock_plan else none) }}.
     Aynı bütçe, farklı adetler; aynı getiri veya aynı gerçekleşen zarar anlamına gelmez.</p>
   {% if withdrawn %}<p class="text-amber-300 text-sm">Giriş geri çekildi. Aşağıdaki fiyatlar güncel işlem fiyatı değildir.</p>{% endif %}
-  <div class="overflow-x-auto mt-2">
+  <div class="overflow-x-auto mt-2" role="region" aria-label="{{ d.ticker }} maliyet karşılaştırması" tabindex="0">
     <table class="w-full text-xs text-left">
       <caption class="sr-only">Kaydedilmiş hisse ve opsiyon maliyet karşılaştırması</caption>
       <thead class="text-gray-400"><tr><th class="pr-3">Araç / birim</th><th class="pr-3">Giriş / pozisyon tutarı</th><th class="pr-3">Risk</th><th class="pr-3">Gidiş-dönüş maliyeti</th><th class="pr-3">Başabaş / hedef</th><th>Adet / engel</th></tr></thead>

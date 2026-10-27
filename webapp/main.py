@@ -55,6 +55,7 @@ from webapp.board.refresher import board_refresh_loop
 from webapp.board.settings import BoardSettings, load_board_settings
 from webapp.board.signals import BoardSignalReader
 from webapp.gamma_live import gamma_refresh_loop
+from webapp.live_alpha import alerts as live_alerts
 from webapp.live_alpha import job as live_job
 from webapp.live_alpha import page as live_page
 from webapp.live_alpha import results as live_results
@@ -300,6 +301,16 @@ def stylesheet() -> FileResponse:
 @app.get("/favicon.svg", include_in_schema=False)
 def favicon() -> FileResponse:
     return FileResponse(_BASE / "static" / "favicon.svg", media_type="image/svg+xml")
+
+
+@app.get("/assets/live-alerts.js", include_in_schema=False)
+def live_alert_script() -> FileResponse:
+    return FileResponse(_BASE / "static" / "live-alerts.js", media_type="text/javascript")
+
+
+@app.get("/assets/live-desk.js", include_in_schema=False)
+def live_desk_script() -> FileResponse:
+    return FileResponse(_BASE / "static" / "live-desk.js", media_type="text/javascript")
 
 
 @app.exception_handler(Exception)
@@ -553,8 +564,14 @@ def live_home(request: Request, ok: str = "") -> HTMLResponse:
     reload_seconds = cfg.cycle.live_seconds if view.mode == "LIVE" else cfg.cycle.closed_seconds
     return templates.TemplateResponse(
         request, "live.html",
-        {"v": view, "ok": _LIVE_OK.get(ok, ""), "reload_seconds": reload_seconds},
+        {"v": view, "ok": _LIVE_OK.get(ok, ""), "reload_seconds": reload_seconds,
+         "alert_settings": _safe(live_alerts.settings, None)},
     )
+
+
+@app.get("/api/canli/uyarilar", response_model=live_alerts.Feed)
+def live_alert_feed() -> live_alerts.Feed:
+    return live_alerts.feed(_board_reader().engine, _now())
 
 
 @app.get("/sonuclar", response_class=HTMLResponse)
