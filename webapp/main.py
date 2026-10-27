@@ -33,7 +33,7 @@ from typing import TYPE_CHECKING, Any, ParamSpec, TypeVar
 from urllib.parse import urlencode, urlsplit
 
 from fastapi import FastAPI, Form, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import event
 from sqlalchemy.engine import Engine
@@ -41,7 +41,7 @@ from starlette.datastructures import Headers
 from starlette.responses import PlainTextResponse
 
 from uoa_detector.sources.market_hours import is_market_open
-from webapp import explanations, gamma, journal, options_board, pricing
+from webapp import explanations, gamma, journal, options_board, pricing, seo
 from webapp.board import alfa_page, cards, copy_tr, decision_ledger, fills, options_paper, outcomes
 from webapp.board.baskets import basket_close_tickers, load_basket_settings
 from webapp.board.copy_tr import IV_NOT_SELL_VOL
@@ -179,7 +179,6 @@ app = FastAPI(title="UOA Screener", lifespan=_lifespan)
 
 _AUTH_USER_ENV = "WEB_AUTH_USER"
 _AUTH_PASSWORD_ENV = "WEB_AUTH_PASSWORD"
-_OPEN_ROUTE = ("GET", "/health")
 _CHALLENGE = {"WWW-Authenticate": 'Basic realm="uoa"'}
 
 
@@ -212,9 +211,10 @@ def _auth_failure(headers: Headers) -> int | None:
 
 
 class _BasicAuthGate:
-    """ASGI middleware in front of every route, mount and 404. Only
-    ``GET /health`` (the Railway healthcheck) is open. Lifespan events pass
-    through untouched. Credentials are never logged."""
+    """Gate every data route and 404; phase 5.29 allows exact static GET paths.
+
+    Lifespan events pass through untouched. Credentials are never logged.
+    """
 
     def __init__(self, app: ASGIApp) -> None:
         self._app = app
@@ -223,7 +223,7 @@ class _BasicAuthGate:
         if scope["type"] not in ("http", "websocket"):
             await self._app(scope, receive, send)
             return
-        if scope["type"] == "http" and (scope["method"], scope["path"]) == _OPEN_ROUTE:
+        if scope["type"] == "http" and scope["method"] == "GET" and scope["path"] in seo.PUBLIC_GET_PATHS:
             await self._app(scope, receive, send)
             return
         failure = _auth_failure(Headers(scope=scope))
@@ -247,6 +247,7 @@ class _BasicAuthGate:
 
 
 app.add_middleware(_BasicAuthGate)
+app.add_middleware(seo.SearchHeaders)
 
 
 templates = Jinja2Templates(directory=str(_BASE / "templates"))
@@ -261,6 +262,41 @@ templates = Jinja2Templates(directory=str(_BASE / "templates"))
 # concern stays addressed. The template set is seven files; it cannot grow
 # unbounded. ``auto_reload`` stays on, so editing a template still takes effect.
 templates.env.cache = {}
+templates.env.globals.update(page_title=seo.page_title, seo_description=seo.DESCRIPTION,
+                             public_canonical=seo.ORIGIN + "/hakkinda")
+
+
+@app.get("/hakkinda", response_class=HTMLResponse, include_in_schema=False)
+def introduction(request: Request) -> HTMLResponse:
+    """Static introduction only: no database, account or feed access."""
+    return templates.TemplateResponse(request, "about.html", {})
+
+
+@app.get("/robots.txt", include_in_schema=False)
+def robots() -> PlainTextResponse:
+    return PlainTextResponse(
+        "User-agent: *\nDisallow: /\nAllow: /hakkinda$\nAllow: /assets/uoa.css\nAllow: /favicon.svg\n"
+        f"Sitemap: {seo.ORIGIN}/sitemap.xml\n",
+    )
+
+
+@app.get("/sitemap.xml", include_in_schema=False)
+def sitemap() -> Response:
+    return Response(
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
+        f"<url><loc>{seo.ORIGIN}/hakkinda</loc></url></urlset>", media_type="application/xml",
+    )
+
+
+@app.get("/assets/uoa.css", include_in_schema=False)
+def stylesheet() -> FileResponse:
+    return FileResponse(_BASE / "static" / "uoa.css", media_type="text/css")
+
+
+@app.get("/favicon.svg", include_in_schema=False)
+def favicon() -> FileResponse:
+    return FileResponse(_BASE / "static" / "favicon.svg", media_type="image/svg+xml")
 
 
 @app.exception_handler(Exception)
@@ -268,11 +304,14 @@ async def _on_error(request: Request, exc: Exception) -> HTMLResponse:
     # Terminal-grade: never show a raw stack trace. Log it, show a clean page.
     _logger.exception("unhandled error on %s", request.url.path)
     try:
-        return templates.TemplateResponse(request, "error.html", {}, status_code=500)
+        return templates.TemplateResponse(request, "error.html", {}, status_code=500,
+                                          headers={"X-Robots-Tag": "noindex, nofollow, nosnippet",
+                                                   "Cache-Control": "private, no-store"})
     except Exception:
         return HTMLResponse(
             "<h1>Temporarily unavailable</h1><p>Refresh in a moment.</p>",
             status_code=500,
+            headers={"X-Robots-Tag": "noindex, nofollow, nosnippet", "Cache-Control": "private, no-store"},
         )
 
 # Shared template context — passed per render (not via env.globals, which

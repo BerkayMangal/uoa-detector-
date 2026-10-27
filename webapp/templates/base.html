@@ -1,61 +1,49 @@
 <!doctype html>
-<html lang="en" class="dark">
+<html lang="tr" class="dark">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>UOA Screener</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = { darkMode: 'class' }
-  </script>
-  <style>
-    body { background:#0b0e14; color:#e6e6e6; }
-    .tip { border-bottom:1px dotted #5b6472; cursor:help; }
-  </style>
+  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#141615">
+  <title>{{ page_title(request.url.path) }}</title>
+  <meta name="description" content="{{ seo_description }}">
+  {% if request.url.path == '/hakkinda' %}
+  <meta name="robots" content="index, follow">
+  <link rel="canonical" href="{{ public_canonical }}">
+  <meta property="og:type" content="website">
+  <meta property="og:locale" content="tr_TR">
+  <meta property="og:title" content="{{ page_title('/hakkinda') }}">
+  <meta property="og:description" content="{{ seo_description }}">
+  <meta property="og:url" content="{{ public_canonical }}">
+  {% else %}<meta name="robots" content="noindex, nofollow, nosnippet">{% endif %}
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/assets/uoa.css?v=5.29.1">
+  {% block head %}{% endblock %}
 </head>
-<body class="min-h-screen">
+<body>
   {% set path = request.url.path %}
-  <header class="border-b border-gray-800 px-6 pt-4">
-    <div class="flex items-baseline gap-4 flex-wrap">
-      <h1 class="text-2xl font-bold text-white">UOA Screener</h1>
-      {% block tagline %}<span class="text-sm text-gray-500">Unusual options flow you review by hand &mdash;
-        <span class="text-gray-400">a screening tool, not a buy signal. It never auto-trades.</span></span>{% endblock %}
+  <a class="skip-link" href="#main">İçeriğe geç</a>
+  <header class="app-header">
+    <div class="app-topbar">
+      <a href="{{ '/hakkinda' if path == '/hakkinda' else '/' }}" class="brand" aria-label="UOA ana sayfa"><span class="brand-mark">u.</span><span>UOA<span class="brand-caption">PERSONAL DESK</span></span></a>
+      <span class="desk-signature">Piyasayı oku. Kararı sen ver.</span>
+      <a class="header-link" href="{{ '/' if path == '/hakkinda' else '/hakkinda' }}">{{ 'Masayı aç' if path == '/hakkinda' else 'Hakkında' }}<svg aria-hidden="true" class="arrow-icon" viewBox="0 0 16 16" fill="none"><path d="M3 13L13 3M3 3h10v10" stroke="currentColor" stroke-width="1.4"/></svg></a>
     </div>
-    <nav class="flex gap-1 mt-4 -mb-px text-sm font-medium">
-      {# Phase 5.25: "/" is the live recommendation screen; the Alfa Board moved to /alfa. #}
-      <a href="/" class="px-4 py-2 rounded-t-lg border-b-2 {{ 'border-emerald-500 text-white bg-gray-900/60' if path == '/' or path.startswith('/canli') else 'border-transparent text-gray-400 hover:text-gray-200' }}">Bugün</a>
-      <a href="/alfa" class="px-4 py-2 rounded-t-lg border-b-2 {{ 'border-emerald-500 text-white bg-gray-900/60' if path.startswith('/alfa') else 'border-transparent text-gray-400 hover:text-gray-200' }}">Alfa Board</a>
-      <a href="/gamma" class="px-4 py-2 rounded-t-lg border-b-2 {{ 'border-emerald-500 text-white bg-gray-900/60' if path.startswith('/gamma') else 'border-transparent text-gray-400 hover:text-gray-200' }}">Gamma &amp; vol</a>
-      <a href="/journal" class="px-4 py-2 rounded-t-lg border-b-2 {{ 'border-emerald-500 text-white bg-gray-900/60' if path.startswith('/journal') else 'border-transparent text-gray-400 hover:text-gray-200' }}">Trade journal</a>
-      <a href="/sonuclar" class="px-4 py-2 rounded-t-lg border-b-2 {{ 'border-emerald-500 text-white bg-gray-900/60' if path == '/sonuclar' else 'border-transparent text-gray-400 hover:text-gray-200' }}">Sonuçlar</a>
-      {# Phase 5.2.C2a: the pass ledger. The card page (/kart) belongs to it, so it lights up too. #}
-      <a href="/defter" class="px-4 py-2 rounded-t-lg border-b-2 {{ 'border-emerald-500 text-white bg-gray-900/60' if path.startswith('/defter') or path.startswith('/kart') else 'border-transparent text-gray-400 hover:text-gray-200' }}">Karar defteri</a>
-      {# Phase 5.24 M7: the option scope's own screen — PAPER cards and their verdicts. #}
-      <a href="/opsiyon" class="px-4 py-2 rounded-t-lg border-b-2 {{ 'border-emerald-500 text-white bg-gray-900/60' if path.startswith('/opsiyon') else 'border-transparent text-gray-400 hover:text-gray-200' }}">Opsiyon</a>
+    {% if path != '/hakkinda' %}
+    <nav class="desk-nav" aria-label="Ana gezinme">
+      {% for href, label, active in [('/', 'Bugün', path == '/' or path.startswith('/canli')), ('/sonuclar', 'Sonuçlar', path == '/sonuclar'), ('/journal', 'İşlemlerim', path.startswith('/journal')), ('/defter', 'Karar defteri', path.startswith('/defter') or path.startswith('/kart')), ('/alfa', 'Akış', path.startswith('/alfa')), ('/gamma', 'Gamma & vol', path.startswith('/gamma')), ('/opsiyon', 'Opsiyon', path.startswith('/opsiyon'))] %}
+      <a href="{{ href }}" {% if active %}aria-current="page"{% endif %}>{{ label }}</a>
+      {% endfor %}
     </nav>
+    {% endif %}
   </header>
-
-  <main class="px-6 py-6">
+  <main id="main" class="desk-main {% if path == '/hakkinda' %}public-main{% endif %}" tabindex="-1">
     {% block content %}{% endblock %}
   </main>
-
-  <footer class="border-t border-gray-800 px-6 py-6 mt-10 text-sm text-gray-400">
-    {% if glossary %}
-    <details>
-      <summary class="cursor-pointer font-semibold text-gray-300">Glossary &mdash; what the terms mean</summary>
-      <dl class="mt-3 grid gap-3 md:grid-cols-2">
-        {% for term, meaning in glossary.items() %}
-        <div>
-          <dt class="font-semibold text-gray-200">{{ term }}</dt>
-          <dd class="text-gray-400">{{ meaning }}</dd>
-        </div>
-        {% endfor %}
-      </dl>
-    </details>
-    {% endif %}
-    <p class="mt-4 text-xs text-gray-600">
-      Signals are decision support only. You decide whether to trade, manually, through your own broker.
-    </p>
+  <footer class="app-footer">
+    <span class="footer-brand">UOA <span>/ kişisel çalışma masası</span></span>
+    <span>Karar desteği. Otomatik emir göndermez.</span>
+    {% if glossary %}<details><summary>Terimler</summary><dl>{% for term, meaning in glossary.items() %}<div><dt>{{ term }}</dt><dd>{{ meaning }}</dd></div>{% endfor %}</dl></details>{% endif %}
   </footer>
 </body>
 </html>

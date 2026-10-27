@@ -255,6 +255,7 @@ def build_rows(
             "iv": iv_txt, "iv_tone": iv_tone,
             "earnings": earn_txt, "earnings_warn": earn_warn,
             "basket": basket_txt, "basket_tone": basket_tone,
+            "basket_lagging": bool(basket is not None and basket.get(t) and basket[t].lagging),
             "verdict": label, "verdict_reason": reason, "verdict_tone": tone,
         })
     return rows

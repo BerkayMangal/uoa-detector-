@@ -113,6 +113,7 @@ class LiveView:
     board: list[dict[str, Any]] = field(default_factory=list)
     open_tr: str = ""
     flow_warning: str = ""
+    entry_ttl_seconds: int = 0  # browser guard when refresh pauses for an unfinished form
 
 
 def _tone(rec: str, readiness: str) -> str:
@@ -196,6 +197,10 @@ def build_view(engine: Engine, now: datetime) -> LiveView:
     age = int((now - as_utc(scan.started_at)).total_seconds())
     max_age = 3 * (cfg.cycle.live_seconds if session_now.mode is MarketMode.LIVE else cfg.cycle.closed_seconds)
     stale = age > max_age
+    entry_ttl = 0
+    if session_now.mode is MarketMode.LIVE and session_now.session_date and session_now.close_et:
+        close = datetime.combine(session_now.session_date, session_now.close_et, tzinfo=_ET)
+        entry_ttl = max(0, int(min(max_age - age, (close - now).total_seconds())))
     by_opp = {p["opportunity_id"]: p for p in papers_open + papers_closed}
     actionable: list[CardView] = []
     watching: list[CardView] = []
@@ -254,6 +259,7 @@ def build_view(engine: Engine, now: datetime) -> LiveView:
         news_failed=snap.get("news_failed", []), policy_version=snap.get("policy_version", cfg.policy_version),
         open_tr=open_tr,
         flow_warning=_flow_warning(snap, session_now),
+        entry_ttl_seconds=entry_ttl,
         board=_board_view(snap.get("board", []), entries_withdrawn=stale or session_now.mode is not MarketMode.LIVE),
     )
 
