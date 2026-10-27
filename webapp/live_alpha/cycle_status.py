@@ -20,7 +20,7 @@ from uoa_detector.sources.unusual_whales.client import (
 )
 
 _ROOT = Path(__file__).resolve().parents[2]
-_STAGES = {"scan", "shadow", "desk", "calibration", "tournament"}
+_STAGES = {"startup", "scan", "shadow", "desk", "calibration", "tournament"}
 _SQLSTATES = {
     **dict.fromkeys(
         ("08000", "08001", "08003", "08004", "08006", "08007", "08P01", "57P01", "57P02", "57P03"),
