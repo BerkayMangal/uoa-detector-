@@ -65,7 +65,7 @@ from webapp.live_alpha import inputs, store, uw
 from webapp.live_alpha.diagnostics import news_counts, news_message
 from webapp.live_alpha.uw import Budget, ContractSpec, JsonClient
 from webapp.tournament.monitor import STATE as TOURNAMENT_STATE
-from webapp.tournament.monitor import run as run_tournament
+from webapp.tournament_forward import run as run_tournament
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable, Sequence
