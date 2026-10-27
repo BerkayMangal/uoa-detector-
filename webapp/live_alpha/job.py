@@ -16,7 +16,7 @@ import asyncio
 import hashlib
 import json
 import logging
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from time import perf_counter
@@ -62,6 +62,7 @@ from webapp.desk.capture import STATE as DESK_STATE
 from webapp.desk.capture import run as run_desk
 from webapp.live_alpha import board as live_board
 from webapp.live_alpha import inputs, store, uw
+from webapp.live_alpha.cycle_status import next_wait, safe_failure
 from webapp.live_alpha.diagnostics import news_counts, news_message
 from webapp.live_alpha.uw import Budget, ContractSpec, JsonClient
 from webapp.research_readiness import run as run_readiness
@@ -729,12 +730,18 @@ async def live_alpha_loop(
     while True:
         now = now_fn()
         status, detail = "ok", {}
+        stage = "scan"
+        failure = None
         try:
             row = await run_cycle(engine, reader, client, settings, board, costs, now,
                                   gamma_source=gamma_repo.latest)
+            stage = "shadow"
             await run_shadow(engine, row, now_fn())
+            stage = "desk"
             await run_desk(engine, row, now_fn())
+            stage = "calibration"
             await run_calibration(engine, now_fn())
+            stage = "tournament"
             await run_tournament(engine, now_fn())
             status = row.status
             detail = {"scan_id": row.scan_id, "cards": len(row.snapshot.get("cards", [])),
@@ -743,6 +750,7 @@ async def live_alpha_loop(
         except Exception as exc:
             _logger.exception("live alpha cycle failed")
             status, detail = "failed", {"error": type(exc).__name__, "message": str(exc)[:300]}
+            failure = safe_failure(exc, stage)
         # Read-only data diagnostics must run even if the preceding scan failed.
         await run_readiness(engine, now_fn())
         try:
@@ -757,6 +765,8 @@ async def live_alpha_loop(
         })
         if detail.get("news_errors"):
             LAST_CYCLE["news_errors"] = detail["news_errors"]
+        if failure is not None:
+            LAST_CYCLE["failure"] = asdict(failure)
         if DESK_STATE:
             LAST_CYCLE["desk_status"] = DESK_STATE.get("status")
         if CALIBRATION_STATE:
@@ -767,5 +777,5 @@ async def live_alpha_loop(
         if max_cycles is not None and cycles >= max_cycles:
             return
         mode = classify(now_fn(), settings.calendar).mode
-        wait = settings.cycle.live_seconds if mode in (MarketMode.LIVE, MarketMode.PREMARKET) else settings.cycle.closed_seconds
+        wait = next_wait(settings, status, mode)
         await pause(wait)
