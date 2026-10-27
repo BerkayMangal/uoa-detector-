@@ -73,6 +73,7 @@ _KNOWN_EXCEPTIONS: Final = {
 # recorded, a telemetry branch that was taken, the OI that confirmed an
 # opening — nobody can re-derive these from the vendor tomorrow.
 _APPEND_ONLY_TABLES: Final = {
+    "alfa_tournament_cohort",    # first family/session roster bounds PAPER publication
     "alfa_tournament_audit",     # first API context for each selected candidate
     "alfa_tournament_decision",  # pre-open experimental arm instruction
     "alfa_tournament_result",    # immutable exact-session PAPER observations
