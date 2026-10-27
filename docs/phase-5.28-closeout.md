@@ -1,6 +1,7 @@
 # Phase 5.28 — results and instrument costs
 
-Implementation complete; publication remains blocked on GitHub API network access.
+Implementation complete. PR #95 tracks CI and publication:
+https://github.com/BerkayMangal/uoa-detector-/pull/95
 
 ## Delivered
 
@@ -49,12 +50,13 @@ Manual fills and the separate Options Alpha PAPER engine are explicitly excluded
 4. Production health was reachable and returned SHA `88d3277`, with a PREMARKET
    `degraded` Live Alpha heartbeat. Its root returns 401; production Basic Auth
    credentials are not available in this machine, so the cause was not inspected.
-5. Native Git access and push dry-run work. GitHub REST calls fail at CONNECT with
-   proxy 403; this is not evidence that GitHub authentication is missing.
+5. Native Git push succeeded (`4ffe7c7`). Initial GitHub REST calls failed at CONNECT
+   with proxy 403; this was not evidence that GitHub authentication was missing.
    Added `api.github.com` to the environment network draft, preserving the
    production hostname. Saving the draft is not runtime application/publication.
-   PR creation, CI verification and merge/deployment require that access to work.
+   After network propagation, PR #95 was created successfully with existing
+   authentication. No additional token was requested.
 
-Next: create the PR after network settings apply, verify CI, merge, and verify
-the deployed SHA and authenticated pages. Investigate the existing degraded
+Release checks: verify PR CI, merge, and verify the deployed SHA and authenticated
+pages when credentials are available. Investigate the existing degraded
 heartbeat with authorized production access separately from this reporting patch.
