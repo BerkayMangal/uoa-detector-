@@ -34,9 +34,10 @@ from typing import NotRequired, TypedDict, cast
 
 import numpy as np
 import pandas as pd
-from sqlalchemy import Float, String, Table, create_engine, select
+from sqlalchemy import Float, String, Table, select
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
 
+from webapp.board.db import make_engine
 from webapp.repo import _normalize_url
 
 _NORM = 1.0 / math.sqrt(2.0 * math.pi)
@@ -234,7 +235,7 @@ class GammaRepo:
         url = _normalize_url(
             database_url or os.environ.get("DATABASE_URL", "sqlite:///webapp/seed.db"),
         )
-        self._engine = create_engine(url, future=True)
+        self._engine = make_engine(url)
         _Base.metadata.create_all(self._engine)
         self._session = sessionmaker(self._engine, future=True)
 

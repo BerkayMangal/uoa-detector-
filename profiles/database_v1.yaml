@@ -1,0 +1,3 @@
+# Application sessions run serial queries to bound dynamic shared-memory demand.
+# Operational setting only; no strategy, position sizing or signal threshold.
+max_parallel_workers_per_gather: 0
