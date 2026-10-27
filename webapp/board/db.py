@@ -36,7 +36,7 @@ def normalize_database_url(url: str) -> str:
 def make_engine(database_url: str | None = None) -> Engine:
     """Engine for ``database_url``, or ``$DATABASE_URL``, or the local seed DB."""
     url = database_url or os.environ.get("DATABASE_URL", _DEFAULT_URL)
-    return create_engine(normalize_database_url(url), future=True)
+    return create_engine(normalize_database_url(url), future=True, pool_pre_ping=True)
 
 
 def create_tables(engine: Engine) -> None:
