@@ -39,6 +39,15 @@
       const age = ageAtRender + (Date.now() - renderedAt) / 1000;
       const label = root.querySelector('#scan-age');
       if (label) label.textContent = String(Math.floor(age / 60));
+      root.querySelectorAll('[data-position-age]').forEach(function (row) {
+        const age = Number(row.dataset.positionAge) + (Date.now() - renderedAt) / 1000;
+        if (age > Number(root.dataset.priceMaxAge) && !row.dataset.ageWarned) {
+          row.dataset.ageWarned = 'true';
+          const note = document.createElement('p'); note.className = 'quiet-copy';
+          note.textContent = 'Fiyat gözlemi eski; güncel fiyatı yeniden kontrol et.';
+          row.querySelector('[data-position-status]').append(note);
+        }
+      });
       if (label && age > cadence * 3 && !root.querySelector('#client-age-warning')) {
         const warning = document.createElement('p');
         warning.id = 'client-age-warning'; warning.className = 'desk-notice'; warning.setAttribute('role', 'alert');

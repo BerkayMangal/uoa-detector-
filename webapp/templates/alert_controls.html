@@ -1,0 +1,10 @@
+{% if alert_settings %}
+<aside class="live-alert-controls" aria-label="Canlı sinyal uyarıları" id="live-alert-controls"
+  data-poll-seconds="{{ alert_settings.poll_seconds }}" data-seen-ttl="{{ alert_settings.seen_ttl_seconds }}" data-max-seen="{{ alert_settings.max_seen }}">
+  <div class="focus-tabs"><button type="button" id="alerts-toggle" aria-pressed="false">Uyarıları aç</button><button type="button" id="alerts-test">Sesi dene</button></div>
+  <label class="quiet-copy" for="alerts-scope">Uyarı kapsamı <select id="alerts-scope"><option value="calls">CALL / call spread</option><option value="all">Tüm ALIM önerileri</option></select></label>
+  <label class="quiet-copy"><input type="checkbox" id="alerts-exits" checked> PAPER / manuel çıkış incelemeleri</label>
+  <p class="quiet-copy" id="alerts-status" role="status" aria-live="polite">Uyarılar kapalı. Sayfa açıkken çalışır; tarayıcı veya işletim sistemi arka plan uyarılarını sınırlayabilir.</p>
+</aside>
+<div class="signal-toast" id="signal-toast" role="status" aria-live="polite" hidden><p id="signal-message"></p><div><button type="button" id="signal-refresh">Planları güncelle</button><button type="button" id="signal-dismiss" aria-label="Uyarıyı kapat">Kapat</button></div></div>
+{% else %}<p class="desk-notice">Uyarı ayarları okunamadı; sinyal uyarıları kapalı.</p>{% endif %}

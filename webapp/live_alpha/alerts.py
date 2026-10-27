@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import logging
 import math
 from datetime import UTC, datetime, timedelta
 from typing import Any, Literal
@@ -15,6 +16,8 @@ from sqlalchemy.engine import Engine
 
 from uoa_detector.live_alpha.calendar import MarketMode, classify
 from uoa_detector.live_alpha.settings import load_live_alpha_settings, profile_path
+from webapp.alpha_lab.readers import spots_at
+from webapp.desk.entry_guard import reason as entry_guard_reason
 from webapp.live_alpha import store
 from webapp.live_alpha.inputs import as_utc
 
@@ -36,14 +39,16 @@ class Signal(BaseModel):
     model_config = ConfigDict(frozen=True)
     key: str
     ticker: str
-    instrument: Literal["stock", "long_call", "bull_call_debit"]
+    instrument: Literal["stock", "long_call", "bull_call_debit", "long_put", "bear_put_debit"]
     label: str
     contracts: tuple[str, ...]
-    underlying_ref: float
-    underlying_stop: float
-    underlying_target: float
+    underlying_ref: float | None = None
+    underlying_stop: float | None = None
+    underlying_target: float | None = None
     as_of: datetime
     expires_at: datetime
+    event_type: Literal["entry", "exit"] = "entry"
+    message: str = ""
 
 
 class Feed(BaseModel):
@@ -53,6 +58,7 @@ class Feed(BaseModel):
     detail: str
     scan_id: str | None = None
     signals: tuple[Signal, ...] = ()
+    exit_status: str = "not_checked"
 
 
 def _at(value: object) -> datetime | None:
@@ -141,12 +147,12 @@ def _signal(
     )
 
 
-def feed(engine: Engine, now: datetime) -> Feed:
+def _entry_feed(engine: Engine, now: datetime) -> Feed:
     now = as_utc(now)
     cfg = load_live_alpha_settings()
     session = classify(now, cfg.calendar)
     if session.mode is not MarketMode.LIVE or not session.session_date or not session.close_et:
-        return Feed(server_time=now, status="not_live", detail="Seans açık değil; uyarı beklemede.")
+        return Feed(server_time=now, status="not_live", detail="Seans açık değil; giriş uyarıları beklemede.")
     scan = store.latest_scan(engine) if inspect(engine).has_table("alfa_live_scan") else None
     if scan is None:
         return Feed(server_time=now, status="no_scan", detail="İlk tarama bekleniyor.")
@@ -162,8 +168,27 @@ def feed(engine: Engine, now: datetime) -> Feed:
     if deadline <= now:
         return Feed(server_time=now, status="stale", detail="Tarama eski; yeni veri bekleniyor.")
     cards = scan.snapshot.get("cards", [])
+    spots = spots_at(engine, [c.get("ticker", "") for c in cards if isinstance(c, dict)], now) if isinstance(cards, list) else {}
+    has_spots = inspect(engine).has_table("alfa_atm")
     signals = tuple(
         signal for card in cards if isinstance(card, dict)
+        if not entry_guard_reason(card, spots.get(card.get("ticker", "")), now, has_spots)
         if (signal := _signal(card, scan.snapshot, now, deadline, started)) is not None
     ) if isinstance(cards, list) else ()
     return Feed(server_time=now, status="current", detail="Güncel tarama izleniyor.", scan_id=scan.scan_id, signals=signals)
+
+
+def feed(engine: Engine, now: datetime) -> Feed:
+    from webapp.desk.exit_alerts import recent
+
+    entry = _entry_feed(engine, now)
+    try:
+        notices = recent(engine, now)
+        exits = tuple(Signal(key=n.key, ticker=n.ticker, instrument=n.instrument, label=n.label,
+            contracts=(), as_of=n.at, expires_at=n.expires, event_type="exit", message=n.message) for n in notices)
+    except Exception:
+        logging.getLogger(__name__).exception("exit alert feed unavailable; entry feed preserved")
+        return entry.model_copy(update={"exit_status": "unavailable"})
+    return entry.model_copy(update={"signals": (*entry.signals, *exits), "exit_status": "ok",
+        "status": "current" if exits else entry.status,
+        "detail": entry.detail + (" PAPER/manuel çıkış kayıtları izleniyor." if exits else "")})

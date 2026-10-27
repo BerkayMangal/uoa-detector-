@@ -490,6 +490,7 @@ def build_card(
         rank_key=(RANK[d.recommendation], rank_premium),
         dimensions=dims,
         plain_action=plain_action,
+        spot_ref=d.price.spot, spot_ref_at=d.price.spot_fetched_at,
         plain_reason=plain_reason,
     )
 

@@ -5,6 +5,7 @@
   if (!controls) return;
   const toggle = document.getElementById('alerts-toggle'), test = document.getElementById('alerts-test');
   const scope = document.getElementById('alerts-scope'), status = document.getElementById('alerts-status');
+  const exitChoice = document.getElementById('alerts-exits');
   const toast = document.getElementById('signal-toast'), message = document.getElementById('signal-message');
   const PREF = 'uoa.live-alerts.pref.v1';
   const pollSeconds = Number(controls.dataset.pollSeconds);
@@ -21,13 +22,13 @@
   function say(text) { status.textContent = text; }
   function readPref() {
     const p = JSON.parse(localStorage.getItem(PREF) || '{}');
-    return {enabled: p.enabled === true, scope: p.scope === 'all' ? 'all' : 'calls'};
+    return {enabled: p.enabled === true, scope: p.scope === 'all' ? 'all' : 'calls', exits: p.exits !== false};
   }
   function paint() {
     toggle.textContent = enabled ? 'Uyarıları kapat' : 'Uyarıları aç';
     toggle.setAttribute('aria-pressed', String(enabled));
   }
-  function persist() { localStorage.setItem(PREF, JSON.stringify({enabled: enabled, scope: scope.value})); }
+  function persist() { localStorage.setItem(PREF, JSON.stringify({enabled: enabled, scope: scope.value, exits: exitChoice ? exitChoice.checked : true})); }
   function failStorage() {
     enabled = false; generation++; paint(); retire();
     say('Tarayıcı kayıt alanı kullanılamıyor. Tekrarları önlemek için uyarılar kapatıldı; site verilerine izin verip yeniden aç.');
@@ -108,11 +109,12 @@
     return data;
   }
   function valid(signal, data) {
+    const exit = signal && signal.event_type === 'exit';
     return data.status === 'current' && signal && /^[a-f0-9]{64}$/.test(signal.key)
-      && ['stock', 'long_call', 'bull_call_debit'].includes(signal.instrument)
-      && (scope.value === 'all' || signal.instrument !== 'stock')
+      && (exit ? ['stock', 'long_call', 'bull_call_debit', 'long_put', 'bear_put_debit'] : ['stock', 'long_call', 'bull_call_debit']).includes(signal.instrument)
+      && (exit ? !exitChoice || exitChoice.checked : scope.value === 'all' || signal.instrument !== 'stock')
       && typeof signal.ticker === 'string' && typeof signal.label === 'string'
-      && [signal.underlying_ref, signal.underlying_stop, signal.underlying_target].every(function (n) { return Number.isFinite(n) && n > 0; })
+      && (exit ? typeof signal.message === 'string' && signal.message.length > 0 : [signal.underlying_ref, signal.underlying_stop, signal.underlying_target].every(function (n) { return Number.isFinite(n) && n > 0; }))
       && Date.parse(signal.expires_at) - Date.parse(data.server_time) > data.elapsed + performance.now() - data.receivedAt;
   }
   function show(signals, data) {
@@ -121,7 +123,7 @@
     const labels = live.map(function (s) { return s.ticker + ' · ' + s.label; });
     const first = live[0];
     const money = new Intl.NumberFormat('en-US', {style: 'currency', currency: 'USD'});
-    const body = first.ticker + ' · Deneysel plan · Dayanak ref ' + money.format(first.underlying_ref)
+    const body = first.event_type === 'exit' ? first.message : first.ticker + ' · Deneysel plan · Dayanak ref ' + money.format(first.underlying_ref)
       + ' · stop ' + money.format(first.underlying_stop) + ' · hedef ' + money.format(first.underlying_target) + '. Güncel planı kontrol et.';
     message.textContent = labels.join(', ') + ' — ' + body;
     toastKeys = live.map(function (s) { return s.key; });
@@ -155,7 +157,7 @@
         catch (_) { failStorage(); return; }
         if (enabled && armed === generation) show(fresh, data);
       });
-      if (enabled) say('Uyarılar açık · ' + data.detail + ' ' + channelText());
+      if (enabled) say('Uyarılar açık · ' + data.detail + (data.exit_status === 'unavailable' ? ' Çıkış uyarıları doğrulanamıyor.' : '') + ' ' + channelText());
     } catch (_) {
       if (enabled && armed === generation) { retire(); say('Uyarı bağlantısı kurulamadı; güncel sinyal doğrulanamıyor. Yeniden denenecek.'); }
     } finally { polling = false; }
@@ -191,7 +193,7 @@
     try { await unlockAudio(); if (!ding()) throw new Error('sound failed'); deliveryIssue = ''; say('Test sesi çalındı. ' + (enabled ? channelText() : 'Sinyal izlemek için uyarıları aç.')); }
     catch (_) { say('Ses etkinleştirilemedi. Tarayıcının site sesine izin verdiğini kontrol et.'); }
   });
-  scope.addEventListener('change', async function () {
+  async function changeScope() {
     generation++; retire();
     if (!enabled) { try { persist(); } catch (_) { failStorage(); } return; }
     scope.disabled = true; enabled = false; paint();
@@ -200,7 +202,9 @@
       say('Kapsam değişti. Mevcut öneriler başlangıç olarak alındı. ' + channelText());
     } catch (_) { try { persist(); } catch (_) {} say('Kapsam kaydedilemedi; uyarıları yeniden aç.'); }
     finally { scope.disabled = false; }
-  });
+  }
+  scope.addEventListener('change', changeScope);
+  if (exitChoice) exitChoice.addEventListener('change', changeScope);
   document.getElementById('signal-dismiss').addEventListener('click', function () { toast.hidden = true; });
   document.getElementById('signal-refresh').addEventListener('click', function () {
     document.dispatchEvent(new Event('uoa:refresh-request')); toast.hidden = true;
@@ -209,7 +213,8 @@
     if (event.key !== PREF) return;
     try {
       const p = readPref(); enabled = p.enabled; scope.value = p.scope; generation++; paint();
-      if (!enabled) retire();
+      if (exitChoice) exitChoice.checked = p.exits;
+      retire();
       say(enabled ? 'Uyarılar açık. ' + channelText() : 'Uyarılar diğer sekmeden kapatıldı.');
     } catch (_) { failStorage(); }
   });
@@ -222,6 +227,7 @@
   setInterval(poll, pollSeconds * 1000);
   try {
     const p = readPref(); enabled = p.enabled; scope.value = p.scope; paint();
+    if (exitChoice) exitChoice.checked = p.exits;
     if (enabled) { say('Uyarı bağlantısı kuruluyor. ' + channelText()); poll(); }
   } catch (_) { failStorage(); }
 })();

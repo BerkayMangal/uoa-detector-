@@ -205,6 +205,7 @@ def price_context(
         benchmark_move=benchmark_move,
         state=CheckState.CHECKED_FOUND if not missing else CheckState.FAILED,
         blocker="; ".join(missing),
+        source_session=spot.trade_date,
     )
 
 

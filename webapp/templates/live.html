@@ -6,15 +6,7 @@
    screen (docs/live-alpha-v1/PRODUCT_OVERRIDE.md); it still applies to /alfa and the rest. #}
 {% block tagline %}<span class="text-sm text-gray-400">Bugün ne alınır, hangi fiyattan, nerede zarar kesilir. Emir göndermez; işlemi sen yaparsın.</span>{% endblock %}
 {% block content %}
-{% if alert_settings %}
-<aside class="live-alert-controls" aria-label="Canlı sinyal uyarıları" id="live-alert-controls"
-  data-poll-seconds="{{ alert_settings.poll_seconds }}" data-seen-ttl="{{ alert_settings.seen_ttl_seconds }}" data-max-seen="{{ alert_settings.max_seen }}">
-  <div class="focus-tabs"><button type="button" id="alerts-toggle" aria-pressed="false">Uyarıları aç</button><button type="button" id="alerts-test">Sesi dene</button></div>
-  <label class="quiet-copy" for="alerts-scope">Uyarı kapsamı <select id="alerts-scope"><option value="calls">CALL / call spread</option><option value="all">Tüm ALIM önerileri</option></select></label>
-  <p class="quiet-copy" id="alerts-status" role="status" aria-live="polite">Uyarılar kapalı. Sayfa açıkken çalışır; tarayıcı veya işletim sistemi arka plan uyarılarını sınırlayabilir.</p>
-</aside>
-<div class="signal-toast" id="signal-toast" role="status" aria-live="polite" hidden><p id="signal-message"></p><div><button type="button" id="signal-refresh">Planları güncelle</button><button type="button" id="signal-dismiss" aria-label="Uyarıyı kapat">Kapat</button></div></div>
-{% else %}<p class="desk-notice">Uyarı ayarları okunamadı; sinyal uyarıları kapalı.</p>{% endif %}
+{% include "alert_controls.html" %}
 <section id="live-alpha" lang="tr" data-entry-ttl="{{ v.entry_ttl_seconds }}" data-scan-age="{{ v.scan_age_seconds or 0 }}" data-reload-seconds="{{ reload_seconds }}">
   <div class="desk-heading">
     <div><p class="eyebrow">PİYASA / KİŞİSEL GÖRÜNÜM</p><h1>Bugünün Fırsatları</h1></div>
@@ -39,6 +31,12 @@
   </div>
   <details class="mb-4"><summary>Seans özeti</summary><p class="quiet-copy" data-summary>{{ v.summary }}</p></details>
 
+  {% if desk and (desk.paper.rows or desk.manual.rows) %}
+  <div class="section-heading"><h2>Açık pozisyon takibi</h2><a href="/pozisyonlar">Risk ve çıkışları aç →</a></div>
+  <p class="quiet-copy">{{ desk.paper.rows | length }} PAPER · {{ desk.manual.rows | length }} günlükte açık gerçek kayıt. PAPER plan riski {% if desk.paper.risk is number %}${{ '%.2f' | format(desk.paper.risk) }}{% else %}bilinmiyor{% endif %} · {{ desk.paper.unknown_risk }} kayıt için risk eksik.</p>
+  {% for p in desk.paper.rows + desk.manual.rows %}{% if p.action == 'EXIT_REVIEW' %}<p class="desk-notice"><b>{{ p.ticker }} · {{ 'PAPER' if p.scope == 'paper' else 'Manuel kayıt' }} · ÇIKIŞ İNCELE:</b> {{ p.reason }} <a class="underline" href="/pozisyonlar">Pozisyonu gör</a></p>{% endif %}{% endfor %}
+  {% endif %}
+
   {% if v.actionable %}<div class="section-heading"><h2>İşlem planları</h2><span>Deneysel görüş · otomatik emir yok</span></div>{% endif %}
   <div class="plan-grid">
   {% for c in v.actionable %}{% set d = c.data %}
@@ -57,6 +55,8 @@
     <p class="plan-reason" data-plain-reason>{{ d.plain_reason or d.why_today }}</p>
     <p class="invalidation"><b>Ne zaman vazgeçilir:</b> {{ d.invalidation }}</p>
     <details><summary>Hisse / opsiyon maliyeti</summary>{{ comparison(d, c.withdrawn) }}</details>
+    {% set model = scenarios.get(d.opportunity_id) if scenarios else none %}
+    {% if model %}<details><summary>Fiyat / IV / zaman senaryoları</summary>{% include "scenarios.html" %}</details>{% endif %}
     <details class="mt-3 text-sm"><summary class="cursor-pointer text-gray-400">Kanıtlar ve karşı görüş</summary>
     <p class="text-xs text-gray-500">Karar anı: {{ d.decision_as_of[:16].replace('T', ' ') }} UTC · {{ d.market_mode }}</p>
     <p class="text-sm mt-2" data-plain-action>{{ d.plain_action or d.headline }}</p>
@@ -165,6 +165,6 @@
   <p class="desk-endnote">Deneysel karar desteği. Giriş seviyeleri koşulludur; stop fiyatı azami zarar garantisi değildir.
     Yeni akış ölçümü ve akran-toparlanma araştırması ayrı gölge sürümde: <a href="/laboratuvar" class="underline">Alfa lab</a>.</p>
 </section>
-<script src="/assets/live-desk.js?v=5.31.1" defer></script>
-<script src="/assets/live-alerts.js?v=5.31.1" defer></script>
+<script src="/assets/live-desk.js?v=5.33.1" defer></script>
+<script src="/assets/live-alerts.js?v=5.33.1" defer></script>
 {% endblock %}

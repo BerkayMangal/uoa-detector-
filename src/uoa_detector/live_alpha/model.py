@@ -138,6 +138,7 @@ class PriceContext:
     benchmark_move: float | None
     state: CheckState          # CHECKED_FOUND when spot, prev close and ATR are all present
     blocker: str = ""
+    source_session: date | None = None
 
     @property
     def move(self) -> float | None:
@@ -196,6 +197,8 @@ class OptionQuote:
     volume: int | None = None
     open_interest: int | None = None
     multiplier: int = 100
+    implied_volatility: float | None = None
+    iv_at: datetime | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -233,6 +236,8 @@ class OptionLegView:
     bid: float | None
     ask: float | None
     fetched_at: datetime | None
+    implied_volatility: float | None = None
+    iv_at: datetime | None = None
 
 
 @dataclass(frozen=True)
@@ -293,6 +298,8 @@ class Card:
     dimensions: dict[str, str] = field(default_factory=dict)
     plain_action: str = ""     # what to do, in everyday Turkish
     plain_reason: str = ""     # the one reason, in everyday Turkish
+    spot_ref: float | None = None
+    spot_ref_at: datetime | None = None
 
 
 # ---------------------------------------------------------------------------

@@ -304,6 +304,7 @@ async def quotes_for(
             bid=Decimal(str(q.nbbo_bid)) if q.nbbo_bid is not None else None,
             ask=Decimal(str(q.nbbo_ask)) if q.nbbo_ask is not None else None,
             fetched_at=now, in_session=in_session, volume=q.volume, open_interest=q.open_interest,
+            implied_volatility=q.implied_volatility, iv_at=q.last_tape_time,
         )
     if not out:
         return QuotesResult(quotes={}, state="UW aday sembollerin hiçbirini döndürmedi")

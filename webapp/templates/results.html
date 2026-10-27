@@ -14,7 +14,7 @@
 </div>
 <p class="text-sm mb-4" data-paper-coverage>Giriş bekleyen {{ s.pending }} · açık {{ s.open }} · çıkış fiyatı bekleyen {{ s.exit_pending }} · dolmayan {{ s.unfilled }} · sonucu belirsiz {{ s.unknown }}.</p>
 <h3 class="text-lg font-semibold text-white">Politika ve araç bazında</h3>
-<div class="overflow-x-auto mb-6"><table class="w-full text-sm text-left" data-policy-results>
+<div class="overflow-x-auto mb-6" role="region" aria-label="Politika sonuçları" tabindex="0"><table class="w-full text-sm text-left" data-policy-results>
 <thead class="text-gray-400"><tr><th>Politika / araç</th><th>Kayıt / kapanmış</th><th>Net sonuç</th><th>Ortalama</th><th>Dolmayan / belirsiz</th></tr></thead><tbody>
 {% for g in v.groups %}<tr class="border-t border-gray-800"><td class="py-2">{{ g.policy }} / {{ g.instrument }}</td><td>{{ g.summary.total }} / {{ g.summary.closed }}</td><td>{{ money(g.summary.pnl_usd) }}</td><td>{{ money(g.summary.average_usd) }}</td><td>{{ g.summary.unfilled }} / {{ g.summary.unknown }}</td></tr>
 {% else %}<tr><td colspan="5" class="py-3 text-gray-400">Henüz PAPER kaydı yok.</td></tr>{% endfor %}
@@ -24,17 +24,18 @@
   Hisse simülasyonu kayma uygular; hisse komisyonu ayrıca modellenmez.
   En büyük düşüş, sıfırdan başlayan kapanmış P&amp;L toplamının zirveden düşüşüdür; eşzamanlı çıkışlar birlikte hesaplanır.</p>
 <h3 class="text-lg font-semibold text-white">Akranlarına göre geride kalanlar sonra ne yaptı?</h3>
+{% if benchmarks %}<details class="fold-panel"><summary>PAPER dayanağı, aynı dönem SPY / akran karşılaştırması</summary><p class="quiet-copy">{{ benchmarks.spy_known }} SPY / {{ benchmarks.peers_known }} akran karşılaştırması, {{ benchmarks.total }} giriş yapmış kapanış. Giriş ve çıkış döngüsünde kaydedilmiş önbellek fiyatları; eşzamanlı broker dolumu değildir. En çok 900 sn yaş ve 60 sn kaynak zaman farkı. Masraf öncesi yönlü dayanak farkı; opsiyon getirisi veya doğrulanmış alfa değildir. Eski girişler sonradan doldurulmaz.</p><div class="overflow-x-auto" role="region" aria-label="PAPER dayanak karşılaştırmaları" tabindex="0"><table class="w-full text-sm"><thead><tr><th>Hisse / PAPER net $</th><th>SPY üstü (yp)</th><th>Akran üstü (yp)</th><th>Kapsama</th></tr></thead><tbody>{% for r in benchmarks.rows[:100] %}<tr><td>{{ r.ticker }} / {{ money(r.pnl) }}</td><td>{{ '%+.3f' | format(r.spy_excess) if r.spy_excess is number else 'bilinmiyor' }}</td><td>{{ '%+.3f' | format(r.peer_excess) if r.peer_excess is number else 'bilinmiyor' }}</td><td>{{ r.note }}</td></tr>{% else %}<tr><td colspan="4">Henüz karşılaştırılabilir kapanış yok.</td></tr>{% endfor %}</tbody></table></div><p class="quiet-copy">En yeni en çok 100 satır; kapsama tüm kapanışlar üzerinden.</p></details>{% endif %}
 <p class="text-sm text-gray-400 mt-1 mb-2">{{ v.lag_status }} Sonuç, ölçümün son referans kapanışından 1/3/5 seans sonraki hisse getirisi eksi o ölçümdeki akranların ortalamasıdır.
   İşlem maliyeti öncesi yüzde puan; işlem kârı değildir. Referans kapanışı kayıt anından önce olabilir; sonradan girilebilir getiri diye okunmaz.
   Örnekler örtüşebilir. Tüm ölçümler grubu diğer grupları da içerir.</p>
-{% if v.lags %}<div class="overflow-x-auto mb-6"><table class="w-full text-sm text-left" data-lag-results>
+{% if v.lags %}<div class="overflow-x-auto mb-6" role="region" aria-label="Gecikme sonuçları" tabindex="0"><table class="w-full text-sm text-left" data-lag-results>
 <thead class="text-gray-400"><tr><th>Profil / grup</th><th>İleri seans</th><th>Sonucu olan / ölçüm</th><th>Ortalama akran üstü getiri (yp)</th></tr></thead><tbody>
 {% for r in v.lags %}<tr class="border-t border-gray-800"><td class="py-1">{{ r.version }} / {{ r.group }}</td><td>{{ r.sessions }}</td><td>{{ r.priced }} / {{ r.total }}</td><td>{% if r.mean_pp is not none %}{{ '%+.3f' | format(r.mean_pp) }}{% else %}bilinmiyor{% endif %}</td></tr>{% endfor %}
 </tbody></table></div>{% endif %}
 <h3 class="text-lg font-semibold text-white">Kayıtlar</h3>
 <p class="text-xs text-gray-400 mb-2">En yeni {{ v.shown }} / {{ s.total }} kayıt gösteriliyor. Yukarıdaki toplamlar tüm geçmişi kapsar.
   Eksik ileri kapanışlar; henüz dolmayan süre veya veri eksikliği olabilir.</p>
-<div class="overflow-x-auto"><table class="w-full text-sm text-left" data-paper-records>
+<div class="overflow-x-auto" role="region" aria-label="PAPER kayıtları" tabindex="0"><table class="w-full text-sm text-left" data-paper-records>
 <thead class="text-gray-400"><tr><th>Hisse / araç</th><th>Politika</th><th>Oluşma / çıkış (UTC)</th><th>Durum</th><th>Net sonuç</th><th>Çıkış nedeni</th></tr></thead><tbody>
 {% set states = {'pending':'Giriş bekliyor','open':'Açık','exit_pending':'Çıkış fiyatı bekliyor','closed':'Fiyatlanmış kapanış','unfilled':'Dolmadı','unknown':'Sonuç belirsiz'} %}
 {% for r in v.rows %}<tr class="border-t border-gray-800"><td class="py-2"><a class="underline" href="/canli/{{ r.opportunity_id | urlencode }}">{{ r.ticker }}</a> / {{ r.instrument }}</td><td>{{ r.policy }}</td><td>{{ r.created_at.strftime('%Y-%m-%d %H:%M') }}<br>{{ r.exit_at.strftime('%Y-%m-%d %H:%M') if r.exit_at else '—' }}</td><td>{{ states[r.category] }}</td><td>{{ money(r.pnl_usd) }}</td><td>{{ r.exit_reason }}</td></tr>

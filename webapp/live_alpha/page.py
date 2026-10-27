@@ -15,10 +15,14 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Any
 from zoneinfo import ZoneInfo
 
+from sqlalchemy import inspect
+
 from uoa_detector.live_alpha.calendar import MarketMode, classify
 from uoa_detector.live_alpha.decide import REC_TR
 from uoa_detector.live_alpha.model import Recommendation
 from uoa_detector.live_alpha.settings import LiveAlphaSettings, load_live_alpha_settings
+from webapp.alpha_lab.readers import spots_at
+from webapp.desk.entry_guard import reason as entry_guard_reason
 from webapp.live_alpha import store
 from webapp.live_alpha.inputs import as_utc
 from webapp.live_alpha.results import paper_result, summarise
@@ -204,6 +208,8 @@ def build_view(engine: Engine, now: datetime) -> LiveView:
     by_opp = {p["opportunity_id"]: p for p in papers_open + papers_closed}
     actionable: list[CardView] = []
     watching: list[CardView] = []
+    current_spots = spots_at(engine, snap.get("universe", []), now)
+    has_spots = inspect(engine).has_table("alfa_atm")
     for card in snap.get("cards", []):
         rec, ready = card["recommendation"], card["readiness"]
         withdrawn = ""
@@ -214,6 +220,8 @@ def build_view(engine: Engine, now: datetime) -> LiveView:
                 f"Karar {MODE_TR.get(card['market_mode'], card['market_mode']).lower()} anına ait; "
                 "piyasa şu an açık değil, giriş geri çekildi."
             )
+        if not withdrawn:
+            withdrawn = entry_guard_reason(card, current_spots.get(card.get("ticker", "")), now, has_spots)
         view = CardView(
             data=card, label=REC_TR[Recommendation(rec)],
             tone="gray" if withdrawn else _tone(rec, ready),
@@ -260,7 +268,8 @@ def build_view(engine: Engine, now: datetime) -> LiveView:
         open_tr=open_tr,
         flow_warning=_flow_warning(snap, session_now),
         entry_ttl_seconds=entry_ttl,
-        board=_board_view(snap.get("board", []), entries_withdrawn=stale or session_now.mode is not MarketMode.LIVE),
+        board=_board_view(snap.get("board", []), entries_withdrawn=stale or session_now.mode is not MarketMode.LIVE,
+            withdrawn_names=frozenset(c.data["ticker"] for c in actionable if c.withdrawn)),
     )
 
 
@@ -294,17 +303,19 @@ def _flow_warning(snap: dict[str, Any], session_now: Session) -> str:
     )
 
 
-def _board_view(rows: list[dict[str, Any]], *, entries_withdrawn: bool) -> list[dict[str, Any]]:
+def _board_view(rows: list[dict[str, Any]], *, entries_withdrawn: bool, withdrawn_names: frozenset[str] = frozenset()) -> list[dict[str, Any]]:
     """A green 'AL' on the board never outlives the live session or a fresh scan."""
     out = []
     for r in rows:
         r = dict(r)
-        if entries_withdrawn and r.get("verdict_tone") == "green":
+        if (entries_withdrawn or r.get("ticker") in withdrawn_names) and r.get("verdict_tone") == "green":
             r["verdict"] = "BEKLE"
             r["verdict_tone"] = "gray"
             r["verdict_reason"] = "Piyasa açık değil ya da tarama eski; giriş yeniden değerlendirilecek. " + str(
                 r.get("verdict_reason", ""),
             )
+            if not entries_withdrawn:
+                r["verdict_reason"] = "Son fiyat giriş planını sağlamıyor; önceki ALIM geri çekildi."
         out.append(r)
     return out
 
