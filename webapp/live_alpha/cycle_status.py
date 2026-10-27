@@ -75,6 +75,7 @@ class Failure:
     site: str | None
     sqlstate: str | None = None
     connection_invalidated: bool = False
+    resource: str | None = None
 
 
 def database_status(exc: Exception) -> tuple[str | None, bool]:
@@ -88,6 +89,34 @@ def database_status(exc: Exception) -> tuple[str | None, bool]:
         raw if isinstance(raw, str) and raw in _SQLSTATES else None,
         exc.connection_invalidated is True,
     )
+
+
+def capacity_resource(exc: Exception, code: str | None) -> str | None:
+    if code == "53300":
+        return "connections"
+    if code == "53200":
+        return "memory"
+    if code != "53100":
+        return None
+    try:
+        text = str(exc.orig if isinstance(exc, DBAPIError) else exc).lower()
+    except Exception:
+        return None
+    if "shared memory segment" in text or "dynamic shared memory" in text:
+        return "shared_memory"
+    if "temporary file" in text or "pgsql_tmp" in text:
+        return "temporary_storage"
+    if any(
+        s in text
+        for s in (
+            "no space left on device",
+            "could not extend file",
+            "could not write block",
+            "disk is full",
+        )
+    ):
+        return "disk"
+    return None
 
 
 def _category(exc: Exception) -> str:
@@ -156,6 +185,7 @@ def safe_failure(exc: Exception, stage: str) -> Failure:
         site,
         code,
         invalidated,
+        capacity_resource(exc, code),
     )
 
 
