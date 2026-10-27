@@ -36,6 +36,8 @@ from uoa_detector.pipeline.stage import PipelineContext
 from uoa_detector.pipeline.stages import build_live_stage_pipeline
 from uoa_detector.sources.unusual_whales.client import UnusualWhalesClient
 from uoa_detector.sources.unusual_whales.flow_poll import UnusualWhalesFlowPollSource
+from webapp.alpha_lab.archive import FlowArchive
+from webapp.alpha_lab.settings import load_settings as load_lab_settings
 from webapp.board.db import make_engine
 from webapp.board.hotlist import HotlistSettings, ensure_hotlist_tables, load_hot_tickers
 from webapp.board.telemetry import AlfaTelemetryWriter
@@ -170,6 +172,7 @@ async def run_live_worker(
     """
     profile = load_profile(profile_path)
     store = _open_live_store(database_url)
+    archive = FlowArchive(database_url)
     _logger.info("live worker started: tickers=%s", tickers)
     # Phase 5.27: with a hot-list profile the poll follows LIVE_TICKERS plus the names the
     # market-wide feed says are active. None keeps the fixed list, exactly as before.
@@ -221,6 +224,12 @@ async def run_live_worker(
                     client, poll_tickers if poll_tickers is not None else tickers,
                     poll_interval_s=poll_interval_s, min_premium=min_premium,
                 )
+                try:
+                    source.observation_timeout_s = load_lab_settings().archive_timeout_seconds
+                    source.observation_sink = archive.record
+                except Exception as exc:
+                    archive.failed(exc)
+                    _logger.warning("lab configuration invalid; legacy capture continues without the research sink", exc_info=True)
                 # Live UW enrichment (Phase 5.0.5): the screener's stages and
                 # order on the shared client, with every provider except M23's
                 # wrapped so a transient UW error (rate limit, daily quota,
@@ -276,6 +285,8 @@ async def run_live_worker(
         _logger.info("live worker cancelled; shutting down")
         raise
     finally:
+        with contextlib.suppress(Exception):
+            archive.close()
         with contextlib.suppress(Exception):
             store.close()
         if hot_engine is not None:

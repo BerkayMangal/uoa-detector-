@@ -1,0 +1,22 @@
+policy_version: alpha_lab_v1
+flow_window_seconds: 900
+poll_max_age_seconds: 120
+min_directional_premium_usd: 250000
+dominance_min: 0.65
+side_known_min: 0.50
+min_contracts: 2
+recovery_min_atr: 0.10
+chase_max_atr: 1.0
+spot_max_age_seconds: 900
+atr_period: 14
+atr_min_sessions: 20
+benchmark: SPY
+primary_sessions: 3
+secondary_sessions: [1, 5]
+slippage_bps_per_side: 5
+news_window_hours: 36
+news_max_age_seconds: 900
+display_limit: 50
+outcome_batch_size: 500
+archive_timeout_seconds: 5
+cycle_timeout_seconds: 30

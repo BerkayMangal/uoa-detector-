@@ -49,6 +49,7 @@ from uoa_detector.live_alpha.option_plan import (
 from uoa_detector.live_alpha.settings import LiveAlphaSettings, load_live_alpha_settings
 from uoa_detector.options_alpha.settings import OptionsAlphaSettings
 from uoa_detector.options_alpha.settings import load_settings as load_options_settings
+from webapp.alpha_lab.job import run_shadow
 from webapp.board.baskets import lags_by_ticker, load_basket_settings
 from webapp.board.daily_close import load_bars_by_ticker, load_closes_by_ticker
 from webapp.board.hotlist import load_hot_tickers, load_hotlist_settings
@@ -717,6 +718,7 @@ async def live_alpha_loop(
         try:
             row = await run_cycle(engine, reader, client, settings, board, costs, now,
                                   gamma_source=gamma_repo.latest)
+            await run_shadow(engine, row, now_fn())
             status = row.status
             detail = {"scan_id": row.scan_id, "cards": len(row.snapshot.get("cards", [])),
                       "requests": row.snapshot.get("requests"), "mode": row.market_mode}

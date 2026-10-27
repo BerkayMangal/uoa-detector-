@@ -233,6 +233,7 @@ A new study needs a fresh, non-overlapping window (`docs/next_studies.md`,
 | 5.27 | **Automatic peers, hot list and lag record** (`auto_peers_v1`) — correlation peers from stored closes for every board row, a market-wide unusual-flow hot list that feeds the live poll and the close universe, and an append-only lag record. Extends 5.26: `docs/phase-5.27-auto-peers-hotlist-acceptance.md`. Studies skip 5.27 |
 | 5.28 | **PAPER results and instrument costs** — full-history results, unresolved/unfilled coverage, policy/instrument breakdowns, existing peer-lag outcomes and saved-plan stock/option cost comparison. Contract: `docs/phase-5.28-results-costs-acceptance.md`. Reporting only; studies skip 5.28. |
 | 5.29 | **Personal desk and public introduction** — concise responsive UI, local styling, stock focus filters and static public `/hakkinda` with SEO; trading pages stay private. Contract: `docs/phase-5.29-personal-desk-acceptance.md`. Studies skip 5.29. |
+| 5.30 | **Prospective alpha laboratory** — lossless observed-alert archive, corrected shadow flow, frozen peer-recovery cohorts and news audit; private `/laboratuvar`. Contract: `docs/phase-5.30-alpha-lab-acceptance.md`; delivery: `docs/phase-5.30-closeout.md`. No live-policy promotion or measured edge; studies skip 5.30. |
 
 Detail for the 5.10–5.19 candidates:
 - **Falsification gates (D8).** `src/uoa_detector/backtest/falsification.py:79-81`

@@ -99,6 +99,14 @@ _APPEND_ONLY_TABLES: Final = {
     "alfa_live_heartbeat",       # proof the live job ran
     # Phase 5.27: what the board measured, kept so it can be scored forward.
     "alfa_lag_record",           # one measured reading per name and ET date, written once
+    # Phase 5.30: first-observed research evidence, never reconstructed later.
+    "alfa_lab_alert",            # original alert payload versions and first availability
+    "alfa_lab_poll",             # successful coverage, including genuinely empty polls
+    "alfa_lab_audit",            # inputs and exclusions as the shadow cycle saw them
+    "alfa_lab_price",            # cached quote availability around a news observation
+    "alfa_lab_cohort",           # first eligible arm, peers and inputs, frozen per day
+    "alfa_lab_outcome",          # first complete matched-price counterfactual result
+    "alfa_lab_cycle",            # evidence that a research cycle ran and its progress
 }
 
 # Rebuildable: refreshed market data or fetch bookkeeping. A row lost here is
