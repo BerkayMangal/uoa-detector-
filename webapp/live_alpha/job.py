@@ -56,6 +56,7 @@ from webapp.board.hotlist import load_hot_tickers, load_hotlist_settings
 from webapp.board.lag_record import append_records, records_from
 from webapp.board.peers import auto_lags, load_peer_settings, load_universe_closes
 from webapp.board.settings import BoardSettings
+from webapp.calibration.monitor import STATE as CALIBRATION_STATE
 from webapp.calibration.monitor import run as run_calibration
 from webapp.desk.capture import STATE as DESK_STATE
 from webapp.desk.capture import run as run_desk
@@ -752,6 +753,8 @@ async def live_alpha_loop(
             LAST_CYCLE["news_errors"] = detail["news_errors"]
         if DESK_STATE:
             LAST_CYCLE["desk_status"] = DESK_STATE.get("status")
+        if CALIBRATION_STATE:
+            LAST_CYCLE["calibration_status"] = CALIBRATION_STATE.get("status")
         cycles += 1
         if max_cycles is not None and cycles >= max_cycles:
             return
