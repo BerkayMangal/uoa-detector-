@@ -235,6 +235,9 @@ A new study needs a fresh, non-overlapping window (`docs/next_studies.md`,
 | 5.29 | **Personal desk and public introduction** — concise responsive UI, local styling, stock focus filters and static public `/hakkinda` with SEO; trading pages stay private. Contract: `docs/phase-5.29-personal-desk-acceptance.md`. Studies skip 5.29. |
 | 5.30 | **Prospective alpha laboratory** — lossless observed-alert archive, corrected shadow flow, frozen peer-recovery cohorts and news audit; private `/laboratuvar`. Contract: `docs/phase-5.30-alpha-lab-acceptance.md`; delivery: `docs/phase-5.30-closeout.md`. No live-policy promotion or measured edge; studies skip 5.30. |
 | 5.31 | **Live signal notifications** — opt-in browser sound, desktop notification and in-page alerts for fresh ready CALL/call-spread or all upward BUY plans. Contract: `docs/phase-5.31-live-alerts-acceptance.md`; delivery: `docs/phase-5.31-closeout.md`. Notify only; private stored-snapshot feed, no policy change or extra vendor calls. Covers the notification subset of reserved 5.5; studies skip 5.31. |
+| 5.32 | **Desk data reliability** — failed-news cooldown, sanitized error categories, source status and lab exclusion counts. Contract: `docs/phase-5.32-data-reliability-acceptance.md`. Owner authorizes the full desk upgrade in chat, 2026-10-27. |
+| 5.33 | **Position management and analysis** — open PAPER risk/exit alerts, portfolio concentration, matched benchmark observations and option scenarios. Each output retains its data coverage and model assumptions; no broker execution. |
+| 5.34 | **Versioned exploratory calibration** — bounded, audited candidate search, temporal validation, untouched prospective/PAPER assessment and a private research report. Reused historical windows remain exploratory; old verdicts/profiles stay frozen. |
 
 Detail for the 5.10–5.19 candidates:
 - **Falsification gates (D8).** `src/uoa_detector/backtest/falsification.py:79-81`

@@ -37,6 +37,7 @@ from uoa_detector.sources.unusual_whales.client import (
 from webapp.board import quota_ledger
 from webapp.board.db import session_factory
 from webapp.board.quotes import fetch_contract_quotes
+from webapp.live_alpha.diagnostics import safe_http_detail
 from webapp.live_alpha.inputs import as_utc
 from webapp.live_alpha.store import LiveNews, LiveNewsCheck, dumps, new_id
 
@@ -211,7 +212,7 @@ async def news_for(
     previous = last_check(engine, ticker)
     if previous is not None and previous.checked_at is not None:
         age = (now - previous.checked_at).total_seconds()
-        if 0 <= age < refresh_seconds and previous.state is not CheckState.FAILED:
+        if 0 <= age < refresh_seconds:
             return previous
     if not budget.take(now):
         if previous is not None and previous.checked_at is not None and previous.state is not CheckState.FAILED:
@@ -226,10 +227,10 @@ async def news_for(
     except UnusualWhalesDailyLimitError:
         state, detail = CheckState.FAILED, "UW günlük istek limiti"
         payload = None
-    except UnusualWhalesNotFoundError:
-        state, detail, payload = CheckState.FAILED, "UW 404/422: istek reddedildi", None
+    except UnusualWhalesNotFoundError as exc:
+        state, detail, payload = CheckState.FAILED, safe_http_detail(exc), None
     except UnusualWhalesAuthError as exc:
-        state, detail, payload = CheckState.FAILED, f"UW yetki/istek hatası ({type(exc).__name__})", None
+        state, detail, payload = CheckState.FAILED, safe_http_detail(exc), None
     except UnusualWhalesRateLimitError:
         state, detail, payload = CheckState.FAILED, "UW 429 hız sınırı", None
     except Exception as exc:
