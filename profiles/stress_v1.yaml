@@ -1,0 +1,4 @@
+version: stress_v1
+entry_delays: [0, 1, 2]
+slippage_bps: [5, 10, 20, 50]
+remove_best_trades: [1, 3]
