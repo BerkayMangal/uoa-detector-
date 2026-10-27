@@ -25,6 +25,7 @@ Ana ürün **opsiyon sinyal terminali**. Hisse tarafı yalnız karşılaştırma
 | **M5d** | Dördüncü aile (prim ucuzken mi alınır) | **KOŞTU — INSUFFICIENT_DATA** (v1 ve v2) | `RESULT_H10.md` · `h10_result_v2.json` |
 | **M5e** | Beşinci aile (tekrarlayan akış) | **DONE — REDDEDİLDİ** | `RESULT_H02.md` · `h02_result.json` |
 | **M5f** | On iki ailenin tek tablosu (v2 motor) | **DONE** | `FAMILIES.md` |
+| **S01** | Ortak kurgunun kayıp ayrıştırması (aile değil, deneme harcamaz) | **ÖN-KAYIT DONDURULDU** | `PREREG_S01.md` |
 | **M6** | Track B replikasyonu | **ENGEL ÖLÇÜLDÜ** | Pencere ~95 seans, şartı 4 çeyrek → kısmi test / yetersiz süre |
 | **M7** | Ayrı opsiyon ekranı + tarayıcı doğrulaması | **KISMEN** | `/opsiyon` kodlandı + test edildi; *gözle* canlı doğrulama B1'e bağlı |
 | **M8** | Mutasyon kanıtı tablosu | **DONE** | `mutation_proof.md` — 7/7 koruma kırmızıya döndü, 0 sağ kalan |
