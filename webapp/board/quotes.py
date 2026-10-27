@@ -243,6 +243,7 @@ class QuoteSnapshot:
     open_interest: int | None
     last_tape_time: datetime | None
     returned: bool
+    implied_volatility: float | None = None
 
 
 @dataclass(frozen=True)
@@ -310,6 +311,7 @@ def parse_option_contract_rows(
                 open_interest=_count(row.get("open_interest")),
                 last_tape_time=_tape_time(row.get("last_tape_time"), volume),
                 returned=True,
+                implied_volatility=_number(row.get("implied_volatility")),
             ),
         )
     return tuple(out)

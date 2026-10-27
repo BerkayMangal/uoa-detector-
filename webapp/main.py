@@ -29,13 +29,14 @@ from contextvars import ContextVar
 from datetime import UTC, datetime
 from pathlib import Path
 from time import perf_counter
-from typing import TYPE_CHECKING, Any, ParamSpec, TypeVar
+from typing import TYPE_CHECKING, Any, ParamSpec, TypeVar, cast
 from urllib.parse import urlencode, urlsplit
+from zoneinfo import ZoneInfo
 
 from fastapi import FastAPI, Form, Request
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
-from sqlalchemy import event
+from sqlalchemy import Table, event
 from sqlalchemy.engine import Engine
 from starlette.datastructures import Headers
 from starlette.responses import PlainTextResponse
@@ -54,6 +55,11 @@ from webapp.board.peers import load_peer_settings
 from webapp.board.refresher import board_refresh_loop
 from webapp.board.settings import BoardSettings, load_board_settings
 from webapp.board.signals import BoardSignalReader
+from webapp.desk import benchmarks as desk_benchmarks
+from webapp.desk import db as desk_db
+from webapp.desk import positions as desk_positions
+from webapp.desk import scenarios as desk_scenarios
+from webapp.desk.capture import STATE as DESK_STATE
 from webapp.gamma_live import gamma_refresh_loop
 from webapp.live_alpha import alerts as live_alerts
 from webapp.live_alpha import job as live_job
@@ -565,7 +571,9 @@ def live_home(request: Request, ok: str = "") -> HTMLResponse:
     return templates.TemplateResponse(
         request, "live.html",
         {"v": view, "ok": _LIVE_OK.get(ok, ""), "reload_seconds": reload_seconds,
-         "alert_settings": _safe(live_alerts.settings, None)},
+         "alert_settings": _safe(live_alerts.settings, None),
+         "desk": _safe(lambda: desk_positions.build(_board_reader().engine, _now()), None),
+         "scenarios": _safe(lambda: {c.data["opportunity_id"]: desk_scenarios.build(c.data, _now(), bool(c.withdrawn)) for c in view.actionable}, None)},
     )
 
 
@@ -580,8 +588,40 @@ def live_results_page(request: Request) -> HTMLResponse:
     engine = _board_reader().engine
     live_page.ensure_ready(engine)
     return templates.TemplateResponse(
-        request, "results.html", {"v": live_results.build_results(engine)},
+        request, "results.html", {"v": live_results.build_results(engine),
+        "benchmarks": _safe(lambda: desk_benchmarks.build(engine, _now()), None)},
     )
+
+
+@app.get("/pozisyonlar", response_class=HTMLResponse)
+def positions_page(request: Request, ok: str = "") -> HTMLResponse:
+    return templates.TemplateResponse(request, "positions.html", {
+        "desk": desk_positions.build(_board_reader().engine, _now()), "job": dict(DESK_STATE),
+        "alert_settings": _safe(live_alerts.settings, None),
+        "reload_seconds": live_page.settings().cycle.live_seconds, "tr_timezone": ZoneInfo("Europe/Istanbul"),
+        "ok": "Dayanak stop/hedef planı kaydedildi." if ok == "plan" else "",
+    })
+
+
+@app.post("/pozisyonlar/plan")
+def manual_position_plan(request: Request, trade_id: str = Form(...), stop: float = Form(...), target: str = Form("")) -> Response:
+    if _foreign_origin(request):
+        return PlainTextResponse("Başka siteden plan kaydedilemez.", status_code=403)
+    engine, now = _board_reader().engine, _now()
+    trade = next((t for t in desk_positions.manual_trades(engine) if t.id == trade_id), None)
+    try:
+        goal = float(target) if target.strip() else None
+    except ValueError:
+        return PlainTextResponse("Hedef sayısal olmalı.", status_code=400)
+    if trade is None or trade.direction not in ("bullish", "bearish"):
+        return PlainTextResponse("Açık ve yönü bilinen işlem bulunamadı.", status_code=400)
+    if not math.isfinite(stop) or stop <= 0 or (goal is not None and (not math.isfinite(goal) or goal <= 0)):
+        return PlainTextResponse("Seviyeler pozitif ve sonlu olmalı.", status_code=400)
+    if goal is not None and ((trade.direction == "bullish" and goal <= stop) or (trade.direction == "bearish" and goal >= stop)):
+        return PlainTextResponse("Hedef, yükseliş planında stopun üstünde; düşüş planında altında olmalı.", status_code=400)
+    desk_db.ensure(engine)
+    desk_db.append(engine, cast(Table, desk_db.ManualPlan.__table__), [dict(key=secrets.token_hex(16), trade_id=trade.id, created_at=now, stop=stop, target=goal)])
+    return RedirectResponse("/pozisyonlar?ok=plan", status_code=303)
 
 
 @app.get("/laboratuvar", response_class=HTMLResponse)

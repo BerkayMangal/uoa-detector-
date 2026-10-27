@@ -113,6 +113,7 @@ def _leg_view(q: OptionQuote, is_long: bool) -> OptionLegView:
         option_symbol=q.option_symbol, right=q.right, strike=float(q.strike), expiry=q.expiry,
         is_long=is_long, bid=float(q.bid) if q.bid is not None else None,
         ask=float(q.ask) if q.ask is not None else None, fetched_at=q.fetched_at,
+        implied_volatility=q.implied_volatility, iv_at=q.iv_at,
     )
 
 

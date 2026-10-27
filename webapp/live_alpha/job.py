@@ -56,6 +56,8 @@ from webapp.board.hotlist import load_hot_tickers, load_hotlist_settings
 from webapp.board.lag_record import append_records, records_from
 from webapp.board.peers import auto_lags, load_peer_settings, load_universe_closes
 from webapp.board.settings import BoardSettings
+from webapp.desk.capture import STATE as DESK_STATE
+from webapp.desk.capture import run as run_desk
 from webapp.live_alpha import board as live_board
 from webapp.live_alpha import inputs, store, uw
 from webapp.live_alpha.diagnostics import news_counts, news_message
@@ -667,6 +669,10 @@ async def run_cycle(
         "news_failed": news_failed,
         "news_errors": news_errors,
         "spot_age_seconds": spot_ages,
+        "price_observations": {ticker: {"spot": p.spot,
+            "source_at": p.spot_fetched_at.isoformat() if p.spot_fetched_at else None,
+            "session": p.source_session.isoformat() if p.source_session else None}
+            for ticker, p in prices.items()},
         "timing_seconds": round(perf_counter() - t0, 2),
         "status_text": "" if status == "ok" else news_message(news_errors),
     })
@@ -722,6 +728,7 @@ async def live_alpha_loop(
             row = await run_cycle(engine, reader, client, settings, board, costs, now,
                                   gamma_source=gamma_repo.latest)
             await run_shadow(engine, row, now_fn())
+            await run_desk(engine, row, now_fn())
             status = row.status
             detail = {"scan_id": row.scan_id, "cards": len(row.snapshot.get("cards", [])),
                       "requests": row.snapshot.get("requests"), "mode": row.market_mode,
@@ -741,6 +748,8 @@ async def live_alpha_loop(
         })
         if detail.get("news_errors"):
             LAST_CYCLE["news_errors"] = detail["news_errors"]
+        if DESK_STATE:
+            LAST_CYCLE["desk_status"] = DESK_STATE.get("status")
         cycles += 1
         if max_cycles is not None and cycles >= max_cycles:
             return

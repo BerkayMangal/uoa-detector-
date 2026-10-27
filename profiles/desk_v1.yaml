@@ -1,0 +1,17 @@
+version: desk_v1
+paper_capital_usd: 10000
+planned_risk_warning_pct: 5
+concentration_warning_pct: 50
+price_max_age_seconds: 900
+benchmark_pair_skew_seconds: 60
+exit_alert_ttl_seconds: 1800
+cycle_timeout_seconds: 15
+display_limit: 100
+scenario_moves: [-0.02, 0, 0.02]
+scenario_iv_shifts: [-0.05, 0, 0.05]
+scenario_sessions: [1, 3, 5]
+scenario_rate: 0.04
+scenario_dividend_yield: 0
+scenario_iv_min: 0.0001
+scenario_iv_max: 5
+scenario_solver_iterations: 100

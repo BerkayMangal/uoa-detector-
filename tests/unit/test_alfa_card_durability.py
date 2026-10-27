@@ -73,6 +73,9 @@ _KNOWN_EXCEPTIONS: Final = {
 # recorded, a telemetry branch that was taken, the OI that confirmed an
 # opening — nobody can re-derive these from the vendor tomorrow.
 _APPEND_ONLY_TABLES: Final = {
+    "alfa_desk_manual_plan",     # owner-written journal plan revisions
+    "alfa_desk_sample",          # observed position/exit review samples
+    "alfa_desk_benchmark",       # entry/exit references as originally available
     "alfa_decision_card",    # the owner's recorded decision
     "alfa_fill",             # what he actually paid
     "alfa_outcome",          # how it resolved
