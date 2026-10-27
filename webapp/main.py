@@ -629,6 +629,13 @@ def alpha_laboratory(request: Request) -> HTMLResponse:
     return templates.TemplateResponse(request, "alpha_lab.html", {"v": lab_view.build(_board_reader().engine)})
 
 
+@app.get("/kalibrasyon", response_class=HTMLResponse)
+def calibration_page(request: Request) -> HTMLResponse:
+    from webapp.calibration.monitor import view
+
+    return templates.TemplateResponse(request, "calibration.html", {"v": view(_board_reader().engine, _now())})
+
+
 @app.get("/canli/{opportunity_id}", response_class=HTMLResponse)
 def live_history(request: Request, opportunity_id: str) -> HTMLResponse:
     engine = _board_reader().engine

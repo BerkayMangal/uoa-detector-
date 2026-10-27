@@ -73,6 +73,9 @@ _KNOWN_EXCEPTIONS: Final = {
 # recorded, a telemetry branch that was taken, the OI that confirmed an
 # opening — nobody can re-derive these from the vendor tomorrow.
 _APPEND_ONLY_TABLES: Final = {
+    "alfa_calibration_bar",      # first observed settled OHLCV payloads
+    "alfa_calibration_decision", # prospective instructions before entry open
+    "alfa_calibration_result",   # exact-date hypothetical entry/exit observations
     "alfa_desk_manual_plan",     # owner-written journal plan revisions
     "alfa_desk_sample",          # observed position/exit review samples
     "alfa_desk_benchmark",       # entry/exit references as originally available
