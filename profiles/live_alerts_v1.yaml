@@ -1,0 +1,5 @@
+# Operational browser settings only; live_alpha_v1 trading rules are untouched.
+version: live_alerts_v1
+poll_seconds: 30
+seen_ttl_seconds: 604800
+max_seen: 1000

@@ -6,7 +6,16 @@
    screen (docs/live-alpha-v1/PRODUCT_OVERRIDE.md); it still applies to /alfa and the rest. #}
 {% block tagline %}<span class="text-sm text-gray-400">Bugün ne alınır, hangi fiyattan, nerede zarar kesilir. Emir göndermez; işlemi sen yaparsın.</span>{% endblock %}
 {% block content %}
-<section id="live-alpha" lang="tr">
+{% if alert_settings %}
+<aside class="live-alert-controls" aria-label="Canlı sinyal uyarıları" id="live-alert-controls"
+  data-poll-seconds="{{ alert_settings.poll_seconds }}" data-seen-ttl="{{ alert_settings.seen_ttl_seconds }}" data-max-seen="{{ alert_settings.max_seen }}">
+  <div class="focus-tabs"><button type="button" id="alerts-toggle" aria-pressed="false">Uyarıları aç</button><button type="button" id="alerts-test">Sesi dene</button></div>
+  <label class="quiet-copy" for="alerts-scope">Uyarı kapsamı <select id="alerts-scope"><option value="calls">CALL / call spread</option><option value="all">Tüm ALIM önerileri</option></select></label>
+  <p class="quiet-copy" id="alerts-status" role="status" aria-live="polite">Uyarılar kapalı. Sayfa açıkken çalışır; tarayıcı veya işletim sistemi arka plan uyarılarını sınırlayabilir.</p>
+</aside>
+<div class="signal-toast" id="signal-toast" role="status" aria-live="polite" hidden><p id="signal-message"></p><div><button type="button" id="signal-refresh">Planları güncelle</button><button type="button" id="signal-dismiss" aria-label="Uyarıyı kapat">Kapat</button></div></div>
+{% else %}<p class="desk-notice">Uyarı ayarları okunamadı; sinyal uyarıları kapalı.</p>{% endif %}
+<section id="live-alpha" lang="tr" data-entry-ttl="{{ v.entry_ttl_seconds }}" data-scan-age="{{ v.scan_age_seconds or 0 }}" data-reload-seconds="{{ reload_seconds }}">
   <div class="desk-heading">
     <div><p class="eyebrow">PİYASA / KİŞİSEL GÖRÜNÜM</p><h1>Bugünün Fırsatları</h1></div>
     <div class="session-clock"><span class="session-pill {{ 'is-live' if v.mode == 'LIVE' else '' }}">{{ v.mode_text }}</span><br>{{ v.now_et }} · {{ v.now_tr }}</div>
@@ -92,7 +101,7 @@
   <div class="section-heading"><h2>Hisse panosu</h2><span id="stock-count" aria-live="polite">{{ v.board | length }} hisse</span></div>
   <div class="table-tools"><label class="sr-only" for="stock-search">Hisse ara</label><input type="search" id="stock-search" placeholder="Hisse ara…" autocomplete="off"><div class="focus-tabs" role="group" aria-label="Hisse filtresi"><button type="button" data-focus="all" aria-pressed="true">Tümü</button><button type="button" data-focus="hot" aria-pressed="false">Sıcak liste</button><button type="button" data-focus="lag" aria-pressed="false">Geride kalanlar</button></div></div>
   <details class="mb-3"><summary>Bu tabloyu nasıl okumalı?</summary><p class="quiet-copy">Ölçülmüş bilgi, tahmin değil. "Opsiyonların fiyatladığı hareket": o vadeye kadar piyasanın beklediği ortalama oynaklık (ATM straddle / fiyat). "Akış": bugün bu saate kadarki işlem sayısı, hissenin son seanslardaki aynı saat ortalamasına göre.{% if show_basket %} "Akranlara göre": hissenin getirisi eksi akranlarının ortalama getirisi, aynı iki kapanış arasında. Akranlar: elle yazılmış bir sepet varsa o, yoksa son 60 seansta bu hisseyle en çok birlikte hareket eden isimler. Ölçüm, tahmin değil.{% endif %} "Sıcak liste": sistemin piyasa genelindeki olağandışı opsiyon akışından kendi seçtiği isimler; canlı takibe otomatik girer.</p></details>
-  <div class="overflow-x-auto">
+  <div class="overflow-x-auto" role="region" aria-label="Hisse panosu" tabindex="0">
   <table class="stock-table w-full" data-board>
     <thead class="text-gray-400 text-left text-xs"><tr>
       <th class="py-1 pr-3">Hisse</th><th class="pr-3">Fiyat</th><th class="pr-3">Opsiyon parası nereye</th>
@@ -129,7 +138,7 @@
   <h3 class="sr-only">Önerilerin sonucu (PAPER: simülasyon, gerçek para değil)</h3>
   <p class="text-sm text-gray-400 mb-2">Açık/bekleyen {{ v.paper_stats.open }} · fiyatlanmış kapanış {{ v.paper_stats.closed }} · dolmayan {{ v.paper_stats.unfilled }} · belirsiz {{ v.paper_stats.unknown }} · model maliyetleri sonrası toplam {% if v.paper_stats.pnl_usd is not none %}${{ '%.2f' | format(v.paper_stats.pnl_usd) }}{% else %}bilinmiyor{% endif %} ({{ v.paper_stats.wins }} kazanç). Tüm geçmiş; aşağıda son 20 kapalı kayıt. <a class="underline" href="/sonuclar">Ayrıntılı sonuçlar</a>. Küçük örneklem; başarı oranı çıkarılmaz.</p>
   {% if v.papers_open or v.papers_closed %}
-  <div class="overflow-x-auto"><table class="text-sm w-full"><thead class="text-gray-400 text-left"><tr><th>Hisse</th><th>Araç</th><th>Durum</th><th>Giriş</th><th>Stop/Hedef</th><th>Son değer</th><th>Çıkış</th><th>P&amp;L</th></tr></thead><tbody>
+  <div class="overflow-x-auto" role="region" aria-label="PAPER pozisyonları" tabindex="0"><table class="text-sm w-full"><thead class="text-gray-400 text-left"><tr><th>Hisse</th><th>Araç</th><th>Durum</th><th>Giriş</th><th>Stop/Hedef</th><th>Son değer</th><th>Çıkış</th><th>P&amp;L</th></tr></thead><tbody>
   {% for p in v.papers_open + v.papers_closed %}
   <tr class="border-t border-gray-800" data-paper="{{ p.ticker }}"><td>{{ p.ticker }}</td><td>{{ p.instrument }}</td><td>{{ p.state_text }}</td><td>{{ p.entry_price or '—' }}{% if p.quantity %} × {{ p.quantity }}{% endif %}</td><td>{{ p.stop }} / {{ p.target }}</td><td>{{ p.last_mark or '—' }}</td><td>{{ p.exit_price or '—' }} {{ p.exit_reason or '' }}</td><td>{{ p.pnl_usd if p.pnl_usd is not none else '—' }}</td></tr>
   {% endfor %}</tbody></table></div>
@@ -156,69 +165,6 @@
   <p class="desk-endnote">Deneysel karar desteği. Giriş seviyeleri koşulludur; stop fiyatı azami zarar garantisi değildir.
     Yeni akış ölçümü ve akran-toparlanma araştırması ayrı gölge sürümde: <a href="/laboratuvar" class="underline">Alfa lab</a>.</p>
 </section>
-<script>
-(function () {
-  const search = document.getElementById('stock-search');
-  const buttons = document.querySelectorAll('[data-focus]');
-  const rows = Array.from(document.querySelectorAll('[data-board-row]'));
-  let focus = 'all';
-  function filter() {
-    const term = search ? search.value.trim().toUpperCase() : '';
-    let count = 0;
-    rows.forEach(function (row) {
-      const matches = row.dataset.boardRow.includes(term) && (focus === 'all' || (focus === 'hot' && row.dataset.hotRow === 'true') || (focus === 'lag' && row.dataset.lagRow === 'true'));
-      row.hidden = !matches; if (matches) count++;
-    });
-    const label = document.getElementById('stock-count');
-    const empty = document.getElementById('stock-empty');
-    if (label) label.textContent = count + ' / ' + rows.length + ' hisse';
-    if (empty) empty.hidden = count !== 0;
-  }
-  if (search) search.addEventListener('input', filter);
-  buttons.forEach(function (button) { button.addEventListener('click', function () {
-    focus = button.dataset.focus;
-    buttons.forEach(function (b) { b.setAttribute('aria-pressed', String(b === button)); }); filter();
-  }); });
-  // Do not discard an unfinished manual fill or an active stock search.
-  let editing = false;
-  document.querySelectorAll('form input, form select').forEach(function (input) { input.addEventListener('input', function () { editing = true; }); });
-  const deadline = Date.now() + {{ v.entry_ttl_seconds }} * 1000;
-  const renderedAt = Date.now();
-  function updateDataAge() {
-    const age = {{ v.scan_age_seconds or 0 }} + (Date.now() - renderedAt) / 1000;
-    const label = document.getElementById('scan-age');
-    if (label) label.textContent = String(Math.floor(age / 60));
-    if (label && age > {{ reload_seconds * 3 }} && !document.getElementById('client-age-warning')) {
-      const warning = document.createElement('p'); warning.id = 'client-age-warning'; warning.className = 'desk-notice'; warning.setAttribute('role', 'alert');
-      warning.textContent = 'Veriler eskidi. Güncel fiyat ve kararlar için sayfayı yenile; yazdığın form korunmak için otomatik yenileme duraklatıldı.';
-      document.querySelector('.desk-heading').after(warning);
-    }
-  }
-  function withdrawExpiredEntries() {
-    if (Date.now() < deadline) return;
-    document.querySelectorAll('.plan-card[data-ready="READY"]').forEach(function (card) {
-      if (card.dataset.clientWithdrawn || card.dataset.serverWithdrawn === 'true') return;
-      card.dataset.clientWithdrawn = 'true'; card.dataset.tone = 'gray';
-      card.querySelector('.decision-badge').textContent = 'GİRİŞ GERİ ÇEKİLDİ';
-      card.querySelector('.plan-status').textContent = 'yeni tarama bekleniyor';
-      const note = document.createElement('p'); note.className = 'desk-notice'; note.setAttribute('role', 'alert');
-      note.textContent = 'Bu planın giriş süresi doldu. Yeni tarama için sayfayı yenile.';
-      card.querySelector('.plan-title').after(note);
-      card.querySelectorAll('form[action$="/paper"] button').forEach(function (button) { button.disabled = true; });
-    });
-    document.querySelectorAll('[data-verdict-tone="green"]').forEach(function (cell) {
-      cell.dataset.verdictTone = 'gray'; cell.style.color = 'var(--muted)';
-      cell.querySelector('span').textContent = 'BEKLE';
-      const reason = cell.querySelector('div'); if (reason) reason.textContent = 'Giriş süresi doldu; yeni tarama bekleniyor.';
-    });
-    const ready = document.getElementById('ready-count'); if (ready) ready.textContent = '0';
-  }
-  withdrawExpiredEntries();
-  setInterval(withdrawExpiredEntries, 1000);
-  setInterval(updateDataAge, 1000);
-  document.addEventListener('visibilitychange', withdrawExpiredEntries);
-  document.addEventListener('visibilitychange', updateDataAge);
-  setInterval(function () { if (!editing && focus === 'all' && !(search && search.value) && document.visibilityState === 'visible') window.location.reload(); }, {{ reload_seconds * 1000 }});
-})();
-</script>
+<script src="/assets/live-desk.js?v=5.31.1" defer></script>
+<script src="/assets/live-alerts.js?v=5.31.1" defer></script>
 {% endblock %}

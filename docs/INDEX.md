@@ -234,6 +234,7 @@ A new study needs a fresh, non-overlapping window (`docs/next_studies.md`,
 | 5.28 | **PAPER results and instrument costs** — full-history results, unresolved/unfilled coverage, policy/instrument breakdowns, existing peer-lag outcomes and saved-plan stock/option cost comparison. Contract: `docs/phase-5.28-results-costs-acceptance.md`. Reporting only; studies skip 5.28. |
 | 5.29 | **Personal desk and public introduction** — concise responsive UI, local styling, stock focus filters and static public `/hakkinda` with SEO; trading pages stay private. Contract: `docs/phase-5.29-personal-desk-acceptance.md`. Studies skip 5.29. |
 | 5.30 | **Prospective alpha laboratory** — lossless observed-alert archive, corrected shadow flow, frozen peer-recovery cohorts and news audit; private `/laboratuvar`. Contract: `docs/phase-5.30-alpha-lab-acceptance.md`; delivery: `docs/phase-5.30-closeout.md`. No live-policy promotion or measured edge; studies skip 5.30. |
+| 5.31 | **Live signal notifications** — opt-in browser sound, desktop notification and in-page alerts for fresh ready CALL/call-spread or all upward BUY plans. Contract: `docs/phase-5.31-live-alerts-acceptance.md`; delivery: `docs/phase-5.31-closeout.md`. Notify only; private stored-snapshot feed, no policy change or extra vendor calls. Covers the notification subset of reserved 5.5; studies skip 5.31. |
 
 Detail for the 5.10–5.19 candidates:
 - **Falsification gates (D8).** `src/uoa_detector/backtest/falsification.py:79-81`
