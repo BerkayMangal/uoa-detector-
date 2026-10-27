@@ -21,6 +21,7 @@ from uoa_detector.live_alpha.model import Recommendation
 from uoa_detector.live_alpha.settings import LiveAlphaSettings, load_live_alpha_settings
 from webapp.live_alpha import store
 from webapp.live_alpha.inputs import as_utc
+from webapp.live_alpha.results import paper_result, summarise
 
 if TYPE_CHECKING:
     from sqlalchemy.engine import Engine
@@ -165,13 +166,14 @@ def build_view(engine: Engine, now: datetime) -> LiveView:
     open_states = {"PAPER_PENDING", "PAPER_OPEN", "EXIT_SIGNALLED"}
     papers_open = [_paper_dict(p, now) for p in papers if p.state in open_states]
     papers_closed = [_paper_dict(p, now) for p in papers if p.state not in open_states][:20]
-    realised = [p["pnl_usd"] for p in papers_closed if p["pnl_usd"] is not None]
+    totals = summarise([paper_result(p) for p in papers])
     paper_stats = {
         "open": len(papers_open),
-        "closed": len(realised),
-        "unfilled": sum(1 for p in papers_closed if p["pnl_usd"] is None),
-        "pnl_usd": round(sum(realised), 2) if realised else 0.0,
-        "wins": sum(1 for x in realised if x > 0),
+        "closed": totals.closed,
+        "unfilled": totals.unfilled,
+        "unknown": totals.unknown,
+        "pnl_usd": totals.pnl_usd,
+        "wins": totals.wins,
     }
     manual_rows = [
         {"at": as_utc(m.at).astimezone(_ET).strftime("%d.%m %H:%M ET"), "ticker": m.ticker,

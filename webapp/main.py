@@ -54,6 +54,7 @@ from webapp.board.signals import BoardSignalReader
 from webapp.gamma_live import gamma_refresh_loop
 from webapp.live_alpha import job as live_job
 from webapp.live_alpha import page as live_page
+from webapp.live_alpha import results as live_results
 from webapp.live_alpha import store as live_store
 from webapp.live_alpha.job import live_alpha_loop
 from webapp.repo import RunInfo, SignalRepo
@@ -511,6 +512,16 @@ def live_home(request: Request, ok: str = "") -> HTMLResponse:
     return templates.TemplateResponse(
         request, "live.html",
         {"v": view, "ok": _LIVE_OK.get(ok, ""), "reload_seconds": reload_seconds},
+    )
+
+
+@app.get("/sonuclar", response_class=HTMLResponse)
+def live_results_page(request: Request) -> HTMLResponse:
+    """Full-history PAPER and peer-lag reporting; no upstream requests."""
+    engine = _board_reader().engine
+    live_page.ensure_ready(engine)
+    return templates.TemplateResponse(
+        request, "results.html", {"v": live_results.build_results(engine)},
     )
 
 
