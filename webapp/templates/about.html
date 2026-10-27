@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block head %}
+<script type="application/ld+json">{{ {"@context": "https://schema.org", "@type": "SoftwareApplication", "name": "UOA", "applicationCategory": "FinanceApplication", "operatingSystem": "Web", "inLanguage": "tr", "url": public_canonical, "description": seo_description} | tojson }}</script>
+{% endblock %}
+{% block content %}
+<section class="about-hero">
+  <p class="eyebrow">BAĞIMSIZ BİR PİYASA ÇALIŞMA MASASI</p>
+  <h1>Akışın arkasındaki<br><em>resmi gör.</em></h1>
+  <p class="about-intro">ABD hisseleri, opsiyon akışı, haber ve risk.<br>Aynı masada. Kendi kararın için.</p>
+  <a class="button-primary" href="/">Kişisel masaya giriş <svg aria-hidden="true" class="arrow-icon" viewBox="0 0 16 16" fill="none"><path d="M3 13L13 3M3 3h10v10" stroke="currentColor" stroke-width="1.4"/></svg></a>
+  <p class="access-note">Davet veya kayıt yok. Çalışma alanı giriş gerektirir.</p>
+  <div class="market-art" aria-hidden="true"><span class="art-label">PRICE / FLOW / CONTEXT</span><svg viewBox="0 0 520 230" fill="none"><path class="art-grid" d="M0 45H520M0 100H520M0 155H520M0 210H520M80 0V230M190 0V230M300 0V230M410 0V230"/><path class="art-line-muted" d="M0 183L40 171L80 180L120 149L160 159L200 130L240 144L280 114L320 130L360 104L400 117L440 82L480 91L520 56"/><path class="art-line" d="M0 188L40 190L80 167L120 179L160 131L200 147L240 109L280 122L320 69L360 88L400 39L440 62L480 29L520 15"/><circle cx="480" cy="29" r="5" fill="currentColor"/></svg><span class="art-footnote">Temsili çizim · piyasa verisi değildir</span></div>
+</section>
+<section class="about-columns" aria-label="Çalışma yaklaşımı">
+  <article><span class="section-number">01 / GÖZLEM</span><h2>Tek bir işlemden<br>fazlasına bak.</h2><p>Opsiyon akışını fiyat, haber, volatilite ve benzer hisselerle birlikte oku. Eksik veriyi eksik olarak gör.</p></article>
+  <article><span class="section-number">02 / RİSK</span><h2>Önce maliyet.<br>Sonra olasılık.</h2><p>Hisse ve opsiyon planlarını risk bütçesi, alış–satış makası ve komisyonla birlikte değerlendir.</p></article>
+  <article><span class="section-number">03 / KAYIT</span><h2>Kararını yaz.<br>Sonucuna dön.</h2><p>Öneriler, paslar ve simülasyon sonuçları ayrı tutulur. Kâğıt üzerindeki sonuç, gerçek işlem kârı değildir.</p></article>
+</section>
+<section class="method-note"><p class="eyebrow">YÖNTEM HAKKINDA</p><h2>Bir garanti değil.<br>Bir çalışma disiplini.</h2><div><p>UOA kişisel kullanım için geliştirilmiş deneysel bir karar destek aracıdır. Canlı veri kaynağı Unusual Whales; geçmiş veri araştırmalarında ThetaData altyapısı da kullanılmıştır.</p><p>Mevcut araştırmalar maliyet sonrası doğrulanmış bir işlem avantajı göstermemiştir. UOA getiri vaat etmez, broker hesabına bağlanmaz ve otomatik emir göndermez. Özel çalışma alanındaki işlem ve portföy verileri bu sayfada yayımlanmaz.</p></div></section>
+{% endblock %}

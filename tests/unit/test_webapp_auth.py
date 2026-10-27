@@ -1,6 +1,6 @@
 """Phase 5.0.9: HTTP Basic auth, fail closed (contract phase-5.0-merge §3.10).
 
-Every entry in ``app.routes`` except ``/health`` is enumerated, so a route
+Every private entry in ``app.routes`` is enumerated, so a route
 added later is covered without editing this file. Path parameters are filled
 with a dummy value and each route is exercised with each of its methods.
 """
@@ -24,6 +24,9 @@ if TYPE_CHECKING:
 
 _CHALLENGE = 'Basic realm="uoa"'
 _CORRECT = basic_auth_header(TEST_USER, TEST_PASSWORD)
+# Phase 5.29: owner's explicit public-introduction request; static GETs only.
+# Keep independent of the implementation allowlist so widening it is detected.
+_PUBLIC_GETS = {"/health", "/hakkinda", "/robots.txt", "/sitemap.xml", "/assets/uoa.css", "/favicon.svg"}
 
 
 def _route_cases() -> list[tuple[str, str]]:
@@ -34,7 +37,8 @@ def _route_cases() -> list[tuple[str, str]]:
             continue
         path = re.sub(r"\{[^}]*\}", "dummy", raw_path) or "/"
         methods = getattr(route, "methods", None) or {"GET"}
-        cases.extend((method, path) for method in sorted(methods))
+        cases.extend((method, path) for method in sorted(methods)
+                     if not (method == "GET" and path in _PUBLIC_GETS))
     return cases
 
 
