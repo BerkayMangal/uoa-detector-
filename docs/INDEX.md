@@ -242,6 +242,7 @@ A new study needs a fresh, non-overlapping window (`docs/next_studies.md`,
 | 5.36 | **Daily quota observation freshness** — preserve native response timestamps and prevent a prior-day API count from poisoning a new ET reservation day; existing caps and strategy reports unchanged. Contract: `docs/phase-5.36-quota-freshness-acceptance.md`; delivery: `docs/phase-5.36-closeout.md`. |
 | 5.37 | **Frozen daily research roster** — cap each family/session cohort under partial data arrival and concurrent publishers; archived tournament/report unchanged, versioned forward runtime. Contract: `docs/phase-5.37-research-roster-acceptance.md`; delivery: `docs/phase-5.37-closeout.md`. |
 | 5.38 | **Fixed-candidate stress audit** — 504 fixed-hypothesis delay/cost/name/month controls; concentration and removal-of-best-trades accounting. Recovery candidate loses after removing its best three wins; no new selection or PAPER promotion. Contract: `docs/phase-5.38-stress-audit-acceptance.md`; delivery: `docs/phase-5.38-closeout.md`. |
+| 5.39 | **Forward data readiness** — distinguish missing/stale data, incomplete history, no qualifying setup and pre-open publication availability; private detailed diagnostics and safe aggregate health summary, independent of scan failure. Contract: `docs/phase-5.39-data-readiness-acceptance.md`; delivery: `docs/phase-5.39-closeout.md`. |
 
 Detail for the 5.10–5.19 candidates:
 - **Falsification gates (D8).** `src/uoa_detector/backtest/falsification.py:79-81`

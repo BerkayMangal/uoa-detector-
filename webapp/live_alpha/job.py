@@ -64,6 +64,7 @@ from webapp.live_alpha import board as live_board
 from webapp.live_alpha import inputs, store, uw
 from webapp.live_alpha.diagnostics import news_counts, news_message
 from webapp.live_alpha.uw import Budget, ContractSpec, JsonClient
+from webapp.research_readiness import run as run_readiness
 from webapp.tournament.monitor import STATE as TOURNAMENT_STATE
 from webapp.tournament_forward import run as run_tournament
 
@@ -742,6 +743,8 @@ async def live_alpha_loop(
         except Exception as exc:
             _logger.exception("live alpha cycle failed")
             status, detail = "failed", {"error": type(exc).__name__, "message": str(exc)[:300]}
+        # Read-only data diagnostics must run even if the preceding scan failed.
+        await run_readiness(engine, now_fn())
         try:
             store.beat(engine, now, status, detail)
         except Exception:

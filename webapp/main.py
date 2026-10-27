@@ -631,11 +631,13 @@ def alpha_laboratory(request: Request) -> HTMLResponse:
 
 @app.get("/stratejiler", response_class=HTMLResponse)
 def strategy_tournament_page(request: Request) -> HTMLResponse:
+    from webapp.research_readiness import view as readiness_view
     from webapp.robustness.report import view as stress_view
     from webapp.tournament.monitor import view
     from webapp.tournament.settings import settings
 
-    return templates.TemplateResponse(request, "tournament.html", {"v": view(_board_reader().engine, _now()), "stress": stress_view(), "families": tuple(settings().thresholds), "min_test_closed": settings().min_test_closed})
+    engine, now = _board_reader().engine, _now()
+    return templates.TemplateResponse(request, "tournament.html", {"v": view(engine, now), "stress": stress_view(), "readiness": readiness_view(engine, now), "families": tuple(settings().thresholds), "min_test_closed": settings().min_test_closed})
 
 
 @app.get("/kalibrasyon", response_class=HTMLResponse)
@@ -1573,4 +1575,8 @@ def health() -> dict[str, object]:
         body["alpha_lab"] = dict(LAB_STATE)
     if ARCHIVE_STATE:
         body["flow_capture"] = dict(ARCHIVE_STATE)
+    from webapp.research_readiness import public_summary
+
+    if live_job.LAST_CYCLE and (summary := public_summary()):
+        body["research_data"] = summary
     return body
