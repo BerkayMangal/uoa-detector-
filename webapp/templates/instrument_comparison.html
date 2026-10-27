@@ -1,0 +1,41 @@
+{% macro money(value) -%}{% if value is number %}${{ '%.2f' | format(value) }}{% else %}bilinmiyor{% endif %}{%- endmacro %}
+{% macro comparison(d, withdrawn) %}
+{% set readiness = {'READY': 'Fiyatlandı, bütçeye sığıyor', 'RISK_BLOCKED': 'Risk bütçesine sığmıyor', 'QUOTE_PENDING': 'Kotasyon bekleniyor', 'INVALID': 'Yapı uygulanamıyor'} %}
+{% set names = {'long_call': 'Call alımı', 'long_put': 'Put alımı', 'bull_call_debit': 'Bull call debit spread', 'bear_put_debit': 'Bear put debit spread', 'stock': 'Hisse', 'none': 'Uygun araç yok'} %}
+<section class="mt-3 border border-gray-700 rounded p-3" data-instrument-comparison="{{ d.ticker }}">
+  <h4 class="font-semibold text-white">Hisse mi, opsiyon mu?</h4>
+  <p class="text-xs text-gray-400 mt-1">Karar anındaki plan · risk bütçesi {{ money(d.stock_plan.r_usd if d.stock_plan else none) }}.
+    Aynı bütçe, farklı adetler; aynı getiri veya aynı gerçekleşen zarar anlamına gelmez.</p>
+  {% if withdrawn %}<p class="text-amber-300 text-sm">Giriş geri çekildi. Aşağıdaki fiyatlar güncel işlem fiyatı değildir.</p>{% endif %}
+  <div class="overflow-x-auto mt-2">
+    <table class="w-full text-xs text-left">
+      <caption class="sr-only">Kaydedilmiş hisse ve opsiyon maliyet karşılaştırması</caption>
+      <thead class="text-gray-400"><tr><th class="pr-3">Araç / birim</th><th class="pr-3">Giriş / pozisyon tutarı</th><th class="pr-3">Risk</th><th class="pr-3">Gidiş-dönüş maliyeti</th><th class="pr-3">Başabaş / hedef</th><th>Adet / engel</th></tr></thead>
+      <tbody>
+        {% if d.stock_plan %}{% set s = d.stock_plan %}
+        <tr class="border-t border-gray-800"><td class="pr-3 py-2">Hisse · tüm pozisyon{% if d.direction == 'down' %} (kısa){% endif %}</td>
+          <td class="pr-3">{{ money(s.notional_usd) }}<br>{{ money(s.entry_ref) }} / hisse</td>
+          <td class="pr-3">{{ money(s.planned_risk_usd) }} planlanan stop riski<br>Stop {{ money(s.stop) }}</td>
+          <td class="pr-3">Planda parasal toplam yok</td>
+          <td class="pr-3">Hedef {{ money(s.target) }}<br>{{ s.horizon_sessions }} seans · politika hedefi</td>
+          <td>{{ s.shares }} hisse{% if s.note %}<br>{{ s.note }}{% endif %}</td></tr>
+        {% endif %}
+        {% for o in d.options %}
+        <tr class="border-t border-gray-800" data-readiness="{{ o.readiness }}"><td class="pr-3 py-2">{{ names.get(o.kind, o.kind) }} · 1 yapı{% if o.legs %}<br>{{ o.legs[0].expiry }}{% endif %}</td>
+          <td class="pr-3">{{ money(o.entry_cost_usd) }}<br>komisyon hariç</td>
+          <td class="pr-3">{{ money(o.max_loss_usd) }} azami zarar / yapı</td>
+          <td class="pr-3">{% if o.entry_debit is number and o.exit_credit is number and o.multiplier is number and o.commission_usd is number %}{{ money((o.entry_debit - o.exit_credit) * o.multiplier + o.commission_usd) }} / yapı<br>{% endif %}{% if o.roundtrip_cost_pct is number %}%{{ '%.1f' | format(o.roundtrip_cost_pct) }} giriş tutarı{% else %}bilinmiyor{% endif %}<br>Komisyon {{ money(o.commission_usd) }} / yapı</td>
+          <td class="pr-3">{{ money(o.breakeven) }}<br>Vadede, prim bazlı; komisyon hariç</td>
+          <td>{{ o.lots }} yapı · {{ readiness.get(o.readiness, 'Durum bilinmiyor') }}{% if o.blocker %}<br>{{ o.blocker }}{% endif %}</td></tr>
+        {% else %}<tr><td colspan="6" class="py-2 text-gray-400">Fiyatlanmış opsiyon alternatifi yok.</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="text-xs text-gray-500 mt-2">Hisse stopu azami zarar garantisi değildir; boşluk ve kayma zararı artırabilir.
+    Opsiyon maliyeti mevcut kotasyonlardaki makas, model kayması ve gidiş-dönüş komisyonunu içerir; komisyonu tekrar ekleme.
+    Opsiyon başabaşı vade içindir; hisse planının ufkunda opsiyon kârı tahmini değildir.
+    Fiyatlanmış olması giriş izni değildir; kartın güncel koşulları geçerlidir.
+    {% if d.direction == 'down' %}Açığa satışın borç ve marjin maliyeti bu tabloda yoktur.{% endif %}
+    Tercih: {{ names.get(d.instrument.preferred, d.instrument.preferred) }} — {{ d.instrument.reason }}</p>
+</section>
+{% endmacro %}

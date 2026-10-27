@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "instrument_comparison.html" import comparison %}
 {# Live Alpha v1 (registry 5.25): "Bugünün Fırsatları". Renders the newest alfa_live_scan
    snapshot only; every sentence on a card was built by uoa_detector.live_alpha.decide from
    source fields and deterministic arithmetic. The old no-advice rule does not apply to this
@@ -41,6 +42,7 @@
     <p class="text-base text-gray-200 mt-1" data-plain-reason>{{ d.plain_reason or d.why_today }}</p>
     <p class="text-sm text-gray-400 mt-2"><b>Ne zaman vazgeçilir:</b> {{ d.invalidation }}</p>
     <p class="text-sm text-gray-400 mt-1"><b>Neden yanılıyor olabiliriz:</b> {{ d.counter_argument }}</p>
+    {{ comparison(d, c.withdrawn) }}
     <details class="mt-3 text-sm"><summary class="cursor-pointer text-gray-400">Detay: opsiyon akışı, haber, fiyat, hisse ve opsiyon planı, kaynaklar</summary>
     <p class="text-gray-300 mt-2"><b>Görüş:</b> {{ d.headline }}</p>
     {% if d.blockers %}<p class="text-amber-200 mt-1"><b>Engel:</b> {{ d.blockers | join('; ') }}</p>{% endif %}
@@ -115,7 +117,7 @@
   {% endif %}
 
   <h3 class="text-lg font-semibold text-white mt-6 mb-2">Önerilerin sonucu (PAPER: simülasyon, gerçek para değil)</h3>
-  <p class="text-sm text-gray-400 mb-2">Açık {{ v.paper_stats.open }} · kapanmış {{ v.paper_stats.closed }} · dolmayan {{ v.paper_stats.unfilled }} · maliyet sonrası toplam ${{ '%.2f' | format(v.paper_stats.pnl_usd) }} ({{ v.paper_stats.wins }} kazanç). Küçük örneklem; başarı oranı çıkarılmaz.</p>
+  <p class="text-sm text-gray-400 mb-2">Açık/bekleyen {{ v.paper_stats.open }} · fiyatlanmış kapanış {{ v.paper_stats.closed }} · dolmayan {{ v.paper_stats.unfilled }} · belirsiz {{ v.paper_stats.unknown }} · model maliyetleri sonrası toplam {% if v.paper_stats.pnl_usd is not none %}${{ '%.2f' | format(v.paper_stats.pnl_usd) }}{% else %}bilinmiyor{% endif %} ({{ v.paper_stats.wins }} kazanç). Tüm geçmiş; aşağıda son 20 kapalı kayıt. <a class="underline" href="/sonuclar">Ayrıntılı sonuçlar</a>. Küçük örneklem; başarı oranı çıkarılmaz.</p>
   {% if v.papers_open or v.papers_closed %}
   <table class="text-sm w-full"><thead class="text-gray-400 text-left"><tr><th>Hisse</th><th>Araç</th><th>Durum</th><th>Giriş</th><th>Stop/Hedef</th><th>Son değer</th><th>Çıkış</th><th>P&amp;L</th></tr></thead><tbody>
   {% for p in v.papers_open + v.papers_closed %}
