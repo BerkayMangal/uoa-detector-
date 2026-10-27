@@ -6,6 +6,7 @@
    screen (docs/live-alpha-v1/PRODUCT_OVERRIDE.md); it still applies to /alfa and the rest. #}
 {% block tagline %}<span class="text-sm text-gray-400">Bugün ne alınır, hangi fiyattan, nerede zarar kesilir. Emir göndermez; işlemi sen yaparsın.</span>{% endblock %}
 {% block content %}
+<p class="quiet-copy mb-3"><a href="/stratejiler">Strateji masası · deneysel adayları ve PAPER sonuçlarını karşılaştır →</a></p>
 {% include "alert_controls.html" %}
 <section id="live-alpha" lang="tr" data-entry-ttl="{{ v.entry_ttl_seconds }}" data-scan-age="{{ v.scan_age_seconds or 0 }}" data-reload-seconds="{{ reload_seconds }}">
   <div class="desk-heading">

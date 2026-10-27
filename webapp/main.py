@@ -629,6 +629,14 @@ def alpha_laboratory(request: Request) -> HTMLResponse:
     return templates.TemplateResponse(request, "alpha_lab.html", {"v": lab_view.build(_board_reader().engine)})
 
 
+@app.get("/stratejiler", response_class=HTMLResponse)
+def strategy_tournament_page(request: Request) -> HTMLResponse:
+    from webapp.tournament.monitor import view
+    from webapp.tournament.settings import settings
+
+    return templates.TemplateResponse(request, "tournament.html", {"v": view(_board_reader().engine, _now()), "families": tuple(settings().thresholds), "min_test_closed": settings().min_test_closed})
+
+
 @app.get("/kalibrasyon", response_class=HTMLResponse)
 def calibration_page(request: Request) -> HTMLResponse:
     from webapp.calibration.monitor import view
