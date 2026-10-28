@@ -70,8 +70,11 @@ from webapp.live_alpha import results as live_results
 from webapp.live_alpha import store as live_store
 from webapp.live_alpha.job import live_alpha_loop
 from webapp.opening import alerts as opening_alerts
+from webapp.opening import measurement as opening_measurement
 from webapp.opening import view as opening_view
+from webapp.opening.model import clock as opening_clock
 from webapp.repo import RunInfo, SignalRepo
+from webapp.storage_diagnostics import native_hint
 from webapp.vol_board import VolBoardRow, build_vol_board, vol_board_summary
 from webapp.worker import live_config_from_env, run_live_worker
 
@@ -121,6 +124,8 @@ def _live_alpha_thread_main(database_url: str) -> None:
             live_job.LAST_CYCLE.clear()
             live_job.LAST_CYCLE.update(at=datetime.now(UTC).isoformat(), status="failed", mode=None,
                                       cards=None, failure=asdict(safe_failure(exc, "startup")))
+            if hint := native_hint(exc):
+                live_job.LAST_CYCLE["database_hint"] = hint.code.value
             _logger.exception("live-alpha crashed; restarting in 30s")
         else:
             from webapp.live_alpha.cycle_status import safe_failure
@@ -351,7 +356,7 @@ async def _database_unavailable(request: Request, exc: OperationalError) -> Resp
                              "outcome": "unknown" if uncertain else "unavailable"},
                             status_code=503, headers=headers)
     try:
-        return templates.TemplateResponse(request, "storage_unavailable.html", {"uncertain": uncertain},
+        return templates.TemplateResponse(request, "storage_unavailable.html", {"uncertain": uncertain, "storage_hint": native_hint(exc)},
                                           status_code=503, headers=headers)
     except Exception:
         message = ("Kaydın tamamlandığını doğrulayamıyoruz. Tekrar göndermeden önce kayıtları kontrol edin."
@@ -624,8 +629,31 @@ def live_home(request: Request, ok: str = "") -> HTMLResponse:
 
 @app.get("/acilis", response_class=HTMLResponse)
 def opening_page(request: Request, before: str = "", journal_day: date | None = None) -> HTMLResponse:
+    now = _now()
+    try:
+        opening = opening_view.build(_board_reader().engine, now, before, journal_day)
+    except OperationalError as exc:
+        _logger.exception("opening storage unavailable; no instructions inferred")
+        session_clock = opening_clock(now)
+        try:
+            return templates.TemplateResponse(request, "opening_unavailable.html", {
+                "clock": session_clock, "tr_time": opening_view.tr_time,
+                "storage_hint": native_hint(exc),
+            }, status_code=503)
+        except Exception:
+            _logger.exception("opening outage template unavailable")
+            preparation = opening_view.tr_time(session_clock.preparation)
+            assessment = opening_view.tr_time(session_clock.assessment)
+            return HTMLResponse(
+                '<!doctype html><html lang="tr"><title>Açılış masası</title>'
+                '<h1>BEKLE · Veri bağlantısı yok</h1><p>Güncel öneriler ve kayıtlar doğrulanamıyor.</p>'
+                f'<p>Türkiye saati: hazırlık {preparation}; giriş kontrolü {assessment}.</p>'
+                '<p>Ölçüm sonuçları bilinmiyor.</p><a href="/acilis">Bağlantıyı yeniden kontrol et</a></html>',
+                status_code=503,
+            )
     return templates.TemplateResponse(request, "opening.html", {
-        "opening": opening_view.build(_board_reader().engine, _now(), before, journal_day),
+        "opening": opening,
+        "measurement": opening_measurement.build(opening.results, now, journal_day),
         "tr_time": opening_view.tr_time, "alert_settings": _safe(live_alerts.settings, None),
         "alert_feed_url": "/api/acilis/uyarilar", "reload_seconds": live_page.settings().cycle.live_seconds,
     })

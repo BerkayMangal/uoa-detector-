@@ -60,3 +60,41 @@ it cannot directly inspect/resize the Railway PostgreSQL volume or claim an
 authenticated production data review. The owner can supply a secure connected
 Railway context or perform the concrete capacity operation above; no password
 or API token should be pasted into chat.
+
+## Native connection evidence after phase 5.46
+
+The owner's actual application log reported `FATAL: the database system is in
+recovery mode`. This is different evidence from the earlier 53100 capacity
+fault. A volume reported below 100MB used does not by itself prove either the
+cause of recovery or that every temporary/shared-memory resource is healthy.
+The Railway account compute budget is also a separate measure.
+
+`live_alpha.database_hint`, when present, is a fixed allowlisted cause read only
+from the native driver exception. `recovery`, `starting` and `shutdown` reflect
+explicit server messages. `not_accepting` (57P03 without native detail) is
+ambiguous. `refused`, `dns`, `connection_timeout`, `authentication`, `tls`,
+`connection_capacity` and `connection_lost` require their corresponding service,
+configuration or native code check; they do not establish a repair by themselves.
+A missing hint is unknown, not proof the database is fine. No host/user/URL/raw
+SQL or driver message is published by this adapter.
+
+Inspect **unique-balance → PostgreSQL service → Deploy Logs**, rather than only
+the application logs. Read whether recovery is progressing, repeating a crash,
+or has reached `database system is ready to accept connections`. If PostgreSQL
+is ready but the app still reports connection refusal/DNS/timeout, compare the
+app's existing DATABASE_URL service reference/network endpoint in Railway.
+Do not paste its secret value into chat. This workspace has no control-plane
+access and does not change the target or invent an internal hostname/port.
+
+During recovery, do not delete WAL, run pg_resetwal, force promotion, replace the
+volume or repeatedly restart a progressing recovery. Retain the database's own
+native log evidence; a platform recovery banner is not a diagnosis of this
+particular database. A provider recovery/escalation or correct service reference
+may be needed, but it must follow the observed service state.
+
+Private `/acilis` now returns a clock-only 503 during storage failure: current
+Istanbul preparation/open/+15 times, BEKLE and a safe known diagnostic. It is
+read-only, never invents journal data or zero P&L and does not automatically
+refresh/replay anything. The owner may retry GET manually. Completion still
+requires an actual successful scan plus `opening_status: ok`, and real recorded
+coverage; a deployed build or a liveness 200 alone is insufficient.

@@ -69,6 +69,7 @@ from webapp.opening.model import next_wait as opening_wait
 from webapp.opening.observer import STATE as OPENING_STATE
 from webapp.opening.observer import run as run_opening
 from webapp.research_readiness import run as run_readiness
+from webapp.storage_diagnostics import native_hint
 from webapp.tournament.monitor import STATE as TOURNAMENT_STATE
 from webapp.tournament_forward import run as run_tournament
 
@@ -737,6 +738,7 @@ async def live_alpha_loop(
         status, detail = "ok", {}
         stage = "scan"
         failure = None
+        database_hint = None
         row: store.ScanRow | None = None
         try:
             row = await run_cycle(engine, reader, client, settings, board, costs, now,
@@ -757,6 +759,7 @@ async def live_alpha_loop(
             _logger.exception("live alpha cycle failed")
             status, detail = "failed", {"error": type(exc).__name__, "message": str(exc)[:300]}
             failure = safe_failure(exc, stage)
+            database_hint = native_hint(exc)
         # Read-only data diagnostics must run even if the preceding scan failed.
         await run_opening(engine, now_fn(), scan_id=row.scan_id if row is not None else None)
         await run_readiness(engine, now_fn())
@@ -774,6 +777,8 @@ async def live_alpha_loop(
             LAST_CYCLE["news_errors"] = detail["news_errors"]
         if failure is not None:
             LAST_CYCLE["failure"] = asdict(failure)
+        if database_hint is not None:
+            LAST_CYCLE["database_hint"] = database_hint.code.value
         if DESK_STATE:
             LAST_CYCLE["desk_status"] = DESK_STATE.get("status")
         if CALIBRATION_STATE:

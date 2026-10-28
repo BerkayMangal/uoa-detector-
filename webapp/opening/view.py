@@ -41,6 +41,9 @@ class Result:
     at: datetime
     instrument: str
     marks: tuple[tuple[str, dict[str, Any] | None], ...]
+    key: str = ""
+    day: date | None = None
+    profile_hash: str = ""
 
 
 @dataclass(frozen=True)
@@ -266,12 +269,21 @@ def build(engine: Engine, now: datetime, before: str = "", journal_day: date | N
                     )
                 )
             }
+            cycle = s.get(storage.OpeningCycle, primary.cycle_key)
+            profile_hash = (
+                json.loads(cycle.payload_json).get("profile_hash", "")
+                if cycle and utc(cycle.published_at) <= now
+                else ""
+            )
             results.append(
                 Result(
                     primary.ticker,
                     utc(primary.published_at),
                     advice.instrument,
                     tuple((label, outcomes.get(kind)) for kind, label in labels),
+                    key=primary.key,
+                    day=primary.day,
+                    profile_hash=profile_hash,
                 )
             )
         return View(

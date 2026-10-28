@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block content %}
+<section aria-label="Açılış masası erişim durumu" data-opening-unavailable>
+  <p class="eyebrow">AÇILIŞ MASASI / {{ clock.day.strftime('%d.%m.%Y') }}</p>
+  <div class="desk-heading"><h1>BEKLE · Veri bağlantısı yok</h1></div>
+  <p class="desk-notice" role="status">Güncel öneriler ve kalıcı kayıtlar okunamıyor. AL / SAT planı doğrulanmadı; ölçüm sonuçları bilinmiyor.</p>
+  <dl class="price-rail"><div><dt>Hazırlık · TR</dt><dd>{{ tr_time(clock.preparation) }}</dd></div><div><dt>ABD açılışı · TR</dt><dd>{{ tr_time(clock.opening) }}</dd></div><div><dt>Giriş kontrolü · TR</dt><dd>{{ tr_time(clock.assessment) }}</dd></div></dl>
+  <p class="quiet-copy">{{ clock.reason }} Saatler işlem takvimidir; veri bağlantısının çalıştığı anlamına gelmez.</p>
+  {% if storage_hint %}<details class="fold-panel" open><summary>Bağlantı durumu: {{ storage_hint.label }}</summary><p class="quiet-copy">{{ storage_hint.action }}</p></details>
+  {% else %}<p class="quiet-copy">Bağlantının neden kesildiği bu yanıttan belirlenemedi. Veritabanı servisinin kendi logu gerekiyor.</p>{% endif %}
+  <p class="quiet-copy">Bu görüntü yeni bir öneri veya işlem kaydı oluşturmadı. Önceden gönderdiğin bir kayıt varsa bağlantı döndüğünde durumunu kontrol et.</p>
+  <p class="quiet-copy"><a class="button-primary" href="/acilis">Bağlantıyı yeniden kontrol et</a></p>
+</section>
+{% endblock %}

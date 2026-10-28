@@ -10,6 +10,8 @@
   <p class="desk-notice" role="status">Bu ekranın güncel verisi doğrulanamıyor. Canlı sinyalleri ve PAPER sonuçlarını güncel kabul etmeyin.</p>
   <p class="quiet-copy">Veritabanı erişiminin yeniden sağlanması gerekiyor. Daha sonra kontrol edebilirsiniz.</p>
   {% endif %}
+  {% if storage_hint %}<details class="fold-panel"><summary>Bağlantı durumu: {{ storage_hint.label }}</summary><p class="quiet-copy">{{ storage_hint.action }}</p></details>{% endif %}
+  {% if not uncertain %}<p class="quiet-copy"><a href="/acilis">Bugünkü açılış saatini ve erişim durumunu gör →</a></p>{% endif %}
   <p class="quiet-copy"><a href="/">Ana sayfayı yeniden kontrol et →</a></p>
 </div>
 {% endblock %}
