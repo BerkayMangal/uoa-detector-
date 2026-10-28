@@ -65,6 +65,9 @@ from webapp.live_alpha import inputs, store, uw
 from webapp.live_alpha.cycle_status import next_wait, safe_failure
 from webapp.live_alpha.diagnostics import news_counts, news_message
 from webapp.live_alpha.uw import Budget, ContractSpec, JsonClient
+from webapp.opening.model import next_wait as opening_wait
+from webapp.opening.observer import STATE as OPENING_STATE
+from webapp.opening.observer import run as run_opening
 from webapp.research_readiness import run as run_readiness
 from webapp.tournament.monitor import STATE as TOURNAMENT_STATE
 from webapp.tournament_forward import run as run_tournament
@@ -679,6 +682,8 @@ async def run_cycle(
             "source_at": p.spot_fetched_at.isoformat() if p.spot_fetched_at else None,
             "session": p.source_session.isoformat() if p.source_session else None}
             for ticker, p in prices.items()},
+        "flow_observations": {t: to_jsonable(f) for t, f in flows.items()},
+        "news_observations": {t: {"state": n.state.value, "checked_at": n.checked_at.isoformat() if n.checked_at else None} for t, n in news.items()},
         "timing_seconds": round(perf_counter() - t0, 2),
         "status_text": "" if status == "ok" else news_message(news_errors),
     })
@@ -732,6 +737,7 @@ async def live_alpha_loop(
         status, detail = "ok", {}
         stage = "scan"
         failure = None
+        row: store.ScanRow | None = None
         try:
             row = await run_cycle(engine, reader, client, settings, board, costs, now,
                                   gamma_source=gamma_repo.latest)
@@ -752,6 +758,7 @@ async def live_alpha_loop(
             status, detail = "failed", {"error": type(exc).__name__, "message": str(exc)[:300]}
             failure = safe_failure(exc, stage)
         # Read-only data diagnostics must run even if the preceding scan failed.
+        await run_opening(engine, now_fn(), scan_id=row.scan_id if row is not None else None)
         await run_readiness(engine, now_fn())
         try:
             store.beat(engine, now, status, detail)
@@ -773,9 +780,11 @@ async def live_alpha_loop(
             LAST_CYCLE["calibration_status"] = CALIBRATION_STATE.get("status")
         if TOURNAMENT_STATE:
             LAST_CYCLE["tournament_status"] = TOURNAMENT_STATE.get("status")
+        if OPENING_STATE:
+            LAST_CYCLE["opening_status"] = OPENING_STATE.get("status")
         cycles += 1
         if max_cycles is not None and cycles >= max_cycles:
             return
         mode = classify(now_fn(), settings.calendar).mode
         wait = next_wait(settings, status, mode)
-        await pause(wait)
+        await pause(opening_wait(now_fn(), wait))

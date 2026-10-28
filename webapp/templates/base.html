@@ -17,7 +17,7 @@
   <meta property="og:url" content="{{ public_canonical }}">
   {% else %}<meta name="robots" content="noindex, nofollow, nosnippet">{% endif %}
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="/assets/uoa.css?v=5.35.1">
+  <link rel="stylesheet" href="/assets/uoa.css?v=5.45.1">
   {% block head %}{% endblock %}
 </head>
 <body>
@@ -31,7 +31,7 @@
     </div>
     {% if path != '/hakkinda' %}
     <nav class="desk-nav" aria-label="Ana gezinme">
-      {% for href, label, active in [('/', 'Bugün', path == '/' or path.startswith('/canli')), ('/pozisyonlar', 'Pozisyonlarım', path == '/pozisyonlar'), ('/sonuclar', 'Sonuçlar', path == '/sonuclar'), ('/laboratuvar', 'Alfa lab', path == '/laboratuvar'), ('/journal', 'İşlemlerim', path.startswith('/journal')), ('/defter', 'Karar defteri', path.startswith('/defter') or path.startswith('/kart')), ('/alfa', 'Akış', path.startswith('/alfa')), ('/gamma', 'Gamma & vol', path.startswith('/gamma')), ('/opsiyon', 'Opsiyon', path.startswith('/opsiyon'))] %}
+      {% for href, label, active in [('/acilis', 'Açılış masası', path == '/acilis'), ('/', 'Bugün', path == '/' or path.startswith('/canli')), ('/pozisyonlar', 'Pozisyonlarım', path == '/pozisyonlar'), ('/sonuclar', 'Sonuçlar', path == '/sonuclar'), ('/laboratuvar', 'Alfa lab', path == '/laboratuvar'), ('/journal', 'İşlemlerim', path.startswith('/journal')), ('/defter', 'Karar defteri', path.startswith('/defter') or path.startswith('/kart')), ('/alfa', 'Akış', path.startswith('/alfa')), ('/gamma', 'Gamma & vol', path.startswith('/gamma')), ('/opsiyon', 'Opsiyon', path.startswith('/opsiyon'))] %}
       <a href="{{ href }}" {% if active %}aria-current="page"{% endif %}>{{ label }}</a>
       {% endfor %}
     </nav>

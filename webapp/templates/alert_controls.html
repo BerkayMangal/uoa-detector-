@@ -1,6 +1,6 @@
 {% if alert_settings %}
 <aside class="live-alert-controls" aria-label="Canlı sinyal uyarıları" id="live-alert-controls"
-  data-poll-seconds="{{ alert_settings.poll_seconds }}" data-seen-ttl="{{ alert_settings.seen_ttl_seconds }}" data-max-seen="{{ alert_settings.max_seen }}">
+  {% if alert_feed_url %}data-feed-url="{{ alert_feed_url }}"{% endif %} data-poll-seconds="{{ alert_settings.poll_seconds }}" data-seen-ttl="{{ alert_settings.seen_ttl_seconds }}" data-max-seen="{{ alert_settings.max_seen }}">
   <div class="focus-tabs"><button type="button" id="alerts-toggle" aria-pressed="false">Uyarıları aç</button><button type="button" id="alerts-test">Sesi dene</button></div>
   <label class="quiet-copy" for="alerts-scope">Uyarı kapsamı <select id="alerts-scope"><option value="calls">CALL / call spread</option><option value="all">Tüm ALIM önerileri</option></select></label>
   <label class="quiet-copy"><input type="checkbox" id="alerts-exits" checked> PAPER / manuel çıkış incelemeleri</label>

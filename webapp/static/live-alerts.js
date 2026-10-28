@@ -100,7 +100,7 @@
   }
   async function load() {
     const began = performance.now();
-    const response = await fetch('/api/canli/uyarilar', {credentials: 'same-origin', cache: 'no-store', signal: AbortSignal.timeout(12000)});
+    const response = await fetch(controls.dataset.feedUrl || '/api/canli/uyarilar', {credentials: 'same-origin', cache: 'no-store', signal: AbortSignal.timeout(12000)});
     if (!response.ok) throw new Error('feed unavailable');
     const data = await response.json();
     if (!Number.isFinite(Date.parse(data.server_time)) || !Array.isArray(data.signals)) throw new Error('invalid feed');

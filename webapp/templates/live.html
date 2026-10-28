@@ -6,6 +6,7 @@
    screen (docs/live-alpha-v1/PRODUCT_OVERRIDE.md); it still applies to /alfa and the rest. #}
 {% block tagline %}<span class="text-sm text-gray-400">Bugün ne alınır, hangi fiyattan, nerede zarar kesilir. Emir göndermez; işlemi sen yaparsın.</span>{% endblock %}
 {% block content %}
+{% include "opening_brief.html" %}
 <p class="quiet-copy mb-3"><a href="/stratejiler">Strateji masası · deneysel adayları ve PAPER sonuçlarını karşılaştır →</a></p>
 {% include "alert_controls.html" %}
 <section id="live-alpha" lang="tr" data-entry-ttl="{{ v.entry_ttl_seconds }}" data-scan-age="{{ v.scan_age_seconds or 0 }}" data-reload-seconds="{{ reload_seconds }}">
@@ -26,7 +27,7 @@
 
   <div class="desk-overview">
     <div class="overview-item"><span>Takipte</span><b>{{ v.universe | length }}</b></div>
-    <div class="overview-item"><span>Alım hazır</span><b id="ready-count">{{ v.actionable | selectattr('tone', 'equalto', 'green') | list | length }}</b></div>
+    <div class="overview-item"><span>Kaynakta hazır</span><b id="ready-count">{{ v.actionable | selectattr('tone', 'equalto', 'green') | list | length }}</b></div>
     <div class="overview-item"><span>Açık / bekleyen PAPER</span><b>{{ v.paper_stats.open }}</b></div>
     <p class="overview-note">Önce fiyat ve risk. Ayrıntılar ihtiyaç duyduğunda bir tık uzakta.</p>
   </div>
@@ -38,6 +39,7 @@
   {% for p in desk.paper.rows + desk.manual.rows %}{% if p.action == 'EXIT_REVIEW' %}<p class="desk-notice"><b>{{ p.ticker }} · {{ 'PAPER' if p.scope == 'paper' else 'Manuel kayıt' }} · ÇIKIŞ İNCELE:</b> {{ p.reason }} <a class="underline" href="/pozisyonlar">Pozisyonu gör</a></p>{% endif %}{% endfor %}
   {% endif %}
 
+  <details class="fold-panel"><summary>Kaynak stratejinin ayrıntıları · deneysel Live Alpha v1</summary><p class="quiet-copy">İşlem zamanlaması için üstteki açılış masasını kullan. Aşağıdaki kaynak plan, +15 dakika ve daha sıkı tazelik kontrollerini ayrıca uygulamaz.</p>
   {% if v.actionable %}<div class="section-heading"><h2>İşlem planları</h2><span>Deneysel görüş · otomatik emir yok</span></div>{% endif %}
   <div class="plan-grid">
   {% for c in v.actionable %}{% set d = c.data %}
@@ -96,10 +98,11 @@
   {% endfor %}
   </div>
 
+  </details>
   {% set tc = {"green": "text-emerald-400", "amber": "text-amber-300", "red": "text-rose-400", "gray": "text-gray-300"} %}
   {% if v.board %}
   {% set show_basket = (v.board | selectattr('basket') | list | length) > 0 %}
-  <div class="section-heading"><h2>Hisse panosu</h2><span id="stock-count" aria-live="polite">{{ v.board | length }} hisse</span></div>
+  <div class="section-heading"><h2>Hisse panosu · kaynak strateji</h2><span id="stock-count" aria-live="polite">{{ v.board | length }} hisse</span></div>
   <div class="table-tools"><label class="sr-only" for="stock-search">Hisse ara</label><input type="search" id="stock-search" placeholder="Hisse ara…" autocomplete="off"><div class="focus-tabs" role="group" aria-label="Hisse filtresi"><button type="button" data-focus="all" aria-pressed="true">Tümü</button><button type="button" data-focus="hot" aria-pressed="false">Sıcak liste</button><button type="button" data-focus="lag" aria-pressed="false">Geride kalanlar</button></div></div>
   <details class="mb-3"><summary>Bu tabloyu nasıl okumalı?</summary><p class="quiet-copy">Ölçülmüş bilgi, tahmin değil. "Opsiyonların fiyatladığı hareket": o vadeye kadar piyasanın beklediği ortalama oynaklık (ATM straddle / fiyat). "Akış": bugün bu saate kadarki işlem sayısı, hissenin son seanslardaki aynı saat ortalamasına göre.{% if show_basket %} "Akranlara göre": hissenin getirisi eksi akranlarının ortalama getirisi, aynı iki kapanış arasında. Akranlar: elle yazılmış bir sepet varsa o, yoksa son 60 seansta bu hisseyle en çok birlikte hareket eden isimler. Ölçüm, tahmin değil.{% endif %} "Sıcak liste": sistemin piyasa genelindeki olağandışı opsiyon akışından kendi seçtiği isimler; canlı takibe otomatik girer.</p></details>
   <div class="overflow-x-auto" role="region" aria-label="Hisse panosu" tabindex="0">
@@ -167,5 +170,6 @@
     Yeni akış ölçümü ve akran-toparlanma araştırması ayrı gölge sürümde: <a href="/laboratuvar" class="underline">Alfa lab</a>.</p>
 </section>
 <script src="/assets/live-desk.js?v=5.33.1" defer></script>
-<script src="/assets/live-alerts.js?v=5.33.1" defer></script>
+<script src="/assets/live-alerts.js?v=5.45.1" defer></script>
+<script src="/assets/opening-desk.js?v=5.45.1" defer></script>
 {% endblock %}
