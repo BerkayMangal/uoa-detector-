@@ -1,0 +1,13 @@
+<section class="opening-brief" aria-label="Açılış masası" id="opening-desk" data-server-now="{{ opening.now.isoformat() if opening else '' }}" data-refresh-seconds="{{ reload_seconds }}" data-opening-current="{{ 'true' if opening and opening.current else 'false' }}">
+  <div class="section-heading"><h2>Açılış masası</h2><a href="/acilis">Planlar ve kayıtlar →</a></div>
+  {% if opening %}
+  <p class="quiet-copy">{{ opening.clock.day.strftime('%d.%m.%Y') }} · Türkiye saati · Hazırlık {{ tr_time(opening.clock.preparation) }} · Borsa {{ tr_time(opening.clock.opening) }} · İşlem kontrolü {{ tr_time(opening.clock.assessment) }}</p>
+  <p class="opening-lead">{% if not opening.current %}BEKLE · {% endif %}{{ opening.clock.reason }}</p>
+  {% if not opening.recorded %}<p class="desk-notice">Bugün henüz kalıcı açılış kaydı yok. Veri ve kayıt bağlantısı doğrulanmadan AL / SAT üretilmez.</p>
+  {% elif not opening.current %}<p class="desk-notice">Son kayıt güncel değil. Eski AL / SAT planları işlem çağrısı olarak gösterilmiyor.</p>{% endif %}
+  {% set buys = opening.statements | selectattr('current') | selectattr('advice.action', 'equalto', 'BUY') | list %}
+  {% if buys %}<p class="opening-lead" data-opening-buys data-opening-expiry="{{ (buys | map(attribute='advice.expires_at') | min).isoformat() }}">{% for s in buys[:opening.display_limit] %}{{ s.advice.headline }}{% if not loop.last %} · {% endif %}{% endfor %}</p>{% elif opening.current %}<p class="quiet-copy">Şu anda giriş koşullarını sağlayan kayıtlı AL planı yok.</p>{% endif %}
+  {% for s in opening.statements %}{% if s.advice.action in ['SELL', 'PAPER_EXIT', 'REVIEW'] %}<p class="desk-notice" data-opening-exit data-opening-expiry="{{ s.advice.expires_at.isoformat() if s.advice.expires_at else '' }}">{{ s.advice.headline if s.current or s.advice.action == 'REVIEW' else s.advice.ticker + ' · ÇIKIŞI İNCELE · TAZE VERİ BEKLE' }} · {{ s.advice.reasons | join(' ') }} <a href="/pozisyonlar">Pozisyonu aç</a></p>{% endif %}{% endfor %}
+  <p class="quiet-copy">Deneysel kurallar; doğrulanmış getiri avantajı yok. Her öneri kaydedilir, tekrarlanan güncellemeler yeni işlem sayılmaz.</p>
+  {% else %}<p class="desk-notice">BEKLE · Açılış kayıtları okunamadı. Güncel AL / SAT doğrulanamıyor.</p>{% endif %}
+</section>

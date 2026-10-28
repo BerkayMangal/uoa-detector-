@@ -27,7 +27,7 @@ import threading
 import time
 from contextvars import ContextVar
 from dataclasses import asdict
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from pathlib import Path
 from time import perf_counter
 from typing import TYPE_CHECKING, Any, ParamSpec, TypeVar, cast
@@ -69,6 +69,8 @@ from webapp.live_alpha import page as live_page
 from webapp.live_alpha import results as live_results
 from webapp.live_alpha import store as live_store
 from webapp.live_alpha.job import live_alpha_loop
+from webapp.opening import alerts as opening_alerts
+from webapp.opening import view as opening_view
 from webapp.repo import RunInfo, SignalRepo
 from webapp.vol_board import VolBoardRow, build_vol_board, vol_board_summary
 from webapp.worker import live_config_from_env, run_live_worker
@@ -326,6 +328,11 @@ def favicon() -> FileResponse:
 @app.get("/assets/live-alerts.js", include_in_schema=False)
 def live_alert_script() -> FileResponse:
     return FileResponse(_BASE / "static" / "live-alerts.js", media_type="text/javascript")
+
+
+@app.get("/assets/opening-desk.js", include_in_schema=False)
+def opening_desk_script() -> FileResponse:
+    return FileResponse(Path(__file__).parent / "static" / "opening-desk.js", media_type="text/javascript")
 
 
 @app.get("/assets/live-desk.js", include_in_schema=False)
@@ -607,9 +614,26 @@ def live_home(request: Request, ok: str = "") -> HTMLResponse:
         request, "live.html",
         {"v": view, "ok": _LIVE_OK.get(ok, ""), "reload_seconds": reload_seconds,
          "alert_settings": _safe(live_alerts.settings, None),
+         "alert_feed_url": "/api/acilis/uyarilar",
+         "opening": _safe(lambda: opening_view.build(_board_reader().engine, _now()), None),
+         "tr_time": opening_view.tr_time,
          "desk": _safe(lambda: desk_positions.build(_board_reader().engine, _now()), None),
          "scenarios": _safe(lambda: {c.data["opportunity_id"]: desk_scenarios.build(c.data, _now(), bool(c.withdrawn)) for c in view.actionable}, None)},
     )
+
+
+@app.get("/acilis", response_class=HTMLResponse)
+def opening_page(request: Request, before: str = "", journal_day: date | None = None) -> HTMLResponse:
+    return templates.TemplateResponse(request, "opening.html", {
+        "opening": opening_view.build(_board_reader().engine, _now(), before, journal_day),
+        "tr_time": opening_view.tr_time, "alert_settings": _safe(live_alerts.settings, None),
+        "alert_feed_url": "/api/acilis/uyarilar", "reload_seconds": live_page.settings().cycle.live_seconds,
+    })
+
+
+@app.get("/api/acilis/uyarilar", response_model=live_alerts.Feed)
+def opening_alert_feed() -> live_alerts.Feed:
+    return opening_alerts.feed(_board_reader().engine, _now())
 
 
 @app.get("/api/canli/uyarilar", response_model=live_alerts.Feed)
