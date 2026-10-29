@@ -10,9 +10,9 @@ ENV PYTHONUNBUFFERED=1 \
 COPY pyproject.toml uv.lock README.md ./
 COPY src ./src
 # Optional build-only CA for a configured corporate proxy; TLS stays verified.
-RUN --mount=type=cache,target=/root/.cache/uv --mount=type=secret,id=build_ca \
+RUN --mount=type=secret,id=build_ca \
     if [ -s /run/secrets/build_ca ]; then export SSL_CERT_FILE=/run/secrets/build_ca; fi; \
-    uv sync --locked --no-dev --no-editable
+    uv sync --locked --no-dev --no-editable --no-cache
 # Frozen runtime profiles/reports/source hashes keep their original paths.
 COPY . .
 CMD ["sh", "-c", "exec uvicorn webapp.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
