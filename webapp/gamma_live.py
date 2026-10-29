@@ -29,6 +29,7 @@ from uoa_detector.sources.unusual_whales.client import (
 from uoa_detector.sources.unusual_whales.providers.catalyst_calendar import (
     UnusualWhalesCatalystCalendarProvider,
 )
+from webapp.failure_logging import log_failure
 from webapp.gamma import GammaFields, GammaRepo
 from webapp.ohlc import regular_session_closes
 
@@ -269,7 +270,7 @@ async def gamma_refresh_loop(
         except asyncio.CancelledError:
             _logger.info("gamma refresh loop cancelled")
             raise
-        except Exception:
-            _logger.exception("gamma refresh loop error; backing off")
+        except Exception as exc:
+            log_failure(_logger, "gamma-loop", exc, "scan")
             with contextlib.suppress(asyncio.CancelledError):
                 await asyncio.sleep(_REFRESH_BACKOFF_S)

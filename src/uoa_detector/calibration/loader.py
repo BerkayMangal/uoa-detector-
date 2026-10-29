@@ -20,7 +20,6 @@ from uoa_detector.calibration.profile import CalibrationProfile
 from uoa_detector.errors import ConfigurationError
 
 _logger = structlog.get_logger(__name__)
-_yaml = YAML(typ="safe")
 
 # Fields the spec marks as commonly tuned — warn if a non-default profile
 # loads without overriding them. Extend over time.
@@ -34,7 +33,9 @@ def _read_yaml(path: Path) -> Mapping[str, Any]:
     """Read a YAML file as a dict. Raise ``ConfigurationError`` on read failure."""
     try:
         with path.open() as f:
-            data = _yaml.load(f)
+            # ruamel parser/scanner state belongs to one read, not to all
+            # concurrently starting live services. Profile semantics are unchanged.
+            data = YAML(typ="safe").load(f)
     except OSError as e:
         msg = f"failed to read profile file {path}: {e}"
         raise ConfigurationError(msg) from e

@@ -5,5 +5,9 @@
     "restartPolicyType": "ON_FAILURE",
     "healthcheckPath": "/health",
     "healthcheckTimeout": 120
+  },
+  "build": {
+    "builder": "DOCKERFILE",
+    "dockerfilePath": "Dockerfile"
   }
 }
