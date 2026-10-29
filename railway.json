@@ -7,7 +7,6 @@
     "healthcheckTimeout": 120
   },
   "build": {
-    "builder": "DOCKERFILE",
     "dockerfilePath": "Dockerfile"
   }
 }
