@@ -62,6 +62,7 @@ from webapp.desk import db as desk_db
 from webapp.desk import positions as desk_positions
 from webapp.desk import scenarios as desk_scenarios
 from webapp.desk.capture import STATE as DESK_STATE
+from webapp.failure_logging import log_failure
 from webapp.gamma_live import gamma_refresh_loop
 from webapp.live_alpha import alerts as live_alerts
 from webapp.live_alpha import job as live_job
@@ -74,6 +75,7 @@ from webapp.opening import measurement as opening_measurement
 from webapp.opening import view as opening_view
 from webapp.opening.model import clock as opening_clock
 from webapp.repo import RunInfo, SignalRepo
+from webapp.service_isolation import run_service
 from webapp.storage_diagnostics import native_hint
 from webapp.vol_board import VolBoardRow, build_vol_board, vol_board_summary
 from webapp.worker import live_config_from_env, run_live_worker
@@ -101,8 +103,8 @@ async def _supervise(make_coro: object, name: str) -> None:
             await make_coro()  # type: ignore[operator]
         except asyncio.CancelledError:
             raise
-        except Exception:
-            _logger.exception("%s crashed; restarting in 30s", name)
+        except Exception as exc:
+            log_failure(_logger, name, exc, "scan")
         else:
             _logger.warning("%s exited unexpectedly; restarting in 30s", name)
         await asyncio.sleep(30)
@@ -126,7 +128,7 @@ def _live_alpha_thread_main(database_url: str) -> None:
                                       cards=None, failure=asdict(safe_failure(exc, "startup")))
             if hint := native_hint(exc):
                 live_job.LAST_CYCLE["database_hint"] = hint.code.value
-            _logger.exception("live-alpha crashed; restarting in 30s")
+            log_failure(_logger, "live-alpha-startup", exc, "startup")
         else:
             from webapp.live_alpha.cycle_status import safe_failure
 
@@ -166,23 +168,24 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
     if config is not None:
         _logger.info("starting live worker + gamma refresh for %s", config["tickers"])
         tasks.append(asyncio.create_task(_supervise(
-            lambda: run_live_worker(**config, hotlist=hotlist), "live-worker",  # type: ignore[arg-type]
+            lambda: run_service(str(config["database_url"]),
+                lambda: run_live_worker(**config, hotlist=hotlist), "live-worker"), "live-worker",  # type: ignore[arg-type]
         )))
         tasks.append(asyncio.create_task(_supervise(
-            lambda: gamma_refresh_loop(
+            lambda: run_service(str(config["database_url"]), lambda: gamma_refresh_loop(
                 tickers=config["tickers"],  # type: ignore[arg-type]
                 database_url=config["database_url"],  # type: ignore[arg-type]
-            ),
+            ), "gamma-refresh"),
             "gamma-refresh",
         )))
         # Phase 5.2.A2: the Alfa Board refresher (quotes, exit depth) on its own
         # long-lived UW client. GET /alfa only reads what it writes.
         tasks.append(asyncio.create_task(_supervise(
-            lambda: board_refresh_loop(
+            lambda: run_service(str(config["database_url"]), lambda: board_refresh_loop(
                 database_url=config["database_url"],  # type: ignore[arg-type]
                 close_extra=basket_close_tickers,  # Phase 5.26: basket members get a daily close
                 hot_flow=hotlist,  # Phase 5.27: the market-wide hot list and its close universe
-            ),
+            ), "board-refresh"),
             "board-refresh",
         )))
         # Phase 5.2.PERF10: the default board view, prebuilt off the request path.
@@ -1643,7 +1646,6 @@ def alfa_fill(
     return RedirectResponse(f"/kart/{card.id}?{urlencode({'dolum': fill_id})}", status_code=303)
 
 
-@app.get("/health")
 def health() -> dict[str, object]:
     """Liveness, plus the commit this instance is running.
 
@@ -1667,3 +1669,9 @@ def health() -> dict[str, object]:
     if live_job.LAST_CYCLE and (summary := public_summary()):
         body["research_data"] = summary
     return body
+
+
+@app.get("/health", name="health", operation_id="health_health_get")
+async def _health_http() -> dict[str, object]:
+    """Memory-only liveness must not queue behind synchronous database requests."""
+    return health()

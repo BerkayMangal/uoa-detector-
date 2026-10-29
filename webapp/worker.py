@@ -41,6 +41,7 @@ from webapp.alpha_lab.settings import load_settings as load_lab_settings
 from webapp.board.db import make_engine
 from webapp.board.hotlist import HotlistSettings, ensure_hotlist_tables, load_hot_tickers
 from webapp.board.telemetry import AlfaTelemetryWriter
+from webapp.failure_logging import log_failure
 
 if TYPE_CHECKING:
     from sqlalchemy.engine import Engine
@@ -269,8 +270,8 @@ async def run_live_worker(
                 await client.aclose()
             except asyncio.CancelledError:
                 raise
-            except Exception:
-                _logger.exception("live worker error; restarting in %ss", _RESTART_BACKOFF_S)
+            except Exception as exc:
+                log_failure(_logger, "worker-cycle", exc, "scan")
                 if writer is not None:
                     writer.close()
                 if source is not None:

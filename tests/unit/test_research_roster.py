@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict, replace
 from datetime import UTC, date, datetime, timedelta
@@ -44,7 +44,16 @@ def later_member() -> tuple[Bar, ...]:
 
 
 @pytest.fixture(autouse=True)
-def restore_status() -> Iterator[None]:
+def restore_status(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
+    # The scenarios declare their own 2026-10-28 availability epoch. Using the
+    # machine's later date makes them fail even on unchanged production source.
+    # Explicit clocks (including slow context crossing the next open) stay intact.
+    original_publication = live.publication_time
+
+    def fixture_publication(asof: datetime, clock: Callable[[], datetime] | None = None) -> datetime:
+        return original_publication(asof, clock if clock is not None else lambda: asof)
+
+    monkeypatch.setattr(live, "publication_time", fixture_publication)
     old = dict(live.STATE)
     yield
     live.STATE.clear()

@@ -60,6 +60,7 @@ from webapp.calibration.monitor import STATE as CALIBRATION_STATE
 from webapp.calibration.monitor import run as run_calibration
 from webapp.desk.capture import STATE as DESK_STATE
 from webapp.desk.capture import run as run_desk
+from webapp.failure_logging import log_failure
 from webapp.live_alpha import board as live_board
 from webapp.live_alpha import inputs, store, uw
 from webapp.live_alpha.cycle_status import next_wait, safe_failure
@@ -756,7 +757,7 @@ async def live_alpha_loop(
                       "requests": row.snapshot.get("requests"), "mode": row.market_mode,
                       "news_errors": row.snapshot.get("news_errors", {})}
         except Exception as exc:
-            _logger.exception("live alpha cycle failed")
+            log_failure(_logger, "live-alpha-cycle", exc, stage)
             status, detail = "failed", {"error": type(exc).__name__, "message": str(exc)[:300]}
             failure = safe_failure(exc, stage)
             database_hint = native_hint(exc)
@@ -765,9 +766,10 @@ async def live_alpha_loop(
         await run_readiness(engine, now_fn())
         try:
             store.beat(engine, now, status, detail)
-        except Exception:
-            _logger.exception("live alpha heartbeat write failed")
-        _logger.warning("live alpha cycle: status=%s %s", status, detail)
+        except Exception as exc:
+            log_failure(_logger, "live-alpha-heartbeat", exc, "scan")
+        if failure is None:
+            _logger.warning("live alpha cycle: status=%s %s", status, detail)
         LAST_CYCLE.clear()
         LAST_CYCLE.update({
             "at": now.isoformat(timespec="seconds"), "status": status,
