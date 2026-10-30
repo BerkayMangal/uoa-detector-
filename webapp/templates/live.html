@@ -6,14 +6,11 @@
    screen (docs/live-alpha-v1/PRODUCT_OVERRIDE.md); it still applies to /alfa and the rest. #}
 {% block tagline %}<span class="text-sm text-gray-400">Bugün ne alınır, hangi fiyattan, nerede zarar kesilir. Emir göndermez; işlemi sen yaparsın.</span>{% endblock %}
 {% block content %}
+{% set opening_home = true %}
 {% include "opening_brief.html" %}
-<p class="quiet-copy mb-3"><a href="/stratejiler">Strateji masası · deneysel adayları ve PAPER sonuçlarını karşılaştır →</a></p>
-{% include "alert_controls.html" %}
+<details class="fold-panel alert-fold"><summary>Sinyal uyarıları <span>· ses ve bildirim ayarları</span></summary>{% include "alert_controls.html" %}</details>
 <section id="live-alpha" lang="tr" data-entry-ttl="{{ v.entry_ttl_seconds }}" data-scan-age="{{ v.scan_age_seconds or 0 }}" data-reload-seconds="{{ reload_seconds }}">
-  <div class="desk-heading">
-    <div><p class="eyebrow">PİYASA / KİŞİSEL GÖRÜNÜM</p><h1>Bugünün Fırsatları</h1></div>
-    <div class="session-clock"><span class="session-pill {{ 'is-live' if v.mode == 'LIVE' else '' }}">{{ v.mode_text }}</span><br>{{ v.now_et }} · {{ v.now_tr }}</div>
-  </div>
+  <div data-age-anchor></div>
   {% if ok %}<p class="text-sm text-emerald-400 mb-2" data-ok>{{ ok }}</p>{% endif %}
   {% if v.has_scan %}
   <p class="text-sm text-gray-500 mb-3">Son güncelleme <span id="scan-age">{{ (v.scan_age_seconds // 60) if v.scan_age_seconds else 0 }}</span> dk önce{% if v.mode != 'LIVE' and v.open_tr %} · piyasa {{ v.open_tr }} açılır{% endif %}{% if v.session.get('close_et') and v.session.close_et != '16:00' %} · erken kapanış {{ v.session.close_et }} ET{% endif %}.</p>
@@ -25,6 +22,16 @@
 
   {% if v.flow_warning %}<p class="desk-notice" data-flow-stale>{{ v.flow_warning }}</p>{% endif %}
 
+  {% if desk and (desk.paper.rows or desk.manual.rows) %}
+  <div class="section-heading"><h2>Açık pozisyon takibi</h2><a href="/pozisyonlar">Risk ve çıkışları aç →</a></div>
+  <p class="quiet-copy">{{ desk.paper.rows | length }} PAPER · {{ desk.manual.rows | length }} günlükte açık gerçek kayıt. PAPER plan riski {% if desk.paper.risk is number %}${{ '%.2f' | format(desk.paper.risk) }}{% else %}bilinmiyor{% endif %} · {{ desk.paper.unknown_risk }} kayıt için risk eksik.</p>
+  {% for p in desk.paper.rows + desk.manual.rows %}{% if p.action == 'EXIT_REVIEW' %}<p class="desk-notice"><b>{{ p.ticker }} · {{ 'PAPER' if p.scope == 'paper' else 'Manuel kayıt' }} · ÇIKIŞ İNCELE:</b> {{ p.reason }} <a class="underline" href="/pozisyonlar">Pozisyonu gör</a></p>{% endif %}{% endfor %}
+  {% endif %}
+
+  <details class="fold-panel" id="source-strategy"><summary>Kaynak stratejinin ayrıntıları · deneysel Live Alpha v1</summary>  <div class="desk-heading">
+    <div><p class="eyebrow">PİYASA / KİŞİSEL GÖRÜNÜM</p><h2>Bugünün Fırsatları</h2></div>
+    <div class="session-clock"><span class="session-pill {{ 'is-live' if v.mode == 'LIVE' else '' }}">{{ v.mode_text }}</span><br>{{ v.now_et }} · {{ v.now_tr }}</div>
+  </div>
   <div class="desk-overview">
     <div class="overview-item"><span>Takipte</span><b>{{ v.universe | length }}</b></div>
     <div class="overview-item"><span>Kaynakta hazır</span><b id="ready-count">{{ v.actionable | selectattr('tone', 'equalto', 'green') | list | length }}</b></div>
@@ -33,13 +40,7 @@
   </div>
   <details class="mb-4"><summary>Seans özeti</summary><p class="quiet-copy" data-summary>{{ v.summary }}</p></details>
 
-  {% if desk and (desk.paper.rows or desk.manual.rows) %}
-  <div class="section-heading"><h2>Açık pozisyon takibi</h2><a href="/pozisyonlar">Risk ve çıkışları aç →</a></div>
-  <p class="quiet-copy">{{ desk.paper.rows | length }} PAPER · {{ desk.manual.rows | length }} günlükte açık gerçek kayıt. PAPER plan riski {% if desk.paper.risk is number %}${{ '%.2f' | format(desk.paper.risk) }}{% else %}bilinmiyor{% endif %} · {{ desk.paper.unknown_risk }} kayıt için risk eksik.</p>
-  {% for p in desk.paper.rows + desk.manual.rows %}{% if p.action == 'EXIT_REVIEW' %}<p class="desk-notice"><b>{{ p.ticker }} · {{ 'PAPER' if p.scope == 'paper' else 'Manuel kayıt' }} · ÇIKIŞ İNCELE:</b> {{ p.reason }} <a class="underline" href="/pozisyonlar">Pozisyonu gör</a></p>{% endif %}{% endfor %}
-  {% endif %}
-
-  <details class="fold-panel"><summary>Kaynak stratejinin ayrıntıları · deneysel Live Alpha v1</summary><p class="quiet-copy">İşlem zamanlaması için üstteki açılış masasını kullan. Aşağıdaki kaynak plan, +15 dakika ve daha sıkı tazelik kontrollerini ayrıca uygulamaz.</p>
+<p class="quiet-copy">İşlem zamanlaması için üstteki açılış masasını kullan. Aşağıdaki kaynak plan, +15 dakika ve daha sıkı tazelik kontrollerini ayrıca uygulamaz.</p>
   {% if v.actionable %}<div class="section-heading"><h2>İşlem planları</h2><span>Deneysel görüş · otomatik emir yok</span></div>{% endif %}
   <div class="plan-grid">
   {% for c in v.actionable %}{% set d = c.data %}
@@ -98,7 +99,6 @@
   {% endfor %}
   </div>
 
-  </details>
   {% set tc = {"green": "text-emerald-400", "amber": "text-amber-300", "red": "text-rose-400", "gray": "text-gray-300"} %}
   {% if v.board %}
   {% set show_basket = (v.board | selectattr('basket') | list | length) > 0 %}
@@ -138,7 +138,9 @@
   </ul>
   {% endif %}
 
-  <details class="fold-panel"><summary>PAPER takibi <span class="text-gray-400">· simülasyon</span></summary>
+  <p class="quiet-copy"><a href="/stratejiler">Strateji masası · deneysel adayları karşılaştır →</a></p>
+  </details>
+  <details class="fold-panel" id="paper-tracking"><summary>PAPER takibi <span class="text-gray-400">· simülasyon</span></summary>
   <h3 class="sr-only">Önerilerin sonucu (PAPER: simülasyon, gerçek para değil)</h3>
   <p class="text-sm text-gray-400 mb-2">Açık/bekleyen {{ v.paper_stats.open }} · fiyatlanmış kapanış {{ v.paper_stats.closed }} · dolmayan {{ v.paper_stats.unfilled }} · belirsiz {{ v.paper_stats.unknown }} · model maliyetleri sonrası toplam {% if v.paper_stats.pnl_usd is not none %}${{ '%.2f' | format(v.paper_stats.pnl_usd) }}{% else %}bilinmiyor{% endif %} ({{ v.paper_stats.wins }} kazanç). Tüm geçmiş; aşağıda son 20 kapalı kayıt. <a class="underline" href="/sonuclar">Ayrıntılı sonuçlar</a>. Küçük örneklem; başarı oranı çıkarılmaz.</p>
   {% if v.papers_open or v.papers_closed %}
@@ -153,7 +155,7 @@
   {% endif %}
 
   </details>
-  <details class="fold-panel"><summary class="cursor-pointer text-sm text-gray-400">Teknik durum (tarama hunisi, veri yaşı, iş kalp atışı)</summary>
+  <details class="fold-panel" id="live-diagnostics"><summary class="cursor-pointer text-sm text-gray-400">Teknik durum (tarama hunisi, veri yaşı, iş kalp atışı)</summary>
   <p class="text-sm text-gray-300" data-funnel>
     taranan {{ v.funnel.get('taranan', 0) }} → akış uygun {{ v.funnel.get('akış_uygun', 0) }} → fiyat verisi uygun {{ v.funnel.get('fiyat_uygun', 0) }} → plan {{ v.funnel.get('plan', 0) }} → giriş hazır {{ v.funnel.get('giriş_hazır', 0) }}
   </p>
@@ -164,12 +166,12 @@
     Politika {{ v.policy_version }}.</p>
   <p class="text-xs text-gray-500 mt-1">İş kalp atışı: {% for b in v.beats %}{{ b.at }} {{ b.status }}{% if not loop.last %} · {% endif %}{% else %}kayıt yok{% endfor %}</p>
   </details>
-  <details class="fold-panel"><summary>Yöntem ve araştırma notu</summary><p class="quiet-copy" data-honesty>Bu kurallar yeni. Geçmişte test ettiğimiz opsiyon-akışı stratejilerinin hepsi maliyetler düşülünce para kaybettirdi; bu ekran onların aynısı değil, ama kazandırdığı da henüz kanıtlanmadı. Her öneri kaydediliyor ve PAPER'da sonucu tutuluyor; sonuç tablosunu Sonuçlar ekranından takip edebilirsin.</p>
+  <details class="fold-panel" id="live-method"><summary>Yöntem ve araştırma notu</summary><p class="quiet-copy" data-honesty>Bu kurallar yeni. Geçmişte test ettiğimiz opsiyon-akışı stratejilerinin hepsi maliyetler düşülünce para kaybettirdi; bu ekran onların aynısı değil, ama kazandırdığı da henüz kanıtlanmadı. Her öneri kaydediliyor ve PAPER'da sonucu tutuluyor; sonuç tablosunu Sonuçlar ekranından takip edebilirsin.</p>
   <p class="text-xs text-gray-500 mt-3">Yayın modları: LIVE_ANALYSIS gerçek güncel veriden öneridir; PAPER_TRACKING otomatik simülasyondur; MANUAL_FILL senin kaydındır; BROKER_EXECUTION kapalıdır. Araştırma ekranları: <a class="underline" href="/alfa">Alfa Board</a>, <a class="underline" href="/opsiyon">Opsiyon</a>.</p></details>
   <p class="desk-endnote">Deneysel karar desteği. Giriş seviyeleri koşulludur; stop fiyatı azami zarar garantisi değildir.
     Yeni akış ölçümü ve akran-toparlanma araştırması ayrı gölge sürümde: <a href="/laboratuvar" class="underline">Alfa lab</a>.</p>
 </section>
-<script src="/assets/live-desk.js?v=5.33.1" defer></script>
+<script src="/assets/live-desk.js?v=5.48.1" defer></script>
 <script src="/assets/live-alerts.js?v=5.45.1" defer></script>
 <script src="/assets/opening-desk.js?v=5.45.1" defer></script>
 {% endblock %}

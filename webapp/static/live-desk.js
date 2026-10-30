@@ -52,7 +52,7 @@
         const warning = document.createElement('p');
         warning.id = 'client-age-warning'; warning.className = 'desk-notice'; warning.setAttribute('role', 'alert');
         warning.textContent = 'Veriler eskidi. Güncel fiyat ve kararlar için sayfayı yenile; yazdığın form korunmak için otomatik yenileme duraklatıldı.';
-        root.querySelector('.desk-heading').after(warning);
+        (root.querySelector('[data-age-anchor]') || root.querySelector('.desk-heading')).after(warning);
       }
     }
     function withdrawExpiredEntries() {
@@ -86,6 +86,10 @@
         // The owner may have begun an edit while this request was in flight.
         if (next && canRefresh() && root.isConnected) {
           next.querySelectorAll('script').forEach(function (script) { script.remove(); });
+          root.querySelectorAll('details[id]').forEach(function (fold) {
+            const replacement = next.querySelector('#' + CSS.escape(fold.id));
+            if (replacement) replacement.open = fold.open;
+          });
           root.replaceWith(next); mount(next);
         }
       } catch (_) {

@@ -59,6 +59,7 @@ from webapp.board.settings import BoardSettings, load_board_settings
 from webapp.board.signals import BoardSignalReader
 from webapp.desk import benchmarks as desk_benchmarks
 from webapp.desk import db as desk_db
+from webapp.desk import overview as desk_overview
 from webapp.desk import positions as desk_positions
 from webapp.desk import scenarios as desk_scenarios
 from webapp.desk.capture import STATE as DESK_STATE
@@ -615,7 +616,9 @@ _LIVE_OK = {
 @app.get("/", response_class=HTMLResponse)
 def live_home(request: Request, ok: str = "") -> HTMLResponse:
     """The live recommendation screen. One read of the newest scan snapshot; no UW call."""
-    view = live_page.build_view(_board_reader().engine, _now())
+    now = _now()
+    view = live_page.build_view(_board_reader().engine, now)
+    opening = _safe(lambda: opening_view.build(_board_reader().engine, now), None)
     cfg = live_page.settings()
     reload_seconds = cfg.cycle.live_seconds if view.mode == "LIVE" else cfg.cycle.closed_seconds
     return templates.TemplateResponse(
@@ -623,10 +626,10 @@ def live_home(request: Request, ok: str = "") -> HTMLResponse:
         {"v": view, "ok": _LIVE_OK.get(ok, ""), "reload_seconds": reload_seconds,
          "alert_settings": _safe(live_alerts.settings, None),
          "alert_feed_url": "/api/acilis/uyarilar",
-         "opening": _safe(lambda: opening_view.build(_board_reader().engine, _now()), None),
+         "opening": opening, "overview": desk_overview.build(opening, now),
          "tr_time": opening_view.tr_time,
-         "desk": _safe(lambda: desk_positions.build(_board_reader().engine, _now()), None),
-         "scenarios": _safe(lambda: {c.data["opportunity_id"]: desk_scenarios.build(c.data, _now(), bool(c.withdrawn)) for c in view.actionable}, None)},
+         "desk": _safe(lambda: desk_positions.build(_board_reader().engine, now), None),
+         "scenarios": _safe(lambda: {c.data["opportunity_id"]: desk_scenarios.build(c.data, now, bool(c.withdrawn)) for c in view.actionable}, None)},
     )
 
 
@@ -655,7 +658,7 @@ def opening_page(request: Request, before: str = "", journal_day: date | None = 
                 status_code=503,
             )
     return templates.TemplateResponse(request, "opening.html", {
-        "opening": opening,
+        "opening": opening, "overview": desk_overview.build(opening, now),
         "measurement": opening_measurement.build(opening.results, now, journal_day),
         "tr_time": opening_view.tr_time, "alert_settings": _safe(live_alerts.settings, None),
         "alert_feed_url": "/api/acilis/uyarilar", "reload_seconds": live_page.settings().cycle.live_seconds,
