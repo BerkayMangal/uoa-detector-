@@ -11,6 +11,8 @@ PUBLIC_GET_PATHS = frozenset({
     "/health", "/hakkinda", "/robots.txt", "/sitemap.xml", "/assets/uoa.css", "/favicon.svg",
 })
 TITLES = {
+    "/karne": "Çağrı karneleri",
+    "/arastirma": "Yeni hipotezler",
     "/acilis": "Açılış masası",
     "/stratejiler": "Strateji masası",
     "/kalibrasyon": "Kalibrasyon",
