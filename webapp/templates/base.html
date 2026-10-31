@@ -35,7 +35,7 @@
       <a href="{{ href }}" {% if active %}aria-current="page"{% endif %}>{{ label }}</a>
       {% endfor %}
       <details class="desk-more"><summary>Diğer ekranlar</summary><div class="desk-menu">
-      {% for href, label, active in [('/laboratuvar', 'Alfa lab', path == '/laboratuvar'), ('/stratejiler', 'Strateji masası', path == '/stratejiler'), ('/journal', 'İşlemlerim', path.startswith('/journal')), ('/defter', 'Karar defteri', path.startswith('/defter') or path.startswith('/kart')), ('/alfa', 'Akış', path.startswith('/alfa')), ('/gamma', 'Gamma & vol', path.startswith('/gamma')), ('/opsiyon', 'Opsiyon', path.startswith('/opsiyon'))] %}
+      {% for href, label, active in [('/karne', 'Çağrı karneleri', path.startswith('/karne')), ('/arastirma', 'Yeni hipotezler', path == '/arastirma'), ('/laboratuvar', 'Alfa lab', path == '/laboratuvar'), ('/stratejiler', 'Strateji masası', path == '/stratejiler'), ('/journal', 'İşlemlerim', path.startswith('/journal')), ('/defter', 'Karar defteri', path.startswith('/defter') or path.startswith('/kart')), ('/alfa', 'Akış', path.startswith('/alfa')), ('/gamma', 'Gamma & vol', path.startswith('/gamma')), ('/opsiyon', 'Opsiyon', path.startswith('/opsiyon'))] %}
       <a href="{{ href }}" {% if active %}aria-current="page"{% endif %}>{{ label }}</a>
       {% endfor %}
       </div></details>

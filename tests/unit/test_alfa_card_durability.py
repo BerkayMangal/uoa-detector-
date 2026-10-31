@@ -73,6 +73,10 @@ _KNOWN_EXCEPTIONS: Final = {
 # recorded, a telemetry branch that was taken, the OI that confirmed an
 # opening — nobody can re-derive these from the vendor tomorrow.
 _APPEND_ONLY_TABLES: Final = {
+    "alfa_call_research_cohort",  # frozen daily shadow rosters
+    "alfa_call_research_result",  # post-commit receipts and exact-session reference marks
+    "alfa_call_data_receipt",    # physical first-seen proof for legacy daily data
+    "alfa_call_context",          # as-of prior-session call context
     "alfa_opening_cycle",
     "alfa_opening_decision",
     "alfa_opening_primary",
@@ -161,6 +165,8 @@ def _alfa_models() -> dict[str, str]:
     import pkgutil
 
     import webapp.board as board
+
+    importlib.import_module("webapp.call_research.storage")
 
     for module in pkgutil.iter_modules(board.__path__):
         importlib.import_module(f"webapp.board.{module.name}")

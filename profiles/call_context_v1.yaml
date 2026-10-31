@@ -1,0 +1,22 @@
+version: call_context_v1
+start_day: 2026-11-02
+capture_limit: 500
+# Membership is prospective from this date; never painted onto earlier calls.
+known_sector_overrides: {NFLX: XLC}
+sector_etfs:
+  technology: XLK
+  communication services: XLC
+  consumer cyclical: XLY
+  consumer discretionary: XLY
+  consumer defensive: XLP
+  consumer staples: XLP
+  energy: XLE
+  financial services: XLF
+  financials: XLF
+  healthcare: XLV
+  health care: XLV
+  industrials: XLI
+  basic materials: XLB
+  materials: XLB
+  utilities: XLU
+  real estate: XLRE

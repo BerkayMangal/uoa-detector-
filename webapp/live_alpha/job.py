@@ -58,6 +58,7 @@ from webapp.board.peers import auto_lags, load_peer_settings, load_universe_clos
 from webapp.board.settings import BoardSettings
 from webapp.calibration.monitor import STATE as CALIBRATION_STATE
 from webapp.calibration.monitor import run as run_calibration
+from webapp.call_research.forward import run as run_call_research
 from webapp.desk.capture import STATE as DESK_STATE
 from webapp.desk.capture import run as run_desk
 from webapp.failure_logging import log_failure
@@ -764,6 +765,7 @@ async def live_alpha_loop(
         # Read-only data diagnostics must run even if the preceding scan failed.
         await run_opening(engine, now_fn(), scan_id=row.scan_id if row is not None else None)
         await run_readiness(engine, now_fn())
+        await run_call_research(engine, now_fn())
         try:
             store.beat(engine, now, status, detail)
         except Exception as exc:

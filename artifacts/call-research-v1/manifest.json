@@ -1,0 +1,23 @@
+{
+  "classification": "EXPLORATORY_REUSED_DATA",
+  "report_hash": "b32a840ebdf92e31140385300e367a68b558bb4fc897372a2e73572c2c9e50da",
+  "source_hash": "ed1f6d8871e900f959793edb8ed7da4b52a1502da3c7974e2279e74e6a7205ca",
+  "profile_hash": "0b3c46f457eb3c2135167c5d42ef206f38c9a250cdfffe999505d0af2eb74746",
+  "code_hash": "be9f524c582e9152761cb76dcff70e322a3d5c6df8ef8efec8685188c2c93993",
+  "ledger_sha256": "b099fbc4e57eb32c4f60018dd52a140d695fc5da35924ec1d8ceb3569a77e1ab",
+  "replays": 144,
+  "arms": 4,
+  "windows": 3,
+  "holding_horizons": 3,
+  "per_side_cost_levels": 4,
+  "fixed_ledger_removal_diagnostics": 288,
+  "descriptive_intervals": 24,
+  "bootstrap_draws_per_interval": 1000,
+  "bootstrap_draws_total": 24000,
+  "notes": [
+    "All 144 portfolios and all diagnostics reuse already researched Study F data.",
+    "Bootstrap draws and repeated portfolio trades are not independent samples or optimization trials.",
+    "No NFLX, sector ETF or executable option history was invented.",
+    "No live strategy or PAPER promotion."
+  ]
+}

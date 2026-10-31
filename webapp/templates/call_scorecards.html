@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="desk-heading"><div><p class="eyebrow">KAYIT / ÇAĞRININ VERİLDİĞİ AN</p><h1>Çağrı karneleri</h1></div><a href="/acilis">Güncel planlar →</a></div>
+<p class="quiet-copy">{% if updates %}AL, BEKLE ve çıkış incelemeleri dahil kayıtlı güncellemeler.{% else %}Her hisse ve seansın ilk AL kaydı. Tekrarlanan güncellemeler yeni işlem sayılmaz.{% endif %} Her karne özgün gerekçeyi, planı ve kaydedilmiş ölçümleri açar.</p>
+<form method="get" class="opening-history-form"><label for="call-ticker">Hisse</label><input id="call-ticker" name="ticker" value="{{ ticker }}" placeholder="Örn. NFLX" maxlength="12"><label><input type="checkbox" name="updates" value="true" {% if updates %}checked{% endif %}> Tüm güncellemeler</label><button type="submit" class="button-primary">Kayıtları bul</button></form>
+<div class="overflow-x-auto" role="region" aria-label="Kayıtlı çağrılar" tabindex="0"><table class="stock-table w-full"><thead><tr><th>Seans</th><th>Saat TR</th><th>Hisse</th><th>O anda söylenen</th><th>Karne</th></tr></thead><tbody>{% for row in rows %}<tr><td>{{ row.day.strftime('%d.%m.%Y') }}</td><td>{{ tr_time(row.at) }}</td><td><b>{{ row.ticker }}</b></td><td>{{ row.headline }}</td><td><a href="/karne/{{ row.key }}">Aç →</a></td></tr>{% else %}<tr><td colspan="5">Bu kapsamda kayıt bulunamadı. Geçmiş bir çağrı sonradan oluşturulmaz.</td></tr>{% endfor %}</tbody></table></div>
+{% if rows | length == 50 %}<p class="quiet-copy"><a href="/karne?before={{ rows[-1].key }}&amp;ticker={{ ticker | urlencode }}&amp;updates={{ 'true' if updates else 'false' }}">Önceki kayıtlar →</a></p>{% endif %}
+<p class="desk-endnote">Dayanak referans getirileri ve PAPER opsiyon sonuçları ayrı kayıtlardır. <a href="/sonuclar">PAPER sonuçları →</a></p>
+{% endblock %}

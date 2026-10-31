@@ -49,7 +49,7 @@ from webapp.alpha_lab import view as lab_view
 from webapp.alpha_lab.archive import STATE as ARCHIVE_STATE
 from webapp.alpha_lab.engine import STATE as LAB_STATE
 from webapp.board import alfa_page, cards, copy_tr, decision_ledger, fills, options_paper, outcomes
-from webapp.board.baskets import basket_close_tickers, load_basket_settings
+from webapp.board.baskets import load_basket_settings
 from webapp.board.copy_tr import IV_NOT_SELL_VOL
 from webapp.board.evidence import request_for
 from webapp.board.hotlist import load_hotlist_settings
@@ -57,6 +57,12 @@ from webapp.board.peers import load_peer_settings
 from webapp.board.refresher import board_refresh_loop
 from webapp.board.settings import BoardSettings, load_board_settings
 from webapp.board.signals import BoardSignalReader
+from webapp.call_research import context as call_context
+from webapp.call_research import coverage as call_coverage
+from webapp.call_research import forward as call_forward
+from webapp.call_research import report as call_report
+from webapp.call_research import scorecard as call_scorecard
+from webapp.call_research.settings import settings as call_research_settings
 from webapp.desk import benchmarks as desk_benchmarks
 from webapp.desk import db as desk_db
 from webapp.desk import overview as desk_overview
@@ -150,6 +156,11 @@ def _start_live_alpha_thread(database_url: str) -> None:
     _LIVE_ALPHA_THREAD.start()
 
 
+def basket_close_tickers() -> tuple[str, ...]:
+    """Preserve the startup provider entrypoint; include research supplemental closes."""
+    return call_coverage.daily_close_targets()
+
+
 @contextlib.asynccontextmanager
 async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
     # Phase 5.2.A-fix3 (review RT-4): the board profile and the calibration values
@@ -184,7 +195,7 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
         tasks.append(asyncio.create_task(_supervise(
             lambda: run_service(str(config["database_url"]), lambda: board_refresh_loop(
                 database_url=config["database_url"],  # type: ignore[arg-type]
-                close_extra=basket_close_tickers,  # Phase 5.26: basket members get a daily close
+                close_extra=basket_close_tickers,  # Existing provider, extended with frozen research/context membership
                 hot_flow=hotlist,  # Phase 5.27: the market-wide hot list and its close universe
             ), "board-refresh"),
             "board-refresh",
@@ -673,6 +684,26 @@ def opening_alert_feed() -> live_alerts.Feed:
 @app.get("/api/canli/uyarilar", response_model=live_alerts.Feed)
 def live_alert_feed() -> live_alerts.Feed:
     return live_alerts.feed(_board_reader().engine, _now())
+
+
+@app.get("/karne", response_class=HTMLResponse)
+def call_scorecards(request: Request, before: str = "", ticker: str = "", updates: bool = False) -> HTMLResponse:
+    rows = call_scorecard.listing(_board_reader().engine, _now(), before, ticker, not updates)
+    return templates.TemplateResponse(request, "call_scorecards.html", {"rows": rows, "ticker": ticker.strip().upper(), "updates": updates, "tr_time": opening_view.tr_time})
+
+
+@app.get("/karne/{key}", response_class=HTMLResponse)
+def call_scorecard_page(request: Request, key: str) -> HTMLResponse:
+    engine, now = _board_reader().engine, _now()
+    card = call_scorecard.get(engine, key, now)
+    return templates.TemplateResponse(request, "call_scorecard.html", {"card": card, "context": call_context.view(engine, key, now) if card else None, "tr_time": opening_view.tr_time}, status_code=200 if card else 404)
+
+
+@app.get("/arastirma", response_class=HTMLResponse)
+def call_research_page(request: Request) -> HTMLResponse:
+    engine, now = _board_reader().engine, _now()
+    frozen = _safe(call_report.load, None)
+    return templates.TemplateResponse(request, "call_research.html", {"research": frozen, "coverage": call_coverage.view(engine, now), "forward": call_forward.view(engine, now), "cfg": call_research_settings(), "observer": dict(call_forward.STATE)})
 
 
 @app.get("/sonuclar", response_class=HTMLResponse)
