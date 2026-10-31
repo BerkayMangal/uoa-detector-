@@ -1,0 +1,39 @@
+version: event_calibration_v1
+bucket_minutes: 15
+opening_delay_minutes: 15
+flow_window_seconds: 900
+poll_gap_seconds: 120
+normalization_sessions: 20
+minimum_history_sessions: 10
+price_acceptance_minutes: 5
+price_max_age_seconds: 300
+mark_tolerance_minutes: 5
+max_units_per_day: 4
+ratios: [1.5, 2.0, 3.0]
+dominance: [0.65, 0.75]
+percentiles: [0.8, 0.9]
+entry_delay_minutes: [1, 5]
+holding_minutes: [15, 60, 180]
+arms: [normalized, normalized_price, normalized_market, normalized_news, normalized_gamma, normalized_sector]
+slippage_bps: [5, 10, 20, 50]
+minimum_sessions: 80
+development_sessions: 60
+training_sessions: [30, 40, 50]
+validation_sessions: 10
+embargo_sessions: 1
+minimum_train_units: 30
+minimum_train_days: 10
+minimum_validation_units: 10
+minimum_validation_days: 5
+shrinkage_units: 20
+bootstrap_draws: 1000
+bootstrap_block_days: 5
+bootstrap_seed: 20261031
+risk_budget_usd: 100
+outlay_cap_usd: 2500
+commission_per_contract_side: 0.65
+quote_max_age_seconds: 300
+row_limit: 50000
+probe_max_requests: 8
+probe_timeout_seconds: 15
+probe_quota_reserve: 5000

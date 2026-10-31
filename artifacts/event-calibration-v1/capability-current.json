@@ -1,0 +1,14 @@
+{
+  "status": "MISSING_CREDENTIAL",
+  "attempted_at": "2026-10-31T11:51:16.568629+00:00",
+  "requested_days": [
+    "2026-10-30",
+    "2026-09-22"
+  ],
+  "ticker": "NFLX",
+  "requests": 0,
+  "rows": [],
+  "ready_for_calibration": false,
+  "bulk_harvest_performed": false,
+  "report_hash": "4c6825c500e5bebe19e8bc931084ecda4bb175ebb7a7eb8a15d595c0404ca9f6"
+}

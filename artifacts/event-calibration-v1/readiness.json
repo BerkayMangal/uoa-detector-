@@ -1,0 +1,64 @@
+{
+  "status": "EVENT_DATA_MISSING",
+  "ready_for_calibration": false,
+  "sources": [
+    {
+      "source": "data/study_e/flow_daily.csv",
+      "sha256": "24cb84615424cf1d553b1e82f9ba5ee7f22be14dc1e7a631b14e280be2cf7a5e",
+      "rows": 133,
+      "tickers": 10,
+      "sessions": 15,
+      "start": "2026-06-16",
+      "end": "2026-09-18",
+      "fields": [
+        "ticker",
+        "day",
+        "print_count",
+        "mean_score",
+        "max_score"
+      ],
+      "event_calibration_usable": false,
+      "reason": "Daily aggregate; lacks first-known event times and executable intraday paths."
+    },
+    {
+      "source": "data/study_f/bars.csv",
+      "sha256": "ed1f6d8871e900f959793edb8ed7da4b52a1502da3c7974e2279e74e6a7205ca",
+      "rows": 17640,
+      "tickers": 70,
+      "sessions": 252,
+      "start": "2025-09-18",
+      "end": "2026-09-18",
+      "fields": [
+        "ticker",
+        "day",
+        "open",
+        "high",
+        "low",
+        "close",
+        "volume",
+        "total_volume"
+      ],
+      "event_calibration_usable": false,
+      "reason": "Daily aggregate; lacks first-known event times and executable intraday paths."
+    }
+  ],
+  "option_snapshot_files": 8,
+  "snapshot_days": [
+    "2026-09-08",
+    "2026-09-22"
+  ],
+  "old_vendor_probe_at": "2026-09-23T09:28:03.329309+00:00",
+  "old_probe_is_current_entitlement": false,
+  "credential_present": false,
+  "reserved_forward_prices_read": false,
+  "new_market_replays_executed": 0,
+  "best_calibration": null,
+  "reasons": [
+    "No canonical observed event dataset is present in the registered local sources.",
+    "Old capability measurements establish earlier reachability, not present access or complete history.",
+    "No minute-level flow, as-of auxiliary feature, quote exit or fitted probability was fabricated."
+  ],
+  "profile_hash": "49fb9bf087a3b9ce56c8d4db7aaf53937c392d83afe4d546cb82697a51a805eb",
+  "code_hash": "c9c23edc0ea1a6f9fb1614005654f2f74060d58703ca993618250004f03ce9c6",
+  "report_hash": "40a0736198c8be0a3682157c9e78c1124ec83e8d6457316b58abfa38fd763789"
+}
