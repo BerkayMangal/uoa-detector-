@@ -1,0 +1,42 @@
+{
+  "version": "event_calibration_v1",
+  "classification": "EXPLORATORY_OBSERVED_REFERENCE_UNITS",
+  "status": "DATA_BLOCKED",
+  "validated_alpha": false,
+  "live_promotion": false,
+  "planned_candidates": 438,
+  "executed_replays": 0,
+  "availability": {
+    "raw_decisions": 0,
+    "first_bucket_samples": 0,
+    "prices": 0,
+    "alerts": 0,
+    "polls": 0,
+    "sessions": 0,
+    "complete_flow_samples": 0,
+    "normalized_samples": 0,
+    "price_acceptance_samples": 0,
+    "news_known_samples": 0,
+    "market_known_samples": 0,
+    "sector_known_samples": 0,
+    "gamma_known_samples": 0,
+    "quote_packets": 0
+  },
+  "source_hash": "4f15a89bb48edec79e3d195cba0981d288f075794b514563c36ef8193ac9f51a",
+  "provenance": {
+    "rejected": "{}",
+    "requested_tickers": "all recorded",
+    "since": "archive start",
+    "publication_evidence": "recorded scan completion; no post-commit publication proof",
+    "option_quality": "B / receipt-dated; no exchange quote time",
+    "universe": "as recorded in original scans, not a reconstructed full market"
+  },
+  "profile_hash": "49fb9bf087a3b9ce56c8d4db7aaf53937c392d83afe4d546cb82697a51a805eb",
+  "code_hash": "c9c23edc0ea1a6f9fb1614005654f2f74060d58703ca993618250004f03ce9c6",
+  "rows": [],
+  "winner": null,
+  "reasons": [
+    "Need at least 80 observed eligible sessions; have 0. No fitted winner or probability was produced."
+  ],
+  "report_hash": "d1e56b647fd3ada3779d1ee47bec0b2fdda1ca4c356fc2264cec68f2aaea1304"
+}
