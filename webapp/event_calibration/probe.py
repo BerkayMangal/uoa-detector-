@@ -94,8 +94,8 @@ async def probe(
                 ),
                 (
                     "option_chains",
-                    f"/api/stock/{ticker}/historic",
-                    {"date": day.isoformat()},
+                    f"/api/stock/{ticker}/option-chains",
+                    {"date": day.isoformat(), "greeks": "true"},
                     ("date",),
                 ),
             ]

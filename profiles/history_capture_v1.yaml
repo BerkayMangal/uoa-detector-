@@ -1,0 +1,11 @@
+version: history_capture_v1
+start: 2026-05-13
+end: 2026-09-18
+tickers: [NFLX, AAPL, NVDA]
+benchmark: SPY
+max_requests: 2500
+quota_reserve: 5000
+spacing_seconds: 0.75
+timeout_seconds: 30
+max_flow_pages: 20
+flow_page_limit: 200

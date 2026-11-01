@@ -1,0 +1,26 @@
+version: history_diagnostic_v1
+classification: EXPLORATORY_VENDOR_EVENT_TIME_ASSUMPTION
+bucket_minutes: 15
+opening_delay_minutes: 15
+flow_window_seconds: 900
+assumed_event_lag_minutes: 1
+price_lookback_minutes: 5
+history_sessions: 20
+minimum_history_sessions: 10
+warmup_sessions: 20
+minimum_directional_premium: 250000
+minimum_contracts: 2
+minimum_known_share: 0.5
+ratio: 1.5
+dominance: 0.65
+percentile: 0.8
+delay_minutes: 1
+hold_minutes: 60
+mark_tolerance_minutes: 5
+max_units_per_day: 4
+unit_budget_usd: 2500
+slippage_bps: [5, 10, 20, 50]
+arms: [baseline_proxy, normalized, normalized_price]
+bootstrap_draws: 1000
+bootstrap_block_days: 5
+bootstrap_seed: 20261101

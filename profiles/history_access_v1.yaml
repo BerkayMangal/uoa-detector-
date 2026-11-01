@@ -1,0 +1,9 @@
+version: history_access_v1
+measured_earliest_flow: 2026-06-24
+fixed_diagnostic_arms: [baseline_proxy, normalized, normalized_price]
+ratio: 1.5
+dominance: 0.65
+percentile: 0.8
+delay_minutes: 1
+holding_minutes: 60
+slippage_bps: [5, 10, 20, 50]

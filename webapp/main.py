@@ -71,6 +71,7 @@ from webapp.desk import scenarios as desk_scenarios
 from webapp.desk.capture import STATE as DESK_STATE
 from webapp.failure_logging import log_failure
 from webapp.gamma_live import gamma_refresh_loop
+from webapp.history_capture import report as vendor_history_report
 from webapp.live_alpha import alerts as live_alerts
 from webapp.live_alpha import job as live_job
 from webapp.live_alpha import page as live_page
@@ -703,7 +704,7 @@ def call_scorecard_page(request: Request, key: str) -> HTMLResponse:
 def call_research_page(request: Request) -> HTMLResponse:
     engine, now = _board_reader().engine, _now()
     frozen = _safe(call_report.load, None)
-    return templates.TemplateResponse(request, "call_research.html", {"research": frozen, "coverage": call_coverage.view(engine, now), "forward": call_forward.view(engine, now), "cfg": call_research_settings(), "observer": dict(call_forward.STATE)})
+    return templates.TemplateResponse(request, "call_research.html", {"research": frozen, "vendor_history": _safe(vendor_history_report.load, None), "coverage": call_coverage.view(engine, now), "forward": call_forward.view(engine, now), "cfg": call_research_settings(), "observer": dict(call_forward.STATE)})
 
 
 @app.get("/sonuclar", response_class=HTMLResponse)
