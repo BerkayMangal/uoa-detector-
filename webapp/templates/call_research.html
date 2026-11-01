@@ -2,6 +2,8 @@
 {% set names = {'baseline':'Temel koşul', 'persistence':'Göreli güç devamı', 'delay_control':'Aynı gecikmeli kontrol', 'retest':'Geri çekilme / teyit'} %}
 {% block content %}
 <div class="desk-heading"><div><p class="eyebrow">ARAŞTIRMA / KURALLARI SABİTLENMİŞ DENEY</p><h1>Yeni hipotezler</h1></div><a href="/karne">Çağrı karneleri →</a></div>
+{% include "_vendor_history.html" %}
+<div class="section-heading"><h2>Günlük fiyat araştırması · ayrı deney</h2><span>Önceki 144 tekrar</span></div>
 {% if research %}
 <p class="desk-notice">Alfa doğrulanmadı. Bu hesaplar daha önce araştırılmış günlük fiyat verisi üzerindedir; canlı UOA stratejisinin veya NFLX çağrısının testi değildir. Canlı kurala otomatik terfi yok.</p>
 <div class="desk-overview"><div class="overview-item"><span>Portföy tekrarı</span><b>{{ research.replays }}</b></div><div class="overview-item"><span>Hisse</span><b>{{ research.stock_universe | length }}</b></div><div class="overview-item"><span>Seans</span><b>{{ research.sessions }}</b></div><p class="overview-note">{{ research.first_day }} → {{ research.last_day }} · tüm zaman pencereleri keşifsel</p></div>

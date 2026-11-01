@@ -1,0 +1,135 @@
+{
+  "status": "RECONCILED",
+  "original_report_hash": "b3b411c1092f00df8f39eadb03aca4050cb4425ff10befd88b2b2dfb080d17af",
+  "script_sha256": "ac766ecf5f38cbc0b3b6d670453cfa5812f5d616a9f5c91fcb7dc6dab89f0259",
+  "source_state_hash": "cb9e713f19f208a801f47ff4fb3e7f048334b56d257aa63cdc60cfcebab1d4a0",
+  "source_manifest_hash": "3b0e3c67cfdfbcab91af8df3f5412edd1a9dc6c7fa1e06e20830deeee4bd49ee",
+  "source_start": "2026-06-24",
+  "source_end": "2026-09-18",
+  "tickers": [
+    "NFLX",
+    "AAPL",
+    "NVDA"
+  ],
+  "benchmark": "SPY",
+  "verified_packets": 614,
+  "verified_reference_units_all_costs": 1024,
+  "source_row_counts": {
+    "chain_rows": 91500,
+    "flow_rows": 17356,
+    "minute_rows": 194845,
+    "daily_rows": 2664
+  },
+  "capture_runs": [
+    {
+      "started_at": "2026-11-01T22:58:19.715342+00:00",
+      "calls_this_run": 641,
+      "sealed": 614,
+      "resumed": 0,
+      "status": "complete",
+      "remaining": 28947
+    }
+  ],
+  "resume_http_calls": 0,
+  "resumed_packets": 614,
+  "rows": [
+    {
+      "arm": "baseline_proxy",
+      "bps_per_side": 5,
+      "units": 85,
+      "gross_fixed_unit_usd": -204.2694999999976,
+      "modeled_price_cost_usd": 202.29841425,
+      "net_unit_usd": -406.56791424997533
+    },
+    {
+      "arm": "baseline_proxy",
+      "bps_per_side": 10,
+      "units": 85,
+      "gross_fixed_unit_usd": -204.2694999999976,
+      "modeled_price_cost_usd": 404.5968285,
+      "net_unit_usd": -608.8663284999765
+    },
+    {
+      "arm": "baseline_proxy",
+      "bps_per_side": 20,
+      "units": 85,
+      "gross_fixed_unit_usd": -203.66949999999764,
+      "modeled_price_cost_usd": 808.588917,
+      "net_unit_usd": -1012.2584169999975
+    },
+    {
+      "arm": "baseline_proxy",
+      "bps_per_side": 50,
+      "units": 85,
+      "gross_fixed_unit_usd": -205.36459999999764,
+      "modeled_price_cost_usd": 2014.056718,
+      "net_unit_usd": -2219.421317999977
+    },
+    {
+      "arm": "normalized",
+      "bps_per_side": 5,
+      "units": 94,
+      "gross_fixed_unit_usd": -174.41689999999898,
+      "modeled_price_cost_usd": 224.27865915,
+      "net_unit_usd": -398.69555914997454
+    },
+    {
+      "arm": "normalized",
+      "bps_per_side": 10,
+      "units": 94,
+      "gross_fixed_unit_usd": -173.84689999999898,
+      "modeled_price_cost_usd": 448.4064883,
+      "net_unit_usd": -622.2533882999726
+    },
+    {
+      "arm": "normalized",
+      "bps_per_side": 20,
+      "units": 94,
+      "gross_fixed_unit_usd": -174.17709999999897,
+      "modeled_price_cost_usd": 894.6631862,
+      "net_unit_usd": -1068.8402862000019
+    },
+    {
+      "arm": "normalized",
+      "bps_per_side": 50,
+      "units": 94,
+      "gross_fixed_unit_usd": -173.76209999999898,
+      "modeled_price_cost_usd": 2232.7406905000003,
+      "net_unit_usd": -2406.502790499976
+    },
+    {
+      "arm": "normalized_price",
+      "bps_per_side": 5,
+      "units": 77,
+      "gross_fixed_unit_usd": -149.93459999999897,
+      "modeled_price_cost_usd": 183.0851638,
+      "net_unit_usd": -333.0197637999786
+    },
+    {
+      "arm": "normalized_price",
+      "bps_per_side": 10,
+      "units": 77,
+      "gross_fixed_unit_usd": -149.93459999999897,
+      "modeled_price_cost_usd": 366.1703276,
+      "net_unit_usd": -516.1049275999767
+    },
+    {
+      "arm": "normalized_price",
+      "bps_per_side": 20,
+      "units": 77,
+      "gross_fixed_unit_usd": -150.26479999999898,
+      "modeled_price_cost_usd": 730.1908648,
+      "net_unit_usd": -880.4556648000018
+    },
+    {
+      "arm": "normalized_price",
+      "bps_per_side": 50,
+      "units": 77,
+      "gross_fixed_unit_usd": -151.20979999999898,
+      "modeled_price_cost_usd": 1822.4040870000001,
+      "net_unit_usd": -1973.6138869999807
+    }
+  ],
+  "interpretation": "Algebraic attribution of original fixed units, not a new zero-cost selection or cash portfolio replay.",
+  "audit_hash": "546c385c34262e7905e945ee676bfa6c6ee5d66d574630a189ea4cd8c2f6fd16"
+}
