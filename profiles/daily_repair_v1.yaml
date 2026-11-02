@@ -1,0 +1,7 @@
+version: daily_repair_v1
+history_sessions: 60
+max_requests: 82
+quota_reserve: 5000
+spacing_seconds: 0.75
+timeout_seconds: 30
+max_packet_rows: 3000

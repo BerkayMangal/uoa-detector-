@@ -73,6 +73,7 @@ _KNOWN_EXCEPTIONS: Final = {
 # recorded, a telemetry branch that was taken, the OI that confirmed an
 # opening — nobody can re-derive these from the vendor tomorrow.
 _APPEND_ONLY_TABLES: Final = {
+    "alfa_daily_repair_run",    # Phase 5.52: one-shot claims, native source and result receipts
     "alfa_call_research_cohort",  # frozen daily shadow rosters
     "alfa_call_research_result",  # post-commit receipts and exact-session reference marks
     "alfa_call_data_receipt",    # physical first-seen proof for legacy daily data
