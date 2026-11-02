@@ -111,7 +111,8 @@ def _seed(url: str) -> Engine:
                                 option_chain=f"NVDA261016C00{int(strike):03d}000", fill_side="at_ask",
                                 option_type="call", strike=strike, expiry=EXPIRY, print_ts=T0, written_at=T0))
         for ticker, close in (("NVDA", 99.0), ("SPY", 500.0)):
-            day = date(2026, 8, 10)
+            # Thirty weekday fixtures must reach the actual prior session (Sep23).
+            day = date(2026, 8, 13)
             n = 0
             while n < 30:
                 if day.weekday() < 5:

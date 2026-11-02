@@ -255,6 +255,8 @@ def _fresh_spot(price: PriceContext | None, ctx: CycleContext) -> float | None:
         return None
     if ctx.session.mode is not MarketMode.LIVE:
         return None
+    if price.source_session is not None and price.source_session != ctx.now.astimezone(_ET).date():
+        return None
     age = (ctx.now - price.spot_fetched_at).total_seconds()
     return price.spot if 0 <= age <= ctx.settings.price.spot_max_age_seconds else None
 
@@ -620,7 +622,7 @@ async def run_cycle(
     prices = inputs.price_contexts(
         engine, [*tickers, *paper_tickers], settings.price.benchmark,
         atr_period=board.spot.atr_period, atr_min_sessions=board.spot.atr_min_sessions,
-        max_age_seconds=settings.price.spot_max_age_seconds,
+        max_age_seconds=settings.price.spot_max_age_seconds, asof=now,
     )
     # Current means today's session is the one being read, whatever run holds it.
     flow_current = today is not None and session_date == today

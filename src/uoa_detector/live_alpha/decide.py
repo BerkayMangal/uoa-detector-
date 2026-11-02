@@ -146,13 +146,17 @@ def evaluate(
             flow=flow, price=price, news=news, session=session, decided_at=now, fresh_news=fresh,
         )
 
+    flow_blocker = (
+        f"akış kaydı ({flow.run_id}) bugünkü seansa ait değil; bugünün akışı gelmeden giriş yok"
+        if session.mode is MarketMode.LIVE and not flow_current else ""
+    )
     dominant: Direction = "up" if flow.premium_up >= flow.premium_down else "down"
     if direction is None:
         return _done(dominant, Recommendation.WATCH, Readiness.INVALID, Path.NONE, [flow_why])
     if price.state is not CheckState.CHECKED_FOUND or price.move_atr is None:
         return _done(
             direction, Recommendation.WATCH, Readiness.INVALID, Path.NONE,
-            [f"fiyat verisi eksik: {price.blocker or 'spot/önceki kapanış/ATR yok'}"],
+            [f"fiyat verisi eksik: {price.blocker or 'spot/önceki kapanış/ATR yok'}", flow_blocker],
         )
     move_atr = price.move_atr
     live = session.mode is MarketMode.LIVE
@@ -162,8 +166,8 @@ def evaluate(
         timing.append(f"piyasa {session.mode.value} ({session.reason}); giriş yalnız canlı seansta")
     elif not fresh_spot:
         timing.append("fiyat bayat; taze fiyat gelmeden giriş yok")
-    if live and not flow_current:
-        timing.append(f"akış kaydı ({flow.run_id}) bugünkü seansa ait değil; bugünün akışı gelmeden giriş yok")
+    if flow_blocker:
+        timing.append(flow_blocker)
     entry_ok = live and fresh_spot and flow_current
 
     if direction == "down":
@@ -445,7 +449,7 @@ def build_card(
     }
     sources = [
         f"UW flow-alerts → signal/alfa_print_meta, run {d.flow.run_id}",
-        "UW atm-chains → alfa_atm (spot), UW ohlc/1d → alfa_daily_bar (önceki kapanış, ATR)",
+        "UW atm-chains → alfa_atm (spot), UW ohlc/1d → alfa_daily_bar / fiziksel erişimi doğrulanmış alfa_calibration_bar (önceki kapanış, ATR)",
     ]
     if d.news.state is not CheckState.NOT_CHECKED:
         sources.append(
