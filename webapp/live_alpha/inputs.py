@@ -9,7 +9,7 @@ daily bars (daily_close job, ``alfa_daily_bar``) and listed expiries
 from __future__ import annotations
 
 from collections import defaultdict
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, date, datetime, time, timedelta
 from typing import TYPE_CHECKING
 from zoneinfo import ZoneInfo
@@ -22,6 +22,7 @@ from webapp.board.atm import AlfaAtm, AlfaAtmExpiry
 from webapp.board.daily_close import load_bars_by_ticker
 from webapp.board.db import session_factory
 from webapp.board.spot import Bar, true_ranges, wilder_atr
+from webapp.live_alpha.daily_reference import previous, supplement
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -192,6 +193,11 @@ def price_context(
     missing = []
     if prev is None:
         missing.append("önceki kapanış yok")
+    expected = previous(session_day)
+    if expected is None:
+        missing.append("önceki seans takvimi bilinmiyor")
+    elif prev is not None and prev.day != expected:
+        missing.append(f"önceki kapanış eski: {prev.day}; gereken tamamlanmış seans {expected}")
     if atr is None:
         missing.append(f"ATR için yeterli seans yok ({usable} < {atr_min_sessions})")
     return PriceContext(
@@ -217,6 +223,7 @@ def price_contexts(
     atr_period: int,
     atr_min_sessions: int,
     max_age_seconds: int,
+    asof: datetime | None = None,
 ) -> dict[str, PriceContext]:
     """Price context per ticker; the benchmark move is used only when it is comparable.
 
@@ -227,14 +234,26 @@ def price_contexts(
     symbols = sorted({t.upper() for t in tickers} | {benchmark.upper()})
     spots = latest_spots(engine, symbols)
     bars = load_bars_by_ticker(engine, symbols)
+    observed = asof or max((s.fetched_at for s in spots.values()), default=datetime.now(UTC))
+    bars = supplement(engine, bars, {t: _session_date(s) for t, s in spots.items()}, observed)
     bench_spot = spots.get(benchmark.upper())
-    bench = price_context(
-        benchmark.upper(), bench_spot, bars.get(benchmark.upper(), ()), None,
-        atr_period=atr_period, atr_min_sessions=atr_min_sessions,
-    )
+    def current_context(ticker: str, benchmark_move: float | None) -> PriceContext:
+        spot = spots.get(ticker)
+        context = price_context(
+            ticker, spot, bars.get(ticker, ()), benchmark_move,
+            atr_period=atr_period, atr_min_sessions=atr_min_sessions,
+        )
+        if asof is not None and spot is not None:
+            current_day = asof.astimezone(_ET).date()
+            if _session_date(spot) != current_day:
+                return replace(context, state=CheckState.FAILED,
+                    blocker=f"fiyat kaynak seansı {_session_date(spot)}; gereken seans {current_day}")
+        return context
+
+    bench = current_context(benchmark.upper(), None)
 
     def _bench_move_for(spot: SpotRead | None) -> float | None:
-        if spot is None or bench_spot is None or bench.move is None:
+        if spot is None or bench_spot is None or bench.move is None or bench.state is not CheckState.CHECKED_FOUND:
             return None
         if _session_date(spot) != _session_date(bench_spot):
             return None
@@ -243,9 +262,6 @@ def price_contexts(
         return bench.move
 
     return {
-        t: price_context(
-            t, spots.get(t), bars.get(t, ()), _bench_move_for(spots.get(t)),
-            atr_period=atr_period, atr_min_sessions=atr_min_sessions,
-        )
+        t: current_context(t, _bench_move_for(spots.get(t)))
         for t in symbols
     }
