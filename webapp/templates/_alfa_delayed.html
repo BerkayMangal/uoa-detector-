@@ -10,7 +10,7 @@
    them, and the render-level forbidden-word scan excludes them (a real name such as
    "Al Green" would match the standalone "al" pattern). #}
 {% if view.delayed %}
-<details class="mt-2 text-sm" data-delayed>
+<details open class="mt-2 text-sm" data-delayed>
   <summary class="cursor-pointer text-gray-400">{{ view.delayed.bucket_label }}</summary>
   <div class="mt-2 space-y-2 text-xs">
     <p class="text-gray-500" data-delayed-exclusion>{{ view.delayed.exclusion_note }}</p>

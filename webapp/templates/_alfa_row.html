@@ -45,7 +45,7 @@
 
   {# R-CA2: the bull and bear columns share width (two equal grid columns) and classes.
      5.3.3 moved this block ABOVE the option fold: the bear case must never sit inside a
-     collapsed <details>, because a counter-argument the reader has to open is not a
+     collapsed <details open>, because a counter-argument the reader has to open is not a
      counter-argument (R-CA1). #}
   <div class="grid gap-3 md:grid-cols-2 mt-2" data-cases>
     <div class="{{ case_class }}" data-case="bull">
@@ -64,7 +64,7 @@
      İŞLENMEZ stays inside it with its reason (R-SP7). #}
   {% include "_alfa_spot.html" %}
 
-  <details class="mt-2" data-option-detail>
+  <details open class="mt-2" data-option-detail>
     <summary class="cursor-pointer text-sm text-gray-300" data-option-detail-summary>{{ spot_copy.option_detail }}</summary>
   <div class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm" data-chip="{{ view.chip.state }}">
     <span class="px-2 py-0.5 rounded border font-semibold {{ chip_style[view.chip.state] }}"
@@ -114,7 +114,7 @@
     {% endif %}
   </div>
 
-  <details class="mt-2 text-sm">
+  <details open class="mt-2 text-sm">
     <summary class="cursor-pointer text-gray-300">{{ detail_summary_text(row) }}</summary>
     <div class="overflow-x-auto">
       <table class="mt-2 w-full text-xs">
@@ -146,7 +146,7 @@
 
   {% include "_alfa_delayed.html" %}
 
-  <details class="mt-2 text-sm" data-audit>
+  <details open class="mt-2 text-sm" data-audit>
     <summary class="cursor-pointer text-gray-400">{{ copy.audit_summary }}</summary>
     <div class="mt-2 space-y-1 text-xs text-gray-400">
       <p data-audit-source>{{ view.audit.source_text }}</p>
