@@ -29,7 +29,7 @@
   {% endif %}
 
   <details open class="fold-panel" id="source-strategy"><summary>Kaynak stratejinin ayrıntıları · deneysel Live Alpha v1</summary>  <div class="desk-heading">
-    <div><p class="eyebrow">PİYASA / KİŞİSEL GÖRÜNÜM</p><h2>Bugünün Fırsatları</h2></div>
+    <div><p class="eyebrow">Bugünün Fırsatları · kaynak model</p><h2>Kaynak modelin değerlendirmeleri</h2></div>
     <div class="session-clock"><span class="session-pill {{ 'is-live' if v.mode == 'LIVE' else '' }}">{{ v.mode_text }}</span><br>{{ v.now_et }} · {{ v.now_tr }}</div>
   </div>
   <div class="desk-overview">
@@ -47,7 +47,7 @@
   <article class="plan-card" data-tone="{{ c.tone }}" data-card="{{ d.ticker }}" data-rec="{{ d.recommendation }}" data-ready="{{ d.readiness }}" data-server-withdrawn="{{ 'true' if c.withdrawn else 'false' }}">
     <div class="plan-title">
       <h3>{{ d.ticker }}</h3>
-      <span class="decision-badge">{{ c.label }}</span>
+      <span class="decision-badge">Kaynak model · {{ c.label }}</span>
       <span class="plan-status">{{ c.readiness_text }}</span>
       {% if c.tracking %}<span class="text-xs px-2 py-0.5 rounded bg-sky-900 text-sky-100">{{ c.tracking }}</span>{% endif %}
     </div>
