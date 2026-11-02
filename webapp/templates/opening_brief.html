@@ -10,10 +10,10 @@
       <p class="workflow-title">{{ brief.title }}</p><p class="workflow-detail">{{ brief.detail }}</p>
       {% if brief.kind == 'plan' %}<p class="workflow-plans">{% for s in brief.buys[:opening.display_limit] %}<a href="/acilis">{{ s.advice.headline }}</a>{% if not loop.last %}<br>{% endif %}{% endfor %}</p>{% endif %}
     </div>
-    <aside class="workflow-next" aria-label="Bir sonraki kontrol" {% if brief.kind == 'plan' %}data-opening-buys data-opening-expiry="{{ (brief.buys | map(attribute='advice.expires_at') | min).isoformat() }}"{% endif %}>
+    <div class="workflow-next" role="group" aria-label="Bir sonraki kontrol" {% if brief.kind == 'plan' %}data-opening-buys data-opening-expiry="{{ (brief.buys | map(attribute='advice.expires_at') | min).isoformat() }}"{% endif %}>
       <span>Bir sonraki bakış</span><strong>{{ 'Şimdi' if brief.kind in ['plan', 'risk'] else tr_time(brief.next_at) + ' TR' if brief.next_at else 'Kayıt bekleniyor' if brief.clock.phase != 'closed' else 'Sonraki seans' }}</strong><p>{{ brief.next_label }}</p>
       <a class="workflow-refresh" href="{{ '/pozisyonlar' if brief.kind == 'risk' else '/acilis' if brief.kind == 'plan' else '/' if opening_home else '/acilis' }}">{{ 'Pozisyonları aç' if brief.kind == 'risk' else 'Planları aç' if brief.kind == 'plan' else 'Güncelle ↗' }}</a>
-    </aside>
+    </div>
   </div>
   {% if brief.kind == 'risk' and brief.buys %}<p class="workflow-plans" data-opening-buys data-opening-expiry="{{ (brief.buys | map(attribute='advice.expires_at') | min).isoformat() }}">Ayrıca {{ brief.buys | length }} kayıtlı giriş planı var. <a href="/acilis">Planları aç →</a></p>{% endif %}
   {% for s in brief.exits %}<p class="desk-notice" data-opening-exit data-opening-expiry="{{ s.advice.expires_at.isoformat() if s.advice.expires_at else '' }}">{{ s.advice.headline if s.current or s.advice.action == 'REVIEW' else s.advice.ticker + ' · ÇIKIŞI İNCELE · TAZE VERİ BEKLE' }} · {{ s.advice.reasons | join(' ') }} <a href="/pozisyonlar">Pozisyonu aç →</a></p>{% endfor %}
@@ -22,7 +22,7 @@
     <div><dt>02 · ABD açılışı</dt><dd>{{ tr_time(brief.clock.opening) }}</dd></div>
     <div><dt>03 · Giriş kontrolü</dt><dd>{{ tr_time(brief.clock.assessment) }}</dd></div>
   </dl>
-  {% if brief.reasons %}<details class="workflow-reasons"><summary>Adaylar neden bekliyor?</summary><ul>{% for reason, count in brief.reasons %}<li><span>{{ reason }}</span><small>{{ count }} aday</small></li>{% endfor %}</ul><p class="quiet-copy">Son kayıtta en sık görülen üç gerekçe; aynı aday birden fazla gerekçede yer alabilir.</p></details>{% endif %}
+  {% if brief.reasons %}<details open class="workflow-reasons"><summary>Adaylar neden bekliyor?</summary><ul>{% for reason, count in brief.reasons %}<li><span>{{ reason }}</span><small>{{ count }} aday</small></li>{% endfor %}</ul><p class="quiet-copy">Son kayıtta en sık görülen üç gerekçe; aynı aday birden fazla gerekçede yer alabilir.</p></details>{% endif %}
   <div class="workflow-foot"><span>Son kalıcı kayıt: {{ tr_time(opening.latest_at) + ' TR' if opening and opening.latest_at else 'henüz yok' }} · Saatler TR</span><a href="/acilis">Planlar ve kayıtlar →</a></div>
   <p class="workflow-note">Deneysel karar desteği · doğrulanmış getiri avantajı yok. Her öneri kaydedilir; emir gönderilmez.</p>
 </section>

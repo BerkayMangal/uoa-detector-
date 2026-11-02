@@ -8,7 +8,7 @@
 {% block content %}
 {% set opening_home = true %}
 {% include "opening_brief.html" %}
-<details class="fold-panel alert-fold"><summary>Sinyal uyarıları <span>· ses ve bildirim ayarları</span></summary>{% include "alert_controls.html" %}</details>
+<details open class="fold-panel alert-fold"><summary>Sinyal uyarıları <span>· ses ve bildirim ayarları</span></summary>{% include "alert_controls.html" %}</details>
 <section id="live-alpha" lang="tr" data-entry-ttl="{{ v.entry_ttl_seconds }}" data-scan-age="{{ v.scan_age_seconds or 0 }}" data-reload-seconds="{{ reload_seconds }}">
   <div data-age-anchor></div>
   {% if ok %}<p class="text-sm text-emerald-400 mb-2" data-ok>{{ ok }}</p>{% endif %}
@@ -28,7 +28,7 @@
   {% for p in desk.paper.rows + desk.manual.rows %}{% if p.action == 'EXIT_REVIEW' %}<p class="desk-notice"><b>{{ p.ticker }} · {{ 'PAPER' if p.scope == 'paper' else 'Manuel kayıt' }} · ÇIKIŞ İNCELE:</b> {{ p.reason }} <a class="underline" href="/pozisyonlar">Pozisyonu gör</a></p>{% endif %}{% endfor %}
   {% endif %}
 
-  <details class="fold-panel" id="source-strategy"><summary>Kaynak stratejinin ayrıntıları · deneysel Live Alpha v1</summary>  <div class="desk-heading">
+  <details open class="fold-panel" id="source-strategy"><summary>Kaynak stratejinin ayrıntıları · deneysel Live Alpha v1</summary>  <div class="desk-heading">
     <div><p class="eyebrow">PİYASA / KİŞİSEL GÖRÜNÜM</p><h2>Bugünün Fırsatları</h2></div>
     <div class="session-clock"><span class="session-pill {{ 'is-live' if v.mode == 'LIVE' else '' }}">{{ v.mode_text }}</span><br>{{ v.now_et }} · {{ v.now_tr }}</div>
   </div>
@@ -36,12 +36,12 @@
     <div class="overview-item"><span>Takipte</span><b>{{ v.universe | length }}</b></div>
     <div class="overview-item"><span>Kaynakta hazır</span><b id="ready-count">{{ v.actionable | selectattr('tone', 'equalto', 'green') | list | length }}</b></div>
     <div class="overview-item"><span>Açık / bekleyen PAPER</span><b>{{ v.paper_stats.open }}</b></div>
-    <p class="overview-note">Önce fiyat ve risk. Ayrıntılar ihtiyaç duyduğunda bir tık uzakta.</p>
+    <p class="overview-note">Plan, kanıt, maliyet ve kaynak ayrıntıları aşağıda açık gösterilir.</p>
   </div>
-  <details class="mb-4"><summary>Seans özeti</summary><p class="quiet-copy" data-summary>{{ v.summary }}</p></details>
+  <details open class="mb-4"><summary>Seans özeti</summary><p class="quiet-copy" data-summary>{{ v.summary }}</p></details>
 
 <p class="quiet-copy">İşlem zamanlaması için üstteki açılış masasını kullan. Aşağıdaki kaynak plan, +15 dakika ve daha sıkı tazelik kontrollerini ayrıca uygulamaz.</p>
-  {% if v.actionable %}<div class="section-heading"><h2>İşlem planları</h2><span>Deneysel görüş · otomatik emir yok</span></div>{% endif %}
+  {% if v.actionable %}<div class="section-heading"><h2>Kaynak strateji planları</h2><span>Deneysel görüş · otomatik emir yok</span></div>{% endif %}
   <div class="plan-grid">
   {% for c in v.actionable %}{% set d = c.data %}
   <article class="plan-card" data-tone="{{ c.tone }}" data-card="{{ d.ticker }}" data-rec="{{ d.recommendation }}" data-ready="{{ d.readiness }}" data-server-withdrawn="{{ 'true' if c.withdrawn else 'false' }}">
@@ -58,10 +58,10 @@
     {% endif %}
     <p class="plan-reason" data-plain-reason>{{ d.plain_reason or d.why_today }}</p>
     <p class="invalidation"><b>Ne zaman vazgeçilir:</b> {{ d.invalidation }}</p>
-    <details><summary>Hisse / opsiyon maliyeti</summary>{{ comparison(d, c.withdrawn) }}</details>
+    <details open><summary>Hisse / opsiyon maliyeti</summary>{{ comparison(d, c.withdrawn) }}</details>
     {% set model = scenarios.get(d.opportunity_id) if scenarios else none %}
-    {% if model %}<details><summary>Fiyat / IV / zaman senaryoları</summary>{% include "scenarios.html" %}</details>{% endif %}
-    <details class="mt-3 text-sm"><summary class="cursor-pointer text-gray-400">Kanıtlar ve karşı görüş</summary>
+    {% if model %}<details open><summary>Fiyat / IV / zaman senaryoları</summary>{% include "scenarios.html" %}</details>{% endif %}
+    <details open class="mt-3 text-sm"><summary class="cursor-pointer text-gray-400">Kanıtlar ve karşı görüş</summary>
     <p class="text-xs text-gray-500">Karar anı: {{ d.decision_as_of[:16].replace('T', ' ') }} UTC · {{ d.market_mode }}</p>
     <p class="text-sm mt-2" data-plain-action>{{ d.plain_action or d.headline }}</p>
     <p class="text-gray-300 mt-2"><b>Görüş:</b> {{ d.headline }}</p>
@@ -84,7 +84,7 @@
       {% for act, txt in [("izle", "İzlemeye al"), ("pas", "Pas geç"), ("paper", "PAPER başlat")] %}
       <form method="post" action="/canli/{{ act }}"><input type="hidden" name="opportunity_id" value="{{ d.opportunity_id }}"><input type="hidden" name="rec_id" value="{{ d.rec_id or '' }}"><button class="rounded bg-gray-800 hover:bg-gray-700 px-3 py-1" type="submit">{{ txt }}</button></form>
       {% endfor %}
-      <details><summary class="cursor-pointer rounded bg-gray-800 px-3 py-1 inline-block">Kendi işlemimi kaydet</summary>
+      <details open><summary class="cursor-pointer rounded bg-gray-800 px-3 py-1 inline-block">Kendi işlemimi kaydet</summary>
         <form method="post" action="/canli/manuel" class="manual-form">
           <input type="hidden" name="opportunity_id" value="{{ d.opportunity_id }}"><input type="hidden" name="rec_id" value="{{ d.rec_id or '' }}">
           <label>Araç <input name="instrument" value="{{ d.instrument.preferred if d.instrument.preferred != 'none' else 'stock' }}" class="bg-gray-900 border border-gray-700 px-1 w-40"></label>
@@ -104,7 +104,7 @@
   {% set show_basket = (v.board | selectattr('basket') | list | length) > 0 %}
   <div class="section-heading"><h2>Hisse panosu · kaynak strateji</h2><span id="stock-count" aria-live="polite">{{ v.board | length }} hisse</span></div>
   <div class="table-tools"><label class="sr-only" for="stock-search">Hisse ara</label><input type="search" id="stock-search" placeholder="Hisse ara…" autocomplete="off"><div class="focus-tabs" role="group" aria-label="Hisse filtresi"><button type="button" data-focus="all" aria-pressed="true">Tümü</button><button type="button" data-focus="hot" aria-pressed="false">Sıcak liste</button><button type="button" data-focus="lag" aria-pressed="false">Geride kalanlar</button></div></div>
-  <details class="mb-3"><summary>Bu tabloyu nasıl okumalı?</summary><p class="quiet-copy">Ölçülmüş bilgi, tahmin değil. "Opsiyonların fiyatladığı hareket": o vadeye kadar piyasanın beklediği ortalama oynaklık (ATM straddle / fiyat). "Akış": bugün bu saate kadarki işlem sayısı, hissenin son seanslardaki aynı saat ortalamasına göre.{% if show_basket %} "Akranlara göre": hissenin getirisi eksi akranlarının ortalama getirisi, aynı iki kapanış arasında. Akranlar: elle yazılmış bir sepet varsa o, yoksa son 60 seansta bu hisseyle en çok birlikte hareket eden isimler. Ölçüm, tahmin değil.{% endif %} "Sıcak liste": sistemin piyasa genelindeki olağandışı opsiyon akışından kendi seçtiği isimler; canlı takibe otomatik girer.</p></details>
+  <details open class="mb-3"><summary>Bu tabloyu nasıl okumalı?</summary><p class="quiet-copy">Ölçülmüş bilgi, tahmin değil. "Opsiyonların fiyatladığı hareket": o vadeye kadar piyasanın beklediği ortalama oynaklık (ATM straddle / fiyat). "Akış": bugün bu saate kadarki işlem sayısı, hissenin son seanslardaki aynı saat ortalamasına göre.{% if show_basket %} "Akranlara göre": hissenin getirisi eksi akranlarının ortalama getirisi, aynı iki kapanış arasında. Akranlar: elle yazılmış bir sepet varsa o, yoksa son 60 seansta bu hisseyle en çok birlikte hareket eden isimler. Ölçüm, tahmin değil.{% endif %} "Sıcak liste": sistemin piyasa genelindeki olağandışı opsiyon akışından kendi seçtiği isimler; canlı takibe otomatik girer.</p></details>
   <div class="overflow-x-auto" role="region" aria-label="Hisse panosu" tabindex="0">
   <table class="stock-table w-full" data-board>
     <thead class="text-gray-400 text-left text-xs"><tr>
@@ -140,7 +140,7 @@
 
   <p class="quiet-copy"><a href="/stratejiler">Strateji masası · deneysel adayları karşılaştır →</a></p>
   </details>
-  <details class="fold-panel" id="paper-tracking"><summary>PAPER takibi <span class="text-gray-400">· simülasyon</span></summary>
+  <details open class="fold-panel" id="paper-tracking"><summary>PAPER takibi <span class="text-gray-400">· simülasyon</span></summary>
   <h3 class="sr-only">Önerilerin sonucu (PAPER: simülasyon, gerçek para değil)</h3>
   <p class="text-sm text-gray-400 mb-2">Açık/bekleyen {{ v.paper_stats.open }} · fiyatlanmış kapanış {{ v.paper_stats.closed }} · dolmayan {{ v.paper_stats.unfilled }} · belirsiz {{ v.paper_stats.unknown }} · model maliyetleri sonrası toplam {% if v.paper_stats.pnl_usd is not none %}${{ '%.2f' | format(v.paper_stats.pnl_usd) }}{% else %}bilinmiyor{% endif %} ({{ v.paper_stats.wins }} kazanç). Tüm geçmiş; aşağıda son 20 kapalı kayıt. <a class="underline" href="/sonuclar">Ayrıntılı sonuçlar</a>. Küçük örneklem; başarı oranı çıkarılmaz.</p>
   {% if v.papers_open or v.papers_closed %}
@@ -155,7 +155,7 @@
   {% endif %}
 
   </details>
-  <details class="fold-panel" id="live-diagnostics"><summary class="cursor-pointer text-sm text-gray-400">Teknik durum (tarama hunisi, veri yaşı, iş kalp atışı)</summary>
+  <details open class="fold-panel" id="live-diagnostics"><summary class="cursor-pointer text-sm text-gray-400">Teknik durum (tarama hunisi, veri yaşı, iş kalp atışı)</summary>
   <p class="text-sm text-gray-300" data-funnel>
     taranan {{ v.funnel.get('taranan', 0) }} → akış uygun {{ v.funnel.get('akış_uygun', 0) }} → fiyat verisi uygun {{ v.funnel.get('fiyat_uygun', 0) }} → plan {{ v.funnel.get('plan', 0) }} → giriş hazır {{ v.funnel.get('giriş_hazır', 0) }}
   </p>
@@ -166,7 +166,7 @@
     Politika {{ v.policy_version }}.</p>
   <p class="text-xs text-gray-500 mt-1">İş kalp atışı: {% for b in v.beats %}{{ b.at }} {{ b.status }}{% if not loop.last %} · {% endif %}{% else %}kayıt yok{% endfor %}</p>
   </details>
-  <details class="fold-panel" id="live-method"><summary>Yöntem ve araştırma notu</summary><p class="quiet-copy" data-honesty>Bu kurallar yeni. Geçmişte test ettiğimiz opsiyon-akışı stratejilerinin hepsi maliyetler düşülünce para kaybettirdi; bu ekran onların aynısı değil, ama kazandırdığı da henüz kanıtlanmadı. Her öneri kaydediliyor ve PAPER'da sonucu tutuluyor; sonuç tablosunu Sonuçlar ekranından takip edebilirsin.</p>
+  <details open class="fold-panel" id="live-method"><summary>Yöntem ve araştırma notu</summary><p class="quiet-copy" data-honesty>Bu kurallar yeni. Geçmişte test ettiğimiz opsiyon-akışı stratejilerinin hepsi maliyetler düşülünce para kaybettirdi; bu ekran onların aynısı değil, ama kazandırdığı da henüz kanıtlanmadı. Her öneri kaydediliyor ve PAPER'da sonucu tutuluyor; sonuç tablosunu Sonuçlar ekranından takip edebilirsin.</p>
   <p class="text-xs text-gray-500 mt-3">Yayın modları: LIVE_ANALYSIS gerçek güncel veriden öneridir; PAPER_TRACKING otomatik simülasyondur; MANUAL_FILL senin kaydındır; BROKER_EXECUTION kapalıdır. Araştırma ekranları: <a class="underline" href="/alfa">Alfa Board</a>, <a class="underline" href="/opsiyon">Opsiyon</a>.</p></details>
   <p class="desk-endnote">Deneysel karar desteği. Giriş seviyeleri koşulludur; stop fiyatı azami zarar garantisi değildir.
     Yeni akış ölçümü ve akran-toparlanma araştırması ayrı gölge sürümde: <a href="/laboratuvar" class="underline">Alfa lab</a>.</p>

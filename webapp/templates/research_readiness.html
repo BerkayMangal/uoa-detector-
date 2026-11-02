@@ -2,7 +2,7 @@
 {% set reasons={'current_bar_missing':'Son seans fiyatı eksik / geçersiz','history_missing':'Kesintisiz geçmiş veya SPY geçmişi yetersiz','feature_unavailable':'Fiyat ölçüleri hesaplanamadı','pattern_not_met':'Fiyat yapısı uygun değil','threshold_not_met':'Sinyal eşiği karşılanmadı','volume_unavailable':'Gerekli hacim ölçüsü eksik','volume_not_met':'Hacim eşiği karşılanmadı','market_filter':'SPY piyasa filtresi karşılanmadı','eligible':'Koşulları geçen'} %}
 {% if readiness %}
 <p class="desk-notice"><b>PAPER veri durumu:</b> {{ states.get(readiness.status,'Kontrol ediliyor') }}. Son kapanışta {{ readiness.covered }}/{{ readiness.expected }} geçerli isim.</p>
-<details class="fold-panel"><summary>Veri eksik mi, sinyal mi yok?</summary>
+<details open class="fold-panel"><summary>Veri eksik mi, sinyal mi yok?</summary>
 <p class="quiet-copy">Kontrol {{ readiness.at_tr }} (Türkiye). Beklenen son tamamlanmış borsa seansı {{ readiness.expected_day or 'takvim bilinmiyor' }}; son geçerli SPY verisi {{ readiness.latest_day or 'yok' }}. Aşağıdaki koşul sayıları son SPY seansına aittir; güncel kapanış eksikse eski bir hesap olabilir.</p>
 <p class="quiet-copy">Bu sinyal seansı için sonraki açılış / son kayıt saati: {{ readiness.deadline_tr or 'bilinmiyor' }}{% if readiness.deadline_tr %} (Türkiye) · {{ 'henüz geçmedi' if readiness.deadline_open else 'geçti' }}{% endif %}. Sonradan gelen veri geçmişe karar yazamaz.</p>
 {% for f in readiness.families %}

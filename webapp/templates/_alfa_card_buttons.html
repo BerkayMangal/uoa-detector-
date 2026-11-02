@@ -12,7 +12,7 @@
    as advice: every string comes from the frozen CARD_COPY dictionary in
    webapp/board/cards.py, which a test runs through honesty.ensure_clean.
 
-   No <details> and no score value here: the audit block stays the only place the combined
+   No <details open> and no score value here: the audit block stays the only place the combined
    score appears (R-EV2). The row template is also rendered on its own in tests, so nothing
    here may require page-level context. #}
 <form method="post" action="/alfa/card" class="mt-2 flex flex-wrap items-center gap-2" data-card-form>
