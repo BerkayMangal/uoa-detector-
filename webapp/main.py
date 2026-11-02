@@ -60,6 +60,8 @@ from webapp.board.signals import BoardSignalReader
 from webapp.call_research import context as call_context
 from webapp.call_research import coverage as call_coverage
 from webapp.call_research import forward as call_forward
+from webapp.call_research import progress as call_progress
+from webapp.call_research import repair_operator
 from webapp.call_research import report as call_report
 from webapp.call_research import scorecard as call_scorecard
 from webapp.call_research.settings import settings as call_research_settings
@@ -207,6 +209,12 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
         # thread and event loop (with its own UW client and engine), so its synchronous
         # database reads can never stall the web server's loop.
         _start_live_alpha_thread(str(config["database_url"]))
+        if os.environ.get("DAILY_REPAIR_REQUEST", "").strip():
+            # Explicit one-shot operator; its durable claim prevents retry on redeploy.
+            tasks.append(asyncio.create_task(run_service(
+                str(config["database_url"]),
+                lambda: repair_operator.requested(str(config["database_url"])), "daily-repair",
+            )))
     try:
         yield
     finally:
@@ -689,15 +697,21 @@ def live_alert_feed() -> live_alerts.Feed:
 
 @app.get("/karne", response_class=HTMLResponse)
 def call_scorecards(request: Request, before: str = "", ticker: str = "", updates: bool = False) -> HTMLResponse:
-    rows = call_scorecard.listing(_board_reader().engine, _now(), before, ticker, not updates)
-    return templates.TemplateResponse(request, "call_scorecards.html", {"rows": rows, "ticker": ticker.strip().upper(), "updates": updates, "tr_time": opening_view.tr_time})
+    engine, now = _board_reader().engine, _now()
+    rows = call_scorecard.listing(engine, now, before, ticker, not updates)
+    return templates.TemplateResponse(request, "call_scorecards.html", {"rows": rows, "progress": call_progress.listing(engine, rows, now), "ticker": ticker.strip().upper(), "updates": updates, "tr_time": opening_view.tr_time})
 
 
 @app.get("/karne/{key}", response_class=HTMLResponse)
 def call_scorecard_page(request: Request, key: str) -> HTMLResponse:
     engine, now = _board_reader().engine, _now()
     card = call_scorecard.get(engine, key, now)
-    return templates.TemplateResponse(request, "call_scorecard.html", {"card": card, "context": call_context.view(engine, key, now) if card else None, "tr_time": opening_view.tr_time}, status_code=200 if card else 404)
+    return templates.TemplateResponse(request, "call_scorecard.html", {"card": card, "progress": call_progress.detail(card, now) if card else (), "context": call_context.view(engine, key, now) if card else None, "tr_time": opening_view.tr_time}, status_code=200 if card else 404)
+
+
+@app.get("/api/arastirma/veri-tamamlama")
+def daily_repair_status() -> dict[str, Any]:
+    return repair_operator.status(_board_reader().engine, _now())
 
 
 @app.get("/arastirma", response_class=HTMLResponse)
