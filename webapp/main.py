@@ -639,6 +639,9 @@ def live_home(request: Request, ok: str = "") -> HTMLResponse:
     now = _now()
     view = live_page.build_view(_board_reader().engine, now)
     opening = _safe(lambda: opening_view.build(_board_reader().engine, now), None)
+    from webapp.desk.calls import today as daily_calls
+
+    calls = _safe(lambda: daily_calls(_board_reader().engine, now), None)
     cfg = live_page.settings()
     reload_seconds = cfg.cycle.live_seconds if view.mode == "LIVE" else cfg.cycle.closed_seconds
     return templates.TemplateResponse(
@@ -646,7 +649,7 @@ def live_home(request: Request, ok: str = "") -> HTMLResponse:
         {"v": view, "ok": _LIVE_OK.get(ok, ""), "reload_seconds": reload_seconds,
          "alert_settings": _safe(live_alerts.settings, None),
          "alert_feed_url": "/api/acilis/uyarilar",
-         "opening": opening, "overview": desk_overview.build(opening, now),
+         "opening": opening, "overview": desk_overview.build(opening, now), "daily_calls": calls,
          "tr_time": opening_view.tr_time,
          "desk": _safe(lambda: desk_positions.build(_board_reader().engine, now), None),
          "scenarios": _safe(lambda: {c.data["opportunity_id"]: desk_scenarios.build(c.data, now, bool(c.withdrawn)) for c in view.actionable}, None)},
