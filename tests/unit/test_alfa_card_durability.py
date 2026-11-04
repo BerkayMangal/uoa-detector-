@@ -73,6 +73,9 @@ _KNOWN_EXCEPTIONS: Final = {
 # recorded, a telemetry branch that was taken, the OI that confirmed an
 # opening — nobody can re-derive these from the vendor tomorrow.
 _APPEND_ONLY_TABLES: Final = {
+    "alfa_shared_news_packet",  # Phase 5.56: physically received curated-source versions cannot be recreated
+    "alfa_shared_news_receipt", # Phase 5.56: post-packet-commit availability evidence
+    "alfa_shared_news_item_observation", # Phase 5.56: immutable item/version-to-packet provenance
     "alfa_news_research_packet",  # Phase 5.53: original physically received news versions
     "alfa_news_research_receipt", # Phase 5.53: post-packet-commit availability proof
     "alfa_daily_repair_run",    # Phase 5.52: one-shot claims, native source and result receipts

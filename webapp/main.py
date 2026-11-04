@@ -44,7 +44,16 @@ from starlette.datastructures import Headers
 from starlette.responses import PlainTextResponse
 
 from uoa_detector.sources.market_hours import is_market_open
-from webapp import explanations, gamma, horizon_diagnostics, journal, options_board, pricing, seo
+from webapp import (
+    explanations,
+    gamma,
+    horizon_diagnostics,
+    journal,
+    options_board,
+    pricing,
+    seo,
+    shared_news,
+)
 from webapp.alpha_lab import view as lab_view
 from webapp.alpha_lab.archive import STATE as ARCHIVE_STATE
 from webapp.alpha_lab.engine import STATE as LAB_STATE
@@ -87,6 +96,7 @@ from webapp.opening import view as opening_view
 from webapp.opening.model import clock as opening_clock
 from webapp.repo import RunInfo, SignalRepo
 from webapp.service_isolation import run_service
+from webapp.shared_news.config import enabled as shared_news_enabled
 from webapp.storage_diagnostics import native_hint
 from webapp.vol_board import VolBoardRow, build_vol_board, vol_board_summary
 from webapp.worker import live_config_from_env, run_live_worker
@@ -210,6 +220,12 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
         # thread and event loop (with its own UW client and engine), so its synchronous
         # database reads can never stall the web server's loop.
         _start_live_alpha_thread(str(config["database_url"]))
+        if shared_news_enabled():
+            tasks.append(asyncio.create_task(_supervise(
+                lambda: run_service(str(config["database_url"]),
+                                    lambda: shared_news.loop(str(config["database_url"])), "shared-news"),
+                "shared-news",
+            )))
         if os.environ.get("DAILY_REPAIR_REQUEST", "").strip():
             # Explicit one-shot operator; its durable claim prevents retry on redeploy.
             tasks.append(asyncio.create_task(run_service(
@@ -725,6 +741,18 @@ def news_research_status() -> dict[str, Any]:
     from webapp.news_research.report import build
 
     return asdict(build(_board_reader().engine, _now()))
+
+
+@app.get("/api/arastirma/haber-kaynaklari")
+def shared_news_status() -> dict[str, Any]:
+    """Private stored context only; no HTTP, optimizer, vote or write on GET."""
+    return shared_news.build(_board_reader().engine, _now()).model_dump(mode="json")
+
+
+@app.get("/haberler", response_class=HTMLResponse)
+def shared_news_page(request: Request) -> HTMLResponse:
+    view = shared_news.build(_board_reader().engine, _now())
+    return templates.TemplateResponse(request, "shared_news.html", {"news": view, "tr_time": opening_view.tr_time})
 
 
 @app.get("/arastirma", response_class=HTMLResponse)

@@ -1,0 +1,18 @@
+version: shared_news_v1
+enabled_env: SHARED_NEWS_ENABLED
+poll_seconds: 900
+request_timeout_seconds: 10
+recording_timeout_seconds: 5
+max_body_bytes: 1048576
+max_items: 100
+max_age_seconds: 3600
+read_packet_limit: 32
+providers:
+  - provider: mahalle
+    url: https://mahalle-production.up.railway.app/news-feed.json
+    token_env: MAHALLE_NEWS_FEED_TOKEN
+    coverage: curated_digest
+  - provider: stajyer
+    url: https://stajyer-production.up.railway.app/api/news
+    token_env: STAJYER_NEWS_FEED_TOKEN
+    coverage: curated_note_sources
