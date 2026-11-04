@@ -268,7 +268,7 @@ A new study needs a fresh, non-overlapping window (`docs/next_studies.md`,
 
 | 5.56 | **Shared corporate/macro news context** — owner-authorized Mahalle/Stajyer dedicated cached feeds, physically receipted UOA collection and private labelled context. Contract: `docs/phase-5.56-shared-news-acceptance.md`. Separate from live AL votes/UW experiment, no historical availability or alpha claim; explicit connection request, 2026-11-04. |
 
-| 5.57 | **Compact signal explanations and desktop alerts** — explicit first/update/check/expiry times, provenance-matched readable reasons/news roles, reduced empty space and one private-screen notification controller. Contract: `docs/phase-5.57-signal-clarity-acceptance.md`; delivery: `docs/phase-5.57-closeout.md`. Notify-only, no policy/research mutation or alpha claim; owner requests consolidated correction, 2026-11-04. |
+| 5.57 | **Compact signal explanations and desktop alerts** — explicit first/update/check/expiry times, provenance-matched readable reasons/news roles, reduced empty space and one private-screen notification controller. Contract: `docs/phase-5.57-signal-clarity-acceptance.md`; delivery: `docs/phase-5.57-closeout.md`; narrow journal follow-up: `docs/phase-5.57.2-journal-wrap-acceptance.md`. Notify-only, no policy/research mutation or alpha claim; owner requests consolidated correction, 2026-11-04. |
 
 Detail for the 5.10–5.19 candidates:
 - **Falsification gates (D8).** `src/uoa_detector/backtest/falsification.py:79-81`
