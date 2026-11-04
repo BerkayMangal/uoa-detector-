@@ -1,0 +1,25 @@
+# Registered before new horizon returns; reused historical data, no selection.
+version: frozen_roster_horizons_v1
+arms: [baseline_proxy, normalized, normalized_price]
+entry_delays_minutes: [1, 5, 15]
+bar_filters_minutes: [0, 5, 15, 30]
+intraday_horizons_minutes: [5, 15, 30, 60, 120, 180]
+session_close_offsets: [0, 1, 3, 5]
+costs_bps_per_side: [5, 10, 20, 50]
+entry_tolerance_minutes: 5
+assumed_bar_lag_minutes: 1
+unit_budget_usd: 2500
+primary_arm: baseline_proxy
+primary_delay_minutes: 1
+primary_filter_minutes: 0
+primary_cost_bps_per_side: 5
+anchor_horizon: m60
+bootstrap_draws: 1000
+bootstrap_block_sessions: 5
+bootstrap_seed: 20261104
+registered_cells: 1440
+source_start: 2026-06-24
+source_end: 2026-09-18
+source_sessions: 61
+evaluation_sessions: 41
+warmup_sessions: 20

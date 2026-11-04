@@ -262,6 +262,8 @@ A new study needs a fresh, non-overlapping window (`docs/next_studies.md`,
 
 | 5.53 | **Physically observed news and fixed policy ablations** — zero-extra-call headline receipts, explicit machine-readable research context, five fixed exposure-matched news/RS arms, private readiness and corrected preregistration. Contract: `docs/phase-5.53-news-evidence-acceptance.md`; design review: `docs/phase-5.53-research-design-review.md`; source integration: `docs/phase-5.53-shared-news-sources.md`; delivery: `docs/phase-5.53-closeout.md`. Owner authorizes robust news/backtest research, 2026-11-04; no live-policy tuning or Study G access. |
 
+| 5.54 | **Frozen-roster horizon and candle sensitivity** — registered1440-cell reused-history diagnostic distinguishing polling, chart bars, delay and holding endpoints. Contract: `docs/phase-5.54-horizon-study-acceptance.md`; volume source note: `docs/phase-5.54-volume-quality-addendum.md`; actual results: `docs/phase-5.54-results.md`; interpretation: `docs/phase-5.54-interpretation.md`; delivery: `docs/phase-5.54-closeout.md`. 368 complete cells all net-negative, 1072 partial; positive multi-session common-panel observations remain concentrated/unvalidated. No live tuning, new vendor call, Study G access or selected winner. Owner prioritizes research, 2026-11-04. |
+
 Detail for the 5.10–5.19 candidates:
 - **Falsification gates (D8).** `src/uoa_detector/backtest/falsification.py:79-81`
   hardcodes `_MIN_CLOSED_TRADES = 30`, `_MIN_BEST_SHARPE = 0.5` and

@@ -1,0 +1,1457 @@
+{
+  "classification": "POSTHOC_DESCRIPTIVE_CONCENTRATION_NOT_NEW_VALIDATION",
+  "report_hash": "ed405e06de5069070f746a9675b015ae9f6dd2620ee0add3a65b1c8380e8182e",
+  "audit_hash": "fd0cb497b2ce44275c547f68f7e4cfccffe060361fbaaef13a0b041ee2760044",
+  "script_sha256": "42769559d90ef2874668238f34dddc5a8ca57e909d898d69a419221203837012",
+  "winner": null,
+  "validated_alpha": false,
+  "rows": [
+    {
+      "horizon": "m5",
+      "cost_bps_per_side": 5,
+      "reference_units": 66,
+      "net_usd": -199.76537199998324,
+      "spy_excess_usd": -41.232377645595406,
+      "price_cost_usd": 157.1511719999839,
+      "without_best_net_1_usd": -210.9407664499833,
+      "without_best_net_3_usd": -223.48963644998383,
+      "without_best_excess_1_usd": -55.259485926242434,
+      "without_best_excess_3_usd": -69.96988067518426,
+      "name_contributions": {
+        "AAPL": {
+          "count": 26,
+          "net_usd": -62.88963279999473,
+          "excess_usd": -2.747795831255889
+        },
+        "NFLX": {
+          "count": 6,
+          "net_usd": -40.5619481499982,
+          "excess_usd": -24.411091062333348
+        },
+        "NVDA": {
+          "count": 34,
+          "net_usd": -96.3137910499903,
+          "excess_usd": -14.073490752006169
+        }
+      },
+      "gross_mfe_observed": 66,
+      "gross_mae_observed": 66,
+      "gross_mfe_mean_pct": 0.1507551264693472,
+      "gross_mae_mean_pct": -0.21459314108363614,
+      "gross_mfe_median_pct": 0.12775680788504884,
+      "gross_mae_median_pct": -0.12941282093394402,
+      "worst_observed_gross_mae_pct": -1.5872214792197692
+    },
+    {
+      "horizon": "m5",
+      "cost_bps_per_side": 10,
+      "reference_units": 66,
+      "net_usd": -356.91654399998095,
+      "spy_excess_usd": -41.211751143515805,
+      "price_cost_usd": 314.30234399998164,
+      "without_best_net_1_usd": -365.7384328999809,
+      "without_best_net_3_usd": -373.55617289998133,
+      "without_best_excess_1_usd": -55.231842361491275,
+      "without_best_excess_3_usd": -69.93487823362001,
+      "name_contributions": {
+        "AAPL": {
+          "count": 26,
+          "net_usd": -123.48086559999433,
+          "excess_usd": -2.7464212460454687
+        },
+        "NFLX": {
+          "count": 6,
+          "net_usd": -55.3353962999978,
+          "excess_usd": -24.39887941097595
+        },
+        "NVDA": {
+          "count": 34,
+          "net_usd": -178.10028209998885,
+          "excess_usd": -14.06645048649439
+        }
+      },
+      "gross_mfe_observed": 66,
+      "gross_mae_observed": 66,
+      "gross_mfe_mean_pct": 0.1507551264693472,
+      "gross_mae_mean_pct": -0.21459314108363614,
+      "gross_mfe_median_pct": 0.12775680788504884,
+      "gross_mae_median_pct": -0.12941282093394402,
+      "worst_observed_gross_mae_pct": -1.5872214792197692
+    },
+    {
+      "horizon": "m5",
+      "cost_bps_per_side": 20,
+      "reference_units": 66,
+      "net_usd": -670.959998,
+      "spy_excess_usd": -41.2380137722639,
+      "price_cost_usd": 628.3107980000007,
+      "without_best_net_1_usd": -675.0748758000001,
+      "without_best_net_3_usd": -675.8899558000002,
+      "without_best_excess_1_usd": -55.24407086489641,
+      "without_best_excess_3_usd": -69.93238898339902,
+      "name_contributions": {
+        "AAPL": {
+          "count": 26,
+          "net_usd": -244.66333120000053,
+          "excess_usd": -2.7436720756275754
+        },
+        "NFLX": {
+          "count": 6,
+          "net_usd": -84.62340259999975,
+          "excess_usd": -24.44197174115645
+        },
+        "NVDA": {
+          "count": 34,
+          "net_usd": -341.6732641999997,
+          "excess_usd": -14.052369955479872
+        }
+      },
+      "gross_mfe_observed": 66,
+      "gross_mae_observed": 66,
+      "gross_mfe_mean_pct": 0.1507551264693472,
+      "gross_mae_mean_pct": -0.21459314108363614,
+      "gross_mfe_median_pct": 0.12775680788504884,
+      "gross_mae_median_pct": -0.12941282093394402,
+      "worst_observed_gross_mae_pct": -1.5872214792197692
+    },
+    {
+      "horizon": "m5",
+      "cost_bps_per_side": 50,
+      "reference_units": 66,
+      "net_usd": -1605.8997954999827,
+      "spy_excess_usd": -40.92829592173226,
+      "price_cost_usd": 1563.3704954999835,
+      "without_best_net_1_usd": -1605.8997954999827,
+      "without_best_net_3_usd": -1605.8997954999827,
+      "without_best_excess_1_usd": -54.892250638334616,
+      "without_best_excess_3_usd": -69.53641549595991,
+      "name_contributions": {
+        "AAPL": {
+          "count": 26,
+          "net_usd": -608.2107279999948,
+          "excess_usd": -2.7354245643793043
+        },
+        "NFLX": {
+          "count": 6,
+          "net_usd": -172.02970649999742,
+          "excess_usd": -24.388835007054766
+        },
+        "NVDA": {
+          "count": 34,
+          "net_usd": -825.6593609999903,
+          "excess_usd": -13.80403635029819
+        }
+      },
+      "gross_mfe_observed": 66,
+      "gross_mae_observed": 66,
+      "gross_mfe_mean_pct": 0.1507551264693472,
+      "gross_mae_mean_pct": -0.21459314108363614,
+      "gross_mfe_median_pct": 0.12775680788504884,
+      "gross_mae_median_pct": -0.12941282093394402,
+      "worst_observed_gross_mae_pct": -1.5872214792197692
+    },
+    {
+      "horizon": "m15",
+      "cost_bps_per_side": 5,
+      "reference_units": 66,
+      "net_usd": -182.89521129998303,
+      "spy_excess_usd": -13.780644898553785,
+      "price_cost_usd": 157.15961129998283,
+      "without_best_net_1_usd": -201.25767629998316,
+      "without_best_net_3_usd": -232.36577769998394,
+      "without_best_excess_1_usd": -33.77113211872914,
+      "without_best_excess_3_usd": -67.53127999224796,
+      "name_contributions": {
+        "AAPL": {
+          "count": 26,
+          "net_usd": -72.52311364999548,
+          "excess_usd": -2.9875564628171345
+        },
+        "NFLX": {
+          "count": 6,
+          "net_usd": -26.37854339999764,
+          "excess_usd": -11.075746053234953
+        },
+        "NVDA": {
+          "count": 34,
+          "net_usd": -83.9935542499899,
+          "excess_usd": 0.28265761749830176
+        }
+      },
+      "gross_mfe_observed": 66,
+      "gross_mae_observed": 66,
+      "gross_mfe_mean_pct": 0.2628766247349265,
+      "gross_mae_mean_pct": -0.33180015042312305,
+      "gross_mfe_median_pct": 0.2392786645627254,
+      "gross_mae_median_pct": -0.2901259533758749,
+      "worst_observed_gross_mae_pct": -1.5872214792197692
+    },
+    {
+      "horizon": "m15",
+      "cost_bps_per_side": 10,
+      "reference_units": 66,
+      "net_usd": -340.0548225999822,
+      "spy_excess_usd": -13.773751129217693,
+      "price_cost_usd": 314.31922259998197,
+      "without_best_net_1_usd": -355.98975259998224,
+      "without_best_net_3_usd": -382.43315539998304,
+      "without_best_excess_1_usd": -33.754238105660875,
+      "without_best_excess_3_usd": -67.49749746098371,
+      "name_contributions": {
+        "AAPL": {
+          "count": 26,
+          "net_usd": -133.10952729999468,
+          "excess_usd": -2.986061937322064
+        },
+        "NFLX": {
+          "count": 6,
+          "net_usd": -41.15908679999683,
+          "excess_usd": -11.07020540988573
+        },
+        "NVDA": {
+          "count": 34,
+          "net_usd": -165.78620849999066,
+          "excess_usd": 0.2825162179901035
+        }
+      },
+      "gross_mfe_observed": 66,
+      "gross_mae_observed": 66,
+      "gross_mfe_mean_pct": 0.2628766247349265,
+      "gross_mae_mean_pct": -0.33180015042312305,
+      "gross_mfe_median_pct": 0.2392786645627254,
+      "gross_mae_median_pct": -0.2901259533758749,
+      "worst_observed_gross_mae_pct": -1.5872214792197692
+    },
+    {
+      "horizon": "m15",
+      "cost_bps_per_side": 20,
+      "reference_units": 66,
+      "net_usd": -654.3446952000008,
+      "spy_excess_usd": -14.080020846665445,
+      "price_cost_usd": 628.3440952000007,
+      "without_best_net_1_usd": -665.4245552000006,
+      "without_best_net_3_usd": -682.5385608000004,
+      "without_best_excess_1_usd": -34.04050733564482,
+      "without_best_excess_3_usd": -67.74998965457506,
+      "name_contributions": {
+        "AAPL": {
+          "count": 26,
+          "net_usd": -254.28235460000116,
+          "excess_usd": -2.9830728863340017
+        },
+        "NFLX": {
+          "count": 6,
+          "net_usd": -70.69082359999977,
+          "excess_usd": -11.379181379302366
+        },
+        "NVDA": {
+          "count": 34,
+          "net_usd": -329.3715169999998,
+          "excess_usd": 0.2822334189709146
+        }
+      },
+      "gross_mfe_observed": 66,
+      "gross_mae_observed": 66,
+      "gross_mfe_mean_pct": 0.2628766247349265,
+      "gross_mae_mean_pct": -0.33180015042312305,
+      "gross_mfe_median_pct": 0.2392786645627254,
+      "gross_mae_median_pct": -0.2901259533758749,
+      "worst_observed_gross_mae_pct": -1.5872214792197692
+    },
+    {
+      "horizon": "m15",
+      "cost_bps_per_side": 50,
+      "reference_units": 66,
+      "net_usd": -1588.5483884999833,
+      "spy_excess_usd": -13.185099531152005,
+      "price_cost_usd": 1563.457688499983,
+      "without_best_net_1_usd": -1588.5483884999833,
+      "without_best_net_3_usd": -1588.5483884999833,
+      "without_best_excess_1_usd": -33.085584557739615,
+      "without_best_excess_3_usd": -66.69373576749533,
+      "name_contributions": {
+        "AAPL": {
+          "count": 26,
+          "net_usd": -617.8008364999944,
+          "excess_usd": -2.9741057333679137
+        },
+        "NFLX": {
+          "count": 6,
+          "net_usd": -158.00965899999716,
+          "excess_usd": -11.170528950974223
+        },
+        "NVDA": {
+          "count": 34,
+          "net_usd": -812.737892999992,
+          "excess_usd": 0.9595351531901244
+        }
+      },
+      "gross_mfe_observed": 66,
+      "gross_mae_observed": 66,
+      "gross_mfe_mean_pct": 0.2628766247349265,
+      "gross_mae_mean_pct": -0.33180015042312305,
+      "gross_mfe_median_pct": 0.2392786645627254,
+      "gross_mae_median_pct": -0.2901259533758749,
+      "worst_observed_gross_mae_pct": -1.5872214792197692
+    },
+    {
+      "horizon": "m30",
+      "cost_bps_per_side": 5,
+      "reference_units": 66,
+      "net_usd": -195.49630759998036,
+      "spy_excess_usd": -9.189322662239059,
+      "price_cost_usd": 157.15330759998267,
+      "without_best_net_1_usd": -215.0490750999807,
+      "without_best_net_3_usd": -242.74788674998192,
+      "without_best_excess_1_usd": -27.04612536922722,
+      "without_best_excess_3_usd": -60.55385421613155,
+      "name_contributions": {
+        "AAPL": {
+          "count": 26,
+          "net_usd": -115.86773049999385,
+          "excess_usd": -41.03660774127978
+        },
+        "NFLX": {
+          "count": 6,
+          "net_usd": 3.826946300002689,
+          "excess_usd": 16.64354180529609
+        },
+        "NVDA": {
+          "count": 34,
+          "net_usd": -83.45552339998918,
+          "excess_usd": 15.203743273744651
+        }
+      },
+      "gross_mfe_observed": 66,
+      "gross_mae_observed": 66,
+      "gross_mfe_mean_pct": 0.3933494117050937,
+      "gross_mae_mean_pct": -0.4309200720673766,
+      "gross_mfe_median_pct": 0.3325848706371315,
+      "gross_mae_median_pct": -0.36088944004211143,
+      "worst_observed_gross_mae_pct": -1.5872214792197692
+    },
+    {
+      "horizon": "m30",
+      "cost_bps_per_side": 10,
+      "reference_units": 66,
+      "net_usd": -352.6496151999813,
+      "spy_excess_usd": -9.184725702428729,
+      "price_cost_usd": 314.30661519998364,
+      "without_best_net_1_usd": -369.9501501999816,
+      "without_best_net_3_usd": -392.7044734999825,
+      "without_best_excess_1_usd": -27.032595541629846,
+      "without_best_excess_3_usd": -60.52356214298843,
+      "name_contributions": {
+        "AAPL": {
+          "count": 26,
+          "net_usd": -176.43246099999413,
+          "excess_usd": -41.01607917312433
+        },
+        "NFLX": {
+          "count": 6,
+          "net_usd": -10.968707399997612,
+          "excess_usd": 16.635215871425764
+        },
+        "NVDA": {
+          "count": 34,
+          "net_usd": -165.24844679998955,
+          "excess_usd": 15.196137599269836
+        }
+      },
+      "gross_mfe_observed": 66,
+      "gross_mae_observed": 66,
+      "gross_mfe_mean_pct": 0.3933494117050937,
+      "gross_mae_mean_pct": -0.4309200720673766,
+      "gross_mfe_median_pct": 0.3325848706371315,
+      "gross_mae_median_pct": -0.36088944004211143,
+      "worst_observed_gross_mae_pct": -1.5872214792197692
+    },
+    {
+      "horizon": "m30",
+      "cost_bps_per_side": 20,
+      "reference_units": 66,
+      "net_usd": -666.6524303999987,
+      "spy_excess_usd": -9.090796507347322,
+      "price_cost_usd": 628.319430400001,
+      "without_best_net_1_usd": -679.4485003999987,
+      "without_best_net_3_usd": -692.3138469999991,
+      "without_best_excess_1_usd": -26.920800610973757,
+      "without_best_excess_3_usd": -60.37824272123888,
+      "name_contributions": {
+        "AAPL": {
+          "count": 26,
+          "net_usd": -297.56192200000044,
+          "excess_usd": -40.975022036816384
+        },
+        "NFLX": {
+          "count": 6,
+          "net_usd": -40.25621479999917,
+          "excess_usd": 16.70329927914886
+        },
+        "NVDA": {
+          "count": 34,
+          "net_usd": -328.834293599999,
+          "excess_usd": 15.180926250320201
+        }
+      },
+      "gross_mfe_observed": 66,
+      "gross_mae_observed": 66,
+      "gross_mfe_mean_pct": 0.3933494117050937,
+      "gross_mae_mean_pct": -0.4309200720673766,
+      "gross_mfe_median_pct": 0.3325848706371315,
+      "gross_mae_median_pct": -0.36088944004211143,
+      "worst_observed_gross_mae_pct": -1.5872214792197692
+    },
+    {
+      "horizon": "m30",
+      "cost_bps_per_side": 50,
+      "reference_units": 66,
+      "net_usd": -1601.734526499982,
+      "spy_excess_usd": -9.61645267532732,
+      "price_cost_usd": 1563.3914264999842,
+      "without_best_net_1_usd": -1601.734526499982,
+      "without_best_net_3_usd": -1601.734526499982,
+      "without_best_excess_1_usd": -27.392859572229515,
+      "without_best_excess_3_usd": -60.749728209217665,
+      "name_contributions": {
+        "AAPL": {
+          "count": 26,
+          "net_usd": -660.9503049999933,
+          "excess_usd": -40.85185062788415
+        },
+        "NFLX": {
+          "count": 6,
+          "net_usd": -128.28841199999795,
+          "excess_usd": 16.293423204788315
+        },
+        "NVDA": {
+          "count": 34,
+          "net_usd": -812.4958094999909,
+          "excess_usd": 14.941974747768512
+        }
+      },
+      "gross_mfe_observed": 66,
+      "gross_mae_observed": 66,
+      "gross_mfe_mean_pct": 0.3933494117050937,
+      "gross_mae_mean_pct": -0.4309200720673766,
+      "gross_mfe_median_pct": 0.3325848706371315,
+      "gross_mae_median_pct": -0.36088944004211143,
+      "worst_observed_gross_mae_pct": -1.5872214792197692
+    },
+    {
+      "horizon": "m60",
+      "cost_bps_per_side": 5,
+      "reference_units": 66,
+      "net_usd": -326.6538959999826,
+      "spy_excess_usd": -133.59666633130533,
+      "price_cost_usd": 157.08769599998362,
+      "without_best_net_1_usd": -357.0162559999832,
+      "without_best_net_3_usd": -406.1315301499841,
+      "without_best_excess_1_usd": -159.14788576418283,
+      "without_best_excess_3_usd": -207.4331280657636,
+      "name_contributions": {
+        "AAPL": {
+          "count": 26,
+          "net_usd": -111.51970559999506,
+          "excess_usd": -53.39852293692874
+        },
+        "NFLX": {
+          "count": 6,
+          "net_usd": -12.65830694999731,
+          "excess_usd": -3.430370888257457
+        },
+        "NVDA": {
+          "count": 34,
+          "net_usd": -202.4758834499902,
+          "excess_usd": -76.76777250611912
+        }
+      },
+      "gross_mfe_observed": 66,
+      "gross_mae_observed": 66,
+      "gross_mfe_mean_pct": 0.5018289628202284,
+      "gross_mae_mean_pct": -0.5750365426858202,
+      "gross_mfe_median_pct": 0.44276618814013124,
+      "gross_mae_median_pct": -0.47951194863077307,
+      "worst_observed_gross_mae_pct": -1.5872214792197692
+    },
+    {
+      "horizon": "m60",
+      "cost_bps_per_side": 10,
+      "reference_units": 66,
+      "net_usd": -483.74159199998184,
+      "spy_excess_usd": -133.52983458226134,
+      "price_cost_usd": 314.1753919999829,
+      "without_best_net_1_usd": -511.84631199998205,
+      "without_best_net_3_usd": -555.9785602999827,
+      "without_best_excess_1_usd": -159.0682720144219,
+      "without_best_excess_3_usd": -207.329359617503,
+      "name_contributions": {
+        "AAPL": {
+          "count": 26,
+          "net_usd": -172.08661119999442,
+          "excess_usd": -53.371810319149105
+        },
+        "NFLX": {
+          "count": 6,
+          "net_usd": -27.4457138999974,
+          "excess_usd": -3.428654844791449
+        },
+        "NVDA": {
+          "count": 34,
+          "net_usd": -284.20926689999004,
+          "excess_usd": -76.72936941832077
+        }
+      },
+      "gross_mfe_observed": 66,
+      "gross_mae_observed": 66,
+      "gross_mfe_mean_pct": 0.5018289628202284,
+      "gross_mae_mean_pct": -0.5750365426858202,
+      "gross_mfe_median_pct": 0.44276618814013124,
+      "gross_mae_median_pct": -0.47951194863077307,
+      "worst_observed_gross_mae_pct": -1.5872214792197692
+    },
+    {
+      "horizon": "m60",
+      "cost_bps_per_side": 20,
+      "reference_units": 66,
+      "net_usd": -797.1191739999996,
+      "spy_excess_usd": -132.66983205973838,
+      "price_cost_usd": 628.0579740000006,
+      "without_best_net_1_usd": -820.7086139999999,
+      "without_best_net_3_usd": -854.8748106000002,
+      "without_best_excess_1_usd": -158.18270549046525,
+      "without_best_excess_3_usd": -206.39548369654608,
+      "name_contributions": {
+        "AAPL": {
+          "count": 26,
+          "net_usd": -293.2204224000017,
+          "excess_usd": -53.318385083597
+        },
+        "NFLX": {
+          "count": 6,
+          "net_usd": -56.22271779999886,
+          "excess_usd": -2.6988837334121847
+        },
+        "NVDA": {
+          "count": 34,
+          "net_usd": -447.676033799999,
+          "excess_usd": -76.6525632427292
+        }
+      },
+      "gross_mfe_observed": 66,
+      "gross_mae_observed": 66,
+      "gross_mfe_mean_pct": 0.5018289628202284,
+      "gross_mae_mean_pct": -0.5750365426858202,
+      "gross_mfe_median_pct": 0.44276618814013124,
+      "gross_mae_median_pct": -0.47951194863077307,
+      "worst_observed_gross_mae_pct": -1.5872214792197692
+    },
+    {
+      "horizon": "m60",
+      "cost_bps_per_side": 50,
+      "reference_units": 66,
+      "net_usd": -1733.4856604999832,
+      "spy_excess_usd": -133.8782947291956,
+      "price_cost_usd": 1562.729360499984,
+      "without_best_net_1_usd": -1743.5292604999836,
+      "without_best_net_3_usd": -1747.5456019999847,
+      "without_best_excess_1_usd": -159.31447615562152,
+      "without_best_excess_3_usd": -207.38232617070219,
+      "name_contributions": {
+        "AAPL": {
+          "count": 26,
+          "net_usd": -656.6218559999945,
+          "excess_usd": -53.15810937693048
+        },
+        "NFLX": {
+          "count": 6,
+          "net_usd": -144.08751949999697,
+          "excess_usd": -2.881702509830891
+        },
+        "NVDA": {
+          "count": 34,
+          "net_usd": -932.7762849999913,
+          "excess_usd": -77.83848284243425
+        }
+      },
+      "gross_mfe_observed": 66,
+      "gross_mae_observed": 66,
+      "gross_mfe_mean_pct": 0.5018289628202284,
+      "gross_mae_mean_pct": -0.5750365426858202,
+      "gross_mfe_median_pct": 0.44276618814013124,
+      "gross_mae_median_pct": -0.47951194863077307,
+      "worst_observed_gross_mae_pct": -1.5872214792197692
+    },
+    {
+      "horizon": "m120",
+      "cost_bps_per_side": 5,
+      "reference_units": 66,
+      "net_usd": -321.8527977499808,
+      "spy_excess_usd": -142.1456569631791,
+      "price_cost_usd": 157.09009774998276,
+      "without_best_net_1_usd": -357.86161774998106,
+      "without_best_net_3_usd": -424.52804774998134,
+      "without_best_excess_1_usd": -170.1746943490553,
+      "without_best_excess_3_usd": -222.60148251265164,
+      "name_contributions": {
+        "AAPL": {
+          "count": 26,
+          "net_usd": -119.139493799994,
+          "excess_usd": -48.445291169518455
+        },
+        "NFLX": {
+          "count": 6,
+          "net_usd": 19.88591280000246,
+          "excess_usd": 23.32263947463306
+        },
+        "NVDA": {
+          "count": 34,
+          "net_usd": -222.5992167499893,
+          "excess_usd": -117.02300526829373
+        }
+      },
+      "gross_mfe_observed": 66,
+      "gross_mae_observed": 66,
+      "gross_mfe_mean_pct": 0.6042051085125095,
+      "gross_mae_mean_pct": -0.6977485092170675,
+      "gross_mfe_median_pct": 0.4755394005725999,
+      "gross_mae_median_pct": -0.5203130602592476,
+      "worst_observed_gross_mae_pct": -2.6133149936587996
+    },
+    {
+      "horizon": "m120",
+      "cost_bps_per_side": 10,
+      "reference_units": 66,
+      "net_usd": -478.9428954999812,
+      "spy_excess_usd": -142.07454858050463,
+      "price_cost_usd": 314.18019549998314,
+      "without_best_net_1_usd": -512.4405354999816,
+      "without_best_net_3_usd": -574.4133954999825,
+      "without_best_excess_1_usd": -170.0895644369231,
+      "without_best_excess_3_usd": -222.4901260931838,
+      "name_contributions": {
+        "AAPL": {
+          "count": 26,
+          "net_usd": -179.70258759999382,
+          "excess_usd": -48.42105640655061
+        },
+        "NFLX": {
+          "count": 6,
+          "net_usd": 5.082225600002403,
+          "excess_usd": 23.310972321318193
+        },
+        "NVDA": {
+          "count": 34,
+          "net_usd": -304.3225334999898,
+          "excess_usd": -116.96446449527221
+        }
+      },
+      "gross_mfe_observed": 66,
+      "gross_mae_observed": 66,
+      "gross_mfe_mean_pct": 0.6042051085125095,
+      "gross_mae_mean_pct": -0.6977485092170675,
+      "gross_mfe_median_pct": 0.4755394005725999,
+      "gross_mae_median_pct": -0.5203130602592476,
+      "worst_observed_gross_mae_pct": -2.6133149936587996
+    },
+    {
+      "horizon": "m120",
+      "cost_bps_per_side": 20,
+      "reference_units": 66,
+      "net_usd": -792.085760999998,
+      "spy_excess_usd": -140.83756786059035,
+      "price_cost_usd": 628.068061,
+      "without_best_net_1_usd": -820.561040999998,
+      "without_best_net_3_usd": -873.146760999998,
+      "without_best_excess_1_usd": -168.82454065809293,
+      "without_best_excess_3_usd": -221.17264929968272,
+      "name_contributions": {
+        "AAPL": {
+          "count": 26,
+          "net_usd": -300.82877519999994,
+          "excess_usd": -48.372586880617796
+        },
+        "NFLX": {
+          "count": 6,
+          "net_usd": -23.48781879999875,
+          "excess_usd": 24.382401969260354
+        },
+        "NVDA": {
+          "count": 34,
+          "net_usd": -467.76916699999924,
+          "excess_usd": -116.8473829492329
+        }
+      },
+      "gross_mfe_observed": 66,
+      "gross_mae_observed": 66,
+      "gross_mfe_mean_pct": 0.6042051085125095,
+      "gross_mae_mean_pct": -0.6977485092170675,
+      "gross_mfe_median_pct": 0.4755394005725999,
+      "gross_mae_median_pct": -0.5203130602592476,
+      "worst_observed_gross_mae_pct": -2.6133149936587996
+    },
+    {
+      "horizon": "m120",
+      "cost_bps_per_side": 50,
+      "reference_units": 66,
+      "net_usd": -1727.877342999981,
+      "spy_excess_usd": -141.21717927707485,
+      "price_cost_usd": 1562.757542999983,
+      "without_best_net_1_usd": -1740.4611429999811,
+      "without_best_net_3_usd": -1764.5924929999821,
+      "without_best_excess_1_usd": -169.12002289783183,
+      "without_best_excess_3_usd": -221.31077249540854,
+      "name_contributions": {
+        "AAPL": {
+          "count": 26,
+          "net_usd": -664.2073379999931,
+          "excess_usd": -48.227178302818544
+        },
+        "NFLX": {
+          "count": 6,
+          "net_usd": -111.26893699999756,
+          "excess_usd": 24.328293678745894
+        },
+        "NVDA": {
+          "count": 34,
+          "net_usd": -952.4010679999906,
+          "excess_usd": -117.3182946530022
+        }
+      },
+      "gross_mfe_observed": 66,
+      "gross_mae_observed": 66,
+      "gross_mfe_mean_pct": 0.6042051085125095,
+      "gross_mae_mean_pct": -0.6977485092170675,
+      "gross_mfe_median_pct": 0.4755394005725999,
+      "gross_mae_median_pct": -0.5203130602592476,
+      "worst_observed_gross_mae_pct": -2.6133149936587996
+    },
+    {
+      "horizon": "m180",
+      "cost_bps_per_side": 5,
+      "reference_units": 66,
+      "net_usd": -206.28780914998367,
+      "spy_excess_usd": -34.18484553134055,
+      "price_cost_usd": 157.14790914998434,
+      "without_best_net_1_usd": -263.19399914998405,
+      "without_best_net_3_usd": -351.3664133499846,
+      "without_best_excess_1_usd": -84.60295277857568,
+      "without_best_excess_3_usd": -163.1234470495399,
+      "name_contributions": {
+        "AAPL": {
+          "count": 26,
+          "net_usd": -130.05603279999553,
+          "excess_usd": -49.34425333099273
+        },
+        "NFLX": {
+          "count": 6,
+          "net_usd": 41.982858800002134,
+          "excess_usd": 46.44805784907633
+        },
+        "NVDA": {
+          "count": 34,
+          "net_usd": -118.21463514999027,
+          "excess_usd": -31.288650049424163
+        }
+      },
+      "gross_mfe_observed": 66,
+      "gross_mae_observed": 66,
+      "gross_mfe_mean_pct": 0.7139885476391344,
+      "gross_mae_mean_pct": -0.7790450783372916,
+      "gross_mfe_median_pct": 0.532456908300083,
+      "gross_mae_median_pct": -0.625424555367865,
+      "worst_observed_gross_mae_pct": -3.446399435629599
+    },
+    {
+      "horizon": "m180",
+      "cost_bps_per_side": 10,
+      "reference_units": 66,
+      "net_usd": -363.4357182999811,
+      "spy_excess_usd": -34.16774455808056,
+      "price_cost_usd": 314.2958182999817,
+      "without_best_net_1_usd": -417.84809829998153,
+      "without_best_net_3_usd": -501.06452669998225,
+      "without_best_excess_1_usd": -84.56063014086,
+      "without_best_excess_3_usd": -163.0418445247451,
+      "name_contributions": {
+        "AAPL": {
+          "count": 26,
+          "net_usd": -190.61366559999374,
+          "excess_usd": -49.319568862088104
+        },
+        "NFLX": {
+          "count": 6,
+          "net_usd": 27.168117600002546,
+          "excess_usd": 46.42482220232865
+        },
+        "NVDA": {
+          "count": 34,
+          "net_usd": -199.99017029998987,
+          "excess_usd": -31.272997898321094
+        }
+      },
+      "gross_mfe_observed": 66,
+      "gross_mae_observed": 66,
+      "gross_mfe_mean_pct": 0.7139885476391344,
+      "gross_mae_mean_pct": -0.7790450783372916,
+      "gross_mfe_median_pct": 0.532456908300083,
+      "gross_mae_median_pct": -0.625424555367865,
+      "worst_observed_gross_mae_pct": -3.446399435629599
+    },
+    {
+      "horizon": "m180",
+      "cost_bps_per_side": 20,
+      "reference_units": 66,
+      "net_usd": -676.5245466000007,
+      "spy_excess_usd": -32.60795439338328,
+      "price_cost_usd": 628.2996466000013,
+      "without_best_net_1_usd": -725.9493066000006,
+      "without_best_net_3_usd": -799.2537634000006,
+      "without_best_excess_1_usd": -82.95039664725068,
+      "without_best_excess_3_usd": -161.35305125697823,
+      "name_contributions": {
+        "AAPL": {
+          "count": 26,
+          "net_usd": -311.7289312000016,
+          "excess_usd": -49.27019992429193
+        },
+        "NFLX": {
+          "count": 6,
+          "net_usd": -1.2543747999993968,
+          "excess_usd": 47.903939127031634
+        },
+        "NVDA": {
+          "count": 34,
+          "net_usd": -363.5412405999996,
+          "excess_usd": -31.24169359612297
+        }
+      },
+      "gross_mfe_observed": 66,
+      "gross_mae_observed": 66,
+      "gross_mfe_mean_pct": 0.7139885476391344,
+      "gross_mae_mean_pct": -0.7790450783372916,
+      "gross_mfe_median_pct": 0.532456908300083,
+      "gross_mae_median_pct": -0.625424555367865,
+      "worst_observed_gross_mae_pct": -3.446399435629599
+    },
+    {
+      "horizon": "m180",
+      "cost_bps_per_side": 50,
+      "reference_units": 66,
+      "net_usd": -1611.0496169999828,
+      "spy_excess_usd": -32.25635298989411,
+      "price_cost_usd": 1563.3446169999836,
+      "without_best_net_1_usd": -1645.5115169999833,
+      "without_best_net_3_usd": -1689.080058999984,
+      "without_best_excess_1_usd": -82.44746525702661,
+      "without_best_excess_3_usd": -160.6144405442798,
+      "name_contributions": {
+        "AAPL": {
+          "count": 26,
+          "net_usd": -675.0747279999953,
+          "excess_usd": -49.12209311089052
+        },
+        "NFLX": {
+          "count": 6,
+          "net_usd": -88.931186999997,
+          "excess_usd": 47.744629887599004
+        },
+        "NVDA": {
+          "count": 34,
+          "net_usd": -847.0437019999908,
+          "excess_usd": -30.878889766602597
+        }
+      },
+      "gross_mfe_observed": 66,
+      "gross_mae_observed": 66,
+      "gross_mfe_mean_pct": 0.7139885476391344,
+      "gross_mae_mean_pct": -0.7790450783372916,
+      "gross_mfe_median_pct": 0.532456908300083,
+      "gross_mae_median_pct": -0.625424555367865,
+      "worst_observed_gross_mae_pct": -3.446399435629599
+    },
+    {
+      "horizon": "c0",
+      "cost_bps_per_side": 5,
+      "reference_units": 66,
+      "net_usd": -385.4915624499829,
+      "spy_excess_usd": -128.18357673977698,
+      "price_cost_usd": 157.0582624499832,
+      "without_best_net_1_usd": -441.3468491499833,
+      "without_best_net_3_usd": -530.726174149984,
+      "without_best_excess_1_usd": -171.94601937692164,
+      "without_best_excess_3_usd": -248.46243876871853,
+      "name_contributions": {
+        "AAPL": {
+          "count": 26,
+          "net_usd": -105.81256059999475,
+          "excess_usd": -4.128495728399983
+        },
+        "NFLX": {
+          "count": 6,
+          "net_usd": 50.88340630000242,
+          "excess_usd": 54.430999233945904
+        },
+        "NVDA": {
+          "count": 34,
+          "net_usd": -330.5624081499906,
+          "excess_usd": -178.4860802453229
+        }
+      },
+      "gross_mfe_observed": 66,
+      "gross_mae_observed": 66,
+      "gross_mfe_mean_pct": 0.809759371014494,
+      "gross_mae_mean_pct": -0.920567392399168,
+      "gross_mfe_median_pct": 0.5594457266755448,
+      "gross_mae_median_pct": -0.7756520209842743,
+      "worst_observed_gross_mae_pct": -3.924979859740474
+    },
+    {
+      "horizon": "c0",
+      "cost_bps_per_side": 10,
+      "reference_units": 66,
+      "net_usd": -542.549824899982,
+      "spy_excess_usd": -128.11945288948016,
+      "price_cost_usd": 314.1165248999823,
+      "without_best_net_1_usd": -595.9469982999826,
+      "without_best_net_3_usd": -680.4556482999834,
+      "without_best_excess_1_usd": -171.8600033592225,
+      "without_best_excess_3_usd": -248.3381454026494,
+      "name_contributions": {
+        "AAPL": {
+          "count": 26,
+          "net_usd": -166.38232119999452,
+          "excess_usd": -4.1264304478951175
+        },
+        "NFLX": {
+          "count": 6,
+          "net_usd": 36.06421260000276,
+          "excess_usd": 54.40377011977284
+        },
+        "NVDA": {
+          "count": 34,
+          "net_usd": -412.23171629999024,
+          "excess_usd": -178.3967925613579
+        }
+      },
+      "gross_mfe_observed": 66,
+      "gross_mae_observed": 66,
+      "gross_mfe_mean_pct": 0.809759371014494,
+      "gross_mae_mean_pct": -0.920567392399168,
+      "gross_mfe_median_pct": 0.5594457266755448,
+      "gross_mae_median_pct": -0.7756520209842743,
+      "worst_observed_gross_mae_pct": -3.924979859740474
+    },
+    {
+      "horizon": "c0",
+      "cost_bps_per_side": 20,
+      "reference_units": 66,
+      "net_usd": -856.4773197999997,
+      "spy_excess_usd": -127.48453537166024,
+      "price_cost_usd": 627.9390197999999,
+      "without_best_net_1_usd": -904.9582665999999,
+      "without_best_net_3_usd": -979.7255665999998,
+      "without_best_excess_1_usd": -171.18130150659795,
+      "without_best_excess_3_usd": -247.5828888532845,
+      "name_contributions": {
+        "AAPL": {
+          "count": 26,
+          "net_usd": -287.5218423999998,
+          "excess_usd": -4.12229988688474
+        },
+        "NFLX": {
+          "count": 6,
+          "net_usd": 6.614855200000719,
+          "excess_usd": 54.855981708654724
+        },
+        "NVDA": {
+          "count": 34,
+          "net_usd": -575.5703326000006,
+          "excess_usd": -178.2182171934303
+        }
+      },
+      "gross_mfe_observed": 66,
+      "gross_mae_observed": 66,
+      "gross_mfe_mean_pct": 0.809759371014494,
+      "gross_mae_mean_pct": -0.920567392399168,
+      "gross_mfe_median_pct": 0.5594457266755448,
+      "gross_mae_median_pct": -0.7756520209842743,
+      "worst_observed_gross_mae_pct": -3.924979859740474
+    },
+    {
+      "horizon": "c0",
+      "cost_bps_per_side": 50,
+      "reference_units": 66,
+      "net_usd": -1787.2973499999816,
+      "spy_excess_usd": -124.16874620271133,
+      "price_cost_usd": 1562.458949999982,
+      "without_best_net_1_usd": -1821.0296169999822,
+      "without_best_net_3_usd": -1866.572866999983,
+      "without_best_excess_1_usd": -167.7341593332357,
+      "without_best_excess_3_usd": -243.9060825897024,
+      "name_contributions": {
+        "AAPL": {
+          "count": 26,
+          "net_usd": -650.9404059999929,
+          "excess_usd": -4.1099082038565875
+        },
+        "NFLX": {
+          "count": 6,
+          "net_usd": -80.93636199999766,
+          "excess_usd": 54.723240502552244
+        },
+        "NVDA": {
+          "count": 34,
+          "net_usd": -1055.420581999991,
+          "excess_usd": -174.782078501407
+        }
+      },
+      "gross_mfe_observed": 66,
+      "gross_mae_observed": 66,
+      "gross_mfe_mean_pct": 0.809759371014494,
+      "gross_mae_mean_pct": -0.920567392399168,
+      "gross_mfe_median_pct": 0.5594457266755448,
+      "gross_mae_median_pct": -0.7756520209842743,
+      "worst_observed_gross_mae_pct": -3.924979859740474
+    },
+    {
+      "horizon": "c1",
+      "cost_bps_per_side": 5,
+      "reference_units": 66,
+      "net_usd": -344.5720324499817,
+      "spy_excess_usd": -144.86102918155882,
+      "price_cost_usd": 157.07873244998297,
+      "without_best_net_1_usd": -507.58631244998196,
+      "without_best_net_3_usd": -725.8616099499823,
+      "without_best_excess_1_usd": -295.3950623007676,
+      "without_best_excess_3_usd": -467.8932269218305,
+      "name_contributions": {
+        "AAPL": {
+          "count": 26,
+          "net_usd": -107.38177559999417,
+          "excess_usd": 24.12929308195308
+        },
+        "NFLX": {
+          "count": 6,
+          "net_usd": -49.96614369999709,
+          "excess_usd": -29.12265079675965
+        },
+        "NVDA": {
+          "count": 34,
+          "net_usd": -187.22411314999044,
+          "excess_usd": -139.86767146675228
+        }
+      },
+      "gross_mfe_observed": 66,
+      "gross_mae_observed": 66,
+      "gross_mfe_mean_pct": 1.7073476679287591,
+      "gross_mae_mean_pct": -1.7722071428487658,
+      "gross_mfe_median_pct": 1.206363771009089,
+      "gross_mae_median_pct": -1.5194209016501092,
+      "worst_observed_gross_mae_pct": -9.305278432795205
+    },
+    {
+      "horizon": "c1",
+      "cost_bps_per_side": 10,
+      "reference_units": 66,
+      "net_usd": -501.65076489998125,
+      "spy_excess_usd": -144.78856243358996,
+      "price_cost_usd": 314.15746489998253,
+      "without_best_net_1_usd": -662.2393248999816,
+      "without_best_net_3_usd": -875.7349198999823,
+      "without_best_excess_1_usd": -295.2472908839043,
+      "without_best_excess_3_usd": -467.6591632765425,
+      "name_contributions": {
+        "AAPL": {
+          "count": 26,
+          "net_usd": -167.9507511999929,
+          "excess_usd": 24.117222400074496
+        },
+        "NFLX": {
+          "count": 6,
+          "net_usd": -64.73488739999766,
+          "excess_usd": -29.10808218705615
+        },
+        "NVDA": {
+          "count": 34,
+          "net_usd": -268.9651262999907,
+          "excess_usd": -139.7977026466083
+        }
+      },
+      "gross_mfe_observed": 66,
+      "gross_mae_observed": 66,
+      "gross_mfe_mean_pct": 1.7073476679287591,
+      "gross_mae_mean_pct": -1.7722071428487658,
+      "gross_mfe_median_pct": 1.206363771009089,
+      "gross_mae_median_pct": -1.5194209016501092,
+      "worst_observed_gross_mae_pct": -9.305278432795205
+    },
+    {
+      "horizon": "c1",
+      "cost_bps_per_side": 20,
+      "reference_units": 66,
+      "net_usd": -816.2479397999994,
+      "spy_excess_usd": -144.9075424636134,
+      "price_cost_usd": 628.0196398000006,
+      "without_best_net_1_usd": -971.9850597999992,
+      "without_best_net_3_usd": -1175.9212497999993,
+      "without_best_excess_1_usd": -295.2156615761395,
+      "without_best_excess_3_usd": -467.4549495119278,
+      "name_contributions": {
+        "AAPL": {
+          "count": 26,
+          "net_usd": -289.0887024,
+          "excess_usd": 24.093081036309673
+        },
+        "NFLX": {
+          "count": 6,
+          "net_usd": -94.71208479999927,
+          "excess_usd": -29.34285849360056
+        },
+        "NVDA": {
+          "count": 34,
+          "net_usd": -432.4471526000001,
+          "excess_usd": -139.65776500632253
+        }
+      },
+      "gross_mfe_observed": 66,
+      "gross_mae_observed": 66,
+      "gross_mfe_mean_pct": 1.7073476679287591,
+      "gross_mae_mean_pct": -1.7722071428487658,
+      "gross_mfe_median_pct": 1.206363771009089,
+      "gross_mae_median_pct": -1.5194209016501092,
+      "worst_observed_gross_mae_pct": -9.305278432795205
+    },
+    {
+      "horizon": "c1",
+      "cost_bps_per_side": 50,
+      "reference_units": 66,
+      "net_usd": -1740.6318499999807,
+      "spy_excess_usd": -133.63928727333155,
+      "price_cost_usd": 1562.693449999982,
+      "without_best_net_1_usd": -1881.814649999981,
+      "without_best_net_3_usd": -2057.0726249999816,
+      "without_best_excess_1_usd": -283.4955783724937,
+      "without_best_excess_3_usd": -455.2171129377336,
+      "name_contributions": {
+        "AAPL": {
+          "count": 26,
+          "net_usd": -652.5025559999917,
+          "excess_usd": 24.020656945020676
+        },
+        "NFLX": {
+          "count": 6,
+          "net_usd": -181.89901199999775,
+          "excess_usd": -29.82958631707668
+        },
+        "NVDA": {
+          "count": 34,
+          "net_usd": -906.2302819999913,
+          "excess_usd": -127.83035790127556
+        }
+      },
+      "gross_mfe_observed": 66,
+      "gross_mae_observed": 66,
+      "gross_mfe_mean_pct": 1.7073476679287591,
+      "gross_mae_mean_pct": -1.7722071428487658,
+      "gross_mfe_median_pct": 1.206363771009089,
+      "gross_mae_median_pct": -1.5194209016501092,
+      "worst_observed_gross_mae_pct": -9.305278432795205
+    },
+    {
+      "horizon": "c3",
+      "cost_bps_per_side": 5,
+      "reference_units": 66,
+      "net_usd": 519.9006150000175,
+      "spy_excess_usd": 433.8751851668,
+      "price_cost_usd": 157.5111849999833,
+      "without_best_net_1_usd": 251.3155950000173,
+      "without_best_net_3_usd": -156.38963194998303,
+      "without_best_excess_1_usd": 247.1055811792857,
+      "without_best_excess_3_usd": -63.87680502439963,
+      "name_contributions": {
+        "AAPL": {
+          "count": 26,
+          "net_usd": -34.84296314999432,
+          "excess_usd": 25.33862366508427
+        },
+        "NFLX": {
+          "count": 6,
+          "net_usd": 261.8078913000023,
+          "excess_usd": 190.65227890718234
+        },
+        "NVDA": {
+          "count": 34,
+          "net_usd": 292.93568685000946,
+          "excess_usd": 217.88428259453335
+        }
+      },
+      "gross_mfe_observed": 66,
+      "gross_mae_observed": 66,
+      "gross_mfe_mean_pct": 3.1116421276276474,
+      "gross_mae_mean_pct": -2.6654769925518305,
+      "gross_mfe_median_pct": 2.233479756966683,
+      "gross_mae_median_pct": -2.045959214484261,
+      "worst_observed_gross_mae_pct": -11.793243362441563
+    },
+    {
+      "horizon": "c3",
+      "cost_bps_per_side": 10,
+      "reference_units": 66,
+      "net_usd": 362.3894300000189,
+      "spy_excess_usd": 433.658139051159,
+      "price_cost_usd": 315.022369999982,
+      "without_best_net_1_usd": 96.29939000001849,
+      "without_best_net_3_usd": -306.4171638999821,
+      "without_best_excess_1_usd": 246.98196658139676,
+      "without_best_excess_3_usd": -63.844850644697374,
+      "name_contributions": {
+        "AAPL": {
+          "count": 26,
+          "net_usd": -95.44822629999317,
+          "excess_usd": 25.32594801542802
+        },
+        "NFLX": {
+          "count": 6,
+          "net_usd": 246.88318260000239,
+          "excess_usd": 190.55690508081517
+        },
+        "NVDA": {
+          "count": 34,
+          "net_usd": 210.95447370000963,
+          "excess_usd": 217.77528595491574
+        }
+      },
+      "gross_mfe_observed": 66,
+      "gross_mae_observed": 66,
+      "gross_mfe_mean_pct": 3.1116421276276474,
+      "gross_mae_mean_pct": -2.6654769925518305,
+      "gross_mfe_median_pct": 2.233479756966683,
+      "gross_mae_median_pct": -2.045959214484261,
+      "worst_observed_gross_mae_pct": -11.793243362441563
+    },
+    {
+      "horizon": "c3",
+      "cost_bps_per_side": 20,
+      "reference_units": 66,
+      "net_usd": 47.007190000000506,
+      "spy_excess_usd": 433.3581624151161,
+      "price_cost_usd": 629.7496100000003,
+      "without_best_net_1_usd": -214.09288999999956,
+      "without_best_net_3_usd": -606.8320977999995,
+      "without_best_excess_1_usd": 246.8688529808593,
+      "without_best_excess_3_usd": -63.64682629005415,
+      "name_contributions": {
+        "AAPL": {
+          "count": 26,
+          "net_usd": -216.65875260000013,
+          "excess_usd": 25.30059671611177
+        },
+        "NFLX": {
+          "count": 6,
+          "net_usd": 216.67389520000086,
+          "excess_usd": 190.5002730233235
+        },
+        "NVDA": {
+          "count": 34,
+          "net_usd": 46.99204739999968,
+          "excess_usd": 217.5572926756807
+        }
+      },
+      "gross_mfe_observed": 66,
+      "gross_mae_observed": 66,
+      "gross_mfe_mean_pct": 3.1116421276276474,
+      "gross_mae_mean_pct": -2.6654769925518305,
+      "gross_mfe_median_pct": 2.233479756966683,
+      "gross_mae_median_pct": -2.045959214484261,
+      "worst_observed_gross_mae_pct": -11.793243362441563
+    },
+    {
+      "horizon": "c3",
+      "cost_bps_per_side": 50,
+      "reference_units": 66,
+      "net_usd": -865.3251759999818,
+      "spy_excess_usd": 450.2245666005965,
+      "price_cost_usd": 1567.0919759999827,
+      "without_best_net_1_usd": -1111.4553759999822,
+      "without_best_net_3_usd": -1474.262545499983,
+      "without_best_excess_1_usd": 264.29584627285516,
+      "without_best_excess_3_usd": -45.28641913251431,
+      "name_contributions": {
+        "AAPL": {
+          "count": 26,
+          "net_usd": -580.290331499993,
+          "excess_usd": 25.224542818169738
+        },
+        "NFLX": {
+          "count": 6,
+          "net_usd": 128.71013800000247,
+          "excess_usd": 189.61160092081212
+        },
+        "NVDA": {
+          "count": 34,
+          "net_usd": -413.74498249999135,
+          "excess_usd": 235.38842286161457
+        }
+      },
+      "gross_mfe_observed": 66,
+      "gross_mae_observed": 66,
+      "gross_mfe_mean_pct": 3.1116421276276474,
+      "gross_mae_mean_pct": -2.6654769925518305,
+      "gross_mfe_median_pct": 2.233479756966683,
+      "gross_mae_median_pct": -2.045959214484261,
+      "worst_observed_gross_mae_pct": -11.793243362441563
+    },
+    {
+      "horizon": "c5",
+      "cost_bps_per_side": 5,
+      "reference_units": 66,
+      "net_usd": 978.1063975000166,
+      "spy_excess_usd": 536.2056482891062,
+      "price_cost_usd": 157.74040249998353,
+      "without_best_net_1_usd": 611.5064950000161,
+      "without_best_net_3_usd": 14.721115000015516,
+      "without_best_excess_1_usd": 294.9371305356437,
+      "without_best_excess_3_usd": -116.83222923439894,
+      "name_contributions": {
+        "AAPL": {
+          "count": 26,
+          "net_usd": -289.3406506499951,
+          "excess_usd": -382.4530474968688
+        },
+        "NFLX": {
+          "count": 6,
+          "net_usd": 247.8948513000023,
+          "excess_usd": 169.0426168168542
+        },
+        "NVDA": {
+          "count": 34,
+          "net_usd": 1019.5521968500102,
+          "excess_usd": 749.6160789691206
+        }
+      },
+      "gross_mfe_observed": 66,
+      "gross_mae_observed": 66,
+      "gross_mfe_mean_pct": 4.134896055937044,
+      "gross_mae_mean_pct": -3.3488760560377244,
+      "gross_mfe_median_pct": 3.3489698888502506,
+      "gross_mae_median_pct": -2.4734124083069298,
+      "worst_observed_gross_mae_pct": -11.793243362441563
+    },
+    {
+      "horizon": "c5",
+      "cost_bps_per_side": 10,
+      "reference_units": 66,
+      "net_usd": 820.3659950000178,
+      "spy_excess_usd": 535.937411346493,
+      "price_cost_usd": 315.4808049999822,
+      "without_best_net_1_usd": 456.43119000001764,
+      "without_best_net_3_usd": -135.33956999998315,
+      "without_best_excess_1_usd": 294.7895881992098,
+      "without_best_excess_3_usd": -116.77378389711157,
+      "name_contributions": {
+        "AAPL": {
+          "count": 26,
+          "net_usd": -349.81860129999455,
+          "excess_usd": -382.2617253120267
+        },
+        "NFLX": {
+          "count": 6,
+          "net_usd": 232.97710260000258,
+          "excess_usd": 168.95805322665177
+        },
+        "NVDA": {
+          "count": 34,
+          "net_usd": 937.20749370001,
+          "excess_usd": 749.2410834318679
+        }
+      },
+      "gross_mfe_observed": 66,
+      "gross_mae_observed": 66,
+      "gross_mfe_mean_pct": 4.134896055937044,
+      "gross_mae_mean_pct": -3.3488760560377244,
+      "gross_mfe_median_pct": 3.3489698888502506,
+      "gross_mae_median_pct": -2.4734124083069298,
+      "worst_observed_gross_mae_pct": -11.793243362441563
+    },
+    {
+      "horizon": "c5",
+      "cost_bps_per_side": 20,
+      "reference_units": 66,
+      "net_usd": 503.8616499999988,
+      "spy_excess_usd": 534.6126147952904,
+      "price_cost_usd": 630.6651500000013,
+      "without_best_net_1_usd": 145.25703999999882,
+      "without_best_net_3_usd": -436.4844800000013,
+      "without_best_excess_1_usd": 293.70618086036734,
+      "without_best_excess_3_usd": -117.44521588850967,
+      "name_contributions": {
+        "AAPL": {
+          "count": 26,
+          "net_usd": -470.77450260000126,
+          "excess_usd": -381.8790809423441
+        },
+        "NFLX": {
+          "count": 6,
+          "net_usd": 202.1180652000004,
+          "excess_usd": 168.00060338027413
+        },
+        "NVDA": {
+          "count": 34,
+          "net_usd": 772.5180873999996,
+          "excess_usd": 748.4910923573607
+        }
+      },
+      "gross_mfe_observed": 66,
+      "gross_mae_observed": 66,
+      "gross_mfe_mean_pct": 4.134896055937044,
+      "gross_mae_mean_pct": -3.3488760560377244,
+      "gross_mfe_median_pct": 3.3489698888502506,
+      "gross_mae_median_pct": -2.4734124083069298,
+      "worst_observed_gross_mae_pct": -11.793243362441563
+    },
+    {
+      "horizon": "c5",
+      "cost_bps_per_side": 50,
+      "reference_units": 66,
+      "net_usd": -411.66497549998223,
+      "spy_excess_usd": 550.6687724947599,
+      "price_cost_usd": 1569.3716754999823,
+      "without_best_net_1_usd": -754.2790004999827,
+      "without_best_net_3_usd": -1305.932800499983,
+      "without_best_excess_1_usd": 310.48650619691523,
+      "without_best_excess_3_usd": -99.42896450963087,
+      "name_contributions": {
+        "AAPL": {
+          "count": 26,
+          "net_usd": -833.6422064999936,
+          "excess_usd": -380.7311478332973
+        },
+        "NFLX": {
+          "count": 6,
+          "net_usd": 112.75531300000264,
+          "excess_usd": 165.99543011368252
+        },
+        "NVDA": {
+          "count": 34,
+          "net_usd": 309.2219180000094,
+          "excess_usd": 765.4044902143746
+        }
+      },
+      "gross_mfe_observed": 66,
+      "gross_mae_observed": 66,
+      "gross_mfe_mean_pct": 4.134896055937044,
+      "gross_mae_mean_pct": -3.3488760560377244,
+      "gross_mfe_median_pct": 3.3489698888502506,
+      "gross_mae_median_pct": -2.4734124083069298,
+      "worst_observed_gross_mae_pct": -11.793243362441563
+    }
+  ],
+  "limitations": [
+    "No replacement or capital reallocation after winner removal.",
+    "Separate best-net and best-excess deletion lists; no retuned rule.",
+    "Gross excursions are path diagnostics, not executable stops or account drawdown.",
+    "Post-hoc view of reused data, not another independent validation."
+  ],
+  "description_hash": "34f424bd527ca4b05943c0e58f0d9126f179d267e7797e4879128f48a1b7b170"
+}
