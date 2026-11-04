@@ -1,7 +1,6 @@
 {% extends "base.html" %}
 {% macro usd(v) %}{% if v is number %}${{ '%.2f' | format(v) }}{% else %}bilinmiyor{% endif %}{% endmacro %}
 {% block content %}
-{% include "alert_controls.html" %}
 <section id="live-alpha" data-entry-ttl="0" data-scan-age="0" data-reload-seconds="{{ reload_seconds }}" data-price-max-age="{{ desk.price_max_age_seconds }}">
 <div class="desk-heading"><div><p class="eyebrow">TAKİP / KAYITLI POZİSYONLAR</p><h1>Pozisyonlarım</h1></div><a href="/journal/new">Gerçek işlem kaydet →</a></div>
 {% if ok %}<p class="desk-notice" role="status">{{ ok }}</p>{% endif %}
@@ -15,8 +14,7 @@
 {% else %}<tr><td colspan="7" class="empty-row">Bu kapsamda açık kayıt yok.</td></tr>{% endfor %}</tbody></table></div>
 {% if account.groups %}<details open class="fold-panel"><summary>Yoğunlaşma · bilinen giriş tutarına göre</summary><ul class="quiet-copy">{% for g in account.groups %}<li{% if g.share >= desk.concentration_warning_pct %} class="text-amber-300"{% endif %}>{{ g.group }} · {{ g.count }} pozisyon · {{ usd(g.allocation) }} · %{{ '%.1f' | format(g.share) }}</li>{% endfor %}</ul><p class="quiet-copy">Gruplar kayıtlı akran sepetleridir; hesaplanmış korelasyon/VaR veya bağımsız bahis sayısı değildir. Eksik tutarlar paydada yoktur.</p></details>{% endif %}
 {% endfor %}
-<p class="desk-endnote">Örneklem işi: {{ job.get('status', 'ilk döngü bekleniyor') }} · {{ job.get('at', '—') }}. Uyarılar bu sayfa veya ana sayfa açıkken çalışır; form yazarken otomatik yenileme bekler. Fiyat örneklemesi seyreltiktir; stop emri veya azami zarar garantisi değildir.</p>
+<p class="desk-endnote">Örneklem işi: {{ job.get('status', 'ilk döngü bekleniyor') }} · {{ job.get('at', '—') }}. Uyarılar özel çalışma ekranlarından biri açıkken çalışır; form yazarken otomatik yenileme bekler. Fiyat örneklemesi seyreltiktir; stop emri veya azami zarar garantisi değildir.</p>
 </section>
 <script src="/assets/live-desk.js?v=5.33.1" defer></script>
-<script src="/assets/live-alerts.js?v=5.33.1" defer></script>
 {% endblock %}

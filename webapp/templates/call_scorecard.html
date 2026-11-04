@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_signal_explanation.html" import explanation_panel with context %}
 {% block content %}
 {% if not card %}<h1>Çağrı kaydı bulunamadı</h1><p class="quiet-copy">Kayıt henüz erişilebilir değil veya bu anahtarla kayıt yok.</p><a href="/karne">Karnelere dön →</a>
 {% else %}
@@ -8,6 +9,7 @@
 {% include "_call_progress.html" %}
 <div class="section-heading"><h2>Neden bu çağrı verildi?</h2></div>
 <ul class="quiet-copy">{% for reason in card.advice.reasons %}<li>{{ reason }}</li>{% else %}<li>Ek gerekçe kaydı yok.</li>{% endfor %}</ul>
+{% if explanation %}{{ explanation_panel(explanation) }}{% endif %}
 {% if card.advice.plan %}{% set p = card.advice.plan %}<dl class="price-rail"><div><dt>Dayanak giriş ref.</dt><dd>${{ '%.2f' | format(p.entry) }}</dd></div><div><dt>Dayanak stop</dt><dd>${{ '%.2f' | format(p.stop) }}</dd></div><div><dt>Dayanak hedef</dt><dd>${{ '%.2f' | format(p.target) }}</dd></div><div><dt>Plan riski</dt><dd>${{ '%.2f' | format(p.risk_usd) }}</dd></div></dl><p class="quiet-copy">Kaydedilmiş araç: {{ p.instrument }} · miktar {{ p.quantity }}. Fiyatlar gerçekleşmiş işlem değildir.</p>{% endif %}
 <details open class="fold-panel"><summary>Kanıtlar ve karşı görüş</summary>{% for e in card.advice.evidence %}<p class="quiet-copy"><b>{{ e.name }}:</b> {{ e.text }} · kaynak {{ tr_time(e.source_at) }} TR</p>{% endfor %}<p class="quiet-copy"><b>Karşı görüş:</b> {{ card.advice.counter_argument or 'Kayıt yok.' }}</p><p class="quiet-copy"><b>Vazgeçme koşulu:</b> {{ card.advice.invalidation or 'Kayıt yok.' }}</p><p class="quiet-copy">Kaynak tarama {{ card.scan_id[:12] }} · profil {{ card.opening_profile[:12] }} · kaynak başlangıcı {{ tr_time(card.source_at) }} TR · özgün kaynak {{ 'doğrulandı' if card.source_valid else 'doğrulanamadı' }}.</p></details>
 <details open class="fold-panel"><summary>Çağrı anındaki araç maliyeti</summary>

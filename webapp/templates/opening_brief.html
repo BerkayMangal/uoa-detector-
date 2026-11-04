@@ -1,3 +1,4 @@
+{% from "_signal_explanation.html" import explanation_panel with context %}
 {% set brief = overview %}
 <section class="opening-brief daily-workflow" aria-label="Açılış masası" id="opening-desk" data-workflow-kind="{{ brief.kind }}" data-server-now="{{ opening.now.isoformat() if opening else '' }}" data-refresh-seconds="{{ reload_seconds }}" data-opening-current="{{ 'true' if opening and opening.current else 'false' }}">
   <div class="workflow-priority">
@@ -27,13 +28,38 @@
     </div>
   </div>
 
-  <div class="workflow-risk">
+  <p class="quiet-copy" data-news-role-guide><b>Haber kullanımı:</b> Model UW haber kontrolünü değerlendirir; her çağrının haber desteği kendi gerekçesinde gösterilir. <a href="/haberler">Mahalle / Stajyer · ayrı haber bağlamı →</a></p>
+
+  <div class="workflow-risk{{ ' has-risk' if brief.exits or (brief.kind == 'risk' and brief.buys) else '' }}">
     {% if brief.kind == 'risk' and brief.buys %}<p class="workflow-plans" data-opening-buys data-opening-expiry="{{ (brief.buys | map(attribute='advice.expires_at') | min).isoformat() }}">Ayrıca {{ brief.buys | length }} kayıtlı giriş planı var. <a href="/acilis">Planları aç →</a></p>{% endif %}
     {% for s in brief.exits %}
     <p class="desk-notice" data-opening-exit data-opening-expiry="{{ s.advice.expires_at.isoformat() if s.advice.expires_at else '' }}">{{ ('PAPER · SANAL TAKİP · ' if s.advice.scope == 'paper' else 'GERÇEK KAYIT · ' if s.advice.scope == 'manual' else 'ÇIKIŞ TAKİBİ · ') }}{{ s.advice.headline if s.current or s.advice.action == 'REVIEW' else s.advice.ticker + ' · ÇIKIŞI İNCELE · TAZE VERİ BEKLE' }} · {{ s.advice.reasons | join(' ') }} <a href="/pozisyonlar">Pozisyonu aç →</a></p>
     {% endfor %}
   </div>
 
+
+  {% if opening_home %}
+  {% if brief.buys %}
+  <div class="workflow-entries">
+    <div class="section-heading"><h2>Güncel giriş planları</h2><span>Fiyat, risk ve geçerlilik</span></div>
+    <div class="plan-grid" aria-label="Güncel giriş planları">
+      {% for s in brief.buys %}{% set a = s.advice %}
+      {% set explanation = (signal_explanations|default({})).get(s.key) %}
+      <article class="plan-card" data-opening-buys data-opening-expiry="{{ a.expires_at.isoformat() }}">
+        <div class="plan-title"><h2>{{ a.ticker }}{% if a.ticker == 'MSFT' %} · Microsoft{% endif %}</h2><span class="decision-badge">{{ 'HİSSE AL' if a.instrument == 'stock' else 'OPSİYON PLANI' }}</span></div>
+        <p>{{ a.headline }}</p>
+        {% if not explanation %}<p class="signal-publication">Yayımlandı {{ london_time(s.at) if london_time is defined else tr_time(s.at) + ' TR' }} · Geçerlilik {{ london_time(a.expires_at) if london_time is defined else tr_time(a.expires_at) + ' TR' }}'ye kadar, güncel koşullar korunursa.</p>{% endif %}
+        {% if a.plan %}<dl class="price-rail"><div><dt>Dayanak giriş referansı</dt><dd>${{ '%.2f' | format(a.plan.entry) }}</dd></div><div><dt>Dayanak stop</dt><dd>${{ '%.2f' | format(a.plan.stop) }}</dd></div><div><dt>Dayanak hedef · politika</dt><dd>${{ '%.2f' | format(a.plan.target) }}</dd></div></dl>{% endif %}
+        {% if explanation %}{{ explanation_panel(explanation) }}
+        {% else %}<p class="signal-projection-missing">Kaydedilmiş makine dayanakları doğrulanamadı; özgün gerekçeler aşağıda. Haber desteği ve kaynak saatleri bilinmiyor.</p>{% endif %}
+        <p class="saved-signal-reasons"><b>Kaydedilmiş gerekçeler:</b> {{ a.reasons | join(' ') }}</p>
+        <a class="underline" href="/karne/{{ s.key }}">Gerekçe, araç ve maliyetleri aç →</a>
+      </article>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+  {% endif %}
   <div class="workflow-checks">
     {% if opening_home %}<div class="section-heading"><h2>Takip ve kontrol saatleri</h2></div>{% endif %}
     <dl class="workflow-schedule" aria-label="Bugünün kontrol saatleri, Türkiye saati">
@@ -45,24 +71,8 @@
     <div class="workflow-foot"><span>Son kalıcı kayıt: {{ tr_time(opening.latest_at) + ' TR' if opening and opening.latest_at else 'henüz yok' }} · Saatler TR</span><a href="/acilis">Planlar ve kayıtlar →</a></div>
   </div>
 
+
   {% if opening_home %}
-  {% if brief.buys %}
-  <div class="workflow-entries">
-    <div class="section-heading"><h2>Güncel giriş planları</h2><span>Fiyat, risk ve geçerlilik</span></div>
-    <div class="plan-grid" aria-label="Güncel giriş planları">
-      {% for s in brief.buys %}{% set a = s.advice %}
-      <article class="plan-card" data-opening-buys data-opening-expiry="{{ a.expires_at.isoformat() }}">
-        <div class="plan-title"><h2>{{ a.ticker }}{% if a.ticker == 'MSFT' %} · Microsoft{% endif %}</h2><span class="decision-badge">{{ 'HİSSE AL' if a.instrument == 'stock' else 'OPSİYON PLANI' }}</span></div>
-        <p>{{ a.headline }}</p>
-        <p class="quiet-copy">Yayımlandı {{ tr_time(s.at) }} TR · Geçerlilik {{ tr_time(a.expires_at) }} TR'ye kadar, güncel koşullar korunursa.</p>
-        {% if a.plan %}<dl class="price-rail"><div><dt>Dayanak giriş referansı</dt><dd>${{ '%.2f' | format(a.plan.entry) }}</dd></div><div><dt>Dayanak stop</dt><dd>${{ '%.2f' | format(a.plan.stop) }}</dd></div><div><dt>Dayanak hedef · politika</dt><dd>${{ '%.2f' | format(a.plan.target) }}</dd></div></dl>{% endif %}
-        <p>{{ a.reasons | join(' ') }}</p>
-        <a class="underline" href="/karne/{{ s.key }}">Gerekçe, araç ve maliyetleri aç →</a>
-      </article>
-      {% endfor %}
-    </div>
-  </div>
-  {% endif %}
   <div class="workflow-history" id="daily-published-calls">
     <div class="section-heading"><h2>Bugün verilen AL çağrıları</h2><a href="/karne">Tüm çağrı karneleri →</a></div>
     <p class="quiet-copy">İlk yayımlanan çağrı burada kalır. Bu geçmiş listedir; yeni giriş için yukarıdaki güncel duruma bak.</p>
@@ -72,9 +82,12 @@
     <div class="call-ledger">
       {% for call in daily_calls %}
       <article class="call-record" data-published-call="{{ call.ticker }}">
-        <div class="call-record-heading"><div><b class="call-record-symbol">{{ call.ticker }}{% if call.ticker == 'MSFT' %} · Microsoft{% endif %}</b><p>İlk çağrı {{ tr_time(call.at) }} TR</p></div><span class="decision-badge">GEÇMİŞ KAYIT</span></div>
+        <div class="call-record-heading"><div><b class="call-record-symbol">{{ call.ticker }}{% if call.ticker == 'MSFT' %} · Microsoft{% endif %}</b><p>İlk çağrı {{ london_time(call.at) if london_time is defined else tr_time(call.at) + ' TR' }}</p></div><span class="decision-badge">GEÇMİŞ KAYIT</span></div>
         <p class="call-record-statement">{{ call.headline }}</p>
         <p class="quiet-copy">Geçmiş yayın · güncel giriş izni değildir</p>
+        {% set explanation = (signal_explanations|default({})).get(call.key) %}
+        {% if explanation %}{{ explanation_panel(explanation, compact=true) }}
+        {% else %}<p class="signal-projection-missing">Bu ilk yayının özgün makine dayanakları okunamadı; sonradan gelen haber veya tarama buraya eklenmez.</p>{% endif %}
         <a class="underline" href="/karne/{{ call.key }}">Gerekçesi ve sonucu →</a>
       </article>
       {% endfor %}

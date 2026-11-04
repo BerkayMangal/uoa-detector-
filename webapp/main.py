@@ -53,6 +53,7 @@ from webapp import (
     pricing,
     seo,
     shared_news,
+    signal_explanation,
 )
 from webapp.alpha_lab import view as lab_view
 from webapp.alpha_lab.archive import STATE as ARCHIVE_STATE
@@ -322,7 +323,17 @@ app.add_middleware(_BasicAuthGate)
 app.add_middleware(seo.SearchHeaders)
 
 
-templates = Jinja2Templates(directory=str(_BASE / "templates"))
+def _alert_context(request: Request) -> dict[str, object]:
+    """One stored-data-only alert controller on every private HTML screen."""
+    if request.url.path == "/hakkinda":
+        return {}
+    return {
+        "alert_settings": _safe(live_alerts.settings, None),
+        "alert_feed_url": "/api/acilis/uyarilar",
+    }
+
+
+templates = Jinja2Templates(directory=str(_BASE / "templates"), context_processors=[_alert_context])
 # Phase 5.2.PERF1: compiled templates are kept in a plain dict.
 # The cache used to be off (``env.cache = None``) because Jinja's default
 # LRUCache key path errors on Python 3.14. Re-parsing is NOT negligible: the
@@ -335,7 +346,9 @@ templates = Jinja2Templates(directory=str(_BASE / "templates"))
 # unbounded. ``auto_reload`` stays on, so editing a template still takes effect.
 templates.env.cache = {}
 templates.env.globals.update(page_title=seo.page_title, seo_description=seo.DESCRIPTION,
-                             public_canonical=seo.ORIGIN + "/hakkinda")
+                             public_canonical=seo.ORIGIN + "/hakkinda",
+                             signal_time=signal_explanation.london_time,
+                             london_time=signal_explanation.london_time)
 
 
 @app.get("/hakkinda", response_class=HTMLResponse, include_in_schema=False)
@@ -397,7 +410,7 @@ async def _database_unavailable(request: Request, exc: OperationalError) -> Resp
                              "outcome": "unknown" if uncertain else "unavailable"},
                             status_code=503, headers=headers)
     try:
-        return templates.TemplateResponse(request, "storage_unavailable.html", {"uncertain": uncertain, "storage_hint": native_hint(exc)},
+        return templates.TemplateResponse(request, "storage_unavailable.html", {"uncertain": uncertain, "storage_hint": native_hint(exc), "alerts_disabled": True},
                                           status_code=503, headers=headers)
     except Exception:
         message = ("Kaydın tamamlandığını doğrulayamıyoruz. Tekrar göndermeden önce kayıtları kontrol edin."
@@ -412,7 +425,7 @@ async def _on_error(request: Request, exc: Exception) -> HTMLResponse:
     # Terminal-grade: never show a raw stack trace. Log it, show a clean page.
     _logger.exception("unhandled error on %s", request.url.path)
     try:
-        return templates.TemplateResponse(request, "error.html", {}, status_code=500,
+        return templates.TemplateResponse(request, "error.html", {"alerts_disabled": True}, status_code=500,
                                           headers={"X-Robots-Tag": "noindex, nofollow, nosnippet",
                                                    "Cache-Control": "private, no-store"})
     except Exception:
@@ -659,13 +672,19 @@ def live_home(request: Request, ok: str = "") -> HTMLResponse:
     from webapp.desk.calls import today as daily_calls
 
     calls = _safe(lambda: daily_calls(_board_reader().engine, now), None)
+    explanations_by_key = _safe(
+        lambda: signal_explanation.build(
+            _board_reader().engine, now,
+            statements=opening.statements if opening else (),
+            keys=tuple(row.key for row in calls or ()),
+        ), dict[str, signal_explanation.Explanation](),
+    )
     cfg = live_page.settings()
     reload_seconds = cfg.cycle.live_seconds if view.mode == "LIVE" else cfg.cycle.closed_seconds
     return templates.TemplateResponse(
         request, "live.html",
         {"v": view, "ok": _LIVE_OK.get(ok, ""), "reload_seconds": reload_seconds,
-         "alert_settings": _safe(live_alerts.settings, None),
-         "alert_feed_url": "/api/acilis/uyarilar",
+         "signal_explanations": explanations_by_key,
          "opening": opening, "overview": desk_overview.build(opening, now), "daily_calls": calls,
          "tr_time": opening_view.tr_time,
          "desk": _safe(lambda: desk_positions.build(_board_reader().engine, now), None),
@@ -685,6 +704,7 @@ def opening_page(request: Request, before: str = "", journal_day: date | None = 
             return templates.TemplateResponse(request, "opening_unavailable.html", {
                 "clock": session_clock, "tr_time": opening_view.tr_time,
                 "storage_hint": native_hint(exc),
+                "alerts_disabled": True,
             }, status_code=503)
         except Exception:
             _logger.exception("opening outage template unavailable")
@@ -699,9 +719,11 @@ def opening_page(request: Request, before: str = "", journal_day: date | None = 
             )
     return templates.TemplateResponse(request, "opening.html", {
         "opening": opening, "overview": desk_overview.build(opening, now),
+        "signal_explanations": _safe(lambda: signal_explanation.build(
+            _board_reader().engine, now, statements=opening.statements,
+        ), dict[str, signal_explanation.Explanation]()),
         "measurement": opening_measurement.build(opening.results, now, journal_day),
-        "tr_time": opening_view.tr_time, "alert_settings": _safe(live_alerts.settings, None),
-        "alert_feed_url": "/api/acilis/uyarilar", "reload_seconds": live_page.settings().cycle.live_seconds,
+        "tr_time": opening_view.tr_time, "reload_seconds": live_page.settings().cycle.live_seconds,
     })
 
 
@@ -726,7 +748,8 @@ def call_scorecards(request: Request, before: str = "", ticker: str = "", update
 def call_scorecard_page(request: Request, key: str) -> HTMLResponse:
     engine, now = _board_reader().engine, _now()
     card = call_scorecard.get(engine, key, now)
-    return templates.TemplateResponse(request, "call_scorecard.html", {"card": card, "progress": call_progress.detail(card, now) if card else (), "context": call_context.view(engine, key, now) if card else None, "tr_time": opening_view.tr_time}, status_code=200 if card else 404)
+    explanation = _safe(lambda: signal_explanation.build(engine, now, keys=(key,)).get(key), None) if card else None
+    return templates.TemplateResponse(request, "call_scorecard.html", {"card": card, "explanation": explanation, "progress": call_progress.detail(card, now) if card else (), "context": call_context.view(engine, key, now) if card else None, "tr_time": opening_view.tr_time}, status_code=200 if card else 404)
 
 
 @app.get("/api/arastirma/veri-tamamlama")
@@ -803,7 +826,6 @@ def live_results_page(request: Request) -> HTMLResponse:
 def positions_page(request: Request, ok: str = "") -> HTMLResponse:
     return templates.TemplateResponse(request, "positions.html", {
         "desk": desk_positions.build(_board_reader().engine, _now()), "job": dict(DESK_STATE),
-        "alert_settings": _safe(live_alerts.settings, None),
         "reload_seconds": live_page.settings().cycle.live_seconds, "tr_timezone": ZoneInfo("Europe/Istanbul"),
         "ok": "Dayanak stop/hedef planı kaydedildi." if ok == "plan" else "",
     })
