@@ -266,6 +266,8 @@ A new study needs a fresh, non-overlapping window (`docs/next_studies.md`,
 
 | 5.55 | **Readable decision desk and current operational data** — high-contrast presentation retaining all information/guards and one bounded existing-operator current daily repair. Contract: `docs/phase-5.55-readable-desk-acceptance.md`. No strategy tuning, holdout access or alpha claim; owner authorizes continued work and requests legibility, 2026-11-04. |
 
+| 5.56 | **Shared corporate/macro news context** — owner-authorized Mahalle/Stajyer dedicated cached feeds, physically receipted UOA collection and private labelled context. Contract: `docs/phase-5.56-shared-news-acceptance.md`. Separate from live AL votes/UW experiment, no historical availability or alpha claim; explicit connection request, 2026-11-04. |
+
 Detail for the 5.10–5.19 candidates:
 - **Falsification gates (D8).** `src/uoa_detector/backtest/falsification.py:79-81`
   hardcodes `_MIN_CLOSED_TRADES = 30`, `_MIN_BEST_SHARPE = 0.5` and

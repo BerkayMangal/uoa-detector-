@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% set names = {'mahalle':'Mahalle', 'stajyer':'Stajyer'} %}
+{% set states = {'context':'Bağlı', 'unknown':'Doğrulanamadı', 'disabled':'Henüz etkinleştirilmedi', 'stale':'Kontrol gecikti'} %}
+{% block content %}
+<div class="desk-heading"><div><p class="eyebrow">ŞİRKET VE MAKRO BAĞLAMI</p><h1>Haber kaynakları</h1></div><a href="/">Bugünün kararları →</a></div>
+<p class="desk-notice">Haberler kararın bağlamıdır. Haber varlığı olumlu gelişme veya AL sinyali demek değildir. Bu iki kaynağın getiriye ek katkısı henüz doğrulanmadı; canlı kurallar değişmedi.</p>
+<div class="plan-grid" aria-label="Bağlı haber kaynakları">
+{% for feed in news.feeds %}<article class="plan-card" data-news-provider="{{ feed.provider }}">
+<div class="plan-title"><h2>{{ names[feed.provider] }}</h2><span class="decision-badge">{{ 'Erişim var · seçilmiş başlık yok' if feed.reason == 'empty_curated_unknown' else states.get(feed.status, 'Doğrulanamadı') }}</span></div>
+<p class="quiet-copy">{{ 'Seçilmiş şirket ve olay haberleri' if feed.provider == 'mahalle' else 'Seçilmiş makro ve piyasa kaynakları' }} · piyasanın tamamını kapsamaz.</p>
+<dl class="call-metrics"><div><span>Son başarılı erişim · TR</span><strong>{{ tr_time(feed.last_successful_check_at) if feed.last_successful_check_at else 'Bilinmiyor' }}</strong></div><div><span>Yanıttaki başlık</span><strong>{{ feed.returned_count if feed.returned_count is not none else 'Bilinmiyor' }}</strong></div><div><span>Görüntülenen kayıt</span><strong>{{ feed.items | length }}</strong></div></dl>
+{% if feed.limited or feed.truncated %}<p class="desk-notice">Kaynak veya okuma sınırı nedeniyle kapsam kısmi. Eksik başlıklar, haber olmadığı anlamına gelmez.</p>{% endif %}
+{% if feed.upstream_status == 'partial' %}<p class="desk-notice" data-upstream-partial="{{ feed.provider }}">Kaynak uygulama kendi haber kapsamını kısmi olarak bildiriyor. Bağlantının çalışması tam haber kapsamı veya bağımsız teyit anlamına gelmez.</p>{% endif %}
+{% if feed.status in ['unknown','disabled','stale'] %}<p class="quiet-copy">{{ {'collector_disabled':'Bağlantı henüz etkinleştirilmedi.', 'storage_unavailable':'Yeni kaynak arşivi henüz hazır değil.', 'not_observed':'İlk başarılı erişim bekleniyor.', 'receipt_pending_or_invalid':'Erişim kaydı henüz doğrulanamadı.', 'recording_unavailable':'Kaynak alındıktan sonraki kayıt tamamlanamadı.', 'stored_evidence_unavailable':'Saklanan kanıt okunamadı.', 'stale_check':'Son kaynak kontrolü güncel değil.', 'auth_failed':'Kaynak erişimi doğrulanamadı.'}.get(feed.reason, 'Kaynak veya erişim kanıtı doğrulanamadı; veri bilinmiyor.') }}</p>{% endif %}
+</article>{% endfor %}</div>
+<div class="section-heading"><h2>İçe alınan başlıklar</h2><a href="/api/arastirma/haber-kaynaklari">Kaynak ve sürüm kayıtları →</a></div>
+<p class="quiet-copy">Aynı bağlantının kopyaları birlikte gösterilir. Farklı adreslerdeki kopya haberler ayrı görünebilir; bağımsız teyit sayılmaz. “Burada ilk bilinen”, içeriğin UOA'ya kaydedilmesinden sonraki saattir. Haberin ilk yayımlandığı an değildir.</p>
+<div class="call-ledger">
+{% for story in news.stories %}<article class="call-record break-words" data-news-story>
+{% for item in story.versions %}
+<div class="call-record-heading"><span class="decision-badge">{{ names[item.provider] }}</span><span class="quiet-copy">{{ item.source or 'Yayıncı belirtilmedi' }}</span></div>
+<h3 class="section-heading">{{ item.source_title or 'Doğrulanmış kaynak başlığı aktarılmadı' }}</h3>
+<p class="quiet-copy">{{ 'Kaynak kataloğundaki başlık' if item.title_provenance != 'publisher_verbatim' else 'Yayıncı başlığı' }} · kaynağın bildirdiği yayın zamanı {{ item.source_published_at if item.publication_precision != 'unknown' and item.source_published_at else 'bilinmiyor' }}{% if item.publication_precision == 'date' %} · yalnız gün bilgisi{% endif %}.</p>
+{% if item.publication_precision == 'unknown' and item.source_publication_raw %}<p class="quiet-copy">Doğrulanmamış tarih iddiası: {{ item.source_publication_raw }}.</p>{% endif %}
+<p class="quiet-copy">Burada ilk bilinen: {{ tr_time(item.first_known_at) + ' TR' if item.first_known_at else 'Bilinmiyor' }} · Yayıncıda ilk görülme zamanı bilinmiyor.</p>
+{% if item.first_seen_at %}<p class="quiet-copy">Kaynağın doğrulanmamış ilk görülme iddiası: {{ item.first_seen_at }}.</p>{% endif %}
+{% if item.exact_tickers %}<p><b>Kaynağın doğrudan hisse etiketi:</b> {{ item.exact_tickers | join(', ') }}.</p>{% else %}<p class="quiet-copy">Doğrudan hisse eşleştirmesi bilinmiyor.</p>{% endif %}
+{% if item.derived_tickers %}<p class="quiet-copy">Çıkarımla ilişkilendirilen: {{ item.derived_tickers | join(', ') }}. Doğrudan şirket haberi sayılmaz.</p>{% endif %}
+{% if item.quality_flags %}<p class="quiet-copy">Başlık, tarih veya eşleştirme bilgilerinin bir bölümü doğrulanamadı; kaynak ve sürüm kaydında belirtilir.</p>{% endif %}
+<p><a class="underline" href="{{ item.url }}" target="_blank" rel="noopener noreferrer">Kaynak yazıyı aç ↗</a></p>
+{% if not loop.last %}<hr>{% endif %}
+{% endfor %}</article>
+{% else %}<p class="desk-notice">Henüz kullanılabilir, erişim zamanı doğrulanmış başlık yok. Bu, piyasada haber olmadığı anlamına gelmez.</p>{% endfor %}
+</div>
+<p class="quiet-copy">Model yorumları yayıncı başlığına karıştırılmaz. Tam kaynak, zaman, eşleştirme ve ayrı yorum alanları özel kaynak kayıtlarında korunur. Bu akış, UW haber deneyinin kayıtlarına veya canlı AL oylarına eklenmez.</p>
+{% endblock %}
