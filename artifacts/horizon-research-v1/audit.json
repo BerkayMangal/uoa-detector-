@@ -1,0 +1,91 @@
+{
+  "status": "RECONCILED",
+  "report_hash": "ed405e06de5069070f746a9675b015ae9f6dd2620ee0add3a65b1c8380e8182e",
+  "original_report_hash": "b3b411c1092f00df8f39eadb03aca4050cb4425ff10befd88b2b2dfb080d17af",
+  "profile_hash": "cb54fb838e7885c8100157c056554df41f66f42ba294905a86edf5d773dfb771",
+  "code_hash": "a3fb365208f78207860f41ba25b5552549f8a9794efd1f91b813f27cc164f174",
+  "source_hash": "773c63a92fc2933a2e73d20d9ab0dd90eed1927d92c020ba5e5e52860b5989b6",
+  "audit_script_sha256": "54f8d1cb09d5452db2bdd02c8f4601747e9884ff361cc9e5080b338202c1598c",
+  "audited_cells": 1440,
+  "audited_outcome_units": 30720,
+  "audited_original_controls": 12,
+  "controls": [
+    {
+      "arm": "baseline_proxy",
+      "cost_bps_per_side": 5,
+      "units": 85,
+      "net_usd": -406.56791424997533
+    },
+    {
+      "arm": "baseline_proxy",
+      "cost_bps_per_side": 10,
+      "units": 85,
+      "net_usd": -608.8663284999765
+    },
+    {
+      "arm": "baseline_proxy",
+      "cost_bps_per_side": 20,
+      "units": 85,
+      "net_usd": -1012.2584169999975
+    },
+    {
+      "arm": "baseline_proxy",
+      "cost_bps_per_side": 50,
+      "units": 85,
+      "net_usd": -2219.421317999977
+    },
+    {
+      "arm": "normalized",
+      "cost_bps_per_side": 5,
+      "units": 94,
+      "net_usd": -398.69555914997454
+    },
+    {
+      "arm": "normalized",
+      "cost_bps_per_side": 10,
+      "units": 94,
+      "net_usd": -622.2533882999726
+    },
+    {
+      "arm": "normalized",
+      "cost_bps_per_side": 20,
+      "units": 94,
+      "net_usd": -1068.8402862000019
+    },
+    {
+      "arm": "normalized",
+      "cost_bps_per_side": 50,
+      "units": 94,
+      "net_usd": -2406.502790499976
+    },
+    {
+      "arm": "normalized_price",
+      "cost_bps_per_side": 5,
+      "units": 77,
+      "net_usd": -333.0197637999786
+    },
+    {
+      "arm": "normalized_price",
+      "cost_bps_per_side": 10,
+      "units": 77,
+      "net_usd": -516.1049275999767
+    },
+    {
+      "arm": "normalized_price",
+      "cost_bps_per_side": 20,
+      "units": 77,
+      "net_usd": -880.4556648000018
+    },
+    {
+      "arm": "normalized_price",
+      "cost_bps_per_side": 50,
+      "units": 77,
+      "net_usd": -1973.6138869999807
+    }
+  ],
+  "source_replay": "ALL_MARKS_GATES_AND_EXCURSIONS",
+  "source_limitations": [],
+  "winner": null,
+  "validated_alpha": false,
+  "audit_hash": "fd0cb497b2ce44275c547f68f7e4cfccffe060361fbaaef13a0b041ee2760044"
+}

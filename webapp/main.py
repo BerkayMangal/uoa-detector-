@@ -34,7 +34,7 @@ from typing import TYPE_CHECKING, Any, ParamSpec, TypeVar, cast
 from urllib.parse import urlencode, urlsplit
 from zoneinfo import ZoneInfo
 
-from fastapi import FastAPI, Form, Request
+from fastapi import FastAPI, Form, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import Table, event
@@ -44,7 +44,7 @@ from starlette.datastructures import Headers
 from starlette.responses import PlainTextResponse
 
 from uoa_detector.sources.market_hours import is_market_open
-from webapp import explanations, gamma, journal, options_board, pricing, seo
+from webapp import explanations, gamma, horizon_diagnostics, journal, options_board, pricing, seo
 from webapp.alpha_lab import view as lab_view
 from webapp.alpha_lab.archive import STATE as ARCHIVE_STATE
 from webapp.alpha_lab.engine import STATE as LAB_STATE
@@ -74,6 +74,7 @@ from webapp.desk.capture import STATE as DESK_STATE
 from webapp.failure_logging import log_failure
 from webapp.gamma_live import gamma_refresh_loop
 from webapp.history_capture import report as vendor_history_report
+from webapp.horizon_research import report as horizon_report
 from webapp.live_alpha import alerts as live_alerts
 from webapp.live_alpha import job as live_job
 from webapp.live_alpha import page as live_page
@@ -733,7 +734,30 @@ def call_research_page(request: Request) -> HTMLResponse:
     from webapp.news_research.report import build as news_research_build
 
     news_research = _safe(lambda: news_research_build(engine, now), None)
-    return templates.TemplateResponse(request, "call_research.html", {"news_research": news_research, "research": frozen, "vendor_history": _safe(vendor_history_report.load, None), "coverage": call_coverage.view(engine, now), "forward": call_forward.view(engine, now), "cfg": call_research_settings(), "observer": dict(call_forward.STATE)})
+    history = _safe(vendor_history_report.load, None)
+    horizon = _safe(horizon_report.load, None) if history is not None else None
+    diagnostic = _safe(horizon_diagnostics.load, None) if horizon is not None else None
+    return templates.TemplateResponse(request, "call_research.html", {"horizon_diagnostics": diagnostic, "horizon_research": horizon, "news_research": news_research, "research": frozen, "vendor_history": history, "coverage": call_coverage.view(engine, now), "forward": call_forward.view(engine, now), "cfg": call_research_settings(), "observer": dict(call_forward.STATE)})
+
+
+@app.get("/api/arastirma/ufuk")
+def horizon_research_report() -> dict[str, Any]:
+    """Static audited summary only: no archive read, optimization or vendor request."""
+    history = _safe(vendor_history_report.load, None)
+    result = _safe(horizon_report.load, None) if history is not None else None
+    if result is None:
+        raise HTTPException(status_code=503, detail="Araştırma raporu doğrulanamadı")
+    return result
+
+
+@app.get("/api/arastirma/ufuk/dayaniklilik")
+def horizon_descriptive_report() -> dict[str, Any]:
+    history = _safe(vendor_history_report.load, None)
+    horizon = _safe(horizon_report.load, None) if history is not None else None
+    result = _safe(horizon_diagnostics.load, None) if horizon is not None else None
+    if result is None:
+        raise HTTPException(status_code=503, detail="Dayanıklılık ölçümü doğrulanamadı")
+    return result
 
 
 @app.get("/sonuclar", response_class=HTMLResponse)
