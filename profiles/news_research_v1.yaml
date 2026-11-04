@@ -1,0 +1,16 @@
+# Preregistered fixed diagnostic, not fitted strategy thresholds.
+version: physical_news_ablation_v1
+entry_delay_minutes: 1
+holding_minutes: 60
+mark_tolerance_minutes: 5
+max_units_per_day: 4
+notional_usd: 2500
+slippage_bps_per_side: 5
+stress_slippage_bps_per_side: [10, 20, 50]
+minimum_common_sessions: 80
+news_window_hours: 36
+news_max_age_seconds: 900
+source_max_age_seconds: 300
+flow_max_age_seconds: 900
+row_limit: 10000
+recording_timeout_seconds: 2
