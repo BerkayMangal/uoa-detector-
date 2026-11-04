@@ -6,6 +6,7 @@
    screen (docs/live-alpha-v1/PRODUCT_OVERRIDE.md); it still applies to /alfa and the rest. #}
 {% block tagline %}<span class="text-sm text-gray-400">Bugün ne alınır, hangi fiyattan, nerede zarar kesilir. Emir göndermez; işlemi sen yaparsın.</span>{% endblock %}
 {% block content %}
+<div class="live-desk-page">
 <nav class="desk-jump-nav" aria-label="Bu sayfada">
   <a href="#opening-desk">Güncel karar</a>
   <a href="#daily-published-calls">Bugünkü çağrılar</a>
@@ -16,7 +17,6 @@
 </nav>
 {% set opening_home = true %}
 {% include "opening_brief.html" %}
-<details open class="fold-panel alert-fold" id="signal-alerts"><summary>Sinyal uyarıları <span>· ses ve bildirim ayarları</span></summary>{% include "alert_controls.html" %}</details>
 <section id="live-alpha" lang="tr" data-entry-ttl="{{ v.entry_ttl_seconds }}" data-scan-age="{{ v.scan_age_seconds or 0 }}" data-reload-seconds="{{ reload_seconds }}">
   <div data-age-anchor></div>
   {% if ok %}<p class="text-sm text-emerald-400 mb-2" data-ok>{{ ok }}</p>{% endif %}
@@ -52,7 +52,7 @@
 
 <p class="quiet-copy">İşlem zamanlaması için üstteki açılış masasını kullan. Aşağıdaki kaynak plan, +15 dakika ve daha sıkı tazelik kontrollerini ayrıca uygulamaz.</p>
   {% if v.actionable %}<div class="section-heading"><h2>Kaynak strateji planları</h2><span>Deneysel görüş · otomatik emir yok</span></div>{% endif %}
-  <div class="plan-grid">
+  <div class="plan-grid source-card-grid">
   {% for c in v.actionable %}{% set d = c.data %}
   <article class="plan-card" data-tone="{{ c.tone }}" data-card="{{ d.ticker }}" data-rec="{{ d.recommendation }}" data-ready="{{ d.readiness }}" data-server-withdrawn="{{ 'true' if c.withdrawn else 'false' }}">
     <div class="plan-title">
@@ -61,12 +61,19 @@
       <span class="plan-status">{{ c.readiness_text }}</span>
       {% if c.tracking %}<span class="text-xs px-2 py-0.5 rounded bg-sky-900 text-sky-100">{{ c.tracking }}</span>{% endif %}
     </div>
+    <p class="source-record-clock">Kaynak karar anı: {{ london_time(d.decision_as_of) if london_time is defined else d.decision_as_of[:16].replace('T', ' ') + ' UTC' }} · {{ d.market_mode }}. Bu kaynak model kaydıdır; güncel giriş izni üstteki masadadır.</p>
     {% if c.withdrawn %}<p class="text-sm text-amber-300 mt-2" data-withdrawn>{{ c.withdrawn }}</p>{% endif %}
     {% if d.stock_plan %}{% set s = d.stock_plan %}
     <dl class="price-rail" data-price-rail><div><dt>Giriş referansı</dt><dd>${{ '%.2f' | format(s.entry_ref) }}</dd></div><div><dt>Zarar-kes</dt><dd class="risk-stop">${{ '%.2f' | format(s.stop) }}</dd></div><div><dt>Hedef · politika</dt><dd class="risk-target">${{ '%.2f' | format(s.target) }}</dd></div><div><dt>Planlanan risk</dt><dd>${{ '%.0f' | format(s.planned_risk_usd) }}</dd></div></dl>
     {% if s.chase_limit is number %}<p class="plan-limit">Giriş sınırı ${{ '%.2f' | format(s.chase_limit) }} · {{ s.shares }} hisse · {{ s.horizon_sessions }} seans</p>{% endif %}
     {% endif %}
     <p class="plan-reason" data-plain-reason>{{ d.plain_reason or d.why_today }}</p>
+    <dl class="source-brief-evidence" aria-label="Kaynak modelin kaydedilmiş dayanakları">
+      <div><dt>Opsiyon kanıtı</dt><dd>{{ d.option_evidence }}</dd></div>
+      <div><dt>Fiyat/tema</dt><dd>{{ d.price_evidence }}</dd></div>
+      <div><dt>Haber/katalizör</dt><dd>{{ d.news_evidence }}</dd></div>
+    </dl>
+    <p class="signal-boundary">Bu haber satırı kaynak modelin kayıtlı kontrolüdür. <a class="underline" href="/haberler">Mahalle / Stajyer</a> ayrı bağlam kaynaklarıdır; sonraki başlıklar bu kararın gerekçesine eklenmez.</p>
     <p class="invalidation"><b>Ne zaman vazgeçilir:</b> {{ d.invalidation }}</p>
     <details open><summary>Hisse / opsiyon maliyeti</summary>{{ comparison(d, c.withdrawn) }}</details>
     {% set model = scenarios.get(d.opportunity_id) if scenarios else none %}
@@ -76,10 +83,7 @@
     <p class="text-sm mt-2" data-plain-action>{{ d.plain_action or d.headline }}</p>
     <p class="text-gray-300 mt-2"><b>Görüş:</b> {{ d.headline }}</p>
     {% if d.blockers %}<p class="text-amber-200 mt-1"><b>Engel:</b> {{ d.blockers | join('; ') }}</p>{% endif %}
-    <dl class="mt-3 grid gap-2">
-      <div><dt class="font-semibold text-gray-200">Opsiyon kanıtı</dt><dd class="text-gray-300">{{ d.option_evidence }}</dd></div>
-      <div><dt class="font-semibold text-gray-200">Haber/katalizör</dt><dd class="text-gray-300">{{ d.news_evidence }}</dd></div>
-      <div><dt class="font-semibold text-gray-200">Fiyat/tema</dt><dd class="text-gray-300">{{ d.price_evidence }}</dd></div>
+    <dl class="mt-3 grid gap-2 source-evidence-grid">
       <div><dt class="font-semibold text-gray-200">Hisse planı</dt><dd class="text-gray-300">{{ d.stock_plan_text }}</dd></div>
       <div><dt class="font-semibold text-gray-200">Opsiyon alternatifi</dt><dd class="text-gray-300 break-words">{{ d.option_text }}</dd></div>
       <div><dt class="font-semibold text-gray-200">Araç tercihi</dt><dd class="text-gray-300">{{ d.instrument.preferred }} — {{ d.instrument.reason }}</dd></div>
@@ -181,7 +185,7 @@
   <p class="desk-endnote">Deneysel karar desteği. Giriş seviyeleri koşulludur; stop fiyatı azami zarar garantisi değildir.
     Yeni akış ölçümü ve akran-toparlanma araştırması ayrı gölge sürümde: <a href="/laboratuvar" class="underline">Alfa lab</a>.</p>
 </section>
+</div>
 <script src="/assets/live-desk.js?v=5.48.1" defer></script>
-<script src="/assets/live-alerts.js?v=5.45.1" defer></script>
 <script src="/assets/opening-desk.js?v=5.45.1" defer></script>
 {% endblock %}

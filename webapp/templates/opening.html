@@ -1,10 +1,10 @@
 {% extends "base.html" %}
+{% from "_signal_explanation.html" import explanation_panel with context %}
 {% macro when(at) %}{{ tr_time(at) }} TR{% endmacro %}
 {% block content %}
 <div id="opening-page" data-server-now="{{ opening.now.isoformat() }}" data-refresh-seconds="{{ reload_seconds }}">
 <h1>Bugünün işlem planı</h1>
 {% include "opening_brief.html" %}
-{% include "alert_controls.html" %}
 <p class="quiet-copy">Son kalıcı kayıt: {{ when(opening.latest_at) if opening.latest_at else 'yok' }} · Bugün {{ opening.count }} öneri/güncelleme. Fiyat referanstır; gerçekleşmiş alış/satış değildir.</p>
 <div class="plan-grid">
 {% for s in opening.statements %}{% set a = s.advice %}
@@ -12,6 +12,7 @@
   <div class="plan-title"><h2>{{ a.ticker }}</h2><span class="decision-badge">{{ {'BUY':'AL', 'SELL':'KAPAT / AZALT', 'PAPER_EXIT':'SANAL ÇIKIŞ', 'REVIEW':'ÇIKIŞ İNCELE'}.get(a.action, 'BEKLE') if s.current or a.action == 'REVIEW' else 'BEKLE' }}</span><span>{{ a.instrument }} · {{ when(s.at) }}</span></div>
   <p data-opening-action-text>{{ a.headline if s.current or a.action in ['WAIT','REVIEW'] else 'Eski plan · yeni işlem için güncel kayıt bekle.' }}</p>
   <p class="plan-reason">{{ a.reasons | join(' ') }}</p>
+  {% set explanation = signal_explanations.get(s.key) if signal_explanations else none %}{% if explanation %}{{ explanation_panel(explanation) }}{% endif %}
   {% if a.plan %}{% set p = a.plan %}<dl class="price-rail"><div><dt>Dayanak giriş ref.</dt><dd>${{ '%.2f' | format(p.entry) }}</dd></div><div><dt>Dayanak stop</dt><dd>${{ '%.2f' | format(p.stop) }}</dd></div><div><dt>Dayanak hedef · politika</dt><dd>${{ '%.2f' | format(p.target) }}</dd></div><div><dt>Plan riski</dt><dd>${{ '%.2f' | format(p.risk_usd) }}</dd></div></dl>
   <p class="quiet-copy">{{ p.quantity }} {{ 'hisse' if p.instrument == 'stock' else 'lot' }}{% if p.debit %} · opsiyon primi ${{ '%.2f' | format(p.debit) }} · gidiş/dönüş maliyeti %{{ '%.1f' | format(p.roundtrip_cost_pct) }}{% endif %}. Sanal profil büyüklüğü; hesabına göre uygunluk hesaplanmadı.</p>
   {% if p.contracts %}<p class="quiet-copy">{{ p.contracts | join(' / ') }}</p>{% endif %}{% endif %}
@@ -33,5 +34,4 @@
 <p class="desk-endnote">opening_desk_v1 · Her tarama ayrı bir günlük kaydı; bağımsız bahis veya kalibre edilmiş başarı olasılığı değil. 15 dakikalık bar / VWAP ölçümü yapılmıyor. Emir otomatik gönderilmez.</p>
 </div>
 <script src="/assets/opening-desk.js?v=5.45.1" defer></script>
-<script src="/assets/live-alerts.js?v=5.45.1" defer></script>
 {% endblock %}

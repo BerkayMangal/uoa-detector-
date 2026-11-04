@@ -1,0 +1,21 @@
+{% macro explanation_panel(x, compact=false) %}
+{% set signal_clock = london_time if london_time is defined else none %}
+{% set support_label = {'uw_news_selected':'Haber desteği', 'relative_strength_selected':'Piyasaya göre güçlü', 'pullback':'Geri çekilme', 'bearish':'Düşüş kurulumu', 'unknown':'Doğrulanamadı'}.get(x.support.role, 'Doğrulanamadı') %}
+{% set source_label = {'saved_record_unavailable':'Özgün kayıt okunamadı', 'source_unverified':'Özgün kaynak doğrulanamadı', 'original_source_verified':'Özgün tarama ve kart doğrulandı'}.get(x.source_status, 'Bilinmiyor') %}
+<div class="signal-explanation{{ ' is-compact' if compact else '' }}{{ ' is-unverified' if not x.source_valid else '' }}" data-signal-explanation="{{ x.key }}">
+  <dl class="signal-times" aria-label="Sinyalin kayıt saatleri, Europe/London">
+    <div><dt>Günün ilk AL yayını</dt><dd>{{ signal_clock(x.first_issued_at) if signal_clock else 'Bilinmiyor · Europe/London' }}</dd></div>
+    <div><dt>Bu kaydın yayını</dt><dd>{{ signal_clock(x.statement_at) if signal_clock else 'Bilinmiyor · Europe/London' }}</dd></div>
+    <div><dt>Kaynak karar kontrolü</dt><dd>{{ signal_clock(x.decision_at) if signal_clock else 'Bilinmiyor · Europe/London' }}</dd></div>
+    <div><dt>Bu kaydın geçerlilik sonu</dt><dd>{{ signal_clock(x.expires_at) if signal_clock else 'Bilinmiyor · Europe/London' }}</dd></div>
+  </dl>
+  <dl class="signal-evidence" aria-label="Kaydedilmiş sinyalin dayanakları">
+    <div><dt>Fiyat ne söylüyor?</dt><dd>{{ x.price.text }}</dd></div>
+    <div><dt>Opsiyon akışı ne söylüyor?</dt><dd>{{ x.flow.text }}</dd></div>
+    <div><dt>Hangi destek yolu?</dt><dd><b>{{ support_label }}.</b> {{ x.support.text }}</dd></div>
+    <div><dt>Haberin rolü</dt><dd><b>{{ x.news.role }}</b> {{ x.news.text }}</dd></div>
+  </dl>
+  <p class="signal-boundary">{{ x.curated_role }}</p>
+  <p class="signal-source-state"><b>Kaynak eşleşmesi:</b> {{ source_label }} · Tarama başlangıcı {{ signal_clock(x.scan_started_at) if signal_clock else 'Bilinmiyor · Europe/London' }} · Tarama tamamlanması {{ signal_clock(x.scan_finished_at) if signal_clock else 'Bilinmiyor · Europe/London' }}.</p>
+</div>
+{% endmacro %}

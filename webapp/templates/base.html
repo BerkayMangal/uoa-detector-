@@ -17,7 +17,7 @@
   <meta property="og:url" content="{{ public_canonical }}">
   {% else %}<meta name="robots" content="noindex, nofollow, nosnippet">{% endif %}
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="/assets/uoa.css?v=5.55">
+  <link rel="stylesheet" href="/assets/uoa.css?v=5.57">
   {% block head %}{% endblock %}
 </head>
 <body>
@@ -27,6 +27,7 @@
     <div class="app-topbar">
       <a href="{{ '/hakkinda' if path == '/hakkinda' else '/' }}" class="brand" aria-label="UOA ana sayfa"><span class="brand-mark">u.</span><span>UOA<span class="brand-caption">PERSONAL DESK</span></span></a>
       <span class="desk-signature">Piyasayı oku. Kararı sen ver.</span>
+      {% if path != '/hakkinda' and not alerts_disabled %}<a class="header-alert-link" href="#signal-alerts">PC bildirimleri</a>{% endif %}
       <a class="header-link" href="{{ '/' if path == '/hakkinda' else '/hakkinda' }}">{{ 'Masayı aç' if path == '/hakkinda' else 'Hakkında' }}<svg aria-hidden="true" class="arrow-icon" viewBox="0 0 16 16" fill="none"><path d="M3 13L13 3M3 3h10v10" stroke="currentColor" stroke-width="1.4"/></svg></a>
     </div>
     {% if path != '/hakkinda' %}
@@ -47,10 +48,12 @@
   <main id="main" class="desk-main {% if path == '/hakkinda' %}public-main{% endif %}" tabindex="-1">
     {% block content %}{% endblock %}
   </main>
+  {% if path != '/hakkinda' and not alerts_disabled %}<div class="global-alert-bar" id="signal-alerts">{% include "alert_controls.html" %}</div>{% endif %}
   <footer class="app-footer">
     <span class="footer-brand">UOA <span>/ kişisel çalışma masası</span></span>
     <span>Karar desteği. Otomatik emir göndermez.</span>
     {% if glossary %}<details open><summary>Terimler</summary><dl>{% for term, meaning in glossary.items() %}<div><dt>{{ term }}</dt><dd>{{ meaning }}</dd></div>{% endfor %}</dl></details>{% endif %}
   </footer>
+  {% if path != '/hakkinda' and not alerts_disabled %}<script src="/assets/live-alerts.js?v=5.57" defer></script>{% endif %}
 </body>
 </html>
