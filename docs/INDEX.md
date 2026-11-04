@@ -264,6 +264,8 @@ A new study needs a fresh, non-overlapping window (`docs/next_studies.md`,
 
 | 5.54 | **Frozen-roster horizon and candle sensitivity** — registered1440-cell reused-history diagnostic distinguishing polling, chart bars, delay and holding endpoints. Contract: `docs/phase-5.54-horizon-study-acceptance.md`; volume source note: `docs/phase-5.54-volume-quality-addendum.md`; actual results: `docs/phase-5.54-results.md`; interpretation: `docs/phase-5.54-interpretation.md`; delivery: `docs/phase-5.54-closeout.md`. 368 complete cells all net-negative, 1072 partial; positive multi-session common-panel observations remain concentrated/unvalidated. No live tuning, new vendor call, Study G access or selected winner. Owner prioritizes research, 2026-11-04. |
 
+| 5.55 | **Readable decision desk and current operational data** — high-contrast presentation retaining all information/guards and one bounded existing-operator current daily repair. Contract: `docs/phase-5.55-readable-desk-acceptance.md`. No strategy tuning, holdout access or alpha claim; owner authorizes continued work and requests legibility, 2026-11-04. |
+
 Detail for the 5.10–5.19 candidates:
 - **Falsification gates (D8).** `src/uoa_detector/backtest/falsification.py:79-81`
   hardcodes `_MIN_CLOSED_TRADES = 30`, `_MIN_BEST_SHARPE = 0.5` and

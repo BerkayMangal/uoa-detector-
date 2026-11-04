@@ -1,10 +1,10 @@
 <!doctype html>
-<html lang="tr" class="dark">
+<html lang="tr">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="color-scheme" content="dark">
-  <meta name="theme-color" content="#141615">
+  <meta name="color-scheme" content="light">
+  <meta name="theme-color" content="#173b5b">
   <title>{{ page_title(request.url.path) }}</title>
   <meta name="description" content="{{ seo_description }}">
   {% if request.url.path == '/hakkinda' %}
@@ -17,7 +17,7 @@
   <meta property="og:url" content="{{ public_canonical }}">
   {% else %}<meta name="robots" content="noindex, nofollow, nosnippet">{% endif %}
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="/assets/uoa.css?v=5.48.2">
+  <link rel="stylesheet" href="/assets/uoa.css?v=5.55">
   {% block head %}{% endblock %}
 </head>
 <body>

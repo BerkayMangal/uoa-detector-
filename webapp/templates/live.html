@@ -6,9 +6,17 @@
    screen (docs/live-alpha-v1/PRODUCT_OVERRIDE.md); it still applies to /alfa and the rest. #}
 {% block tagline %}<span class="text-sm text-gray-400">Bugün ne alınır, hangi fiyattan, nerede zarar kesilir. Emir göndermez; işlemi sen yaparsın.</span>{% endblock %}
 {% block content %}
+<nav class="desk-jump-nav" aria-label="Bu sayfada">
+  <a href="#opening-desk">Güncel karar</a>
+  <a href="#daily-published-calls">Bugünkü çağrılar</a>
+  <a href="#source-strategy">Kaynak model</a>
+  <a href="#paper-tracking">PAPER sonuçları</a>
+  <a href="#live-diagnostics">Veri durumu</a>
+  <a href="#live-method">Yöntem</a>
+</nav>
 {% set opening_home = true %}
 {% include "opening_brief.html" %}
-<details open class="fold-panel alert-fold"><summary>Sinyal uyarıları <span>· ses ve bildirim ayarları</span></summary>{% include "alert_controls.html" %}</details>
+<details open class="fold-panel alert-fold" id="signal-alerts"><summary>Sinyal uyarıları <span>· ses ve bildirim ayarları</span></summary>{% include "alert_controls.html" %}</details>
 <section id="live-alpha" lang="tr" data-entry-ttl="{{ v.entry_ttl_seconds }}" data-scan-age="{{ v.scan_age_seconds or 0 }}" data-reload-seconds="{{ reload_seconds }}">
   <div data-age-anchor></div>
   {% if ok %}<p class="text-sm text-emerald-400 mb-2" data-ok>{{ ok }}</p>{% endif %}
@@ -23,9 +31,11 @@
   {% if v.flow_warning %}<p class="desk-notice" data-flow-stale>{{ v.flow_warning }}</p>{% endif %}
 
   {% if desk and (desk.paper.rows or desk.manual.rows) %}
+  <div class="desk-position-context">
   <div class="section-heading"><h2>Açık pozisyon takibi</h2><a href="/pozisyonlar">Risk ve çıkışları aç →</a></div>
   <p class="quiet-copy">{{ desk.paper.rows | length }} PAPER · {{ desk.manual.rows | length }} günlükte açık gerçek kayıt. PAPER plan riski {% if desk.paper.risk is number %}${{ '%.2f' | format(desk.paper.risk) }}{% else %}bilinmiyor{% endif %} · {{ desk.paper.unknown_risk }} kayıt için risk eksik.</p>
   {% for p in desk.paper.rows + desk.manual.rows %}{% if p.action == 'EXIT_REVIEW' %}<p class="desk-notice"><b>{{ p.ticker }} · {{ 'PAPER' if p.scope == 'paper' else 'Manuel kayıt' }} · ÇIKIŞ İNCELE:</b> {{ p.reason }} <a class="underline" href="/pozisyonlar">Pozisyonu gör</a></p>{% endif %}{% endfor %}
+  </div>
   {% endif %}
 
   <details open class="fold-panel" id="source-strategy"><summary>Kaynak stratejinin ayrıntıları · deneysel Live Alpha v1</summary>  <div class="desk-heading">
