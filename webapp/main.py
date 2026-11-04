@@ -717,11 +717,23 @@ def daily_repair_status() -> dict[str, Any]:
     return repair_operator.status(_board_reader().engine, _now())
 
 
+@app.get("/api/arastirma/haber")
+def news_research_status() -> dict[str, Any]:
+    from dataclasses import asdict
+
+    from webapp.news_research.report import build
+
+    return asdict(build(_board_reader().engine, _now()))
+
+
 @app.get("/arastirma", response_class=HTMLResponse)
 def call_research_page(request: Request) -> HTMLResponse:
     engine, now = _board_reader().engine, _now()
     frozen = _safe(call_report.load, None)
-    return templates.TemplateResponse(request, "call_research.html", {"research": frozen, "vendor_history": _safe(vendor_history_report.load, None), "coverage": call_coverage.view(engine, now), "forward": call_forward.view(engine, now), "cfg": call_research_settings(), "observer": dict(call_forward.STATE)})
+    from webapp.news_research.report import build as news_research_build
+
+    news_research = _safe(lambda: news_research_build(engine, now), None)
+    return templates.TemplateResponse(request, "call_research.html", {"news_research": news_research, "research": frozen, "vendor_history": _safe(vendor_history_report.load, None), "coverage": call_coverage.view(engine, now), "forward": call_forward.view(engine, now), "cfg": call_research_settings(), "observer": dict(call_forward.STATE)})
 
 
 @app.get("/sonuclar", response_class=HTMLResponse)

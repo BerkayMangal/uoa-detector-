@@ -67,6 +67,9 @@ from webapp.live_alpha import inputs, store, uw
 from webapp.live_alpha.cycle_status import next_wait, safe_failure
 from webapp.live_alpha.diagnostics import news_counts, news_message
 from webapp.live_alpha.uw import Budget, ContractSpec, JsonClient
+from webapp.news_research.config import profile_hash as news_research_profile_hash
+from webapp.news_research.storage import ensure as ensure_news_research
+from webapp.news_research.transport import RecordingClient
 from webapp.opening.model import next_wait as opening_wait
 from webapp.opening.observer import STATE as OPENING_STATE
 from webapp.opening.observer import run as run_opening
@@ -629,13 +632,14 @@ async def run_cycle(
     expiries = inputs.listed_expiries(engine, tickers)
 
     news: dict[str, NewsCheck] = {}
+    news_client = RecordingClient(client, engine, application_checked_at=now)
     for t in tickers:
         qualifies, _ = qualifying_direction(flows[t], settings.flow)
         if qualifies is None:
             news[t] = NewsCheck(ticker=t, state=CheckState.NOT_CHECKED, checked_at=None,
                                 detail="akış eşiği geçilmedi; haber çağrısı yapılmadı")
             continue
-        news[t] = await uw.news_for(engine, client, budget, t, now,
+        news[t] = await uw.news_for(engine, news_client, budget, t, now,
                                     refresh_seconds=settings.news.refresh_seconds, limit=settings.news.limit)
 
     decisions = [
@@ -670,6 +674,17 @@ async def run_cycle(
         t: int((now - p.spot_fetched_at).total_seconds()) for t, p in prices.items() if p.spot_fetched_at is not None
     }
     board_rows = _board_rows(engine, tickers, run_id, now, session, flows, prices, cards, gamma_source)
+    # Auxiliary research features remain separate from the frozen live decision.
+    # New studies use the completed scan time and physical news receipts, never
+    # reverse-engineer numeric inputs from an old explanatory string.
+    try:
+        snapshot["news_research_context"] = {
+            "version": "physical_news_v1",
+            "profile_hash": news_research_profile_hash(),
+            "prices": {ticker: to_jsonable(price) for ticker, price in prices.items()},
+        }
+    except Exception as exc:
+        log_failure(_logger, "news-research-context", exc, "scan")
     snapshot.update({
         "board": board_rows,
         "flow_run": run_id,
@@ -722,6 +737,10 @@ async def live_alpha_loop(
     engine = make_engine(database_url)
     store.ensure_live_tables(engine)
     ensure_quota_tables(engine)
+    try:
+        ensure_news_research(engine)
+    except Exception as exc:
+        log_failure(_logger, "news-research-storage", exc, "startup")
     reader = BoardSignalReader(engine=engine)
     from webapp.gamma import GammaRepo
 
