@@ -1,0 +1,37 @@
+{% macro clock(at) -%}{{ london_time(at) if london_time is defined else 'Bilinmiyor · Europe/London' }}{%- endmacro %}
+{% macro percentage(value, suffix='%') -%}{% if value is number %}{{ '%+.2f' | format(value) }}{{ suffix }}{% else %}Bilinmiyor{% endif %}{%- endmacro %}
+{% macro seconds(value) -%}{% if value is number %}{{ '%.1f' | format(value) }} sn{% else %}Bilinmiyor{% endif %}{%- endmacro %}
+{% macro instrument_title(kind) -%}{{ {'stock':'Hisse', 'long_call':'Call', 'bull_call_debit':'Call spread', 'long_put':'Put', 'bear_put_debit':'Put spread'}.get(kind, kind) }}{%- endmacro %}
+{% macro target_table(rows, show_calls=true) %}
+{% set labels = {'pending':'Zamanı bekleniyor', 'due':'Ölçüm zamanı geldi', 'awaiting':'Kayıt bekleniyor', 'mature':'Pencere tamamlandı', 'complete':'Dayanak + SPY eşleşti', 'paired':'Dayanak + SPY eşleşti', 'partial':'Kısmi ölçüm', 'missing':'Ölçüm eksik', 'unknown':'Doğrulanamadı', 'not_applicable':'Kapsam dışı', 'rejected':'Kayıt kabul edilmedi', 'late':'Geç kayıt'} %}
+{% if rows %}
+<div class="call-ledger" aria-label="Yeni zamanlı referans ölçümleri">
+{% for row in rows %}<article class="call-record timed-target" data-timed-target="{{ row.key }}">
+<div class="call-record-heading"><div>{% if show_calls %}<a class="call-record-symbol" href="/karne/{{ row.call_key }}">{{ row.ticker }}</a>{% else %}<b>{{ row.ticker }}</b>{% endif %}<p>{{ {'m15':'+15 dk', 'm60':'+60 dk', '15m':'+15 dk', '60m':'+60 dk'}.get(row.horizon, row.horizon) }} · {{ instrument_title(row.instrument) }}</p></div><span class="decision-badge">{{ row.state_label if row.state_label is defined else labels.get(row.state | lower, 'Durum doğrulanamadı') }}</span></div>
+<dl class="call-metrics"><div><span>Dayanak referansı · maliyet öncesi</span><strong>{{ percentage(row.own_pct) }}</strong></div><div><span>SPY farkı · eşleşmiş gözlem</span><strong>{{ percentage(row.excess_pp, ' puan') }}</strong></div></dl>
+{% if row.reasons %}<p class="quiet-copy">{% for reason in row.reasons %}{{ reason }}{% if not loop.last %} {% endif %}{% endfor %}</p>{% endif %}
+<p class="quiet-copy"><b>Hedef:</b> {{ clock(row.target_at) }}<br><b>Son kayıt sınırı:</b> {{ clock(row.deadline) }}.</p>
+<details open><summary>Kaynak ve kalıcı kayıt saatleri</summary>
+<p class="quiet-copy">Özgün ilk AL yayını: {{ clock(row.call_at) }}. Aşağıdaki tüm saatler Europe/London.</p>
+<dl class="signal-times"><div><dt>Dayanak · kaynak işlemi</dt><dd>{{ clock(row.own_source_at) }}</dd></div><div><dt>Dayanak · yanıt alındı</dt><dd>{{ clock(row.own_received_at) }}</dd></div><div><dt>Dayanak · kalıcı kayıt doğrulandı</dt><dd>{{ clock(row.own_confirmed_at) }}</dd></div><div><dt>Dayanak · kayıt anındaki kaynak yaşı / kayıt gecikmesi</dt><dd>{{ seconds(row.own_source_age_seconds) }} / {{ seconds(row.own_recording_lag_seconds) }}</dd></div></dl>
+<dl class="signal-times"><div><dt>SPY · kaynak işlemi</dt><dd>{{ clock(row.spy_source_at) }}</dd></div><div><dt>SPY · yanıt alındı</dt><dd>{{ clock(row.spy_received_at) }}</dd></div><div><dt>SPY · kalıcı kayıt doğrulandı</dt><dd>{{ clock(row.spy_confirmed_at) }}</dd></div><div><dt>SPY · kayıt anındaki kaynak yaşı / kayıt gecikmesi</dt><dd>{{ seconds(row.spy_source_age_seconds) }} / {{ seconds(row.spy_recording_lag_seconds) }}</dd></div></dl>
+<p class="quiet-copy">Dayanak / SPY kaynak zamanı farkı: {{ seconds(row.exit_skew_seconds) }}. Sırayla alınan gözlemlerdir; eşzamanlı alış/satış dolumu değildir.</p>
+</details>
+</article>{% endfor %}
+</div>
+{% else %}<p class="desk-notice">Bu kapsamda yeni zamanlı hedef kaydı yok. Getiri ve başarı oranı bilinmiyor; eksik sonuç sıfır sayılmaz.</p>{% endif %}
+{% endmacro %}
+
+{% macro call_capture_panel(x, day) %}
+<section aria-label="Çağrının yeni zamanlı ölçümü" data-call-timed-capture>
+<div class="section-heading"><h2>Yeni zamanlı ölçüm · +15 / +60 dk</h2><a href="/olcum?day={{ day.isoformat() }}">Günün ölçüm kapsamı →</a></div>
+<p class="quiet-copy">Bu akış eski sonuçlardan ayrıdır. Eski eksik ölçümleri geriye dönük doldurmaz; güncel giriş izni veya otomatik öğrenme anlamına gelmez.</p>
+{% if x %}
+<p class="desk-notice">{{ x.reason }}</p>
+<p class="quiet-copy">Yöntem: {{ x.method }} · Kalıcı etkinleşme: {{ clock(x.activation_at) }}.</p>
+{% if x.first is sameas false and x.canonical_key %}<p class="quiet-copy">Bu kayıt güncellemedir; ilk AL sonucunu devralmaz. <a class="underline" href="/karne/{{ x.canonical_key }}">Özgün ilk AL kaydını aç →</a></p>{% endif %}
+{% if x.limited %}<p class="desk-notice">Okuma sınırı nedeniyle bu çağrının kapsamı tam doğrulanamadı.</p>{% endif %}
+{{ target_table(x.rows, false) }}
+{% else %}<p class="desk-notice">Yeni akışın bu çağrıya ait kapsamı henüz doğrulanamadı. Eski sonuçlar ve eksik kayıtlar aşağıda kendi yöntemleriyle korunur.</p>{% endif %}
+</section>
+{% endmacro %}

@@ -1,0 +1,18 @@
+version: timed_measurement_v1
+enabled_env: TIMED_MEASUREMENT_ENABLED
+source_path: /api/stock/{ticker}/quote
+idle_poll_seconds: 15
+active_poll_seconds: 5
+attempt_offsets_seconds: [2, 32, 62]
+attempt_spacing_seconds: 30
+max_attempts: 3
+trade_max_age_seconds: 60
+pair_skew_seconds: 60
+request_timeout_seconds: 8
+max_body_bytes: 65536
+module_daily_cap: 256
+read_limit: 200
+slot_conflict_retries: 8
+statement_timeout_ms: 2000
+lock_timeout_ms: 1000
+rate_limit_cooldown_seconds: 60

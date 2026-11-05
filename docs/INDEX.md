@@ -270,6 +270,9 @@ A new study needs a fresh, non-overlapping window (`docs/next_studies.md`,
 
 | 5.57 | **Compact signal explanations and desktop alerts** — explicit first/update/check/expiry times, provenance-matched readable reasons/news roles, reduced empty space and one private-screen notification controller. Contract: `docs/phase-5.57-signal-clarity-acceptance.md`; delivery: `docs/phase-5.57-closeout.md`; narrow journal follow-up: `docs/phase-5.57.2-journal-wrap-acceptance.md`. Notify-only, no policy/research mutation or alpha claim; owner requests consolidated correction, 2026-11-04. |
 
+| 5.58 | **Prospective timed measurement and daily accountability** — isolated, bounded first-call/SPY target captures with durable clocks/claims, explicit completeness and separate legacy/PAPER/news scopes. Contract: `docs/phase-5.58-timed-measurement-acceptance.md`. Owner explicitly authorizes continued implementation/publication, 2026-11-05; no strategy training, order execution, old-outcome repair or alpha claim. |
+| 5.58.1 | **Production quote capability check** — engineering addendum `docs/phase-5.58.1-production-quote-capability.md`, registered before at most two additional single-attempt production-key probes after the original managed-session key proved different. No original contract rewrite, outcome capture, strategy search or credential change. |
+
 Detail for the 5.10–5.19 candidates:
 - **Falsification gates (D8).** `src/uoa_detector/backtest/falsification.py:79-81`
   hardcodes `_MIN_CLOSED_TRADES = 30`, `_MIN_BEST_SHARPE = 0.5` and
