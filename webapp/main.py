@@ -45,6 +45,7 @@ from starlette.responses import PlainTextResponse
 
 from uoa_detector.sources.market_hours import is_market_open
 from webapp import (
+    call_review,
     explanations,
     gamma,
     horizon_diagnostics,
@@ -776,6 +777,19 @@ def timed_measurement_status(day: date | None = None) -> dict[str, Any]:
 @app.get("/api/arastirma/veri-tamamlama")
 def daily_repair_status() -> dict[str, Any]:
     return repair_operator.status(_board_reader().engine, _now())
+
+
+@app.get("/inceleme", response_class=HTMLResponse)
+def first_call_review(request: Request) -> HTMLResponse:
+    review = call_review.build(_board_reader().engine, _now())
+    return templates.TemplateResponse(request, "call_review.html", {
+        "review": review, "role_labels": call_review.ROLE_LABELS, "states": call_progress.LABELS,
+    })
+
+
+@app.get("/api/arastirma/cagri-inceleme")
+def first_call_review_api() -> dict[str, Any]:
+    return asdict(call_review.build(_board_reader().engine, _now()))
 
 
 @app.get("/api/arastirma/haber")
