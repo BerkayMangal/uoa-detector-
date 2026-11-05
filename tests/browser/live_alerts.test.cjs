@@ -200,7 +200,7 @@ class Browser {
   }
 }
 
-test('new browsers default to all upward plans and retain an existing CALL-only choice', async () => {
+test('new browsers default to all supported directions and retain an existing CALL-only choice', async () => {
   const fresh = new Browser(), a = fresh.tab(); await settle();
   assert.equal(a.elements['alerts-scope'].value, 'all'); assert.equal(fresh.permissionRequests.length, 0);
   const old = new Browser({pref: {enabled: false, scope: 'calls', exits: false}}), b = old.tab(); await settle();
@@ -408,3 +408,64 @@ for (const failure of ['open', 'commit']) {
     hub.signals.push(signal(24)); await reloaded.poll(); assert.equal(hub.notifications.length, 1);
   });
 }
+
+function put(number, instrument = 'long_put', overrides = {}) {
+  return signal(number, {instrument, label: 'PUT AL · Düşüş tezi', underlying_stop: 105, underlying_target: 90, ...overrides});
+}
+for (const instrument of ['long_put', 'bear_put_debit']) {
+  test(`fresh ${instrument} entry delivers once and stays deduplicated on reload`, async () => {
+    const hub = new Browser(), tab = hub.tab(); await tab.click('alerts-toggle');
+    hub.signals = [put(41, instrument)]; await tab.poll(); await tab.poll();
+    assert.equal(hub.notifications.length, 1); assert.match(hub.notifications[0].title, /PUT/);
+    tab.close(); hub.tab(); await settle(); assert.equal(hub.notifications.length, 1);
+  });
+}
+for (const [scope, expected] of [['all',[51,52,53,54,55]],['up',[51,52,53]],['calls',[52,53]],['puts',[54,55]]]) {
+  test(`${scope} scope admits exactly its directional instruments`, async () => {
+    const hub=new Browser({pref:{enabled:false,scope}}), tab=hub.tab(); await tab.click('alerts-toggle');
+    hub.signals=[signal(51,{instrument:'stock'}),signal(52),signal(53,{instrument:'bull_call_debit'}),put(54),put(55,'bear_put_debit')];
+    await tab.poll();
+    assert.deepEqual(Object.keys(hub.seen).sort(), expected.map(n=>signal(n).key).sort());
+    assert.equal(hub.notifications.length,1);
+  });
+}
+test('invalid and expired PUT entries stay silent',async()=>{
+ const hub=new Browser(),tab=hub.tab();await tab.click('alerts-toggle');
+ hub.signals=[put(61,'long_put',{underlying_stop:95}),put(62,'bear_put_debit',{underlying_target:110}),put(63,'long_put',{expires_at:new Date(EPOCH-1).toISOString()})];
+ await tab.poll();assert.equal(hub.notifications.length,0);assert.equal(tab.elements['signal-toast'].hidden,true);
+});
+test('PUT exit reviews remain independent of CALL-only entry scope',async()=>{
+ const hub=new Browser({pref:{enabled:false,scope:'calls',exits:true}}),tab=hub.tab();await tab.click('alerts-toggle');
+ hub.signals=[put(64),put(65,'long_put',{event_type:'exit',message:'Existing PUT position review'})];await tab.poll();
+ assert.equal(hub.notifications.length,1);assert.ok(Object.hasOwn(hub.seen,put(65).key));assert.ok(!Object.hasOwn(hub.seen,put(64).key));
+});
+test('scope expansion baselines existing PUT plans before accepting later fresh ones',async()=>{
+ const hub=new Browser({pref:{enabled:false,scope:'calls'}}),tab=hub.tab();hub.signals=[put(66)];await tab.click('alerts-toggle');
+ await tab.change('puts');await tab.poll();assert.equal(hub.notifications.length,0);
+ hub.signals.push(put(67));await tab.poll();assert.equal(hub.notifications.length,1);
+ assert.equal(hub.pref().scope,'puts');tab.close();const other=hub.tab();await settle();assert.equal(other.elements['alerts-scope'].value,'puts');assert.equal(hub.notifications.length,1);
+});
+test('legacy enabled all scope baselines PUTs without swallowing fresh upward signals or prompting',async()=>{
+ const hub=new Browser({pref:{enabled:true,scope:'all',exits:true}});hub.signals=[put(71),signal(72)];const tab=hub.tab();await settle();await settle();
+ assert.equal(hub.pref().scopeVersion,2);assert.equal(hub.permissionRequests.length,0);
+ assert.ok(Object.hasOwn(hub.seen,put(71).key));assert.equal(hub.notifications.length,1);assert.match(hub.notifications[0].title,/SYNTH72/);
+ hub.signals.push(put(73));await tab.poll();assert.equal(hub.notifications.length,2);
+});
+test('legacy migration cannot undo another tab disabling alerts during durable baseline',async()=>{
+ const hub=new Browser({pref:{enabled:true,scope:'all',exits:true}});hub.paused=true;hub.signals=[put(74)];const tab=hub.tab();await settle();
+ hub.writePref({enabled:false,scope:'all',exits:true});await settle();hub.paused=false;hub.pump();await settle();await settle();
+ assert.equal(tab.enabled(),false);assert.equal(hub.pref().enabled,false);assert.equal(hub.notifications.length,0);
+});
+test('unknown persisted or current scopes cannot broaden entry delivery',async()=>{
+ const hub=new Browser({pref:{enabled:true,scope:'unknown'}}),tab=hub.tab();await settle();assert.equal(tab.enabled(),false);assert.equal(hub.fetches.length,0);
+ await tab.click('alerts-toggle');await tab.change('unknown');hub.signals=[put(75),signal(76)];await tab.poll();assert.equal(hub.notifications.length,0);
+});
+
+ test('legacy migration leaves fresh PUT exits available to the normal exit channel',async()=>{
+  const hub=new Browser({pref:{enabled:true,scope:'all',exits:true}});hub.signals=[put(81),put(82,'long_put',{event_type:'exit',message:'Existing PUT exit review'})];hub.tab();await settle();await settle();
+  assert.equal(hub.notifications.length,1);assert.match(hub.notifications[0].options.body,/Existing PUT exit review/);assert.ok(Object.hasOwn(hub.seen,put(81).key));
+ });
+ test('parallel legacy migrations never notify the existing PUT or duplicate a fresh CALL',async()=>{
+  const hub=new Browser({pref:{enabled:true,scope:'all',exits:true}});hub.signals=[put(83),signal(84)];hub.tab();hub.tab();await settle();await settle();
+  assert.equal(hub.notifications.length,1);assert.match(hub.notifications[0].title,/SYNTH84/);
+ });

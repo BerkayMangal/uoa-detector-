@@ -22,9 +22,10 @@
     });
   }
   function say(text) { status.textContent = text; }
+  function knownScope(value) { return ['all', 'calls', 'puts', 'up'].includes(value); }
   function readPref() {
     const p = JSON.parse(localStorage.getItem(PREF) || '{}');
-    return {enabled: p.enabled === true, scope: p.scope === 'calls' ? 'calls' : 'all', exits: p.exits !== false};
+    return {enabled: p.enabled === true && (p.scope === undefined || knownScope(p.scope)), scope: knownScope(p.scope) ? p.scope : 'all', scopeVersion: p.scopeVersion === 2, exits: p.exits !== false};
   }
   function permission() {
     return 'Notification' in window && window.isSecureContext !== false ? Notification.permission : 'unsupported';
@@ -50,7 +51,7 @@
     if (exitChoice) exitChoice.disabled = busy;
     paintChannels();
   }
-  function persist() { localStorage.setItem(PREF, JSON.stringify({enabled: enabled, scope: scope.value, exits: exitChoice ? exitChoice.checked : true})); }
+  function persist() { localStorage.setItem(PREF, JSON.stringify({enabled: enabled, scope: scope.value, scopeVersion: 2, exits: exitChoice ? exitChoice.checked : true})); }
   function failStorage(error) {
     enabled = false; generation++; paint(); retire();
     // A recovered database after reload must not auto-arm an old preference
@@ -143,10 +144,16 @@
   function valid(signal, data) {
     const exit = signal && signal.event_type === 'exit';
     return data.status === 'current' && signal && /^[a-f0-9]{64}$/.test(signal.key)
-      && (exit ? ['stock', 'long_call', 'bull_call_debit', 'long_put', 'bear_put_debit'] : ['stock', 'long_call', 'bull_call_debit']).includes(signal.instrument)
-      && (exit ? !exitChoice || exitChoice.checked : scope.value === 'all' || signal.instrument !== 'stock')
+      && ['stock', 'long_call', 'bull_call_debit', 'long_put', 'bear_put_debit'].includes(signal.instrument)
+      && (exit ? !exitChoice || exitChoice.checked : scope.value === 'all'
+        || scope.value === 'calls' && ['long_call', 'bull_call_debit'].includes(signal.instrument)
+        || scope.value === 'puts' && ['long_put', 'bear_put_debit'].includes(signal.instrument)
+        || scope.value === 'up' && ['stock', 'long_call', 'bull_call_debit'].includes(signal.instrument))
       && typeof signal.ticker === 'string' && typeof signal.label === 'string'
       && (exit ? typeof signal.message === 'string' && signal.message.length > 0 : [signal.underlying_ref, signal.underlying_stop, signal.underlying_target].every(function (n) { return Number.isFinite(n) && n > 0; }))
+      && (exit || (['long_put', 'bear_put_debit'].includes(signal.instrument)
+        ? signal.underlying_target < signal.underlying_ref && signal.underlying_ref < signal.underlying_stop
+        : signal.underlying_stop < signal.underlying_ref && signal.underlying_ref < signal.underlying_target))
       && Date.parse(signal.expires_at) - Date.parse(data.server_time) > data.elapsed + performance.now() - data.receivedAt;
   }
   function show(signals, data) {
@@ -196,15 +203,29 @@
       if (enabled && armed === generation) { retire(); say('Uyarı bağlantısı kurulamadı; güncel sinyal doğrulanamıyor. Yeniden denenecek.'); }
     } finally { polling = false; }
   }
-  async function baseline(armed) {
+  async function baseline(armed, putsOnly) {
     const data = await load();
     if (armed !== generation) return null;
     if (!['current', 'not_live', 'no_scan', 'stale'].includes(data.status)) throw new Error('no usable feed');
     await lock(async function () {
-      if (armed === generation) await claim(data.signals.filter(function (s) { return valid(s, data); }), data.server_time);
+      if (armed === generation) await claim(data.signals.filter(function (s) { return valid(s, data) && (!putsOnly || s.event_type !== 'exit' && ['long_put', 'bear_put_debit'].includes(s.instrument)); }), data.server_time);
     });
     if (armed !== generation) return null;
     return data;
+  }
+  async function upgradeDirections() {
+    const armed = ++generation;
+    enabled = false; busy = true; retire(); paint();
+    try {
+      await baseline(armed, true);
+      if (armed !== generation) return;
+      enabled = true;
+      try { persist(); } catch (error) { failStorage(error); return; }
+      paint(); say('Tüm yönler izleniyor. Mevcut PUT planları başlangıç kaydına alındı; sonraki yeni planlar bildirilir.');
+      poll();
+    } catch (error) {
+      if (armed === generation) failStorage(error);
+    } finally { busy = false; paint(); }
   }
   async function enable(wantDesktop) {
     const armed = ++generation, wasEnabled = enabled;
@@ -296,7 +317,8 @@
       const p = readPref(); enabled = p.enabled; scope.value = p.scope; generation++; paint();
       if (exitChoice) exitChoice.checked = p.exits;
       retire();
-      say(enabled ? 'Uyarılar açık. ' + channelText() : 'Uyarılar diğer sekmeden kapatıldı.');
+      if (enabled && p.scope === 'all' && !p.scopeVersion) upgradeDirections();
+      else say(enabled ? 'Uyarılar açık. ' + channelText() : 'Uyarılar diğer sekmeden kapatıldı.');
     } catch (_) { failStorage(); }
   });
   function expireToast() {
@@ -310,6 +332,7 @@
   try {
     const p = readPref(); enabled = p.enabled; scope.value = p.scope; paint();
     if (exitChoice) exitChoice.checked = p.exits;
-    if (enabled) { say('Uyarı bağlantısı kuruluyor. ' + channelText()); poll(); }
+    if (enabled && p.scope === 'all' && !p.scopeVersion) upgradeDirections();
+    else if (enabled) { say('Uyarı bağlantısı kuruluyor. ' + channelText()); poll(); }
   } catch (_) { failStorage(); }
 })();

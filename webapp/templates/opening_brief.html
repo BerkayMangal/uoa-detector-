@@ -46,8 +46,8 @@
       {% for s in brief.buys %}{% set a = s.advice %}
       {% set explanation = (signal_explanations|default({})).get(s.key) %}
       <article class="plan-card" data-opening-buys data-opening-expiry="{{ a.expires_at.isoformat() }}">
-        <div class="plan-title"><h2>{{ a.ticker }}{% if a.ticker == 'MSFT' %} · Microsoft{% endif %}</h2><span class="decision-badge">{{ 'HİSSE AL' if a.instrument == 'stock' else 'OPSİYON PLANI' }}</span></div>
-        <p>{{ a.headline }}</p>
+        <div class="plan-title"><h2>{{ a.ticker }}{% if a.ticker == 'MSFT' %} · Microsoft{% endif %}</h2><span class="decision-badge">{{ {'stock':'HİSSE AL', 'long_call':'CALL AL', 'bull_call_debit':'CALL SPREAD AL', 'long_put':'PUT AL', 'bear_put_debit':'PUT SPREAD AL'}.get(a.instrument,'OPSİYON PLANI') }}</span></div>
+        <p>{{ a.headline }}</p>{% if a.direction == 'down' %}<p class="signal-publication"><b>Düşüş tezi · PUT alımı.</b> Dayanak hedef girişin altında, stop üstündedir. Mevcut pozisyonu kapatma talimatı değildir.</p>{% endif %}
         <p class="signal-publication">Yayımlandı {{ london_time(s.at) if london_time is defined else tr_time(s.at) + ' TR' }} · Geçerlilik {{ london_time(a.expires_at) if london_time is defined else tr_time(a.expires_at) + ' TR' }}'ye kadar, güncel koşullar korunursa.</p>
         {% if a.plan %}<dl class="price-rail"><div><dt>Dayanak giriş referansı</dt><dd>${{ '%.2f' | format(a.plan.entry) }}</dd></div><div><dt>Dayanak stop</dt><dd>${{ '%.2f' | format(a.plan.stop) }}</dd></div><div><dt>Dayanak hedef · politika</dt><dd>${{ '%.2f' | format(a.plan.target) }}</dd></div></dl>{% endif %}
         {% if explanation %}<details class="call-evidence-disclosure"><summary>Fiyat, akış ve haber dayanaklarını aç</summary>{{ explanation_panel(explanation) }}</details>

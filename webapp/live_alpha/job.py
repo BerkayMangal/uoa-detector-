@@ -218,6 +218,7 @@ def _paper_plan(card: Card) -> dict[str, Any]:
     preferred = card.instrument.preferred
     structure = next((v for v in card.options if v.kind == preferred), None)
     return {
+        **({"auto_paper_scope": "downside_source_v1"} if card.direction == "down" else {}),
         "instrument": preferred,
         "stock_plan": to_jsonable(card.stock_plan),
         "structure": to_jsonable(structure) if structure is not None else None,
@@ -233,8 +234,15 @@ def open_papers_for_new_buys(ctx: CycleContext, cards: Sequence[Card], rec_ids: 
         return 0
     opened = 0
     for c in cards:
-        if c.recommendation is not Recommendation.BUY or c.readiness is not Readiness.READY:
+        if c.recommendation not in (Recommendation.BUY, Recommendation.BEARISH_SETUP) or c.readiness is not Readiness.READY:
             continue
+        if c.direction == "down" or c.recommendation is Recommendation.BEARISH_SETUP:
+            selected = next((s for s in c.options if s.kind == c.instrument.preferred), None)
+            if (c.direction != "down" or c.recommendation is not Recommendation.BEARISH_SETUP
+                    or c.instrument.preferred not in ("long_put", "bear_put_debit")
+                    or selected is None or selected.readiness is not Readiness.READY
+                    or selected.lots <= 0 or selected.entry_debit is None or selected.entry_debit <= 0):
+                continue
         if c.instrument.preferred == "none" or c.stock_plan is None:
             continue
         paper = store.LivePaper(
