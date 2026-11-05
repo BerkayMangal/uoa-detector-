@@ -272,6 +272,7 @@ A new study needs a fresh, non-overlapping window (`docs/next_studies.md`,
 
 | 5.58 | **Prospective timed measurement and daily accountability** — isolated, bounded first-call/SPY target captures with durable clocks/claims, explicit completeness and separate legacy/PAPER/news scopes. Contract: `docs/phase-5.58-timed-measurement-acceptance.md`. Owner explicitly authorizes continued implementation/publication, 2026-11-05; no strategy training, order execution, old-outcome repair or alpha claim. |
 | 5.58.1 | **Production quote capability check** — engineering addendum `docs/phase-5.58.1-production-quote-capability.md`, registered before at most two additional single-attempt production-key probes after the original managed-session key proved different. No original contract rewrite, outcome capture, strategy search or credential change. |
+| 5.59 | **Readable trading desk** — owner-requested visual hierarchy, prominent calls and progressive disclosure; `docs/phase-5.59-readable-desk-acceptance.md`. Existing signal/measurement logic, modules, forms and alert safeguards remain. Authorized implementation and publication, 2026-11-05. |
 
 Detail for the 5.10–5.19 candidates:
 - **Falsification gates (D8).** `src/uoa_detector/backtest/falsification.py:79-81`

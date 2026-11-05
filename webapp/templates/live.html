@@ -7,6 +7,7 @@
 {% block tagline %}<span class="text-sm text-gray-400">Bugün ne alınır, hangi fiyattan, nerede zarar kesilir. Emir göndermez; işlemi sen yaparsın.</span>{% endblock %}
 {% block content %}
 <div class="live-desk-page">
+<div class="desk-intro"><div><p class="eyebrow">UOA / GÜNLÜK ÇALIŞMA MASASI</p><p class="desk-intro-title">Önce karar. Sonra dayanakları.</p></div><div class="desk-shortcuts"><a href="/acilis">Güncel planlar <span>Giriş · stop · hedef</span></a><a href="/karne">Verilen çağrılar <span>Ne zaman, neden söylendi?</span></a><a href="/olcum">Ölçüm defteri <span>Sonrasında ne oldu?</span></a></div></div>
 <nav class="desk-jump-nav" aria-label="Bu sayfada">
   <a href="#opening-desk">Güncel karar</a>
   <a href="#daily-published-calls">Bugünkü çağrılar</a>
@@ -38,7 +39,7 @@
   </div>
   {% endif %}
 
-  <details open class="fold-panel" id="source-strategy"><summary>Kaynak stratejinin ayrıntıları · deneysel Live Alpha v1</summary>  <div class="desk-heading">
+  <details class="fold-panel secondary-disclosure" id="source-strategy"><summary>Kaynak stratejinin ayrıntıları · deneysel Live Alpha v1</summary>  <div class="desk-heading">
     <div><p class="eyebrow">Bugünün Fırsatları · kaynak model</p><h2>Kaynak modelin değerlendirmeleri</h2></div>
     <div class="session-clock"><span class="session-pill {{ 'is-live' if v.mode == 'LIVE' else '' }}">{{ v.mode_text }}</span><br>{{ v.now_et }} · {{ v.now_tr }}</div>
   </div>

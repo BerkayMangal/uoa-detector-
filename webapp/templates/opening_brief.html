@@ -48,9 +48,9 @@
       <article class="plan-card" data-opening-buys data-opening-expiry="{{ a.expires_at.isoformat() }}">
         <div class="plan-title"><h2>{{ a.ticker }}{% if a.ticker == 'MSFT' %} · Microsoft{% endif %}</h2><span class="decision-badge">{{ 'HİSSE AL' if a.instrument == 'stock' else 'OPSİYON PLANI' }}</span></div>
         <p>{{ a.headline }}</p>
-        {% if not explanation %}<p class="signal-publication">Yayımlandı {{ london_time(s.at) if london_time is defined else tr_time(s.at) + ' TR' }} · Geçerlilik {{ london_time(a.expires_at) if london_time is defined else tr_time(a.expires_at) + ' TR' }}'ye kadar, güncel koşullar korunursa.</p>{% endif %}
+        <p class="signal-publication">Yayımlandı {{ london_time(s.at) if london_time is defined else tr_time(s.at) + ' TR' }} · Geçerlilik {{ london_time(a.expires_at) if london_time is defined else tr_time(a.expires_at) + ' TR' }}'ye kadar, güncel koşullar korunursa.</p>
         {% if a.plan %}<dl class="price-rail"><div><dt>Dayanak giriş referansı</dt><dd>${{ '%.2f' | format(a.plan.entry) }}</dd></div><div><dt>Dayanak stop</dt><dd>${{ '%.2f' | format(a.plan.stop) }}</dd></div><div><dt>Dayanak hedef · politika</dt><dd>${{ '%.2f' | format(a.plan.target) }}</dd></div></dl>{% endif %}
-        {% if explanation %}{{ explanation_panel(explanation) }}
+        {% if explanation %}<details class="call-evidence-disclosure"><summary>Fiyat, akış ve haber dayanaklarını aç</summary>{{ explanation_panel(explanation) }}</details>
         {% else %}<p class="signal-projection-missing">Kaydedilmiş makine dayanakları doğrulanamadı; özgün gerekçeler aşağıda. Haber desteği ve kaynak saatleri bilinmiyor.</p>{% endif %}
         <p class="saved-signal-reasons"><b>Kaydedilmiş gerekçeler:</b> {{ a.reasons | join(' ') }}</p>
         <a class="underline" href="/karne/{{ s.key }}">Gerekçe, araç ve maliyetleri aç →</a>
