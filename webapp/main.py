@@ -99,6 +99,8 @@ from webapp.repo import RunInfo, SignalRepo
 from webapp.service_isolation import run_service
 from webapp.shared_news.config import enabled as shared_news_enabled
 from webapp.storage_diagnostics import native_hint
+from webapp.timed_measurement import service as timed_service
+from webapp.timed_measurement import view as timed_view
 from webapp.vol_board import VolBoardRow, build_vol_board, vol_board_summary
 from webapp.worker import live_config_from_env, run_live_worker
 
@@ -226,6 +228,13 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
                 lambda: run_service(str(config["database_url"]),
                                     lambda: shared_news.loop(str(config["database_url"])), "shared-news"),
                 "shared-news",
+            )))
+        if timed_service.enabled():
+            tasks.append(asyncio.create_task(_supervise(
+                lambda: run_service(str(config["database_url"]),
+                                    lambda: timed_service.loop(str(config["database_url"])),
+                                    "timed-measurement"),
+                "timed-measurement",
             )))
         if os.environ.get("DAILY_REPAIR_REQUEST", "").strip():
             # Explicit one-shot operator; its durable claim prevents retry on redeploy.
@@ -749,7 +758,19 @@ def call_scorecard_page(request: Request, key: str) -> HTMLResponse:
     engine, now = _board_reader().engine, _now()
     card = call_scorecard.get(engine, key, now)
     explanation = _safe(lambda: signal_explanation.build(engine, now, keys=(key,)).get(key), None) if card else None
-    return templates.TemplateResponse(request, "call_scorecard.html", {"card": card, "explanation": explanation, "progress": call_progress.detail(card, now) if card else (), "context": call_context.view(engine, key, now) if card else None, "tr_time": opening_view.tr_time}, status_code=200 if card else 404)
+    return templates.TemplateResponse(request, "call_scorecard.html", {"card": card, "explanation": explanation, "progress": call_progress.detail(card, now) if card else (), "context": call_context.view(engine, key, now) if card else None, "measurement_call": timed_view.build_call(engine, now, key) if card else None, "tr_time": opening_view.tr_time}, status_code=200 if card else 404)
+
+
+@app.get("/olcum", response_class=HTMLResponse)
+def timed_measurement_page(request: Request, day: date | None = None) -> HTMLResponse:
+    report = timed_view.build(_board_reader().engine, _now(), day)
+    return templates.TemplateResponse(request, "olcum.html", {"measurement": report})
+
+
+@app.get("/api/olcum")
+def timed_measurement_status(day: date | None = None) -> dict[str, Any]:
+    """Stored, versioned references only: GET never starts capture or calibration."""
+    return asdict(timed_view.build(_board_reader().engine, _now(), day))
 
 
 @app.get("/api/arastirma/veri-tamamlama")
@@ -1802,6 +1823,8 @@ def health() -> dict[str, object]:
         body["alpha_lab"] = dict(LAB_STATE)
     if ARCHIVE_STATE:
         body["flow_capture"] = dict(ARCHIVE_STATE)
+    if timed_service.STATE:
+        body["timed_measurement"] = timed_service.safe_status()
     from webapp.research_readiness import public_summary
 
     if live_job.LAST_CYCLE and (summary := public_summary()):

@@ -86,6 +86,7 @@ decision (no built-in cache here):
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
@@ -170,6 +171,21 @@ class UnusualWhalesTransientError(UnusualWhalesError):
     """Retryable failure: 5xx, network error, timeout."""
 
 
+class UnusualWhalesResponseBodyError(UnusualWhalesError):
+    """An opt-in bounded response was refused, without retry or body disclosure."""
+
+    def __init__(self, reason: str, *, status_code: int, body_bytes: int) -> None:
+        super().__init__("Unusual Whales bounded response rejected")
+        self.reason = reason
+        self.status_code = status_code
+        self.body_bytes = body_bytes
+
+
+class _ResponseHookError(Exception):
+    def __init__(self, error: Exception) -> None:
+        self.error = error
+
+
 class CircuitBreakerOpenError(_BaseCircuitBreakerOpenError, UnusualWhalesError):
     """The circuit breaker is open; refusing requests until reset.
 
@@ -216,12 +232,24 @@ class UnusualWhalesClient:
         circuit_breaker_threshold: int = 5,
         circuit_breaker_reset_s: float = 30.0,
         rate_limit_backoff_s: float = 1.0,
+        before_request: Callable[[], Awaitable[None]] | None = None,
+        after_response: Callable[[httpx.Response], Awaitable[None]] | None = None,
+        max_response_bytes: int | None = None,
     ) -> None:
+        if max_response_bytes is not None and (
+            isinstance(max_response_bytes, bool)
+            or not isinstance(max_response_bytes, int)
+            or max_response_bytes <= 0
+        ):
+            raise ValueError("max_response_bytes must be positive")
         self._api_key = api_key
         self._settings = settings
         self._base_url = base_url.rstrip("/")
         self._retry = retry or RetryPolicy()
         self._rate_limit_backoff_s = rate_limit_backoff_s
+        self._before_request = before_request
+        self._after_response = after_response
+        self._max_response_bytes = max_response_bytes
         self._bucket = TokenBucket(
             capacity=max(settings.rate_limit_requests_per_second, 1.0),
             refill_per_second=settings.rate_limit_requests_per_second,
@@ -323,6 +351,43 @@ class UnusualWhalesClient:
 
     # -- core request loop --------------------------------------------------
 
+    async def _request(
+        self, method: str, path: str, params: dict[str, Any] | None,
+    ) -> httpx.Response:
+        """Use the existing proxy/CA client; bound bytes only when explicitly requested."""
+        headers = self._auth_headers()
+        limit = self._max_response_bytes
+        if limit is None:
+            return await self._http.request(method, path, params=params, headers=headers)
+        headers["Accept-Encoding"] = "identity"
+        async with self._http.stream(method, path, params=params, headers=headers) as response:
+            # Even a rejected/truncated response can supply a real quota header.
+            self._capture_daily_count(response)
+            reason = None
+            if response.headers.get("content-encoding", "identity").lower() != "identity":
+                reason = "content_encoding"
+            length = response.headers.get("content-length")
+            if reason is None and length is not None and not length.isdecimal():
+                reason = "content_length"
+            if reason is None and length is not None and int(length) > limit:
+                reason = "body_limit"
+            if reason is not None:
+                raise UnusualWhalesResponseBodyError(
+                    reason, status_code=response.status_code, body_bytes=0,
+                )
+            raw = bytearray()
+            async for chunk in response.aiter_bytes(chunk_size=limit + 1):
+                if len(raw) + len(chunk) > limit:
+                    raise UnusualWhalesResponseBodyError(
+                        "body_limit", status_code=response.status_code,
+                        body_bytes=limit + 1,
+                    )
+                raw.extend(chunk)
+            return httpx.Response(
+                response.status_code, headers=response.headers, content=bytes(raw),
+                request=response.request, extensions=response.extensions,
+            )
+
     async def request_json(
         self,
         path: str,
@@ -355,13 +420,17 @@ class UnusualWhalesClient:
         last_error: Exception | None = None
         for attempt in range(self._retry.max_attempts):
             await self._bucket.acquire()
+            # Ownership/budget refusal must escape unchanged and cannot be retried.
+            if self._before_request is not None:
+                await self._before_request()
             try:
-                response = await self._http.request(
-                    method, path,
-                    params=params,
-                    headers=self._auth_headers(),
-                )
+                response = await self._request(method, path, params)
                 self._capture_daily_count(response)
+                if self._after_response is not None:
+                    try:
+                        await self._after_response(response)
+                    except Exception as exc:
+                        raise _ResponseHookError(exc) from None
                 status = response.status_code
                 if status >= 500:
                     msg = f"UnusualWhales {method} {path} returned HTTP {status}"
@@ -387,6 +456,8 @@ class UnusualWhalesClient:
                 # carrying garbage counts as a failure, not a reset.
                 self._breaker.record_success()
                 return result
+            except _ResponseHookError as exc:
+                raise exc.error from None
             except (
                 httpx.RequestError,
                 UnusualWhalesTransientError,

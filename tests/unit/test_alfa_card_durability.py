@@ -73,6 +73,15 @@ _KNOWN_EXCEPTIONS: Final = {
 # recorded, a telemetry branch that was taken, the OI that confirmed an
 # opening — nobody can re-derive these from the vendor tomorrow.
 _APPEND_ONLY_TABLES: Final = {
+    "alfa_timed_activation",    # Phase 5.58: durable prospective cohort boundary
+    "alfa_timed_target",        # exact first-call target and original source binding
+    "alfa_timed_attempt",       # non-replayable ownership before vendor I/O
+    "alfa_timed_request_slot",  # conservative per-leg module reservation evidence
+    "alfa_timed_packet",        # original bounded wire response and source metadata
+    "alfa_timed_receipt",       # post-commit receipt/confirmation clocks
+    "alfa_timed_completion",    # immutable paired-attempt facts, including failed legs
+    "alfa_timed_assessment",    # fixed-order outcome selection and explicit unknowns
+    "alfa_timed_day_halt",      # durable auth/quota stops and rate-limit cooldowns
     "alfa_shared_news_packet",  # Phase 5.56: physically received curated-source versions cannot be recreated
     "alfa_shared_news_receipt", # Phase 5.56: post-packet-commit availability evidence
     "alfa_shared_news_item_observation", # Phase 5.56: immutable item/version-to-packet provenance

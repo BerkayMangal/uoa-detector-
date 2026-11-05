@@ -17,7 +17,7 @@
   <meta property="og:url" content="{{ public_canonical }}">
   {% else %}<meta name="robots" content="noindex, nofollow, nosnippet">{% endif %}
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="/assets/uoa.css?v=5.57">
+  <link rel="stylesheet" href="/assets/uoa.css?v=5.58">
   {% block head %}{% endblock %}
 </head>
 <body>
@@ -38,7 +38,7 @@
       {% endfor %}
       </div>
       <div class="desk-nav-secondary" role="group" aria-label="Araştırma ve kayıt ekranları">
-      {% for href, label, active in [('/karne', 'Çağrı karneleri', path.startswith('/karne')), ('/haberler', 'Haber kaynakları', path == '/haberler'), ('/arastirma', 'Yeni hipotezler', path == '/arastirma'), ('/laboratuvar', 'Alfa lab', path == '/laboratuvar'), ('/stratejiler', 'Strateji masası', path == '/stratejiler'), ('/journal', 'İşlemlerim', path.startswith('/journal')), ('/defter', 'Karar defteri', path.startswith('/defter') or path.startswith('/kart')), ('/alfa', 'Akış', path.startswith('/alfa')), ('/gamma', 'Gamma & vol', path.startswith('/gamma')), ('/opsiyon', 'Opsiyon', path.startswith('/opsiyon'))] %}
+      {% for href, label, active in [('/olcum', 'Günlük ölçüm', path == '/olcum'), ('/karne', 'Çağrı karneleri', path.startswith('/karne')), ('/haberler', 'Haber kaynakları', path == '/haberler'), ('/arastirma', 'Yeni hipotezler', path == '/arastirma'), ('/laboratuvar', 'Alfa lab', path == '/laboratuvar'), ('/stratejiler', 'Strateji masası', path == '/stratejiler'), ('/journal', 'İşlemlerim', path.startswith('/journal')), ('/defter', 'Karar defteri', path.startswith('/defter') or path.startswith('/kart')), ('/alfa', 'Akış', path.startswith('/alfa')), ('/gamma', 'Gamma & vol', path.startswith('/gamma')), ('/opsiyon', 'Opsiyon', path.startswith('/opsiyon'))] %}
       <a href="{{ href }}" {% if active %}aria-current="page"{% endif %}>{{ label }}</a>
       {% endfor %}
       </div>
