@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from collections import defaultdict
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date, datetime
 from typing import Any
 
@@ -68,8 +68,31 @@ class View:
     primary_label: str
 
 
+def _normalize_marks(
+    marks: tuple[tuple[str, dict[str, Any] | None], ...],
+    intraday_minutes: tuple[int, ...],
+    close_sessions: tuple[int, ...],
+) -> tuple[tuple[str, dict[str, Any] | None], ...]:
+    """Translate fixed writer IDs; aliases never select a last/better result."""
+    aliases = {f"m{m}": f"+{m} dk" for m in intraday_minutes} | {
+        f"c{d}": "Bugün kapanış" if d == 0 else f"+{d} seans kapanış"
+        for d in close_sessions
+    }
+    grouped: dict[str, list[dict[str, Any] | None]] = defaultdict(list)
+    for label, value in marks:
+        grouped[aliases.get(label, label)].append(value)
+    return tuple(
+        (label, values[0] if len(values) == 1 else {"invalid": True})
+        for label, values in grouped.items()
+    )
+
+
 def metrics(result: Result, now: datetime, blocked: str = "") -> tuple[Metric, ...]:
-    summary = measurement.build((result,), now)
+    cfg = settings()
+    normalized = replace(
+        result, marks=_normalize_marks(result.marks, cfg.intraday_minutes, cfg.close_sessions)
+    )
+    summary = measurement.build((normalized,), now)
     out = []
     for horizon in summary.horizons:
         if blocked:
