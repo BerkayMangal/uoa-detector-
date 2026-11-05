@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block content %}
+<p class="quiet-copy"><a href="/inceleme">Çağrı incelemesi · hangi grupta ne kaybediyoruz? →</a></p>
 <div class="desk-heading"><div><p class="eyebrow">KAYIT / ÇAĞRININ VERİLDİĞİ AN</p><h1>Çağrı karneleri</h1></div><a href="/acilis">Güncel planlar →</a></div>
 <p class="quiet-copy">{% if updates %}AL, BEKLE ve çıkış incelemeleri dahil kayıtlı güncellemeler.{% else %}Her hisse ve seansın ilk AL kaydı. Tekrarlanan güncellemeler yeni işlem sayılmaz.{% endif %} Getiriler gözlenen dayanak referansıdır; maliyet öncesidir.</p>
 <div class="desk-overview"><div class="overview-item"><span>İlk AL kaydı</span><b>{{ progress.first_entries }}</b></div><div class="overview-item"><span>{{ progress.primary_label }} ölçümü</span><b>{{ progress.observed }}</b></div><div class="overview-item"><span>SPY eşleşmesi</span><b>{{ progress.matched }}</b></div><p class="overview-note">Gösterilen {{ progress.rows | length }} kayıt · {{ progress.sessions }} seans. Eksik ölçüm sıfır getiri sayılmaz.</p></div>
