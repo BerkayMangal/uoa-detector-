@@ -516,3 +516,44 @@ button:disabled { cursor: default; }
   .live-desk-page .fold-panel { padding-inline: 12px; }
   .source-brief-evidence { padding: 8px 10px; }
 }
+
+/* Phase5.59: a quiet, editorial desk. State colors describe actions, not decoration. */
+:root { --canvas:#f6f4ee; --panel:#fffefa; --raised:#eceee9; --line:#d8d9d0; --ink:#202d2c; --muted:#596660; --accent:#254c43; --green:#17664e; --red:#a43e36; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; line-height:1.6; }
+.app-header { border-top-color:#254c43; }
+.desk-main { padding-top:24px; }
+.desk-heading h1, .desk-intro-title { font-family:Georgia,"Times New Roman",serif; font-weight:400; letter-spacing:-.035em; }
+.desk-intro { border-bottom:1px solid var(--line); padding:4px 0 22px; margin-bottom:18px; display:flex; align-items:center; justify-content:space-between; gap:24px; }
+.desk-intro-title { font-size:32px; line-height:1.2; margin-top:6px; }
+.desk-shortcuts { display:flex; gap:24px; }
+.desk-shortcuts a { font-size:14px; font-weight:650; border-left:2px solid #bd7354; padding-left:12px; }
+.desk-shortcuts a:hover { color:var(--green); }
+.desk-shortcuts span { display:block; font-size:12px; font-weight:400; color:var(--muted); margin-top:3px; }
+.workflow-priority { border-top:3px solid var(--accent); background:var(--panel); }
+.workflow-state { letter-spacing:.12em; }
+.workflow-title { line-height:1.3; }
+.price-rail { background:#f0f3ed; padding:16px; border-radius:4px; gap:16px; }
+.price-rail dd { font-size:25px; letter-spacing:-.04em; }
+.plan-card, .call-record { box-shadow:none; background:var(--panel); border-color:var(--line); }
+.call-record-symbol { font-size:30px; letter-spacing:-.045em; }
+.call-record-heading { border-bottom:1px solid var(--line); padding-bottom:12px; }
+.call-record-statement { font-size:18px; line-height:1.45; }
+.call-record-foot a { color:var(--accent); font-weight:650; }
+[data-opening-action="BUY"] { border-top:3px solid var(--green); }
+[data-opening-action="REVIEW"], [data-opening-action="SELL"] { border-top:3px solid #b17643; }
+.candidate-detail > summary { list-style:none; display:block; padding:0; }
+.candidate-detail > summary::-webkit-details-marker { display:none; }
+.candidate-detail > summary .plan-title { margin:0; }
+.candidate-preview { display:block; color:var(--muted); font-size:13px; margin:9px 0; }
+.candidate-toggle { display:block; font-size:12px; font-weight:650; color:var(--accent); }
+.candidate-toggle:after { content:" +"; }
+.candidate-detail[open] > summary .candidate-toggle:after { content:" −"; }
+.candidate-detail[open] > summary { border-bottom:1px solid var(--line); padding-bottom:12px; margin-bottom:14px; }
+#opening-page > .plan-grid { grid-template-columns:repeat(2,minmax(0,1fr)); align-items:start; }
+#opening-page > .plan-grid .plan-card { padding:18px; }
+.secondary-disclosure > summary { font-size:16px; font-weight:650; padding:18px 0; }
+.signal-evidence > div { border-left:2px solid var(--line); padding-left:12px; }
+.signal-times { background:#f5f5ef; padding:12px; border:0; border-radius:4px; }
+.desk-nav a { font-size:14px; }
+.desk-nav-secondary a { font-size:13px; }
+@media(max-width:760px) { .desk-intro { display:block; } .desk-intro-title { font-size:29px; } .desk-shortcuts { gap:16px; flex-wrap:wrap; margin-top:18px; } .desk-shortcuts a { font-size:13px; } #opening-page > .plan-grid { grid-template-columns:1fr; } .price-rail dd { font-size:22px; } }

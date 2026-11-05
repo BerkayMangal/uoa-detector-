@@ -3,20 +3,20 @@
 {% macro when(at) %}{{ tr_time(at) }} TR{% endmacro %}
 {% block content %}
 <div id="opening-page" data-server-now="{{ opening.now.isoformat() }}" data-refresh-seconds="{{ reload_seconds }}">
-<h1>Bugünün işlem planı</h1>
+<div class="desk-heading"><div><p class="eyebrow">GÜNCEL KARARLAR</p><h1>Bugünün işlem planı</h1></div><a href="/karne">Verilen çağrılar ve sonuçları →</a></div>
 {% include "opening_brief.html" %}
 <p class="quiet-copy">Son kalıcı kayıt: {{ when(opening.latest_at) if opening.latest_at else 'yok' }} · Bugün {{ opening.count }} öneri/güncelleme. Fiyat referanstır; gerçekleşmiş alış/satış değildir.</p>
 <div class="plan-grid">
 {% for s in opening.statements %}{% set a = s.advice %}
 <article class="plan-card" data-opening-action="{{ a.action if s.current else 'WAIT' }}" data-opening-expiry="{{ a.expires_at.isoformat() if a.expires_at else '' }}">
-  <div class="plan-title"><h2>{{ a.ticker }}</h2><span class="decision-badge">{{ {'BUY':'AL', 'SELL':'KAPAT / AZALT', 'PAPER_EXIT':'SANAL ÇIKIŞ', 'REVIEW':'ÇIKIŞ İNCELE'}.get(a.action, 'BEKLE') if s.current or a.action == 'REVIEW' else 'BEKLE' }}</span><span>{{ a.instrument }} · {{ when(s.at) }}</span></div>
+  <details class="candidate-detail" {% if (s.current and a.action != 'WAIT') or a.action == 'REVIEW' %}open{% endif %}><summary><div class="plan-title"><h2>{{ a.ticker }}</h2><span class="decision-badge">{{ {'BUY':'AL', 'SELL':'KAPAT / AZALT', 'PAPER_EXIT':'SANAL ÇIKIŞ', 'REVIEW':'ÇIKIŞ İNCELE'}.get(a.action, 'BEKLE') if s.current or a.action == 'REVIEW' else 'BEKLE' }}</span><span>{{ a.instrument }} · {{ when(s.at) }}</span></div><span class="candidate-preview">{{ a.reasons | first | default('Gerekçeyi ve planı aç') }}</span><span class="candidate-toggle">Plan ve gerekçe</span></summary>
   <p data-opening-action-text>{{ a.headline if s.current or a.action in ['WAIT','REVIEW'] else 'Eski plan · yeni işlem için güncel kayıt bekle.' }}</p>
   <p class="plan-reason">{{ a.reasons | join(' ') }}</p>
-  {% set explanation = signal_explanations.get(s.key) if signal_explanations else none %}{% if explanation %}{{ explanation_panel(explanation) }}{% endif %}
   {% if a.plan %}{% set p = a.plan %}<dl class="price-rail"><div><dt>Dayanak giriş ref.</dt><dd>${{ '%.2f' | format(p.entry) }}</dd></div><div><dt>Dayanak stop</dt><dd>${{ '%.2f' | format(p.stop) }}</dd></div><div><dt>Dayanak hedef · politika</dt><dd>${{ '%.2f' | format(p.target) }}</dd></div><div><dt>Plan riski</dt><dd>${{ '%.2f' | format(p.risk_usd) }}</dd></div></dl>
   <p class="quiet-copy">{{ p.quantity }} {{ 'hisse' if p.instrument == 'stock' else 'lot' }}{% if p.debit %} · opsiyon primi ${{ '%.2f' | format(p.debit) }} · gidiş/dönüş maliyeti %{{ '%.1f' | format(p.roundtrip_cost_pct) }}{% endif %}. Sanal profil büyüklüğü; hesabına göre uygunluk hesaplanmadı.</p>
   {% if p.contracts %}<p class="quiet-copy">{{ p.contracts | join(' / ') }}</p>{% endif %}{% endif %}
-  <details open><summary>Dayanaklar ve karşı görüş</summary><p><a href="/karne/{{ s.key }}">Çağrı karnesini aç →</a></p>{% for e in a.evidence %}<p><b>{{ e.name }}:</b> {{ e.text }} <span class="quiet-copy">{{ when(e.source_at) }}</span></p>{% endfor %}<p><b>Karşı görüş:</b> {{ a.counter_argument or 'Giriş koşulları doğrulanmadı.' }}</p><p><b>Vazgeçme koşulu:</b> {{ a.invalidation or 'Güncel veri / plan bekle.' }}</p><p class="quiet-copy">Kaynak {{ s.scan_id[:12] }} · {{ a.source_policy }} · kaynak profil {{ a.source_profile_hash[:12] }} · kart {{ a.source_card_hash[:12] }}. Bilginin bize ulaşma zamanı: {{ when(s.at) }}; yukarıdaki saatler kaynak gözlemleridir.</p></details>
+  {% set explanation = signal_explanations.get(s.key) if signal_explanations else none %}{% if explanation %}<details class="call-evidence-disclosure"><summary>Fiyat, akış ve haber dayanaklarını aç</summary>{{ explanation_panel(explanation) }}</details>{% endif %}
+  <details open><summary>Dayanaklar ve karşı görüş</summary><p><a href="/karne/{{ s.key }}">Çağrı karnesini aç →</a></p>{% for e in a.evidence %}<p><b>{{ e.name }}:</b> {{ e.text }} <span class="quiet-copy">{{ when(e.source_at) }}</span></p>{% endfor %}<p><b>Karşı görüş:</b> {{ a.counter_argument or 'Giriş koşulları doğrulanmadı.' }}</p><p><b>Vazgeçme koşulu:</b> {{ a.invalidation or 'Güncel veri / plan bekle.' }}</p><p class="quiet-copy">Kaynak {{ s.scan_id[:12] }} · {{ a.source_policy }} · kaynak profil {{ a.source_profile_hash[:12] }} · kart {{ a.source_card_hash[:12] }}. Bilginin bize ulaşma zamanı: {{ when(s.at) }}; yukarıdaki saatler kaynak gözlemleridir.</p></details></details>
 </article>
 {% else %}<p class="desk-notice">Kayıtlı aday yok. Canlı veri ve kalıcı kayıt oluşana kadar bekle.</p>{% endfor %}
 </div>
