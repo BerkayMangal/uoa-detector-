@@ -2,7 +2,7 @@
 <aside class="live-alert-controls" aria-label="Canlı sinyal uyarıları" id="live-alert-controls"
   data-feed-url="/api/acilis/uyarilar" data-poll-seconds="{{ alert_settings.poll_seconds }}" data-seen-ttl="{{ alert_settings.seen_ttl_seconds }}" data-max-seen="{{ alert_settings.max_seen }}">
   <div class="focus-tabs"><button type="button" id="alerts-toggle" aria-pressed="false">Uyarıları aç</button><button type="button" id="alerts-desktop">PC bildirimlerini aç</button><button type="button" id="alerts-desktop-test" disabled>PC bildirimi dene</button><button type="button" id="alerts-test">Sesi dene</button></div>
-  <label class="quiet-copy" for="alerts-scope">Yeni girişler <select id="alerts-scope"><option value="all">Tüm yukarı yönlü planlar · hisse / CALL / call spread</option><option value="calls">Yalnız CALL / call spread</option></select></label>
+  <label class="quiet-copy" for="alerts-scope">Yeni girişler <select id="alerts-scope"><option value="all">Tüm yönler · hisse / CALL / PUT / spread</option><option value="calls">Yalnız CALL / call spread</option><option value="puts">Yalnız PUT / put spread</option><option value="up">Yalnız yukarı · hisse / CALL / call spread</option></select></label>
   <label class="quiet-copy"><input type="checkbox" id="alerts-exits" checked> PAPER / manuel çıkış incelemeleri</label>
   <p class="quiet-copy" id="alerts-channel-status" role="status" aria-live="polite">PC izni kontrol ediliyor; kendiliğinden izin istenmez.</p>
   <p class="quiet-copy" id="alerts-status" role="status" aria-live="polite">Uyarılar kapalı. Açarken mevcut planlar bildirilmez; sonraki yeni ve güncel sinyal izlenir.</p>

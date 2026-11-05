@@ -274,6 +274,8 @@ A new study needs a fresh, non-overlapping window (`docs/next_studies.md`,
 | 5.58.1 | **Production quote capability check** — engineering addendum `docs/phase-5.58.1-production-quote-capability.md`, registered before at most two additional single-attempt production-key probes after the original managed-session key proved different. No original contract rewrite, outcome capture, strategy search or credential change. |
 | 5.59 | **Readable trading desk** — owner-requested visual hierarchy, prominent calls and progressive disclosure; `docs/phase-5.59-readable-desk-acceptance.md`. Existing signal/measurement logic, modules, forms and alert safeguards remain. Authorized implementation and publication, 2026-11-05. |
 | 5.60 | **First-call failure review** — bounded read-only attribution by original support path, instrument and session; `docs/phase-5.60-call-review-acceptance.md`. Explicit continuation/publication authorized 2026-11-05; no selected winner or live threshold change. |
+| 5.61 | **Downside entry delivery** — surface existing validated PUT/debit-put plans and deliver directional PC alerts; `docs/phase-5.61-downside-entry-acceptance.md`; delivery: `docs/phase-5.61-downside-entry-closeout.md`. Owner explicitly requests downside opportunities, 2026-11-05. No short-stock/naked-option selling, strategy threshold change or historical repair. |
+| 5.61.1 | **Downside source PAPER capture** — `docs/phase-5.61.1-downside-paper-addendum.md`; closes an additional BUY-only simulation selector found during downside audit. Future priced P4 PUT plans only; no broker action, old-record repair or threshold change. |
 
 Detail for the 5.10–5.19 candidates:
 - **Falsification gates (D8).** `src/uoa_detector/backtest/falsification.py:79-81`
