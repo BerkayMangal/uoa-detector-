@@ -215,3 +215,45 @@ def test_exact_midnight_scan_belongs_only_to_next_export(engine):
     old = news_export.export_session(engine, DAY, LATER)
     new = news_export.export_session(engine, DAY + timedelta(days=1), LATER)
     assert old.source_scans == new.source_scans == 1
+
+
+def test_metadata_inspects_oversized_source_without_materializing_it(engine, monkeypatch):
+    scan(engine)
+    monkeypatch.setattr(news_export, 'MAX_SOURCE_CHARACTERS', 1)
+    monkeypatch.setattr(adapter, 'audit', lambda *_a, **_k: pytest.fail('metadata materialized source'))
+    m = news_export.source_metadata(engine, DAY, LATER)
+    assert m.source_scans == 1 and m.source_characters > 1
+    assert m.method == 'physical_news_source_metadata_v1' and m.strategy_tests_executed == 0
+
+
+def test_explicit_budget_keeps_old_default_and_accepts_only_whole_complete_source(engine, monkeypatch):
+    scan(engine)
+    m = news_export.source_metadata(engine, DAY, LATER)
+    monkeypatch.setattr(news_export, 'MAX_SOURCE_CHARACTERS', 1)
+    with pytest.raises(news_export.ExportRefusedError, match='source_limit_exceeded'):
+        news_export.export_session(engine, DAY, LATER)
+    accepted = news_export.export_session(engine, DAY, LATER, source_character_budget=m.source_characters)
+    assert accepted.source_character_budget == accepted.source_characters
+    assert accepted.audit.dataset.opportunities[0].base is True
+    with pytest.raises(news_export.ExportRefusedError, match='source_limit_exceeded'):
+        news_export.export_session(engine, DAY, LATER, source_character_budget=m.source_characters - 1)
+
+
+@pytest.mark.parametrize('budget', [0, -1, True, 1.5, news_export.HARD_MAX_SOURCE_CHARACTERS + 1])
+def test_invalid_explicit_budget_refuses_before_source_queries(engine, budget):
+    with pytest.raises(news_export.ExportRefusedError, match='invalid_source_budget'):
+        news_export.export_session(engine, DAY, LATER, source_character_budget=budget)
+
+
+def test_http_metadata_only_has_same_auth_origin_and_hard_budget_validation(engine, monkeypatch):
+    scan(engine)
+    monkeypatch.setattr(main, '_board_reader', lambda: SimpleNamespace(engine=engine))
+    monkeypatch.setattr(main, '_now', lambda: LATER)
+    headers = set_web_auth(monkeypatch) | {'Origin':'http://testserver'}
+    monkeypatch.setattr(adapter, 'audit', lambda *_a, **_k: pytest.fail('metadata exported inputs'))
+    c = TestClient(main.app)
+    path = '/api/arastirma/haber/export'
+    r = c.post(path, json={'day':DAY.isoformat(),'metadata_only':True}, headers=headers)
+    assert r.status_code == 200 and r.json()['source_scans'] == 1 and 'audit' not in r.json()
+    assert c.post(path, json={'day':DAY.isoformat(),'source_character_budget':True}, headers=headers).status_code == 422
+    assert c.post(path, json={'day':DAY.isoformat(),'source_character_budget':news_export.HARD_MAX_SOURCE_CHARACTERS + 1}, headers=headers).status_code == 422

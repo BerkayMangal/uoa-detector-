@@ -808,7 +808,10 @@ def news_research_export(request: Request, body: news_export.ExportRequest) -> d
     if not _same_origin(request):
         raise HTTPException(status_code=403, detail="same_origin_required")
     try:
-        return asdict(news_export.export_session(_board_reader().engine, body.day, _now()))
+        if body.metadata_only:
+            return asdict(news_export.source_metadata(_board_reader().engine, body.day, _now()))
+        return asdict(news_export.export_session(_board_reader().engine, body.day, _now(),
+                                                source_character_budget=body.source_character_budget))
     except news_export.ExportRefusedError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
 
