@@ -9,6 +9,7 @@ stay a green ALIM.
 from __future__ import annotations
 
 import json
+import math
 import threading
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -34,6 +35,9 @@ if TYPE_CHECKING:
 
 _TR = ZoneInfo("Europe/Istanbul")
 _ET = ZoneInfo("America/New_York")
+_LONDON = ZoneInfo("Europe/London")
+_PAPER_ACTIVE_STATES = frozenset(("PAPER_PENDING", "PAPER_OPEN", "EXIT_SIGNALLED"))
+_PAPER_TERMINAL_LIMIT = 20
 _ready_lock = threading.Lock()
 _ready_engines: set[int] = set()
 _SETTINGS: LiveAlphaSettings | None = None
@@ -132,13 +136,54 @@ def _tone(rec: str, readiness: str) -> str:
 
 def _paper_dict(p: store.LivePaper, now: datetime) -> dict[str, Any]:
     plan = json.loads(p.plan_json)
+    at = as_utc(now)
+    entry_at = as_utc(p.entry_at) if p.entry_at else None
+    exit_at = as_utc(p.exit_at) if p.exit_at else None
+    mark_at = as_utc(p.last_mark_at) if p.last_mark_at else None
+    mark = p.last_mark
+    valid_mark = (
+        not isinstance(mark, bool) and isinstance(mark, int | float)
+        and math.isfinite(mark) and (mark > 0 if p.instrument == "stock" else mark >= 0)
+    )
+    recorded_mark = mark if valid_mark else None
+    current_mark = None
+    if mark is None:
+        mark_status, mark_text = "missing", "Güncel fiyat bilinmiyor"
+    elif not valid_mark:
+        mark_status, mark_text = "invalid", "Kayıtlı fiyat doğrulanamadı"
+    elif mark_at is None:
+        mark_status, mark_text = "missing_time", "Fiyat saati kayıtsız; güncel sayılmaz"
+    elif mark_at > at:
+        mark_status, mark_text = "future", "Fiyat saati gelecekte; güncel sayılmaz"
+    elif entry_at is not None and mark_at < entry_at:
+        mark_status, mark_text = "invalid_time", "Fiyat girişten önce; güncel sayılmaz"
+    elif p.state not in _PAPER_ACTIVE_STATES:
+        mark_status, mark_text = "historical", "Kapanmış kaydın fiyat gözlemi"
+    elif (
+        mark_at.astimezone(_ET).date() != at.astimezone(_ET).date()
+        or (at - mark_at).total_seconds() > settings().price.spot_max_age_seconds
+    ):
+        mark_status, mark_text = "stale", "Eski fiyat; güncel sayılmaz"
+    else:
+        current_mark = recorded_mark
+        mark_status, mark_text = "current", "Güncel fiyat gözlemi"
+    category = paper_result(p).category
+    state_text = "PAPER: dolmadı" if category == "unfilled" else TRACKING_TR.get(p.state, p.state)
+
+    def clock(value: datetime | None) -> str:
+        return value.astimezone(_LONDON).strftime("%d.%m.%Y %H:%M:%S") if value else "Saati kayıtsız"
+
     return {
         "paper_id": p.paper_id, "opportunity_id": p.opportunity_id, "ticker": p.ticker,
         "direction": p.direction, "instrument": p.instrument, "state": p.state,
-        "state_text": TRACKING_TR.get(p.state, p.state),
+        "state_text": state_text, "category": category,
         "created_at": as_utc(p.created_at).astimezone(_ET).strftime("%d.%m %H:%M ET"),
         "entry_price": p.entry_price, "quantity": p.quantity, "exit_price": p.exit_price,
         "exit_reason": p.exit_reason, "pnl_usd": p.pnl_usd, "last_mark": p.last_mark,
+        "entry_at": entry_at, "exit_at": exit_at, "last_mark_at": mark_at,
+        "entry_time": clock(entry_at), "exit_time": clock(exit_at), "last_mark_time": clock(mark_at),
+        "recorded_mark": recorded_mark, "current_mark": current_mark,
+        "mark_status": mark_status, "mark_text": mark_text,
         "stop": (plan.get("stock_plan") or {}).get("stop"),
         "target": (plan.get("stock_plan") or {}).get("target"),
         "chase_limit": (plan.get("stock_plan") or {}).get("chase_limit"),
@@ -168,17 +213,29 @@ def build_view(engine: Engine, now: datetime) -> LiveView:
     now_et = now.astimezone(_ET).strftime("%Y-%m-%d %H:%M ET")
     now_tr = now.astimezone(_TR).strftime("%H:%M TR")
     papers = store.papers(engine)
-    open_states = {"PAPER_PENDING", "PAPER_OPEN", "EXIT_SIGNALLED"}
-    papers_open = [_paper_dict(p, now) for p in papers if p.state in open_states]
-    papers_closed = [_paper_dict(p, now) for p in papers if p.state not in open_states][:20]
+    papers_open = [_paper_dict(p, now) for p in papers if p.state in _PAPER_ACTIVE_STATES]
+    terminal = [p for p in papers if p.state not in _PAPER_ACTIVE_STATES][:_PAPER_TERMINAL_LIMIT]
+    papers_closed = [_paper_dict(p, now) for p in terminal]
     totals = summarise([paper_result(p) for p in papers])
+    recent = summarise([paper_result(p) for p in terminal])
     paper_stats = {
+        "total": totals.total,
         "open": len(papers_open),
         "closed": totals.closed,
         "unfilled": totals.unfilled,
         "unknown": totals.unknown,
         "pnl_usd": totals.pnl_usd,
         "wins": totals.wins,
+        "losses": totals.losses,
+        "flats": totals.flats,
+        "recent_limit": _PAPER_TERMINAL_LIMIT,
+        "recent_total": recent.total,
+        "recent_closed": recent.closed,
+        "recent_wins": recent.wins,
+        "recent_losses": recent.losses,
+        "recent_flats": recent.flats,
+        "recent_unfilled": recent.unfilled,
+        "recent_unknown": recent.unknown,
     }
     manual_rows = [
         {"at": as_utc(m.at).astimezone(_ET).strftime("%d.%m %H:%M ET"), "ticker": m.ticker,
