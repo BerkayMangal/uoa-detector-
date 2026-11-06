@@ -73,6 +73,8 @@ _KNOWN_EXCEPTIONS: Final = {
 # recorded, a telemetry branch that was taken, the OI that confirmed an
 # opening — nobody can re-derive these from the vendor tomorrow.
 _APPEND_ONLY_TABLES: Final = {
+    "alfa_shadow_event",        # Phase5.64: source/target/request/packet/outcome ownership facts
+    "alfa_shadow_receipt",      # physically staged post-commit availability proof
     "alfa_news_pilot_claim",     # Phase5.63: daily evaluation ownership, never replayed on restart
     "alfa_news_pilot_result",    # immutable fixed-arm summaries/errors in a separate namespace
     "alfa_timed_activation",    # Phase 5.58: durable prospective cohort boundary

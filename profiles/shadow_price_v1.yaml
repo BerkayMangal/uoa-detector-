@@ -1,0 +1,20 @@
+version: shadow_price_v1
+enabled_env: SHADOW_CAPTURE_ENABLED
+poll_seconds: 5
+idle_poll_seconds: 60
+source_max_age_seconds: 60
+source_row_limit: 128
+candidate_slots: 4
+entry_delay_seconds: 60
+horizons_minutes: [15, 60]
+window_seconds: 300
+attempt_offsets_seconds: [2, 32, 62]
+attempt_spacing_seconds: 30
+trade_max_age_seconds: 60
+pair_skew_seconds: 60
+request_timeout_seconds: 8
+max_body_bytes: 65536
+module_daily_cap: 96
+rate_limit_cooldown_seconds: 60
+reference_usd: 2500
+slippage_bps_per_side: 5
