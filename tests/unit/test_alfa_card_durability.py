@@ -73,6 +73,8 @@ _KNOWN_EXCEPTIONS: Final = {
 # recorded, a telemetry branch that was taken, the OI that confirmed an
 # opening — nobody can re-derive these from the vendor tomorrow.
 _APPEND_ONLY_TABLES: Final = {
+    "alfa_news_pilot_claim",     # Phase5.63: daily evaluation ownership, never replayed on restart
+    "alfa_news_pilot_result",    # immutable fixed-arm summaries/errors in a separate namespace
     "alfa_timed_activation",    # Phase 5.58: durable prospective cohort boundary
     "alfa_timed_target",        # exact first-call target and original source binding
     "alfa_timed_attempt",       # non-replayable ownership before vendor I/O

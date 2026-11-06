@@ -124,6 +124,10 @@ def _no_live_alpha_thread(monkeypatch: pytest.MonkeyPatch) -> None:
     except Exception:
         return
     monkeypatch.setattr(m, "_start_live_alpha_thread", lambda database_url: None)
+    # The daily evaluator is exercised explicitly with frozen clocks in its own
+    # tests; ordinary app-lifespan tests must not run a real background batch.
+    monkeypatch.setenv("NEWS_PILOT_ENABLED", "false")
+    monkeypatch.setattr(m.news_pilot_service, "STATE", {})
 
     async def _idle() -> None:
         # Phase 5.2.PERF10: the board prerender loop would read the default database

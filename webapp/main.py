@@ -51,6 +51,7 @@ from webapp import (
     horizon_diagnostics,
     journal,
     news_export,
+    news_pilot_view,
     options_board,
     pricing,
     seo,
@@ -93,6 +94,7 @@ from webapp.live_alpha import page as live_page
 from webapp.live_alpha import results as live_results
 from webapp.live_alpha import store as live_store
 from webapp.live_alpha.job import live_alpha_loop
+from webapp.news_pilot import service as news_pilot_service
 from webapp.opening import alerts as opening_alerts
 from webapp.opening import measurement as opening_measurement
 from webapp.opening import view as opening_view
@@ -237,6 +239,13 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
                                     lambda: timed_service.loop(str(config["database_url"])),
                                     "timed-measurement"),
                 "timed-measurement",
+            )))
+        if news_pilot_service.enabled():
+            tasks.append(asyncio.create_task(_supervise(
+                lambda: run_service(str(config["database_url"]),
+                                    lambda: news_pilot_service.loop(str(config["database_url"])),
+                                    "news-pilot"),
+                "news-pilot",
             )))
         if os.environ.get("DAILY_REPAIR_REQUEST", "").strip():
             # Explicit one-shot operator; its durable claim prevents retry on redeploy.
@@ -828,6 +837,12 @@ def shared_news_page(request: Request) -> HTMLResponse:
     return templates.TemplateResponse(request, "shared_news.html", {"news": view, "tr_time": opening_view.tr_time})
 
 
+@app.get("/api/arastirma/pilot")
+def news_pilot_status() -> dict[str, Any]:
+    """Stored aggregates only; GET never exports, evaluates or writes."""
+    return asdict(news_pilot_view.build(_board_reader().engine, _now()))
+
+
 @app.get("/arastirma", response_class=HTMLResponse)
 def call_research_page(request: Request) -> HTMLResponse:
     engine, now = _board_reader().engine, _now()
@@ -838,7 +853,8 @@ def call_research_page(request: Request) -> HTMLResponse:
     history = _safe(vendor_history_report.load, None)
     horizon = _safe(horizon_report.load, None) if history is not None else None
     diagnostic = _safe(horizon_diagnostics.load, None) if horizon is not None else None
-    return templates.TemplateResponse(request, "call_research.html", {"horizon_diagnostics": diagnostic, "horizon_research": horizon, "news_research": news_research, "research": frozen, "vendor_history": history, "coverage": call_coverage.view(engine, now), "forward": call_forward.view(engine, now), "cfg": call_research_settings(), "observer": dict(call_forward.STATE)})
+    pilot = _safe(lambda: news_pilot_view.build(engine, now), None)
+    return templates.TemplateResponse(request, "call_research.html", {"news_pilot": pilot, "horizon_diagnostics": diagnostic, "horizon_research": horizon, "news_research": news_research, "research": frozen, "vendor_history": history, "coverage": call_coverage.view(engine, now), "forward": call_forward.view(engine, now), "cfg": call_research_settings(), "observer": dict(call_forward.STATE)})
 
 
 @app.get("/api/arastirma/ufuk")
@@ -1852,6 +1868,8 @@ def health() -> dict[str, object]:
         body["alpha_lab"] = dict(LAB_STATE)
     if ARCHIVE_STATE:
         body["flow_capture"] = dict(ARCHIVE_STATE)
+    if news_pilot_service.STATE:
+        body["news_pilot"] = news_pilot_service.safe_status()
     if timed_service.STATE:
         body["timed_measurement"] = timed_service.safe_status()
     from webapp.research_readiness import public_summary
