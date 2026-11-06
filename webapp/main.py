@@ -101,6 +101,8 @@ from webapp.opening import view as opening_view
 from webapp.opening.model import clock as opening_clock
 from webapp.repo import RunInfo, SignalRepo
 from webapp.service_isolation import run_service
+from webapp.shadow_capture import service as shadow_service
+from webapp.shadow_capture import view as shadow_view
 from webapp.shared_news.config import enabled as shared_news_enabled
 from webapp.storage_diagnostics import native_hint
 from webapp.timed_measurement import service as timed_service
@@ -246,6 +248,13 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
                                     lambda: news_pilot_service.loop(str(config["database_url"])),
                                     "news-pilot"),
                 "news-pilot",
+            )))
+        if shadow_service.enabled():
+            tasks.append(asyncio.create_task(_supervise(
+                lambda: run_service(str(config["database_url"]),
+                                    lambda: shadow_service.loop(str(config["database_url"])),
+                                    "shadow-price-capture"),
+                "shadow-price-capture",
             )))
         if os.environ.get("DAILY_REPAIR_REQUEST", "").strip():
             # Explicit one-shot operator; its durable claim prevents retry on redeploy.
@@ -843,6 +852,12 @@ def news_pilot_status() -> dict[str, Any]:
     return asdict(news_pilot_view.build(_board_reader().engine, _now()))
 
 
+@app.get("/api/arastirma/aday-olcum")
+def shadow_measurement_status(day: date | None = None) -> dict[str, Any]:
+    """Bounded verified reference reads only; GET never starts capture."""
+    return asdict(shadow_view.build(_board_reader().engine, _now(), day))
+
+
 @app.get("/arastirma", response_class=HTMLResponse)
 def call_research_page(request: Request) -> HTMLResponse:
     engine, now = _board_reader().engine, _now()
@@ -854,7 +869,8 @@ def call_research_page(request: Request) -> HTMLResponse:
     horizon = _safe(horizon_report.load, None) if history is not None else None
     diagnostic = _safe(horizon_diagnostics.load, None) if horizon is not None else None
     pilot = _safe(lambda: news_pilot_view.build(engine, now), None)
-    return templates.TemplateResponse(request, "call_research.html", {"news_pilot": pilot, "horizon_diagnostics": diagnostic, "horizon_research": horizon, "news_research": news_research, "research": frozen, "vendor_history": history, "coverage": call_coverage.view(engine, now), "forward": call_forward.view(engine, now), "cfg": call_research_settings(), "observer": dict(call_forward.STATE)})
+    shadow = _safe(lambda: shadow_view.build(engine, now), None)
+    return templates.TemplateResponse(request, "call_research.html", {"news_shadow": shadow, "news_pilot": pilot, "horizon_diagnostics": diagnostic, "horizon_research": horizon, "news_research": news_research, "research": frozen, "vendor_history": history, "coverage": call_coverage.view(engine, now), "forward": call_forward.view(engine, now), "cfg": call_research_settings(), "observer": dict(call_forward.STATE)})
 
 
 @app.get("/api/arastirma/ufuk")
@@ -1868,6 +1884,8 @@ def health() -> dict[str, object]:
         body["alpha_lab"] = dict(LAB_STATE)
     if ARCHIVE_STATE:
         body["flow_capture"] = dict(ARCHIVE_STATE)
+    if shadow_service.STATE:
+        body["shadow_capture"] = shadow_service.safe_status()
     if news_pilot_service.STATE:
         body["news_pilot"] = news_pilot_service.safe_status()
     if timed_service.STATE:

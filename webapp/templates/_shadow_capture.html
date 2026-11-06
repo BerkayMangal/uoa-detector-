@@ -1,0 +1,23 @@
+<section id="shadow-price-capture" aria-label="Yeni aday fiyat kayıtları">
+<div class="section-heading"><h2>Yeni adayların fiyat kayıtları</h2><span>Giriş · 15 dk · 60 dk</span></div>
+{% if not news_shadow or news_shadow.status == 'STORAGE_UNAVAILABLE' %}<p class="desk-notice">Kayıt hattının durumu henüz okunamıyor; sonuç bilinmiyor.</p>
+{% else %}
+<p class="quiet-copy">{{ news_shadow.reason }}{% if news_shadow.activation_at %} Etkinleşme {{ news_shadow.activation_at.strftime('%d.%m.%Y %H:%M:%S') }} Londra.{% endif %}</p>
+{% if news_shadow.cooldown_until %}<p class="quiet-copy">Bekleme sonu {{ news_shadow.cooldown_until.strftime('%H:%M:%S') }} Londra.</p>{% endif %}
+{% if news_shadow.candidate_count is not none %}<p><b>{{ news_shadow.candidate_count }} doğrulanmış araştırma adayı</b> · {{ news_shadow.day.strftime('%d.%m.%Y') }} New York günü. Bu kayıtlar AL/SAT talimatı değildir.</p>{% endif %}
+{% if news_shadow.invalid_records %}<p class="desk-notice">{{ news_shadow.invalid_records }} kaynak kaydı doğrulanamadı; hesaplara katılmadı.</p>{% endif %}
+{% if news_shadow.ignored_candidates %}<p class="quiet-copy">Bu günün {{ news_shadow.ignored_candidates }} farklı aktivasyona ait veya doğrulanamayan kayıt yeri mevcut grupla birleştirilmedi.</p>{% endif %}
+{% if news_shadow.limited %}<p class="desk-notice">Okuma sınırına ulaşıldı; görünüm tüm kayıtları temsil etmeyebilir.</p>{% endif %}
+{% if news_shadow.candidate_count %}<p class="quiet-copy">{% for c in news_shadow.coverage %}{{ c.label }}: {{ c.observed }} eşlenmiş, {{ c.pending }} bekleyen, {{ c.missing + c.unverified }} eksik/doğrulanamayan{% if not loop.last %} · {% endif %}{% endfor %}.</p>{% endif %}
+{% for row in news_shadow.rows %}<article class="plan-card" data-shadow-candidate="{{ row.key }}">
+<div class="plan-title"><h3>{{ row.ticker }}</h3><span class="decision-badge">Araştırma kaydı</span></div>
+<p class="quiet-copy">İlk kayıt {{ row.available_at.strftime('%H:%M:%S') }} Londra · kaynak {{ row.source_at.strftime('%H:%M:%S') }}. Orijinal göreli güç koşulu: {{ 'var' if row.rs is sameas true else 'yok' if row.rs is sameas false else 'bilinmiyor' }} · haber koşulu: {{ 'var' if row.news is sameas true else 'yok' if row.news is sameas false else 'bilinmiyor' }}.</p>
+<div class="overflow-x-auto" role="region" aria-label="{{ row.ticker }} zamanlı fiyat kayıtları" tabindex="0"><table class="stock-table w-full"><thead><tr><th>Ölçüm</th><th>Durum</th><th>Hedef · Londra</th><th>Hisse %</th><th>SPY %</th><th>SPY farkı · puan</th></tr></thead><tbody>
+{% for phase in row.phases %}<tr><td>{{ phase.label }}</td><td>{{ phase.state_label }}</td><td>{{ phase.target_at.strftime('%H:%M:%S') if phase.target_at else 'girişten sonra belirlenir' }}</td><td>{{ '%+.2f' | format(phase.own_pct) if phase.own_pct is not none else 'ölçülmedi' }}</td><td>{{ '%+.2f' | format(phase.spy_pct) if phase.spy_pct is not none else 'ölçülmedi' }}</td><td>{{ '%+.2f' | format(phase.excess_pp) if phase.excess_pp is not none else 'ölçülmedi' }}</td></tr>{% endfor %}
+</tbody></table></div>
+<details class="fold-panel"><summary>Fiyat, kayıt saati ve maliyet ayrıntıları</summary>
+{% for phase in row.phases %}<p class="quiet-copy"><b>{{ phase.label }}</b>: {{ phase.state_label }}{% if phase.own_price is not none %} · hisse ${{ '%.4f' | format(phase.own_price) }} · SPY ${{ '%.4f' | format(phase.spy_price) }}{% endif %}{% if phase.confirmed_at %} · kayıt {{ phase.confirmed_at.strftime('%H:%M:%S') }} Londra{% endif %}{% if phase.model_net_usd is not none %} · model maliyetli hisse referansı ${{ '%+.2f' | format(phase.model_net_usd) }} ({{ phase.reference_quantity }} hisse){% endif %}{% if phase.reason %} · <code>{{ phase.reason }}</code>{% endif %}.</p>{% endfor %}
+<p class="quiet-copy">Referans 2.500$ bağımsız hisse birimi ve yön başına 5 bp varsayımsal maliyet kullanır. Son işlem fiyatı gözlemidir; gerçekleşmiş emir, portföy veya CALL/PUT getirisi değildir.</p>
+</details></article>{% endfor %}
+<details class="fold-panel"><summary>Kayıt yöntemini aç</summary><p class="quiet-copy">Haber ve göreli güç filtresinden önce, taban koşulları doğrulanan en fazla dört yeni aday/gün izlenir. Giriş referansı aday kaydından bir dakika sonra; 15/60 dakika ölçümü giriş çiftinin kaydından sonra planlanır. Hisse ve SPY aynı denemede alınır; kaynak saatleri ayrıca doğrulanır.</p><p class="quiet-copy">Bu yeni ileriye dönük grup eski eksik fiyatları tamamlamaz. Eski sabit haber deneyi, yayımlanan çağrılar, opsiyonlar ve PAPER hesaplarıyla birleştirilmez. Eksik fiyat sıfır getiri sayılmaz; otomatik kural seçimi veya kâr olasılığı üretilmez.</p></details>
+{% endif %}</section>
