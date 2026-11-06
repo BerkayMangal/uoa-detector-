@@ -1,0 +1,717 @@
+{
+  "version": "fixed_news_daily_pilot_v1",
+  "profile_hash": "2551202732bebc67197f0d30e390bfe5ef0f7de411dc67c15a8392c8ec455185",
+  "implementation_hash": "2a389a08c1a2f48d41c08b39066401c1a0ee3d5f1c13d6afed93fdc273e27ed3",
+  "rows": [
+    {
+      "version": "fixed_news_daily_pilot_v1",
+      "day": "2026-11-04",
+      "since": "2026-11-04T05:00:00Z",
+      "as_of": "2026-11-05T04:59:59.999999Z",
+      "profile_hash": "2551202732bebc67197f0d30e390bfe5ef0f7de411dc67c15a8392c8ec455185",
+      "implementation_hash": "2a389a08c1a2f48d41c08b39066401c1a0ee3d5f1c13d6afed93fdc273e27ed3",
+      "source_identity": "5d43d6036d659b8ffb50b3eb5ec96e0c414f26bd199830b7edfb50623db76eb4",
+      "source_scans": 138,
+      "status": "INSUFFICIENT_EVIDENCE",
+      "source_characters": 21242498,
+      "source_character_budget": 22020096,
+      "new_context_scans": 120,
+      "legacy_scans": 18,
+      "opportunity_rows": 1742,
+      "base_true": 11,
+      "base_unknown": 102,
+      "roster_slots": 4,
+      "price_rows": 3712,
+      "stored_prices": 917,
+      "complete_common_sessions": 0,
+      "eb_paired_days": 0,
+      "paired_difference_excess": null,
+      "unit_missing": {
+        "exit_missing_observed_price": 4
+      },
+      "audit_missing": {
+        "flow_below_fixed_threshold": 1422,
+        "flow_not_current": 172,
+        "mark_profile_or_machine_context_unavailable": 18,
+        "mark_source_session_clock_or_value_unavailable": 2795,
+        "news_check_unavailable": 8,
+        "outside_assessment_session": 81,
+        "price_context_unavailable": 964,
+        "price_outside_fixed_confirmation_range": 319,
+        "price_source_session_or_freshness_unavailable": 361,
+        "relative_strength_unavailable": 102
+      },
+      "arms": [
+        {
+          "arm": "A",
+          "selected": 2,
+          "ineligible": 0,
+          "unknown": 2,
+          "priced": 0,
+          "complete_days": 0,
+          "incomplete_days": 1,
+          "net_complete_days": null,
+          "excess_complete_days": null
+        },
+        {
+          "arm": "B",
+          "selected": 2,
+          "ineligible": 0,
+          "unknown": 2,
+          "priced": 0,
+          "complete_days": 0,
+          "incomplete_days": 1,
+          "net_complete_days": null,
+          "excess_complete_days": null
+        },
+        {
+          "arm": "C",
+          "selected": 2,
+          "ineligible": 2,
+          "unknown": 0,
+          "priced": 0,
+          "complete_days": 0,
+          "incomplete_days": 1,
+          "net_complete_days": null,
+          "excess_complete_days": null
+        },
+        {
+          "arm": "D",
+          "selected": 2,
+          "ineligible": 2,
+          "unknown": 0,
+          "priced": 0,
+          "complete_days": 0,
+          "incomplete_days": 1,
+          "net_complete_days": null,
+          "excess_complete_days": null
+        },
+        {
+          "arm": "E",
+          "selected": 2,
+          "ineligible": 0,
+          "unknown": 2,
+          "priced": 0,
+          "complete_days": 0,
+          "incomplete_days": 1,
+          "net_complete_days": null,
+          "excess_complete_days": null
+        }
+      ],
+      "stresses": [
+        {
+          "slippage_bps_per_side": 5.0,
+          "arms": [
+            {
+              "arm": "A",
+              "selected": 2,
+              "ineligible": 0,
+              "unknown": 2,
+              "priced": 0,
+              "complete_days": 0,
+              "incomplete_days": 1,
+              "net_complete_days": null,
+              "excess_complete_days": null
+            },
+            {
+              "arm": "B",
+              "selected": 2,
+              "ineligible": 0,
+              "unknown": 2,
+              "priced": 0,
+              "complete_days": 0,
+              "incomplete_days": 1,
+              "net_complete_days": null,
+              "excess_complete_days": null
+            },
+            {
+              "arm": "C",
+              "selected": 2,
+              "ineligible": 2,
+              "unknown": 0,
+              "priced": 0,
+              "complete_days": 0,
+              "incomplete_days": 1,
+              "net_complete_days": null,
+              "excess_complete_days": null
+            },
+            {
+              "arm": "D",
+              "selected": 2,
+              "ineligible": 2,
+              "unknown": 0,
+              "priced": 0,
+              "complete_days": 0,
+              "incomplete_days": 1,
+              "net_complete_days": null,
+              "excess_complete_days": null
+            },
+            {
+              "arm": "E",
+              "selected": 2,
+              "ineligible": 0,
+              "unknown": 2,
+              "priced": 0,
+              "complete_days": 0,
+              "incomplete_days": 1,
+              "net_complete_days": null,
+              "excess_complete_days": null
+            }
+          ],
+          "complete_common_sessions": 0,
+          "eb_paired_days": 0
+        },
+        {
+          "slippage_bps_per_side": 10.0,
+          "arms": [
+            {
+              "arm": "A",
+              "selected": 2,
+              "ineligible": 0,
+              "unknown": 2,
+              "priced": 0,
+              "complete_days": 0,
+              "incomplete_days": 1,
+              "net_complete_days": null,
+              "excess_complete_days": null
+            },
+            {
+              "arm": "B",
+              "selected": 2,
+              "ineligible": 0,
+              "unknown": 2,
+              "priced": 0,
+              "complete_days": 0,
+              "incomplete_days": 1,
+              "net_complete_days": null,
+              "excess_complete_days": null
+            },
+            {
+              "arm": "C",
+              "selected": 2,
+              "ineligible": 2,
+              "unknown": 0,
+              "priced": 0,
+              "complete_days": 0,
+              "incomplete_days": 1,
+              "net_complete_days": null,
+              "excess_complete_days": null
+            },
+            {
+              "arm": "D",
+              "selected": 2,
+              "ineligible": 2,
+              "unknown": 0,
+              "priced": 0,
+              "complete_days": 0,
+              "incomplete_days": 1,
+              "net_complete_days": null,
+              "excess_complete_days": null
+            },
+            {
+              "arm": "E",
+              "selected": 2,
+              "ineligible": 0,
+              "unknown": 2,
+              "priced": 0,
+              "complete_days": 0,
+              "incomplete_days": 1,
+              "net_complete_days": null,
+              "excess_complete_days": null
+            }
+          ],
+          "complete_common_sessions": 0,
+          "eb_paired_days": 0
+        },
+        {
+          "slippage_bps_per_side": 20.0,
+          "arms": [
+            {
+              "arm": "A",
+              "selected": 2,
+              "ineligible": 0,
+              "unknown": 2,
+              "priced": 0,
+              "complete_days": 0,
+              "incomplete_days": 1,
+              "net_complete_days": null,
+              "excess_complete_days": null
+            },
+            {
+              "arm": "B",
+              "selected": 2,
+              "ineligible": 0,
+              "unknown": 2,
+              "priced": 0,
+              "complete_days": 0,
+              "incomplete_days": 1,
+              "net_complete_days": null,
+              "excess_complete_days": null
+            },
+            {
+              "arm": "C",
+              "selected": 2,
+              "ineligible": 2,
+              "unknown": 0,
+              "priced": 0,
+              "complete_days": 0,
+              "incomplete_days": 1,
+              "net_complete_days": null,
+              "excess_complete_days": null
+            },
+            {
+              "arm": "D",
+              "selected": 2,
+              "ineligible": 2,
+              "unknown": 0,
+              "priced": 0,
+              "complete_days": 0,
+              "incomplete_days": 1,
+              "net_complete_days": null,
+              "excess_complete_days": null
+            },
+            {
+              "arm": "E",
+              "selected": 2,
+              "ineligible": 0,
+              "unknown": 2,
+              "priced": 0,
+              "complete_days": 0,
+              "incomplete_days": 1,
+              "net_complete_days": null,
+              "excess_complete_days": null
+            }
+          ],
+          "complete_common_sessions": 0,
+          "eb_paired_days": 0
+        },
+        {
+          "slippage_bps_per_side": 50.0,
+          "arms": [
+            {
+              "arm": "A",
+              "selected": 2,
+              "ineligible": 0,
+              "unknown": 2,
+              "priced": 0,
+              "complete_days": 0,
+              "incomplete_days": 1,
+              "net_complete_days": null,
+              "excess_complete_days": null
+            },
+            {
+              "arm": "B",
+              "selected": 2,
+              "ineligible": 0,
+              "unknown": 2,
+              "priced": 0,
+              "complete_days": 0,
+              "incomplete_days": 1,
+              "net_complete_days": null,
+              "excess_complete_days": null
+            },
+            {
+              "arm": "C",
+              "selected": 2,
+              "ineligible": 2,
+              "unknown": 0,
+              "priced": 0,
+              "complete_days": 0,
+              "incomplete_days": 1,
+              "net_complete_days": null,
+              "excess_complete_days": null
+            },
+            {
+              "arm": "D",
+              "selected": 2,
+              "ineligible": 2,
+              "unknown": 0,
+              "priced": 0,
+              "complete_days": 0,
+              "incomplete_days": 1,
+              "net_complete_days": null,
+              "excess_complete_days": null
+            },
+            {
+              "arm": "E",
+              "selected": 2,
+              "ineligible": 0,
+              "unknown": 2,
+              "priced": 0,
+              "complete_days": 0,
+              "incomplete_days": 1,
+              "net_complete_days": null,
+              "excess_complete_days": null
+            }
+          ],
+          "complete_common_sessions": 0,
+          "eb_paired_days": 0
+        }
+      ],
+      "inference": "NOT_PERFORMED",
+      "winner": null,
+      "new_fitted_trials": 0,
+      "evaluated_arms": 5,
+      "cost_scenarios": 4,
+      "fixed_arm_cost_evaluations": 20,
+      "source_export_sha256": "5e01530696cac00862e14a6244e960f58677ba7bace49948109506d928451061",
+      "frozen_report_sha256": "5099f94e60e6acac8e1a3d678de8a8cba0be10698a92a74ccf2ceed8438959d8",
+      "arithmetic_audit_sha256": "dbc62c4737b677984d7e822e349f505c70061b2d1980531b72a6a2e9ea5527cd"
+    },
+    {
+      "version": "fixed_news_daily_pilot_v1",
+      "day": "2026-11-05",
+      "since": "2026-11-05T05:00:00Z",
+      "as_of": "2026-11-06T04:59:59.999999Z",
+      "profile_hash": "2551202732bebc67197f0d30e390bfe5ef0f7de411dc67c15a8392c8ec455185",
+      "implementation_hash": "2a389a08c1a2f48d41c08b39066401c1a0ee3d5f1c13d6afed93fdc273e27ed3",
+      "source_identity": "d66a18712f0c571b37abeed0064af319532e633b2ef12f446421d5180006d66b",
+      "source_scans": 148,
+      "status": "INSUFFICIENT_EVIDENCE",
+      "source_characters": 23391893,
+      "source_character_budget": 24117248,
+      "new_context_scans": 148,
+      "legacy_scans": 0,
+      "opportunity_rows": 1909,
+      "base_true": 0,
+      "base_unknown": 12,
+      "roster_slots": 4,
+      "price_rows": 4685,
+      "stored_prices": 1162,
+      "complete_common_sessions": 0,
+      "eb_paired_days": 0,
+      "paired_difference_excess": null,
+      "unit_missing": {
+        "entry_missing_observed_price": 3,
+        "exit_missing_observed_price": 1
+      },
+      "audit_missing": {
+        "flow_below_fixed_threshold": 1722,
+        "flow_not_current": 140,
+        "mark_source_session_clock_or_value_unavailable": 3523,
+        "news_check_unavailable": 3,
+        "outside_assessment_session": 81,
+        "price_context_unavailable": 23,
+        "price_outside_fixed_confirmation_range": 1143,
+        "price_source_session_or_freshness_unavailable": 742,
+        "relative_strength_unavailable": 12
+      },
+      "arms": [
+        {
+          "arm": "A",
+          "selected": 0,
+          "ineligible": 0,
+          "unknown": 4,
+          "priced": 0,
+          "complete_days": 0,
+          "incomplete_days": 1,
+          "net_complete_days": null,
+          "excess_complete_days": null
+        },
+        {
+          "arm": "B",
+          "selected": 0,
+          "ineligible": 0,
+          "unknown": 4,
+          "priced": 0,
+          "complete_days": 0,
+          "incomplete_days": 1,
+          "net_complete_days": null,
+          "excess_complete_days": null
+        },
+        {
+          "arm": "C",
+          "selected": 0,
+          "ineligible": 3,
+          "unknown": 1,
+          "priced": 0,
+          "complete_days": 0,
+          "incomplete_days": 1,
+          "net_complete_days": null,
+          "excess_complete_days": null
+        },
+        {
+          "arm": "D",
+          "selected": 0,
+          "ineligible": 3,
+          "unknown": 1,
+          "priced": 0,
+          "complete_days": 0,
+          "incomplete_days": 1,
+          "net_complete_days": null,
+          "excess_complete_days": null
+        },
+        {
+          "arm": "E",
+          "selected": 0,
+          "ineligible": 0,
+          "unknown": 4,
+          "priced": 0,
+          "complete_days": 0,
+          "incomplete_days": 1,
+          "net_complete_days": null,
+          "excess_complete_days": null
+        }
+      ],
+      "stresses": [
+        {
+          "slippage_bps_per_side": 5.0,
+          "arms": [
+            {
+              "arm": "A",
+              "selected": 0,
+              "ineligible": 0,
+              "unknown": 4,
+              "priced": 0,
+              "complete_days": 0,
+              "incomplete_days": 1,
+              "net_complete_days": null,
+              "excess_complete_days": null
+            },
+            {
+              "arm": "B",
+              "selected": 0,
+              "ineligible": 0,
+              "unknown": 4,
+              "priced": 0,
+              "complete_days": 0,
+              "incomplete_days": 1,
+              "net_complete_days": null,
+              "excess_complete_days": null
+            },
+            {
+              "arm": "C",
+              "selected": 0,
+              "ineligible": 3,
+              "unknown": 1,
+              "priced": 0,
+              "complete_days": 0,
+              "incomplete_days": 1,
+              "net_complete_days": null,
+              "excess_complete_days": null
+            },
+            {
+              "arm": "D",
+              "selected": 0,
+              "ineligible": 3,
+              "unknown": 1,
+              "priced": 0,
+              "complete_days": 0,
+              "incomplete_days": 1,
+              "net_complete_days": null,
+              "excess_complete_days": null
+            },
+            {
+              "arm": "E",
+              "selected": 0,
+              "ineligible": 0,
+              "unknown": 4,
+              "priced": 0,
+              "complete_days": 0,
+              "incomplete_days": 1,
+              "net_complete_days": null,
+              "excess_complete_days": null
+            }
+          ],
+          "complete_common_sessions": 0,
+          "eb_paired_days": 0
+        },
+        {
+          "slippage_bps_per_side": 10.0,
+          "arms": [
+            {
+              "arm": "A",
+              "selected": 0,
+              "ineligible": 0,
+              "unknown": 4,
+              "priced": 0,
+              "complete_days": 0,
+              "incomplete_days": 1,
+              "net_complete_days": null,
+              "excess_complete_days": null
+            },
+            {
+              "arm": "B",
+              "selected": 0,
+              "ineligible": 0,
+              "unknown": 4,
+              "priced": 0,
+              "complete_days": 0,
+              "incomplete_days": 1,
+              "net_complete_days": null,
+              "excess_complete_days": null
+            },
+            {
+              "arm": "C",
+              "selected": 0,
+              "ineligible": 3,
+              "unknown": 1,
+              "priced": 0,
+              "complete_days": 0,
+              "incomplete_days": 1,
+              "net_complete_days": null,
+              "excess_complete_days": null
+            },
+            {
+              "arm": "D",
+              "selected": 0,
+              "ineligible": 3,
+              "unknown": 1,
+              "priced": 0,
+              "complete_days": 0,
+              "incomplete_days": 1,
+              "net_complete_days": null,
+              "excess_complete_days": null
+            },
+            {
+              "arm": "E",
+              "selected": 0,
+              "ineligible": 0,
+              "unknown": 4,
+              "priced": 0,
+              "complete_days": 0,
+              "incomplete_days": 1,
+              "net_complete_days": null,
+              "excess_complete_days": null
+            }
+          ],
+          "complete_common_sessions": 0,
+          "eb_paired_days": 0
+        },
+        {
+          "slippage_bps_per_side": 20.0,
+          "arms": [
+            {
+              "arm": "A",
+              "selected": 0,
+              "ineligible": 0,
+              "unknown": 4,
+              "priced": 0,
+              "complete_days": 0,
+              "incomplete_days": 1,
+              "net_complete_days": null,
+              "excess_complete_days": null
+            },
+            {
+              "arm": "B",
+              "selected": 0,
+              "ineligible": 0,
+              "unknown": 4,
+              "priced": 0,
+              "complete_days": 0,
+              "incomplete_days": 1,
+              "net_complete_days": null,
+              "excess_complete_days": null
+            },
+            {
+              "arm": "C",
+              "selected": 0,
+              "ineligible": 3,
+              "unknown": 1,
+              "priced": 0,
+              "complete_days": 0,
+              "incomplete_days": 1,
+              "net_complete_days": null,
+              "excess_complete_days": null
+            },
+            {
+              "arm": "D",
+              "selected": 0,
+              "ineligible": 3,
+              "unknown": 1,
+              "priced": 0,
+              "complete_days": 0,
+              "incomplete_days": 1,
+              "net_complete_days": null,
+              "excess_complete_days": null
+            },
+            {
+              "arm": "E",
+              "selected": 0,
+              "ineligible": 0,
+              "unknown": 4,
+              "priced": 0,
+              "complete_days": 0,
+              "incomplete_days": 1,
+              "net_complete_days": null,
+              "excess_complete_days": null
+            }
+          ],
+          "complete_common_sessions": 0,
+          "eb_paired_days": 0
+        },
+        {
+          "slippage_bps_per_side": 50.0,
+          "arms": [
+            {
+              "arm": "A",
+              "selected": 0,
+              "ineligible": 0,
+              "unknown": 4,
+              "priced": 0,
+              "complete_days": 0,
+              "incomplete_days": 1,
+              "net_complete_days": null,
+              "excess_complete_days": null
+            },
+            {
+              "arm": "B",
+              "selected": 0,
+              "ineligible": 0,
+              "unknown": 4,
+              "priced": 0,
+              "complete_days": 0,
+              "incomplete_days": 1,
+              "net_complete_days": null,
+              "excess_complete_days": null
+            },
+            {
+              "arm": "C",
+              "selected": 0,
+              "ineligible": 3,
+              "unknown": 1,
+              "priced": 0,
+              "complete_days": 0,
+              "incomplete_days": 1,
+              "net_complete_days": null,
+              "excess_complete_days": null
+            },
+            {
+              "arm": "D",
+              "selected": 0,
+              "ineligible": 3,
+              "unknown": 1,
+              "priced": 0,
+              "complete_days": 0,
+              "incomplete_days": 1,
+              "net_complete_days": null,
+              "excess_complete_days": null
+            },
+            {
+              "arm": "E",
+              "selected": 0,
+              "ineligible": 0,
+              "unknown": 4,
+              "priced": 0,
+              "complete_days": 0,
+              "incomplete_days": 1,
+              "net_complete_days": null,
+              "excess_complete_days": null
+            }
+          ],
+          "complete_common_sessions": 0,
+          "eb_paired_days": 0
+        }
+      ],
+      "inference": "NOT_PERFORMED",
+      "winner": null,
+      "new_fitted_trials": 0,
+      "evaluated_arms": 5,
+      "cost_scenarios": 4,
+      "fixed_arm_cost_evaluations": 20,
+      "source_export_sha256": "424028c7cfe8f9d5959b9766fad74d51b47c26c477bde0bbed8351dd8473f4de",
+      "frozen_report_sha256": "150916282c7f26204a8c972695991344b88df65e6eb687a5b4252a1d57f25f19",
+      "arithmetic_audit_sha256": "dbc62c4737b677984d7e822e349f505c70061b2d1980531b72a6a2e9ea5527cd"
+    }
+  ]
+}

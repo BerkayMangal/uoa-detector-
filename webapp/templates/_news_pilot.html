@@ -1,0 +1,46 @@
+<section id="daily-news-pilot" aria-label="Günlük sabit haber deneyi">
+<div class="section-heading"><h2>Günlük ölçüm · otomatik sabit deney</h2><span>Beş kol · kurallar sabit</span></div>
+<p class="quiet-copy">Tamamlanan seans, gün kapandıktan sonra bir kez değerlendirilir. Aşağıdaki sayılar saklanan hesaplara aittir; canlı AL/SAT önerisi veya opsiyon getirisi değildir.</p>
+{% if not news_pilot or news_pilot.status == 'STORAGE_UNAVAILABLE' %}
+<p class="desk-notice">Günlük deney kayıtları henüz okunamıyor. Sonuç bilinmiyor; bu durum sıfır getiri veya kayıp sayılmaz.</p>
+{% else %}
+{% if news_pilot.completed_days %}
+<div class="desk-overview">
+  <div class="overview-item"><span>Tarama kaydı</span><b>{{ news_pilot.source_scans }}</b></div>
+  <div class="overview-item"><span>Aday satırı</span><b>{{ news_pilot.opportunity_rows }}</b></div>
+  <div class="overview-item"><span>Sabit fırsat yeri</span><b>{{ news_pilot.roster_slots }}</b></div>
+  <div class="overview-item"><span>Beş kolda tam ortak seans</span><b>{{ news_pilot.complete_common_sessions }}</b></div>
+  <p class="overview-note">Yalnız aşağıda görünen {{ news_pilot.completed_days }} tamamlanmış günün sayımları. Tarama ve aday satırları bağımsız işlem sayısı değildir.</p>
+</div>
+{% if news_pilot.complete_common_sessions == 0 %}<p class="desk-notice"><b>Karşılaştırmalı getiri henüz ölçülemedi.</b> Sabit giriş/çıkış pencerelerinde fiyat eksikse sonuç bilinmiyor kalır. Haber yararlı veya yararsız sonucu çıkarılmadı.</p>{% endif %}
+{% else %}<p class="desk-notice">{{ news_pilot.reason }}</p>{% endif %}
+{% if news_pilot.limited %}<p class="desk-notice">Son {{ news_pilot.rows | length }} günlük kayıt gösteriliyor; okuma sınırına ulaşıldı. Bunlar tüm arşivin toplamı değildir.</p>{% endif %}
+{% if news_pilot.ignored_versions %}<p class="quiet-copy">Görünen kaynak örneğinde {{ news_pilot.ignored_versions }} farklı profil veya kod sürümü toplamlardan ayrı tutuldu.</p>{% endif %}
+{% if news_pilot.invalid_records %}<p class="quiet-copy">{{ news_pilot.invalid_records }} kayıt doğrulanamadı; sayımlara veya getirilere katılmadı.</p>{% endif %}
+{% for row in news_pilot.rows %}
+<article class="plan-card" data-news-pilot-day="{{ row.day.isoformat() }}" data-news-pilot-status="{{ row.status }}">
+  <div class="plan-title"><h3>{{ row.day.strftime('%d.%m.%Y') }} · New York seansı</h3><span class="decision-badge">{{ row.status_label }}</span></div>
+  <p>{{ row.reason }}</p>
+  {% if row.status == 'completed' %}
+  <p class="quiet-copy">{{ row.source_scans }} tarama · {{ row.opportunity_rows }} aday satırı · {{ row.roster_slots }} sabit yer · {{ row.complete_common_sessions }} tam ortak seans. E−B için eşlenmiş gün: {{ row.eb_paired_days }}.</p>
+  {% if row.unit_missing %}<p class="plan-reason">{% for missing in row.unit_missing %}{{ missing.label }}: {{ missing.count }}{% if not loop.last %} · {% endif %}{% endfor %}.</p>{% endif %}
+  <details class="fold-panel"><summary>Beş kolun tamamını aç · {{ '%g' | format(news_pilot.base_cost_bps) }} bp / yön</summary>
+  <div class="overflow-x-auto" role="region" aria-label="{{ row.day }} sabit beş kol" tabindex="0"><table class="stock-table w-full"><thead><tr><th>Kol</th><th>Seçili / fiyatlı</th><th>Bilinmeyen</th><th>Tam gün</th><th>Net $ · tam günler</th><th>SPY farkı $ · tam günler</th></tr></thead><tbody>
+  {% for arm in row.arms %}<tr><td>{{ arm.key }} · {{ arm.label }}</td><td>{{ arm.selected }} / {{ arm.priced }}</td><td>{{ arm.unknown }}</td><td>{{ arm.complete_days }}</td><td>{% if arm.net is not none %}{{ '%+.2f' | format(arm.net) }}{% else %}ölçülmedi{% endif %}</td><td>{% if arm.excess is not none %}{{ '%+.2f' | format(arm.excess) }}{% else %}ölçülmedi{% endif %}</td></tr>{% endfor %}
+  </tbody></table></div>
+  <p class="quiet-copy">A akış+fiyat; B göreli güç; C haber; D göreli güç VE haber; E göreli güç VEYA haber. Aynı fırsat listesi, en fazla dört sabit yer/gün; elenen yerin yerine yeni işlem konmaz. Koşulu sağlamadığı bilinen yerler sıfır katkı verir. Eksik fiyatlı işlemler “ölçülmedi” olarak kalır.</p>
+  </details>
+  <details class="fold-panel"><summary>Maliyet streslerini ve kaynak eksiklerini aç</summary>
+    {% for cost in row.stresses %}{% if cost.bps != news_pilot.base_cost_bps %}
+    <p class="quiet-copy"><b>{{ '%g' | format(cost.bps) }} bp / yön</b> · beş kolda tam ortak seans {{ cost.complete_common_sessions }}.</p>
+    <div class="overflow-x-auto" role="region" aria-label="{{ row.day }} {{ cost.bps }} bp stres" tabindex="0"><table class="stock-table w-full"><thead><tr><th>Kol</th><th>Fiyatlı</th><th>Tam gün</th><th>Net $</th><th>SPY farkı $</th></tr></thead><tbody>{% for arm in cost.arms %}<tr><td>{{ arm.key }} · {{ arm.label }}</td><td>{{ arm.priced }}</td><td>{{ arm.complete_days }}</td><td>{% if arm.net is not none %}{{ '%+.2f' | format(arm.net) }}{% else %}ölçülmedi{% endif %}</td><td>{% if arm.excess is not none %}{{ '%+.2f' | format(arm.excess) }}{% else %}ölçülmedi{% endif %}</td></tr>{% endfor %}</tbody></table></div>
+    {% endif %}{% endfor %}
+    {% if row.audit_missing %}<ul class="quiet-copy">{% for missing in row.audit_missing %}<li>{{ missing.label }}: {{ missing.count }} <code>{{ missing.code }}</code></li>{% endfor %}</ul>{% endif %}
+    <p class="quiet-copy">Kaynak {{ row.source_identity[:12] }}. Günlük kayıt {{ row.key[:12] }}. Raporun saklanma saati {{ row.recorded_at.strftime('%d.%m.%Y %H:%M') }} Londra; bu saat haberin ilk yayın saati değildir.</p>
+  </details>
+  {% endif %}
+</article>
+{% endfor %}
+<p class="quiet-copy">Çıkarım için sabit alt sınır {{ news_pilot.minimum_common_sessions }} tam ortak seanstır; bu sınır tek başına alfa kanıtı değildir. E−B eşlenmiş gün sayısı, beş kolun ortak tam gün sayısından ayrıdır. Bu deneyin bağımsız hisse referansları; CALL/PUT, eski çağrı karneleri, zamanlı ölçüm ve model maliyetli PAPER hesaplarından ayrı tutulur.</p>
+{% endif %}
+</section>
