@@ -50,6 +50,7 @@ from webapp import (
     gamma,
     horizon_diagnostics,
     journal,
+    news_export,
     options_board,
     pricing,
     seo,
@@ -799,6 +800,17 @@ def news_research_status() -> dict[str, Any]:
     from webapp.news_research.report import build
 
     return asdict(build(_board_reader().engine, _now()))
+
+
+@app.post("/api/arastirma/haber/export")
+def news_research_export(request: Request, body: news_export.ExportRequest) -> dict[str, Any]:
+    """Private operator input export; no vendor call, write or evaluation."""
+    if not _same_origin(request):
+        raise HTTPException(status_code=403, detail="same_origin_required")
+    try:
+        return asdict(news_export.export_session(_board_reader().engine, body.day, _now()))
+    except news_export.ExportRefusedError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 
 @app.get("/api/arastirma/haber-kaynaklari")
