@@ -157,12 +157,21 @@
   </details>
   <details open class="fold-panel" id="paper-tracking"><summary>PAPER takibi <span class="text-gray-400">· simülasyon</span></summary>
   <h3 class="sr-only">Önerilerin sonucu (PAPER: simülasyon, gerçek para değil)</h3>
-  <p class="text-sm text-gray-400 mb-2">Açık/bekleyen {{ v.paper_stats.open }} · fiyatlanmış kapanış {{ v.paper_stats.closed }} · dolmayan {{ v.paper_stats.unfilled }} · belirsiz {{ v.paper_stats.unknown }} · model maliyetleri sonrası toplam {% if v.paper_stats.pnl_usd is not none %}${{ '%.2f' | format(v.paper_stats.pnl_usd) }}{% else %}bilinmiyor{% endif %} ({{ v.paper_stats.wins }} kazanç). Tüm geçmiş; aşağıda son 20 kapalı kayıt. <a class="underline" href="/sonuclar">Ayrıntılı sonuçlar</a>. Küçük örneklem; başarı oranı çıkarılmaz.</p>
+  <p class="quiet-copy" data-paper-all-history><b>Tüm geçmiş · {{ v.paper_stats.total }} kayıt:</b> {{ v.paper_stats.closed }} fiyatlanmış kapanış · {{ v.paper_stats.wins }} kazanç · {{ v.paper_stats.losses }} kayıp · {{ v.paper_stats.flats }} başabaş. Model maliyetleri sonrası kapanış toplamı {% if v.paper_stats.pnl_usd is not none %}${{ '%.2f' | format(v.paper_stats.pnl_usd) }}{% else %}bilinmiyor{% endif %}. Açık/bekleyen {{ v.paper_stats.open }} · dolmayan {{ v.paper_stats.unfilled }} · belirsiz {{ v.paper_stats.unknown }}. <a class="underline" href="/sonuclar">Tüm geçmişi ve araç ayrımını aç →</a></p>
+  <p class="quiet-copy" data-paper-recent>Aşağıda tüm açık/bekleyen kayıtlar ve oluşturulma sırasına göre son {{ v.paper_stats.recent_total }} sonuçlanan kayıt gösterilir (üst sınır {{ v.paper_stats.recent_limit }}). Bu son grupta {{ v.paper_stats.recent_closed }} fiyatlanmış kapanış: {{ v.paper_stats.recent_wins }} kazanç · {{ v.paper_stats.recent_losses }} kayıp · {{ v.paper_stats.recent_flats }} başabaş; {{ v.paper_stats.recent_unfilled }} dolmayan · {{ v.paper_stats.recent_unknown }} belirsiz. Eksik fiyatlar kayıp veya sıfır getiri sayılmaz.</p>
   {% if v.papers_open or v.papers_closed %}
-  <div class="overflow-x-auto" role="region" aria-label="PAPER pozisyonları" tabindex="0"><table class="text-sm w-full"><thead class="text-gray-400 text-left"><tr><th>Hisse</th><th>Araç</th><th>Durum</th><th>Giriş</th><th>Stop/Hedef</th><th>Son değer</th><th>Çıkış</th><th>P&amp;L</th></tr></thead><tbody>
+  <div class="overflow-x-auto" role="region" aria-label="PAPER pozisyonları" tabindex="0"><table class="text-sm w-full"><thead class="text-gray-400 text-left"><tr><th>Hisse</th><th>Araç</th><th>Durum</th><th>Giriş / kayıt saati</th><th>Stop/Hedef</th><th>Fiyat gözlemi</th><th>Çıkış / kayıt saati</th><th>Kapanış neti</th></tr></thead><tbody>
   {% for p in v.papers_open + v.papers_closed %}
-  <tr class="border-t border-gray-800" data-paper="{{ p.ticker }}"><td>{{ p.ticker }}</td><td>{{ p.instrument }}</td><td>{{ p.state_text }}</td><td>{{ p.entry_price or '—' }}{% if p.quantity %} × {{ p.quantity }}{% endif %}</td><td>{{ p.stop }} / {{ p.target }}</td><td>{{ p.last_mark or '—' }}</td><td>{{ p.exit_price or '—' }} {{ p.exit_reason or '' }}</td><td>{{ p.pnl_usd if p.pnl_usd is not none else '—' }}</td></tr>
+  <tr class="border-t border-gray-800" data-paper="{{ p.ticker }}">
+    <td>{{ p.ticker }}</td><td>{{ p.instrument }}</td><td>{{ p.state_text }}</td>
+    <td>{{ p.entry_price if p.entry_price is not none else '—' }}{% if p.quantity %} × {{ p.quantity }}{% endif %}<small class="block quiet-copy">{{ p.entry_time if p.entry_at else 'Giriş saati kayıtsız' }}</small></td>
+    <td>{{ p.stop }} / {{ p.target }}</td>
+    <td data-paper-mark-state="{{ p.mark_status }}">{% if p.current_mark is not none %}<span data-paper-current-mark>{{ p.current_mark }}</span><small class="block quiet-copy">{{ p.mark_text }} · {{ p.last_mark_time }}</small>{% else %}<span class="quiet-copy">{{ p.mark_text }}</span>{% if p.recorded_mark is not none %}<small class="block quiet-copy">Kayıtlı fiyat {{ p.recorded_mark }} · {{ p.last_mark_time }}</small>{% endif %}{% endif %}</td>
+    <td>{{ p.exit_price if p.exit_price is not none else '—' }} {{ p.exit_reason or '' }}{% if p.exit_at %}<small class="block quiet-copy">{{ 'Çıkış' if p.category == 'closed' else 'Sinyal / kayıt' }} · {{ p.exit_time }}</small>{% endif %}</td>
+    <td>{{ p.pnl_usd if p.category == 'closed' and p.pnl_usd is not none else 'bilinmiyor' }}</td>
+  </tr>
   {% endfor %}</tbody></table></div>
+  <p class="quiet-copy">Saatler Londra (Europe/London). Yalnız aynı New York gününde, tazelik sınırı içindeki fiyat güncel gösterilir; diğerleri tarihli kayıtlı gözlemdir. Fiyat gözlemi kapanış sonucu veya broker dolumu değildir. Küçük örneklem; başarı oranı çıkarılmaz.</p>
   {% else %}<p class="text-sm text-gray-500">Henüz PAPER pozisyonu yok. Bir ALIM kartı hazır olduğunda simüle giriş tetik ve taze fiyatla açılır.</p>{% endif %}
   {% if v.manuals %}
   <h4 class="text-sm font-semibold text-white mt-4">Kendi işlemlerim (MANUAL_FILL, PAPER'dan ayrı)</h4>
