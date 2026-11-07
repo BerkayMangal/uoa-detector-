@@ -20,6 +20,7 @@ from uoa_detector.live_alpha.calendar import MarketMode, classify
 from uoa_detector.live_alpha.settings import load_live_alpha_settings
 from webapp.alpha_lab.db import digest
 from webapp.board.db import session_factory
+from webapp.evidence_reads import scoped_read
 from webapp.live_alpha.results import paper_result
 from webapp.live_alpha.store import LivePaper, LiveScan
 from webapp.opening import storage as opening_storage
@@ -665,6 +666,7 @@ def _new_rows(engine: Engine, now: datetime, day: date, names: set[str]) -> tupl
     return activation, _read_rows(engine, now, targets), total > len(targets), _first_pending(engine, now, activation)
 
 
+@scoped_read
 def build(engine: Engine, now: datetime, day: date | None = None) -> DailyReport:
     """Read the chosen US call-session date. All displayed clocks use London."""
     now = aware(now)

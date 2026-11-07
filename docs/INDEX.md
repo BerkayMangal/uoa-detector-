@@ -285,6 +285,7 @@ A new study needs a fresh, non-overlapping window (`docs/next_studies.md`,
 | 5.66 | **Semantic news and multimodal research engine** — `docs/phase-5.66-fusion-engine-acceptance.md`; implementation/results in `docs/phase-5.66-closeout.md`, verified external references in `docs/phase-5.66-external-research.md`. Real bounded Mahalle/Grok interpretation, physically available fundamentals, typed multi-source research and5184 measured exploratory configurations: no validated edge, no promotion. Owner explicitly authorizes full measured build2026-11-07; no old-record repair, reserved-label access or broker action. |
 | 5.66.1 | **Runtime profile parse cache** — `docs/phase-5.66.1-runtime-profile-cache.md`; exact-byte bounded cache and pinned historical dependency compatibility bridge, preserving old report/audit/capture identities. |
 | 5.66.2 | **Forward clocks and fixed arms** — `docs/phase-5.66.2-forward-decision-clocks.md`; pending/final decisions, four-way bounded workers, source-grounded semantic truth tables and coherent financials+earnings pair after actual schema checks. |
+| 5.66.3 | **Observation-local evidence reads** — `docs/phase-5.66.3-evidence-read-scope.md`, results `docs/phase-5.66.3-results.md`; exact-key bounded ORM SELECT reuse within a pure read observation after108.33s native627-query report; preserve verifiers/source identities, no cross-request stale data or database migration. |
 
 Detail for the 5.10–5.19 candidates:
 - **Falsification gates (D8).** `src/uoa_detector/backtest/falsification.py:79-81`

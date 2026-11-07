@@ -85,6 +85,7 @@ from webapp.desk import overview as desk_overview
 from webapp.desk import positions as desk_positions
 from webapp.desk import scenarios as desk_scenarios
 from webapp.desk.capture import STATE as DESK_STATE
+from webapp.evidence_reads import read_scope
 from webapp.failure_logging import log_failure
 from webapp.fundamental_context import service as fundamental_service
 from webapp.fundamental_context import view as fundamental_view
@@ -884,22 +885,30 @@ def news_pilot_status() -> dict[str, Any]:
 @app.get("/api/arastirma/aday-olcum")
 def shadow_measurement_status(day: date | None = None) -> dict[str, Any]:
     """Bounded verified reference reads only; GET never starts capture."""
-    return asdict(shadow_view.build(_board_reader().engine, _now(), day))
+    engine = _board_reader().engine
+    with read_scope(engine):
+        return asdict(shadow_view.build(engine, _now(), day))
 
 
 @app.get("/api/motor")
 def fusion_engine_status(day: date | None = None) -> dict[str, Any]:
-    return asdict(fusion_view.build(_board_reader().engine, _now(), day))
+    engine = _board_reader().engine
+    with read_scope(engine):
+        return asdict(fusion_view.build(engine, _now(), day))
 
 
 @app.get("/api/motor/haber")
 def semantic_news_status(day: date | None = None) -> dict[str, Any]:
-    return asdict(semantic_view.build(_board_reader().engine, _now(), day))
+    engine = _board_reader().engine
+    with read_scope(engine):
+        return asdict(semantic_view.build(engine, _now(), day))
 
 
 @app.get("/api/motor/temel")
 def fundamental_context_status(day: date | None = None) -> dict[str, Any]:
-    return asdict(fundamental_view.build(_board_reader().engine, _now(), day))
+    engine = _board_reader().engine
+    with read_scope(engine):
+        return asdict(fundamental_view.build(engine, _now(), day))
 
 
 @app.get("/api/motor/arastirma")
@@ -921,10 +930,11 @@ def call_research_page(request: Request) -> HTMLResponse:
     horizon = _safe(horizon_report.load, None) if history is not None else None
     diagnostic = _safe(horizon_diagnostics.load, None) if horizon is not None else None
     pilot = _safe(lambda: news_pilot_view.build(engine, now), None)
-    shadow = _safe(lambda: shadow_view.build(engine, now), None)
-    fusion = _safe(lambda: fusion_view.build(engine, now), None)
-    semantic = _safe(lambda: semantic_view.build(engine, now), None)
-    fundamental = _safe(lambda: fundamental_view.build(engine, now), None)
+    with read_scope(engine):
+        shadow = _safe(lambda: shadow_view.build(engine, now), None)
+        fusion = _safe(lambda: fusion_view.build(engine, now), None)
+        semantic = _safe(lambda: semantic_view.build(engine, now), None)
+        fundamental = _safe(lambda: fundamental_view.build(engine, now), None)
     new_research = _safe(fusion_research_report.load, None)
     capability = _safe(lambda: fusion_capability.load("capability"), None)
     semantic_capability = _safe(lambda: fusion_capability.load("semantic-capability"), None)

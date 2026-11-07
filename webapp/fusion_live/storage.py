@@ -157,6 +157,21 @@ def get(engine: Engine, key: str, now: datetime, *, confirmed: bool = True) -> R
     )
 
 
+def get_existing(engine: Engine, keys: tuple[str, ...], now: datetime) -> dict[str, Record]:
+    """Batch only existence; every present row still uses the original verifier."""
+    if len(keys) > config.settings().candidate_limit * len(config.settings().arms):
+        raise ValueError("fusion_existing_limit")
+    if not keys:
+        return {}
+    with session_factory(engine)() as session:
+        present = tuple(session.scalars(select(FusionEvent.key).where(FusionEvent.key.in_(keys))))
+    return {
+        key: record
+        for key in present
+        if (record := get(engine, key, now, confirmed=False)) is not None
+    }
+
+
 def _confirm(engine: Engine, row: Record, clock: Callable[[], datetime]) -> Record:
     at = aware(clock())
     if at < row.at:

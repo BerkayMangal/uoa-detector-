@@ -22,6 +22,7 @@ from webapp.board import quota_ledger
 from webapp.board.db import normalize_database_url
 from webapp.board.refresher import _LIVE_CALIBRATION_PROFILE
 from webapp.board.settings import load_board_settings
+from webapp.evidence_reads import read_scope
 from webapp.fundamental_context import settings as config
 from webapp.fundamental_context import storage
 from webapp.fundamental_context.model import Endpoint, Record, aware, digest
@@ -247,7 +248,8 @@ async def tick(
     if len(candidates) > config.settings().max_tickers_per_day:
         _halt(engine, day, "candidate_limit_invalid", at, clock)
         return {"status": "halted"}
-    candidates = tuple(c for c in candidates if _eligible(engine, c, activation, at))
+    with read_scope(engine):
+        candidates = tuple(c for c in candidates if _eligible(engine, c, activation, at))
     lock, semaphore = asyncio.Lock(), asyncio.Semaphore(config.settings().max_tickers_per_day)
     last_wire: datetime | None = None
     endpoints: tuple[Endpoint, ...] = (config.settings().statement_endpoint, "earnings")

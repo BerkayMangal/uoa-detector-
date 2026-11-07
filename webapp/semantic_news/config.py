@@ -52,6 +52,7 @@ def profile_hash() -> str:
 @cache
 def implementation_hash() -> str:
     paths = sorted(p for p in Path(__file__).parent.glob("*.py") if p.name != "view.py")
+    paths.append(ROOT / "webapp/evidence_reads.py")
     return hashlib.sha256(
         b"".join(str(p.relative_to(ROOT)).encode() + p.read_bytes() for p in paths)
     ).hexdigest()

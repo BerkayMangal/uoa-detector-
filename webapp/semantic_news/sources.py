@@ -13,6 +13,7 @@ from sqlalchemy import inspect
 from sqlalchemy.engine import Engine
 
 from webapp.board.db import session_factory
+from webapp.evidence_reads import scoped_read
 from webapp.news_research import storage as physical
 from webapp.semantic_news import config
 from webapp.semantic_news.model import EmptySource, Headline, Request, Source, aware, digest, stored
@@ -21,6 +22,7 @@ from webapp.shadow_capture import storage as shadow
 from webapp.shadow_capture.model import Record
 
 
+@scoped_read
 def candidates(engine: Engine, now: datetime) -> tuple[Record, ...]:
     if not shadow.available(engine):
         return ()
@@ -30,6 +32,7 @@ def candidates(engine: Engine, now: datetime) -> tuple[Record, ...]:
     return shadow.list_events(engine, "candidate", now, day=day, limit=5)
 
 
+@scoped_read
 def source(engine: Engine, candidate: Record, now: datetime) -> Source:
     """One original source-bound packet, interpreted only at the current clock."""
     at = aware(now)
@@ -170,6 +173,7 @@ def source(engine: Engine, candidate: Record, now: datetime) -> Source:
     )
 
 
+@scoped_read
 def empty_source(engine: Engine, candidate: Record, now: datetime) -> EmptySource | None:
     """Known checked-empty is evidence; missing or truncated data is not empty."""
     if candidate.payload.get("news") is not False:
