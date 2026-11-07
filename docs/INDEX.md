@@ -30,7 +30,7 @@ history the clause says does not exist is reachable for ~95 sessions
 what is true — no verdict in this section moves. Re-measured 2026-11-01, the
 current subscription floor is 2026-06-24. Phase 5.51 captures 61 sessions through
 2026-09-18; its twelve exploratory flow/price controls are negative, and its
-80-session full-selection gate is unmet (`docs/phase-5.51-results.md`).
+80-session full-selection gate is unmet (`docs/phase-5.51-results.md`). Phase5.66 adds5184 explicitly exploratory configurations on reused daily history; the selected result fails concentration/cost robustness, all ticker fits fall back globally, and no rule is promoted (`docs/phase-5.66-closeout.md`).
 
 | Clause | Evidence | Commits |
 |---|---|---|
@@ -282,6 +282,9 @@ A new study needs a fresh, non-overlapping window (`docs/next_studies.md`,
 | 5.64 | **Prospective pre-filter shadow price capture** — `docs/phase-5.64-shadow-price-capture-acceptance.md`; delivery: `docs/phase-5.64-shadow-price-capture-closeout.md`. Dedicated entry/15/60 own/SPY references on newly observed known-base candidates before RS/news filters. Owner explicitly directs fixing capture2026-11-06; separate forward cohort, no old mark repair, threshold promotion or broker action. |
 | 5.64.1 | **Physical confirmation clocks** — `docs/phase-5.64.1-confirmation-clocks.md`; dual post-commit receipt stages for the new shadow namespace, deadline admission and actual-confirmation-based scheduling. No old receipt or sampling change. |
 | 5.65 | **PAPER accounting and quote visibility** — `docs/phase-5.65-paper-accountability-acceptance.md`; audit: `docs/phase-5.65-paper-accountability-audit.md`; delivery: `docs/phase-5.65-paper-accountability-closeout.md`. Independent actual-event reconciliation, fixed-clock inverse diagnostic and home fresh/historical price clarity. Owner accounting concern2026-11-06; no strategy inversion, threshold change, old PnL rewrite or broker action. |
+| 5.66 | **Semantic news and multimodal research engine** — `docs/phase-5.66-fusion-engine-acceptance.md`; implementation/results in `docs/phase-5.66-closeout.md`, verified external references in `docs/phase-5.66-external-research.md`. Real bounded Mahalle/Grok interpretation, physically available fundamentals, typed multi-source research and5184 measured exploratory configurations: no validated edge, no promotion. Owner explicitly authorizes full measured build2026-11-07; no old-record repair, reserved-label access or broker action. |
+| 5.66.1 | **Runtime profile parse cache** — `docs/phase-5.66.1-runtime-profile-cache.md`; exact-byte bounded cache and pinned historical dependency compatibility bridge, preserving old report/audit/capture identities. |
+| 5.66.2 | **Forward clocks and fixed arms** — `docs/phase-5.66.2-forward-decision-clocks.md`; pending/final decisions, four-way bounded workers, source-grounded semantic truth tables and coherent financials+earnings pair after actual schema checks. |
 
 Detail for the 5.10–5.19 candidates:
 - **Falsification gates (D8).** `src/uoa_detector/backtest/falsification.py:79-81`

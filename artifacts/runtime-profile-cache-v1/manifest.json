@@ -1,0 +1,13 @@
+{
+  "version": "runtime_profile_cache_v1",
+  "reason": "exact-byte immutable profile parse cache only",
+  "dependency": "src/uoa_detector/live_alpha/settings.py",
+  "original_dependency_sha256": "73d76fa69295195107960e49fb4fe5ac2bdcc8da3c52e0c9f60f574ba4c2e0f7",
+  "runtime_dependency_sha256": "dd36bbb8f2f363aedccb33c6a5b80bcfae8d17f5f454829635ebf6c51a2e3c79",
+  "profile_path": "profiles/live_alpha_v1.yaml",
+  "profile_sha256": "e3e425cfc5e5cac07a35ec7e8b12ca970eb57fb405ea8f3e73680a962ea14e6e",
+  "report_path": "artifacts/vendor-history-v1/report.json",
+  "report_hash": "b3b411c1092f00df8f39eadb03aca4050cb4425ff10befd88b2b2dfb080d17af",
+  "audit_path": "artifacts/vendor-history-v1/audit.json",
+  "audit_hash": "546c385c34262e7905e945ee676bfa6c6ee5d66d574630a189ea4cd8c2f6fd16"
+}

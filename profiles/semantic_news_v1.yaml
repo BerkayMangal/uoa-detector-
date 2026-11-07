@@ -1,0 +1,17 @@
+version: semantic_news_v1
+enabled_env: SEMANTIC_NEWS_ENABLED
+endpoint: https://mahalle-production.up.railway.app/internal/uoa/news-analyze
+token_env: MAHALLE_ANALYSIS_TOKEN
+poll_seconds: 2
+idle_poll_seconds: 60
+request_timeout_seconds: 45
+max_input_bytes: 16384
+max_body_bytes: 65536
+max_items: 3
+max_headline_characters: 1600
+daily_analyses: 4
+min_completion_lead_seconds: 5
+news_window_hours: 36
+source_row_limit: 128
+expected_prompt_hash: b351f68d8dd3b7c95605a1506697829317e91ae980e7ec4814c054bfa378b0f1
+expected_schema_hash: 5ffd00f86a39e598a048f21f59b63b2c676155b1ece90fe262c1c56d95c51d1c

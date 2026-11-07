@@ -130,6 +130,12 @@ def _no_live_alpha_thread(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(m.news_pilot_service, "STATE", {})
     monkeypatch.setenv("SHADOW_CAPTURE_ENABLED", "false")
     monkeypatch.setattr(m.shadow_service, "STATE", {})
+    monkeypatch.setenv("SEMANTIC_NEWS_ENABLED", "false")
+    monkeypatch.setattr(m.semantic_service, "STATE", {})
+    monkeypatch.setenv("FUNDAMENTAL_CONTEXT_ENABLED", "false")
+    monkeypatch.setattr(m.fundamental_service, "STATE", {})
+    monkeypatch.setenv("FUSION_ENGINE_ENABLED", "false")
+    monkeypatch.setattr(m.fusion_service, "STATE", {})
 
     async def _idle() -> None:
         # Phase 5.2.PERF10: the board prerender loop would read the default database

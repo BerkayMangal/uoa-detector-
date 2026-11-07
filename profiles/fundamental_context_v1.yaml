@@ -1,0 +1,15 @@
+version: fundamental_context_v1
+enabled_env: FUNDAMENTAL_CONTEXT_ENABLED
+statement_endpoint: financials
+max_tickers_per_day: 4
+max_requests_per_day: 8
+request_timeout_seconds: 8
+max_body_bytes: 1048576
+poll_seconds: 5
+idle_poll_seconds: 60
+read_limit: 16
+candidate_max_age_seconds: 60
+claim_pending_seconds: 30
+wire_min_spacing_seconds: 1
+source_row_limit: 256
+eps_denominator_floor: 0.01

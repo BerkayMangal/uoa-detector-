@@ -1,0 +1,12 @@
+version: fusion_live_v1
+enabled_env: FUSION_ENGINE_ENABLED
+poll_seconds: 2
+idle_poll_seconds: 60
+candidate_limit: 4
+entry_lead_seconds: 5
+read_limit: 32
+history_read_limit: 128
+arms: [base, semantic_positive, semantic_veto, semantic_fundamental]
+fundamental_revenue_yoy_min_pct: 0
+fundamental_operating_margin_min_pct: 0
+minimum_complete_sessions: 80

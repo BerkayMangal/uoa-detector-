@@ -47,6 +47,7 @@ from uoa_detector.sources.market_hours import is_market_open
 from webapp import (
     call_review,
     explanations,
+    fusion_capability,
     gamma,
     horizon_diagnostics,
     journal,
@@ -85,6 +86,11 @@ from webapp.desk import positions as desk_positions
 from webapp.desk import scenarios as desk_scenarios
 from webapp.desk.capture import STATE as DESK_STATE
 from webapp.failure_logging import log_failure
+from webapp.fundamental_context import service as fundamental_service
+from webapp.fundamental_context import view as fundamental_view
+from webapp.fusion_live import service as fusion_service
+from webapp.fusion_live import view as fusion_view
+from webapp.fusion_research import report as fusion_research_report
 from webapp.gamma_live import gamma_refresh_loop
 from webapp.history_capture import report as vendor_history_report
 from webapp.horizon_research import report as horizon_report
@@ -100,6 +106,8 @@ from webapp.opening import measurement as opening_measurement
 from webapp.opening import view as opening_view
 from webapp.opening.model import clock as opening_clock
 from webapp.repo import RunInfo, SignalRepo
+from webapp.semantic_news import service as semantic_service
+from webapp.semantic_news import view as semantic_view
 from webapp.service_isolation import run_service
 from webapp.shadow_capture import service as shadow_service
 from webapp.shadow_capture import view as shadow_view
@@ -255,6 +263,27 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
                                     lambda: shadow_service.loop(str(config["database_url"])),
                                     "shadow-price-capture"),
                 "shadow-price-capture",
+            )))
+        if semantic_service.enabled():
+            tasks.append(asyncio.create_task(_supervise(
+                lambda: run_service(str(config["database_url"]),
+                                    lambda: semantic_service.loop(str(config["database_url"])),
+                                    "semantic-news"),
+                "semantic-news",
+            )))
+        if fundamental_service.enabled():
+            tasks.append(asyncio.create_task(_supervise(
+                lambda: run_service(str(config["database_url"]),
+                                    lambda: fundamental_service.loop(str(config["database_url"])),
+                                    "fundamental-context"),
+                "fundamental-context",
+            )))
+        if fusion_service.enabled():
+            tasks.append(asyncio.create_task(_supervise(
+                lambda: run_service(str(config["database_url"]),
+                                    lambda: fusion_service.loop(str(config["database_url"])),
+                                    "fusion-paper"),
+                "fusion-paper",
             )))
         if os.environ.get("DAILY_REPAIR_REQUEST", "").strip():
             # Explicit one-shot operator; its durable claim prevents retry on redeploy.
@@ -858,6 +887,29 @@ def shadow_measurement_status(day: date | None = None) -> dict[str, Any]:
     return asdict(shadow_view.build(_board_reader().engine, _now(), day))
 
 
+@app.get("/api/motor")
+def fusion_engine_status(day: date | None = None) -> dict[str, Any]:
+    return asdict(fusion_view.build(_board_reader().engine, _now(), day))
+
+
+@app.get("/api/motor/haber")
+def semantic_news_status(day: date | None = None) -> dict[str, Any]:
+    return asdict(semantic_view.build(_board_reader().engine, _now(), day))
+
+
+@app.get("/api/motor/temel")
+def fundamental_context_status(day: date | None = None) -> dict[str, Any]:
+    return asdict(fundamental_view.build(_board_reader().engine, _now(), day))
+
+
+@app.get("/api/motor/arastirma")
+def fusion_research_status() -> dict[str, Any]:
+    report = _safe(fusion_research_report.load, None)
+    if report is None:
+        raise HTTPException(status_code=503, detail="Yeni motor araştırma kaydı doğrulanamadı")
+    return report
+
+
 @app.get("/arastirma", response_class=HTMLResponse)
 def call_research_page(request: Request) -> HTMLResponse:
     engine, now = _board_reader().engine, _now()
@@ -870,7 +922,13 @@ def call_research_page(request: Request) -> HTMLResponse:
     diagnostic = _safe(horizon_diagnostics.load, None) if horizon is not None else None
     pilot = _safe(lambda: news_pilot_view.build(engine, now), None)
     shadow = _safe(lambda: shadow_view.build(engine, now), None)
-    return templates.TemplateResponse(request, "call_research.html", {"news_shadow": shadow, "news_pilot": pilot, "horizon_diagnostics": diagnostic, "horizon_research": horizon, "news_research": news_research, "research": frozen, "vendor_history": history, "coverage": call_coverage.view(engine, now), "forward": call_forward.view(engine, now), "cfg": call_research_settings(), "observer": dict(call_forward.STATE)})
+    fusion = _safe(lambda: fusion_view.build(engine, now), None)
+    semantic = _safe(lambda: semantic_view.build(engine, now), None)
+    fundamental = _safe(lambda: fundamental_view.build(engine, now), None)
+    new_research = _safe(fusion_research_report.load, None)
+    capability = _safe(lambda: fusion_capability.load("capability"), None)
+    semantic_capability = _safe(lambda: fusion_capability.load("semantic-capability"), None)
+    return templates.TemplateResponse(request, "call_research.html", {"fusion_engine": fusion, "semantic_news": semantic, "fundamental_context": fundamental, "fusion_research": new_research, "fusion_capability": capability, "semantic_capability": semantic_capability, "fusion_timezone": ZoneInfo("Europe/London"), "news_shadow": shadow, "news_pilot": pilot, "horizon_diagnostics": diagnostic, "horizon_research": horizon, "news_research": news_research, "research": frozen, "vendor_history": history, "coverage": call_coverage.view(engine, now), "forward": call_forward.view(engine, now), "cfg": call_research_settings(), "observer": dict(call_forward.STATE)})
 
 
 @app.get("/api/arastirma/ufuk")
@@ -1884,6 +1942,12 @@ def health() -> dict[str, object]:
         body["alpha_lab"] = dict(LAB_STATE)
     if ARCHIVE_STATE:
         body["flow_capture"] = dict(ARCHIVE_STATE)
+    if semantic_service.STATE:
+        body["semantic_news"] = semantic_service.safe_status()
+    if fundamental_service.STATE:
+        body["fundamental_context"] = fundamental_service.safe_status()
+    if fusion_service.STATE:
+        body["fusion_engine"] = fusion_service.safe_status()
     if shadow_service.STATE:
         body["shadow_capture"] = shadow_service.safe_status()
     if news_pilot_service.STATE:

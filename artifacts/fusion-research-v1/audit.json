@@ -1,0 +1,17 @@
+{
+  "auditor_sha256": "3d34f52b7bfa7c8f6aad7a5a3b34e5496bfca80d94c2958fc40e04a2163cb555",
+  "excess_usd": 1371.1593885603302,
+  "grid_configurations_checked": 5184,
+  "gross_usd": 977.0710000000025,
+  "independent_causal_roster_exact_match": true,
+  "limitations": "Checks selected-ledger/roster arithmetic and registry; not independent reconstruction of every fold/candidate or prospective alpha.",
+  "max_units_per_signal_day": 4,
+  "modeled_price_cost_usd": 416.42180769999976,
+  "net_usd": 560.6491923000442,
+  "research_report_hash": "5e4868ccea8b24bd41b1730ca82abec8f508f5f2ff99bd8d7a8aa733271d9688",
+  "selected_units_checked": 172,
+  "source_sha256": "ed1f6d8871e900f959793edb8ed7da4b52a1502da3c7974e2279e74e6a7205ca",
+  "state": "PASS",
+  "without_best_1_net_usd": -70.11524769999909,
+  "without_best_3_net_usd": -1253.6770526999992
+}
