@@ -17,6 +17,7 @@ test fails and a human reads the new line before it ships.
 
 from __future__ import annotations
 
+import ast
 import re
 from datetime import UTC, datetime
 from pathlib import Path
@@ -274,6 +275,11 @@ def test_the_webapp_has_no_destructive_path_beyond_the_pinned_exception() -> Non
         for number, line in enumerate(source.splitlines(), start=1):
             for label, pattern in _DESTRUCTIVE:
                 if pattern.search(line):
+                    # Restoring a typed ContextVar token cannot reset a DB table.
+                    # This exact receiver/line is independently pinned below.
+                    if (name == "webapp/evidence_reads.py" and label == "reset("
+                            and line.strip() == "_CURRENT.reset(token)"):
+                        continue
                     found.add((name, label))
                     lines.append(f"{name}:{number}: {line.strip()}")
 
@@ -436,3 +442,20 @@ def _reset(m: ModuleType) -> None:
     m._REPO = m._JOURNAL = m._GAMMA = None
     m._BOARD_READER = None
     m._CARDS = None
+
+
+def test_only_contextvar_token_restore_is_exempt_from_destructive_scan() -> None:
+    tree = ast.parse((_WEBAPP / "evidence_reads.py").read_text())
+    definitions = [node for node in ast.walk(tree) if isinstance(node, ast.AnnAssign)
+                   and isinstance(node.target, ast.Name) and node.target.id == "_CURRENT"]
+    assert len(definitions) == 1
+    value = definitions[0].value
+    assert isinstance(value, ast.Call) and isinstance(value.func, ast.Name)
+    assert value.func.id == "ContextVar"
+    assert any(isinstance(node, ast.ImportFrom) and node.module == "contextvars"
+               and any(alias.name == "ContextVar" and alias.asname is None
+                       for alias in node.names) for node in tree.body)
+    restores = [node for node in ast.walk(tree) if isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Attribute) and node.func.attr == "reset"]
+    assert len(restores) == 1
+    assert ast.unparse(restores[0]) == "_CURRENT.reset(token)"

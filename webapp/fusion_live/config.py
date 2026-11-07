@@ -52,6 +52,7 @@ def identity() -> dict[str, str]:
             p for p in (ROOT / "webapp" / component).glob("*.py") if p.name != "view.py"
         )
     files += [
+        ROOT / "webapp/evidence_reads.py",
         ROOT / "profiles/semantic_news_v1.yaml",
         ROOT / "profiles/fundamental_context_v1.yaml",
     ]

@@ -17,6 +17,7 @@ from sqlalchemy.engine import Engine, make_url
 from uoa_detector.live_alpha.calendar import MarketMode, classify, is_session_day
 from uoa_detector.live_alpha.settings import load_live_alpha_settings
 from webapp.board.db import normalize_database_url
+from webapp.evidence_reads import read_scope
 from webapp.fundamental_context import view as fundamental_view
 from webapp.fusion_live import adapters, archive, config, policy, storage
 from webapp.fusion_live.model import Arm
@@ -120,49 +121,60 @@ def tick(engine: Engine, now: datetime, *, clock: Callable[[], datetime]) -> dic
     day = at.astimezone(_ET).date()
     if not shadow_storage.available(engine):
         return {"status": "waiting", "candidates": 0, "decisions": 0, "pending": 0}
-    candidates = shadow_storage.list_events(
-        engine, "candidate", at, day=day, limit=config.settings().candidate_limit + 1
-    )
-    if len(candidates) > config.settings().candidate_limit:
-        return {"status": "source_limit", "candidates": 0, "decisions": 0, "pending": 0}
-    usable = [c for c in candidates if _eligible(engine, c, active, at)]
-    unfinished: list[tuple[ShadowRecord, tuple[Arm, ...]]] = []
-    decisions = pending = 0
-    for candidate in usable:
-        missing: list[Arm] = []
-        for arm in config.settings().arms:
-            key = digest((config.settings().version, active.key, candidate.key, arm))
-            saved = storage.get(engine, key, at, confirmed=False)
-            if saved is None:
-                missing.append(arm)
-            else:
-                decisions += 1
-        if missing:
-            unfinished.append((candidate, tuple(missing)))
-    if not unfinished:
-        return {
-            "status": "active" if usable else "waiting",
-            "candidates": len(usable),
-            "decisions": decisions,
-            "pending": 0,
-        }
-    news_rows: dict[str, Mapping[str, Any]] = {}
-    fund_rows: dict[str, Mapping[str, Any]] = {}
-    # No outcome/reference view is called on this path. Only contemporaneous
-    # feature read models may affect a pre-entry decision.
-    if any(
-        arm != "base"
-        and at
-        < c.confirmed_at
-        + timedelta(
-            seconds=shadow_config.settings().entry_delay_seconds
-            - config.settings().entry_lead_seconds
+    # One fixed-time observation; exit before any claim/decision write.
+    with read_scope(engine):
+        candidates = shadow_storage.list_events(
+            engine, "candidate", at, day=day, limit=config.settings().candidate_limit + 1
         )
-        for c, arms in unfinished
-        for arm in arms
-        if c.confirmed_at is not None
-    ):
-        news_rows, fund_rows = _views(engine, at, day)
+        if len(candidates) > config.settings().candidate_limit:
+            return {"status": "source_limit", "candidates": 0, "decisions": 0, "pending": 0}
+        usable = [c for c in candidates if _eligible(engine, c, active, at)]
+        unfinished: list[tuple[ShadowRecord, tuple[Arm, ...]]] = []
+        decisions = pending = 0
+        existing = storage.get_existing(
+            engine,
+            tuple(
+                digest((config.settings().version, active.key, candidate.key, arm))
+                for candidate in usable
+                for arm in config.settings().arms
+            ),
+            at,
+        )
+        for candidate in usable:
+            missing: list[Arm] = []
+            for arm in config.settings().arms:
+                key = digest((config.settings().version, active.key, candidate.key, arm))
+                saved = existing.get(key)
+                if saved is None:
+                    missing.append(arm)
+                else:
+                    decisions += 1
+            if missing:
+                unfinished.append((candidate, tuple(missing)))
+        if not unfinished:
+            return {
+                "status": "active" if usable else "waiting",
+                "candidates": len(usable),
+                "decisions": decisions,
+                "pending": 0,
+            }
+        news_rows: dict[str, Mapping[str, Any]] = {}
+        fund_rows: dict[str, Mapping[str, Any]] = {}
+        # No outcome/reference view is called on this path. Only contemporaneous
+        # feature read models may affect a pre-entry decision.
+        if any(
+            arm != "base"
+            and at
+            < c.confirmed_at
+            + timedelta(
+                seconds=shadow_config.settings().entry_delay_seconds
+                - config.settings().entry_lead_seconds
+            )
+            for c, arms in unfinished
+            for arm in arms
+            if c.confirmed_at is not None
+        ):
+            news_rows, fund_rows = _views(engine, at, day)
     for candidate, arms in unfinished:
         assert candidate.confirmed_at is not None
         moment = aware(clock())
@@ -297,7 +309,8 @@ def close_day(engine: Engine, now: datetime, *, clock: Callable[[], datetime]) -
     key = digest((config.settings().version, active.key, day.isoformat(), "day_result"))
     if storage.get(engine, key, at, confirmed=False) is not None:
         return 0
-    result = scoring.build_day(engine, day, at)
+    with read_scope(engine):
+        result = scoring.build_day(engine, day, at)
     if result.candidates == 0 or not result.session_closed:
         return 0
     moment = aware(clock())

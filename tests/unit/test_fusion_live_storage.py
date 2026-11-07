@@ -256,3 +256,17 @@ def test_storage_query_rejects_unbounded_read_limits(engine: Engine) -> None:
     for limit in (0, -1, 513):
         with pytest.raises(ValueError, match="fusion_read_limit"):
             storage.list_events(engine, "decision", NOW, limit=limit)
+
+
+def test_batched_existence_retains_original_future_missing_and_partial_semantics(engine: Engine) -> None:
+    assert put(engine, "known") is not None
+    assert put(engine, "future", at=NOW + timedelta(days=1), clock=lambda: NOW + timedelta(days=2)) is not None
+    keys = ("known", "future", "missing")
+    now = NOW + timedelta(seconds=2)
+    expected = {key: value for key in keys if (value := storage.get(engine, key, now, confirmed=False)) is not None}
+    assert storage.get_existing(engine, keys, now) == expected
+    assert set(expected) == {"known"}
+    statements = []
+    event.listen(engine, "before_cursor_execute", lambda _c, _cur, sql, *_a: statements.append(sql))
+    assert storage.get_existing(engine, tuple(f"missing-{i}" for i in range(16)), now) == {}
+    assert len(statements) == 1
