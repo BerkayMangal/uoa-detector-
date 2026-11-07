@@ -1,0 +1,352 @@
+{
+  "method": "fundamental_capability_v1",
+  "status": "VERIFIED_CAPABILITY",
+  "as_of": "2026-11-07T08:28:51.465358+00:00",
+  "inference": "NOT_PERFORMED",
+  "registered_max_requests": 3,
+  "actual_requests": 3,
+  "native_daily_count": 45,
+  "native_daily_limit": 30000,
+  "rows": [
+    {
+      "ticker": "AAPL",
+      "endpoint": "financials",
+      "status": "VERIFIED",
+      "requested_at": "2026-11-07T07:57:55.864750+00:00",
+      "received_at": "2026-11-07T07:57:55.979621+00:00",
+      "extracted_at": "2026-11-07T08:14:18.665262+00:00",
+      "source_hash": "bbcc4ef012e2045f4dc42d97146559fad7b9844bcccbfc991be3741df7b19acd",
+      "bytes": 439494,
+      "facts": {
+        "ticker": "AAPL",
+        "endpoint": "financials",
+        "available_at": "2026-11-07 08:14:18.665262+00:00",
+        "metrics": [
+          {
+            "name": "revenue",
+            "value": 114477000000.0,
+            "unit": "USD",
+            "reason": "",
+            "source_paths": [
+              "data.income_statements[].total_revenue"
+            ]
+          },
+          {
+            "name": "net_income",
+            "value": 30711000000.0,
+            "unit": "USD",
+            "reason": "",
+            "source_paths": [
+              "data.income_statements[].net_income"
+            ]
+          },
+          {
+            "name": "operating_income",
+            "value": 35631000000.0,
+            "unit": "USD",
+            "reason": "",
+            "source_paths": [
+              "data.income_statements[].operating_income"
+            ]
+          },
+          {
+            "name": "revenue_yoy_pct",
+            "value": 11.721937032771844,
+            "unit": "percent",
+            "reason": "",
+            "source_paths": [
+              "data.income_statements[].total_revenue",
+              "data.income_statements[].fiscal_date_ending",
+              "data.income_statements[].report_type",
+              "data.income_statements[].reported_currency"
+            ]
+          },
+          {
+            "name": "operating_margin_pct",
+            "value": 31.125029481904665,
+            "unit": "percent",
+            "reason": "",
+            "source_paths": [
+              "data.income_statements[].total_revenue",
+              "data.income_statements[].operating_income",
+              "data.income_statements[].fiscal_date_ending",
+              "data.income_statements[].reported_currency"
+            ]
+          },
+          {
+            "name": "net_margin_pct",
+            "value": 26.827222935611523,
+            "unit": "percent",
+            "reason": "",
+            "source_paths": [
+              "data.income_statements[].total_revenue",
+              "data.income_statements[].net_income",
+              "data.income_statements[].fiscal_date_ending",
+              "data.income_statements[].reported_currency"
+            ]
+          },
+          {
+            "name": "cash",
+            "value": 36305000000.0,
+            "unit": "USD",
+            "reason": "",
+            "source_paths": [
+              "data.balance_sheets[].cash_and_cash_equivalents"
+            ]
+          },
+          {
+            "name": "debt",
+            "value": 80111000000.0,
+            "unit": "USD",
+            "reason": "",
+            "source_paths": [
+              "data.balance_sheets[].short_long_term_debt_total"
+            ]
+          },
+          {
+            "name": "cash_to_debt",
+            "value": 0.4531837076056971,
+            "unit": "ratio",
+            "reason": "",
+            "source_paths": [
+              "data.balance_sheets[].cash_and_cash_equivalents",
+              "data.balance_sheets[].short_long_term_debt_total",
+              "data.balance_sheets[].fiscal_date_ending",
+              "data.balance_sheets[].reported_currency"
+            ]
+          }
+        ],
+        "filings": [
+          {
+            "accession": null,
+            "filing_date": null,
+            "period_end": "2026-09-30",
+            "report_type": "quarterly",
+            "currency": "USD",
+            "vendor_inserted_at": "2026-11-03 06:25:42+00:00",
+            "vendor_updated_at": "2026-11-07 06:03:25+00:00",
+            "report_date": null,
+            "report_time": null,
+            "accounting_basis": null
+          },
+          {
+            "accession": null,
+            "filing_date": null,
+            "period_end": "2026-09-30",
+            "report_type": "quarterly",
+            "currency": "USD",
+            "vendor_inserted_at": "2026-11-03 06:25:42+00:00",
+            "vendor_updated_at": "2026-11-07 06:03:25+00:00",
+            "report_date": null,
+            "report_time": null,
+            "accounting_basis": null
+          }
+        ],
+        "missing": [
+          "filing_accession_unavailable",
+          "filing_date_unavailable"
+        ]
+      },
+      "availability_scope": "actual extraction diagnostic; not a durable production record or historical training feature"
+    },
+    {
+      "ticker": "AAPL",
+      "endpoint": "earnings",
+      "status": "VERIFIED",
+      "requested_at": "2026-11-07T07:57:55.774499+00:00",
+      "received_at": "2026-11-07T07:57:55.863154+00:00",
+      "extracted_at": "2026-11-07T08:14:18.665262+00:00",
+      "source_hash": "a0037b5ea8f84d7f26d7e8e2d24caf4cfcf31d2d78414287019714a8c274549c",
+      "bytes": 45886,
+      "facts": {
+        "ticker": "AAPL",
+        "endpoint": "earnings",
+        "available_at": "2026-11-07 08:14:18.665262+00:00",
+        "metrics": [
+          {
+            "name": "reported_eps",
+            "value": 2.05,
+            "unit": "unknown_currency/share",
+            "reason": "",
+            "source_paths": [
+              "data[].reported_eps"
+            ]
+          },
+          {
+            "name": "estimated_eps",
+            "value": 1.98,
+            "unit": "unknown_currency/share",
+            "reason": "",
+            "source_paths": [
+              "data[].estimated_eps"
+            ]
+          },
+          {
+            "name": "eps_surprise",
+            "value": null,
+            "unit": "unknown_currency/share",
+            "reason": "basis_period_currency_unverified",
+            "source_paths": [
+              "data[].reported_eps",
+              "data[].estimated_eps",
+              "data[].reported_basis",
+              "data[].estimated_basis",
+              "data[].reported_currency",
+              "data[].estimated_currency",
+              "data[].fiscal_date_ending",
+              "data[].estimated_fiscal_date_ending"
+            ]
+          },
+          {
+            "name": "eps_surprise_pct",
+            "value": null,
+            "unit": "percent",
+            "reason": "basis_period_currency_unverified_or_small_consensus",
+            "source_paths": [
+              "data[].reported_eps",
+              "data[].estimated_eps",
+              "data[].reported_basis",
+              "data[].estimated_basis",
+              "data[].reported_currency",
+              "data[].estimated_currency",
+              "data[].fiscal_date_ending",
+              "data[].estimated_fiscal_date_ending"
+            ]
+          }
+        ],
+        "filings": [
+          {
+            "accession": null,
+            "filing_date": null,
+            "period_end": "2026-09-30",
+            "report_type": "quarterly",
+            "currency": null,
+            "vendor_inserted_at": "2026-08-17 03:00:00+00:00",
+            "vendor_updated_at": "2026-11-07 06:03:25+00:00",
+            "report_date": "2026-11-02",
+            "report_time": "postmarket",
+            "accounting_basis": null
+          }
+        ],
+        "missing": [
+          "eps_surprise:basis_period_currency_unverified",
+          "eps_surprise_pct:basis_period_currency_unverified_or_small_consensus"
+        ]
+      },
+      "availability_scope": "actual extraction diagnostic; not a durable production record or historical training feature"
+    },
+    {
+      "ticker": "AAPL",
+      "endpoint": "fundamental-breakdown",
+      "status": "VERIFIED",
+      "requested_at": "2026-11-07T07:57:55.552569+00:00",
+      "received_at": "2026-11-07T07:57:55.763520+00:00",
+      "extracted_at": "2026-11-07T08:14:18.665262+00:00",
+      "source_hash": "b10b095e9571808eba1a9453b2b3967c6c65d0413568e658206bf7016555e001",
+      "bytes": 223826,
+      "facts": {
+        "ticker": "AAPL",
+        "endpoint": "fundamental-breakdown",
+        "available_at": "2026-11-07 08:14:18.665262+00:00",
+        "metrics": [
+          {
+            "name": "revenue",
+            "value": null,
+            "unit": "unknown",
+            "reason": "field_duration_currency_unverified",
+            "source_paths": []
+          },
+          {
+            "name": "net_income",
+            "value": null,
+            "unit": "unknown",
+            "reason": "field_duration_currency_unverified",
+            "source_paths": []
+          },
+          {
+            "name": "operating_income",
+            "value": null,
+            "unit": "unknown",
+            "reason": "field_duration_currency_unverified",
+            "source_paths": []
+          },
+          {
+            "name": "revenue_yoy_pct",
+            "value": null,
+            "unit": "unknown",
+            "reason": "field_duration_currency_unverified",
+            "source_paths": []
+          },
+          {
+            "name": "operating_margin_pct",
+            "value": null,
+            "unit": "unknown",
+            "reason": "field_duration_currency_unverified",
+            "source_paths": []
+          },
+          {
+            "name": "net_margin_pct",
+            "value": null,
+            "unit": "unknown",
+            "reason": "field_duration_currency_unverified",
+            "source_paths": []
+          },
+          {
+            "name": "cash",
+            "value": null,
+            "unit": "unknown",
+            "reason": "field_duration_currency_unverified",
+            "source_paths": []
+          },
+          {
+            "name": "debt",
+            "value": null,
+            "unit": "unknown",
+            "reason": "field_duration_currency_unverified",
+            "source_paths": []
+          },
+          {
+            "name": "cash_to_debt",
+            "value": null,
+            "unit": "unknown",
+            "reason": "field_duration_currency_unverified",
+            "source_paths": []
+          }
+        ],
+        "filings": [
+          {
+            "accession": "0000320193-26-000026",
+            "filing_date": "2026-11-03",
+            "period_end": "2026-09-26",
+            "report_type": "annual",
+            "currency": null,
+            "vendor_inserted_at": null,
+            "vendor_updated_at": null,
+            "report_date": null,
+            "report_time": null,
+            "accounting_basis": null
+          }
+        ],
+        "missing": [
+          "breakdown_mixed_period_semantics",
+          "cash:field_duration_currency_unverified",
+          "cash_to_debt:field_duration_currency_unverified",
+          "debt:field_duration_currency_unverified",
+          "net_income:field_duration_currency_unverified",
+          "net_margin_pct:field_duration_currency_unverified",
+          "operating_income:field_duration_currency_unverified",
+          "operating_margin_pct:field_duration_currency_unverified",
+          "revenue:field_duration_currency_unverified",
+          "revenue_yoy_pct:field_duration_currency_unverified"
+        ]
+      },
+      "availability_scope": "actual extraction diagnostic; not a durable production record or historical training feature"
+    }
+  ],
+  "limits": [
+    "Current-source extraction diagnostic only; not a historical training feature or production cohort result.",
+    "Mixed-duration fundamental-breakdown ratios rejected.",
+    "Unknown EPS basis/currency keeps reported-versus-consensus surprise unknown."
+  ],
+  "artifact_hash": "1c8b4fc261c0bca3d4699dcfafbd225684b1ad554d86a6c1cf6f28b57f6583e5"
+}

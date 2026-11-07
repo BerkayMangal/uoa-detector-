@@ -1,0 +1,122 @@
+{
+  "method": "semantic_capability_v1",
+  "status": "VERIFIED_INFERENCE",
+  "as_of": "2026-11-07T08:33:22.517908+00:00",
+  "inference": "NOT_PERFORMED",
+  "provider": "Mahalle / xAI",
+  "model": "grok-4.7",
+  "prompt_hash": "b351f68d8dd3b7c95605a1506697829317e91ae980e7ec4814c054bfa378b0f1",
+  "schema_hash": "5ffd00f86a39e598a048f21f59b63b2c676155b1ece90fe262c1c56d95c51d1c",
+  "actual_paid_attempts": 1,
+  "synthetic_inputs": true,
+  "market_calls_created": 0,
+  "aggregate_interpretation": "mixed",
+  "all_expected_directions": true,
+  "usage": {
+    "input_tokens": 2247,
+    "output_tokens": 1801,
+    "cost_usd": 0.013572
+  },
+  "cases": [
+    {
+      "id": "synthetic-positive",
+      "headline": "Apple raises its full-year revenue guidance.",
+      "synthetic": true,
+      "direction": "positive",
+      "certainty": "confirmed",
+      "event": "guidance",
+      "reason": "Başlık, Apple’ın tam yıl gelir rehberliğini yükselttiğini doğrudan bildiriyor. Bu, şirket beklentisi açısından olumlu bir ifadedir; büyüklük verilmediği için önem derecesi belirlenemez.",
+      "evidence": [
+        {
+          "quote": "raises its full-year revenue guidance",
+          "field": "direction"
+        },
+        {
+          "quote": "full-year revenue guidance",
+          "field": "event"
+        },
+        {
+          "quote": "Apple raises its full-year revenue guidance.",
+          "field": "certainty"
+        }
+      ],
+      "limitations": [
+        "Yalnızca başlık var; makale bağlamı yok.",
+        "Artışın miktarı, dönemi ve para birimi belirtilmiyor.",
+        "Bilginin fiyatlanıp fiyatlanmadığına dair kanıt yok.",
+        "Kaynak sentetik tanı amaçlıdır, piyasa haberi değildir."
+      ]
+    },
+    {
+      "id": "synthetic-negative",
+      "headline": "Apple cuts its full-year revenue guidance.",
+      "synthetic": true,
+      "direction": "negative",
+      "certainty": "confirmed",
+      "event": "guidance",
+      "reason": "Başlık, Apple’ın tam yıl gelir rehberliğini kıstığını doğrudan belirtiyor. Bu, şirket beklentisi açısından olumsuzdur; kesintinin boyutu verilmediğinden önem derecesi bilinmiyor.",
+      "evidence": [
+        {
+          "quote": "cuts its full-year revenue guidance",
+          "field": "direction"
+        },
+        {
+          "quote": "full-year revenue guidance",
+          "field": "event"
+        },
+        {
+          "quote": "Apple cuts its full-year revenue guidance.",
+          "field": "certainty"
+        }
+      ],
+      "limitations": [
+        "Yalnızca başlık var; makale bağlamı yok.",
+        "Kesintinin miktarı ve karşılaştırma temeli yok.",
+        "Fiyatlama etkisine dair kanıt sağlanmıyor.",
+        "Kaynak sentetik tanı amaçlıdır, piyasa haberi değildir."
+      ]
+    },
+    {
+      "id": "synthetic-mixed",
+      "headline": "Apple beats earnings estimates but cuts its full-year revenue guidance.",
+      "synthetic": true,
+      "direction": "mixed",
+      "certainty": "confirmed",
+      "event": "earnings",
+      "reason": "Başlık hem kazanç tahminlerinin aşıldığını hem de tam yıl gelir rehberliğinin düşürüldüğünü birlikte söylüyor. Olumlu ve olumsuz unsurlar birlikte olduğu için yön karışıktır; sürprizin ölçüsü bilinmiyor.",
+      "evidence": [
+        {
+          "quote": "beats earnings estimates",
+          "field": "direction"
+        },
+        {
+          "quote": "cuts its full-year revenue guidance",
+          "field": "direction"
+        },
+        {
+          "quote": "beats earnings estimates",
+          "field": "event"
+        },
+        {
+          "quote": "Apple beats earnings estimates but cuts its full-year revenue guidance.",
+          "field": "certainty"
+        }
+      ],
+      "limitations": [
+        "Tek olay etiketi yetersiz; başlıkta hem kazanç hem rehberlik var.",
+        "Gerçekleşen, konsensüs, dönem ve GAAP esası yok; sürpriz ölçülemez.",
+        "Rehberlik kesintisinin miktarı belirtilmiyor.",
+        "Fiyatlama kanıtı yok; kaynak sentetik tanı amaçlıdır."
+      ]
+    }
+  ],
+  "source_hashes": [
+    "d3ab7d8edd024e2818e9dda8c8c10e34630d4e23ded753572f4e8ecf0e9e1ded"
+  ],
+  "response_hash": "c07ac177b6c6427890824290f17dceb494dac4996051ef887013b85f7e958566",
+  "limits": [
+    "Actual native model inference on synthetic text only; no market recommendation or strategy return.",
+    "Headline interpretation is a model claim, not publisher verification or a probability of profit."
+  ],
+  "artifact_hash": "892baa92a57288bf2bcef50f803bb2d680e7b27ea35aa29de029a66a8e813841"
+}

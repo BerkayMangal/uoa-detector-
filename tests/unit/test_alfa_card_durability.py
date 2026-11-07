@@ -73,6 +73,12 @@ _KNOWN_EXCEPTIONS: Final = {
 # recorded, a telemetry branch that was taken, the OI that confirmed an
 # opening — nobody can re-derive these from the vendor tomorrow.
 _APPEND_ONLY_TABLES: Final = {
+    "alfa_semantic_event",     # Phase5.66: bounded model ownership/raw grounded interpretation
+    "alfa_semantic_receipt",   # physically confirmed availability, no historical backdate
+    "alfa_fundamental_event",  # source-bound financial packets and quota ownership
+    "alfa_fundamental_receipt",# physical statement/earnings availability
+    "alfa_fusion_event",       # independent pre-entry decisions/features/fixed-arm daily results
+    "alfa_fusion_receipt",     # staged immutable decision recording clocks
     "alfa_shadow_event",        # Phase5.64: source/target/request/packet/outcome ownership facts
     "alfa_shadow_receipt",      # physically staged post-commit availability proof
     "alfa_news_pilot_claim",     # Phase5.63: daily evaluation ownership, never replayed on restart
@@ -185,7 +191,12 @@ def _alfa_models() -> dict[str, str]:
 
     import webapp.board as board
 
-    importlib.import_module("webapp.call_research.storage")
+    # Register evidence models independently of test collection order.
+    for package in (
+        "call_research", "timed_measurement", "shadow_capture", "news_pilot",
+        "semantic_news", "fundamental_context", "fusion_live",
+    ):
+        importlib.import_module(f"webapp.{package}.storage")
 
     for module in pkgutil.iter_modules(board.__path__):
         importlib.import_module(f"webapp.board.{module.name}")

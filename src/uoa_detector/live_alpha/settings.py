@@ -10,7 +10,9 @@ from __future__ import annotations
 import hashlib
 import io
 import pathlib
+import threading
 from datetime import date, time
+from functools import lru_cache
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -118,10 +120,24 @@ class LiveAlphaSettings(_Strict):
         return self
 
 
+_PROFILE_PARSE_LOCK = threading.RLock()
+
+
+@lru_cache(maxsize=8)
+def _parse_live_alpha_settings(raw: bytes, label: str, checksum: str) -> LiveAlphaSettings:
+    """Memoize only immutable values, bound to the exact file bytes and path."""
+    data: Any = YAML(typ="safe").load(io.BytesIO(raw))
+    if not isinstance(data, dict):
+        raise ValueError(f"{label}: profile is not a mapping")
+    return LiveAlphaSettings(**data, profile_sha256=checksum)
+
+
 def load_live_alpha_settings(path: pathlib.Path | str = DEFAULT_PROFILE) -> LiveAlphaSettings:
     file_path = pathlib.Path(path)
     raw = file_path.read_bytes()
-    data: Any = YAML(typ="safe").load(io.BytesIO(raw))
-    if not isinstance(data, dict):
-        raise ValueError(f"{file_path}: profile is not a mapping")
-    return LiveAlphaSettings(**data, profile_sha256=hashlib.sha256(raw).hexdigest())
+    checksum = hashlib.sha256(raw).hexdigest()
+    # Reading and hashing precede lookup: edits, invalid files and missing files
+    # cannot fall back to previously cached settings. The lock coalesces cold
+    # concurrent loads without sharing a mutable YAML parser between threads.
+    with _PROFILE_PARSE_LOCK:
+        return _parse_live_alpha_settings(raw, str(file_path), checksum)
