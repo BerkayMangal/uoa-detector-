@@ -1,0 +1,14 @@
+version: daily_guardian_v1
+enabled_env: DAILY_DATA_GUARDIAN_ENABLED
+start_et: '05:00'
+stop_et: '09:15'
+poll_seconds: 60
+idle_poll_seconds: 300
+owner_read_limit: 256
+max_result_bytes: 262144
+history_sessions: 60
+max_requests: 82
+quota_reserve: 5000
+spacing_seconds: 0.75
+timeout_seconds: 30
+max_packet_rows: 3000

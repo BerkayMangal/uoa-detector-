@@ -136,6 +136,8 @@ def _no_live_alpha_thread(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(m.fundamental_service, "STATE", {})
     monkeypatch.setenv("FUSION_ENGINE_ENABLED", "false")
     monkeypatch.setattr(m.fusion_service, "STATE", {})
+    monkeypatch.setenv("DAILY_DATA_GUARDIAN_ENABLED", "false")
+    monkeypatch.setattr(m.guardian_service, "STATE", {})
 
     async def _idle() -> None:
         # Phase 5.2.PERF10: the board prerender loop would read the default database

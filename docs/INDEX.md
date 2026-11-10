@@ -286,6 +286,8 @@ A new study needs a fresh, non-overlapping window (`docs/next_studies.md`,
 | 5.66.1 | **Runtime profile parse cache** — `docs/phase-5.66.1-runtime-profile-cache.md`; exact-byte bounded cache and pinned historical dependency compatibility bridge, preserving old report/audit/capture identities. |
 | 5.66.2 | **Forward clocks and fixed arms** — `docs/phase-5.66.2-forward-decision-clocks.md`; pending/final decisions, four-way bounded workers, source-grounded semantic truth tables and coherent financials+earnings pair after actual schema checks. |
 | 5.66.3 | **Observation-local evidence reads** — `docs/phase-5.66.3-evidence-read-scope.md`, results `docs/phase-5.66.3-results.md`; exact-key bounded ORM SELECT reuse within a pure read observation after108.33s native627-query report; preserve verifiers/source identities, no cross-request stale data or database migration. |
+| 5.67 | **Operational settled-data coverage and bound news diagnostics** — `docs/phase-5.67-coverage-and-news-diagnostics-acceptance.md`; delivery `docs/phase-5.67-closeout.md`; independent bounded preopen missing-data guardian and read-only original-packet metadata, preserving all signal/capture rules, identities and old outcomes. Owner continues measured UOA operation2026-11-10; no fitting, source reinterpretation or promotion. |
+| 5.67.1 | **Historical read navigation and per-wire guard** — `docs/phase-5.67.1-history-and-wire-window.md`; previous-session/today read links, shared manual/guardian lock and actual pre-send window checks; no old decision rewrite or strategy change. |
 
 Detail for the 5.10–5.19 candidates:
 - **Falsification gates (D8).** `src/uoa_detector/backtest/falsification.py:79-81`
