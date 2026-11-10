@@ -73,7 +73,7 @@ def configured_engine(database_url: str) -> Engine:
         url,
         future=True,
         pool_pre_ping=True,
-        pool_size=2,
+        pool_size=3,
         max_overflow=0,
         pool_timeout=2,
         connect_args={
