@@ -43,6 +43,8 @@ from sqlalchemy.exc import OperationalError
 from starlette.datastructures import Headers
 from starlette.responses import PlainTextResponse
 
+from uoa_detector.live_alpha.calendar import previous_session_before
+from uoa_detector.live_alpha.settings import load_live_alpha_settings
 from uoa_detector.sources.market_hours import is_market_open
 from webapp import (
     call_review,
@@ -51,6 +53,7 @@ from webapp import (
     gamma,
     horizon_diagnostics,
     journal,
+    news_diagnostics,
     news_export,
     news_pilot_view,
     options_board,
@@ -79,6 +82,8 @@ from webapp.call_research import repair_operator
 from webapp.call_research import report as call_report
 from webapp.call_research import scorecard as call_scorecard
 from webapp.call_research.settings import settings as call_research_settings
+from webapp.daily_guardian import service as guardian_service
+from webapp.daily_guardian import view as guardian_view
 from webapp.desk import benchmarks as desk_benchmarks
 from webapp.desk import db as desk_db
 from webapp.desk import overview as desk_overview
@@ -286,11 +291,18 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
                                     "fusion-paper"),
                 "fusion-paper",
             )))
+        if guardian_service.enabled():
+            tasks.append(asyncio.create_task(_supervise(
+                lambda: run_service(str(config["database_url"]),
+                                    lambda: guardian_service.loop(str(config["database_url"])),
+                                    "daily-data-guardian"),
+                "daily-data-guardian",
+            )))
         if os.environ.get("DAILY_REPAIR_REQUEST", "").strip():
             # Explicit one-shot operator; its durable claim prevents retry on redeploy.
             tasks.append(asyncio.create_task(run_service(
                 str(config["database_url"]),
-                lambda: repair_operator.requested(str(config["database_url"])), "daily-repair",
+                lambda: guardian_service.manual_requested(str(config["database_url"])), "daily-repair",
             )))
     try:
         yield
@@ -911,6 +923,20 @@ def fundamental_context_status(day: date | None = None) -> dict[str, Any]:
         return asdict(fundamental_view.build(engine, _now(), day))
 
 
+@app.get("/api/motor/haber/tani")
+def bound_news_diagnostics(day: date | None = None) -> dict[str, Any]:
+    """Source-bound metadata only; never interpretation, repair or policy."""
+    engine = _board_reader().engine
+    with read_scope(engine):
+        return asdict(news_diagnostics.build(engine, _now(), day))
+
+
+@app.get("/api/arastirma/veri-gozcusu")
+def current_daily_data_status() -> dict[str, Any]:
+    """Read-only maintenance status; GET never admits a repair."""
+    return asdict(guardian_view.build(_board_reader().engine, _now()))
+
+
 @app.get("/api/motor/arastirma")
 def fusion_research_status() -> dict[str, Any]:
     report = _safe(fusion_research_report.load, None)
@@ -920,8 +946,13 @@ def fusion_research_status() -> dict[str, Any]:
 
 
 @app.get("/arastirma", response_class=HTMLResponse)
-def call_research_page(request: Request) -> HTMLResponse:
-    engine, now = _board_reader().engine, _now()
+def call_research_page(request: Request, day: date | None = None) -> HTMLResponse:
+    now = _now()
+    today = now.astimezone(ZoneInfo("America/New_York")).date()
+    selected = day or today
+    if selected > today:
+        raise HTTPException(status_code=400, detail="Gelecek seans için ölçüm gösterilemez")
+    engine = _board_reader().engine
     frozen = _safe(call_report.load, None)
     from webapp.news_research.report import build as news_research_build
 
@@ -931,14 +962,18 @@ def call_research_page(request: Request) -> HTMLResponse:
     diagnostic = _safe(horizon_diagnostics.load, None) if horizon is not None else None
     pilot = _safe(lambda: news_pilot_view.build(engine, now), None)
     with read_scope(engine):
-        shadow = _safe(lambda: shadow_view.build(engine, now), None)
-        fusion = _safe(lambda: fusion_view.build(engine, now), None)
-        semantic = _safe(lambda: semantic_view.build(engine, now), None)
-        fundamental = _safe(lambda: fundamental_view.build(engine, now), None)
+        shadow = _safe(lambda: shadow_view.build(engine, now, selected), None)
+        fusion = _safe(lambda: fusion_view.build(engine, now, selected), None)
+        semantic = _safe(lambda: semantic_view.build(engine, now, selected), None)
+        fundamental = _safe(lambda: fundamental_view.build(engine, now, selected), None)
+        source_diagnostics = _safe(lambda: news_diagnostics.build(engine, now, selected), None)
+    previous = previous_session_before(selected, load_live_alpha_settings().calendar)
+    if fusion is None or fusion.activation_at is None or (previous is not None and previous < fusion.activation_at.astimezone(ZoneInfo("America/New_York")).date()):
+        previous = None
     new_research = _safe(fusion_research_report.load, None)
     capability = _safe(lambda: fusion_capability.load("capability"), None)
     semantic_capability = _safe(lambda: fusion_capability.load("semantic-capability"), None)
-    return templates.TemplateResponse(request, "call_research.html", {"fusion_engine": fusion, "semantic_news": semantic, "fundamental_context": fundamental, "fusion_research": new_research, "fusion_capability": capability, "semantic_capability": semantic_capability, "fusion_timezone": ZoneInfo("Europe/London"), "news_shadow": shadow, "news_pilot": pilot, "horizon_diagnostics": diagnostic, "horizon_research": horizon, "news_research": news_research, "research": frozen, "vendor_history": history, "coverage": call_coverage.view(engine, now), "forward": call_forward.view(engine, now), "cfg": call_research_settings(), "observer": dict(call_forward.STATE)})
+    return templates.TemplateResponse(request, "call_research.html", {"fusion_previous_day": previous, "fusion_today": today, "news_diagnostics": source_diagnostics, "fusion_engine": fusion, "semantic_news": semantic, "fundamental_context": fundamental, "fusion_research": new_research, "fusion_capability": capability, "semantic_capability": semantic_capability, "fusion_timezone": ZoneInfo("Europe/London"), "news_shadow": shadow, "news_pilot": pilot, "horizon_diagnostics": diagnostic, "horizon_research": horizon, "news_research": news_research, "research": frozen, "vendor_history": history, "coverage": call_coverage.view(engine, now), "forward": call_forward.view(engine, now), "cfg": call_research_settings(), "observer": dict(call_forward.STATE)})
 
 
 @app.get("/api/arastirma/ufuk")
@@ -1958,6 +1993,8 @@ def health() -> dict[str, object]:
         body["fundamental_context"] = fundamental_service.safe_status()
     if fusion_service.STATE:
         body["fusion_engine"] = fusion_service.safe_status()
+    if guardian_service.STATE:
+        body["daily_data_guardian"] = guardian_service.safe_status()
     if shadow_service.STATE:
         body["shadow_capture"] = shadow_service.safe_status()
     if news_pilot_service.STATE:

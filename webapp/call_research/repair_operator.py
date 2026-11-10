@@ -8,6 +8,7 @@ import json
 import logging
 import os
 import re
+from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, cast
@@ -50,7 +51,13 @@ def record(
     )
 
 
-async def once(engine: Engine, request_id: str, root: Path) -> bool:
+async def once(
+    engine: Engine,
+    request_id: str,
+    root: Path,
+    *,
+    run: Callable[[Engine, Path], Awaitable[dict[str, Any]]] | None = None,
+) -> bool:
     if not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", request_id):
         raise ValueError("invalid_operator_request_id")
     cast(Table, RepairRecord.__table__).create(engine, checkfirst=True)
@@ -60,7 +67,7 @@ async def once(engine: Engine, request_id: str, root: Path) -> bool:
     output = root / request_id
     result: dict[str, Any]
     try:
-        result = await daily_repair.run(engine, output)
+        result = await (run or daily_repair.run)(engine, output)
     except Exception as error:
         result = dict(status="stopped", reason=type(error).__name__)
     try:
