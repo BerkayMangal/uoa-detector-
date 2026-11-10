@@ -288,6 +288,7 @@ A new study needs a fresh, non-overlapping window (`docs/next_studies.md`,
 | 5.66.3 | **Observation-local evidence reads** — `docs/phase-5.66.3-evidence-read-scope.md`, results `docs/phase-5.66.3-results.md`; exact-key bounded ORM SELECT reuse within a pure read observation after108.33s native627-query report; preserve verifiers/source identities, no cross-request stale data or database migration. |
 | 5.67 | **Operational settled-data coverage and bound news diagnostics** — `docs/phase-5.67-coverage-and-news-diagnostics-acceptance.md`; delivery `docs/phase-5.67-closeout.md`; independent bounded preopen missing-data guardian and read-only original-packet metadata, preserving all signal/capture rules, identities and old outcomes. Owner continues measured UOA operation2026-11-10; no fitting, source reinterpretation or promotion. |
 | 5.67.1 | **Historical read navigation and per-wire guard** — `docs/phase-5.67.1-history-and-wire-window.md`; previous-session/today read links, shared manual/guardian lock and actual pre-send window checks; no old decision rewrite or strategy change. |
+| 5.67.2 | **Maintenance lock connection headroom** — `docs/phase-5.67.2-maintenance-pool.md`; native verified reader needs a third bounded connection while advisory lock and Session are held; preserve all other limits/verifiers. |
 
 Detail for the 5.10–5.19 candidates:
 - **Falsification gates (D8).** `src/uoa_detector/backtest/falsification.py:79-81`
