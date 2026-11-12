@@ -27,6 +27,10 @@ _CORRECT = basic_auth_header(TEST_USER, TEST_PASSWORD)
 # Phase 5.29: owner's explicit public-introduction request; static GETs only.
 # Keep independent of the implementation allowlist so widening it is detected.
 _PUBLIC_GETS = {"/health", "/hakkinda", "/robots.txt", "/sitemap.xml", "/assets/uoa.css", "/favicon.svg"}
+# Phase5.68.2 explicitly authorizes a no-login handoff; the POST still requires
+# a one-use capability and same-origin check, tested in test_theta_pairing_app.
+_PAIRING_HANDOFF = {("GET", "/theta-bagla"), ("GET", "/assets/theta_pairing.js"),
+                    ("POST", "/api/theta/pairing/redeem")}
 
 
 def _route_cases() -> list[tuple[str, str]]:
@@ -38,7 +42,8 @@ def _route_cases() -> list[tuple[str, str]]:
         path = re.sub(r"\{[^}]*\}", "dummy", raw_path) or "/"
         methods = getattr(route, "methods", None) or {"GET"}
         cases.extend((method, path) for method in sorted(methods)
-                     if not (method == "GET" and path in _PUBLIC_GETS))
+                     if not (method == "GET" and path in _PUBLIC_GETS)
+                     and (method, path) not in _PAIRING_HANDOFF)
     return cases
 
 

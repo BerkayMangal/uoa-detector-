@@ -20,27 +20,32 @@ doğrulanmadığından 100 hisse çarpanı bir varsayımdır.
 
 ## Mac bağlantısı
 
-Bu adımlar yeni sürüm canlıya alındıktan sonra geçerlidir:
+Phase 5.68.2, kullanıcının tekrar UOA kullanıcı adı/şifresi giremediği geri
+bildirimi üzerine bu adımı kaldırır. Yeni sürümde:
 
 1. ThetaData Terminal açık ve hesabına bağlı kalsın.
-2. UOA → Opsiyon → Opsiyon doğrulama → Mac bağlantısını kur bölümünden
-   `uoa-theta-baglanti.py` dosyasını indir.
-3. Mac Terminal uygulamasında çalıştır:
+2. Sana verilen tek kullanımlık bağlantıyı aç veya açık UOA oturumunda
+   Opsiyon doğrulama → Şifresiz Mac bağlantısı hazırla seçeneğini kullan.
+3. Bağlantı sayfasındaki indirme düğmesine bas. Yeni dosya benzersiz bir ad
+   alır; böylece daha önce indirilmiş, şifre isteyen dosya ile karışmaz.
+4. İndirme tamamlanınca sayfada görünen **o dosyaya ait komutu** Mac Terminal’e
+   yapıştır. Kullanıcı adı, UOA şifresi ve ThetaData anahtarı sorulmaz.
+   Sağlayıcı girişini zaten açık olan Theta Terminal yönetir.
 
-   ```bash
-   python3 ~/Downloads/uoa-theta-baglanti.py --watch
-   ```
-
-4. İstendiğinde **UOA site kullanıcı adı ve şifresini** yerel gizli isteme gir.
-   ThetaData anahtarı bu programa girilmez; sağlayıcı girişini Theta Terminal
-   yönetir. Site şifresi Theta Terminal’e gönderilmez.
-5. UOA’da bir inceleme kaydet. Geçmiş incelemeler sonraki kontrolde alınır;
-   yeni zamanların tüm ölçüm pencereleri kapanana kadar beklenir.
+İncelemeler bağlantı hazırlanmasından önce kaydedilmiş ve ölçüm pencereleri
+tamamlanmış olmalıdır. İlk sekiz inceleme bunun için önceden hazırlanmıştır.
 
 Python 3.9+ yeterlidir; ek Python paketi gerekmez. Varsayılan Terminal
 `http://127.0.0.1:25503`, site mevcut UOA adresidir. Program dışarıya HTTPS
 bağlantısı açar; Mac’in Terminal portunu internete açmaz, üretim veritabanı
 parolası istemez. Mac veya program kapalıysa yeni sonuç gelmez.
+
+İndirme bağlantısı iki saat içinde bir kez kullanılabilir; adresin `#` sonrası
+parçası sunucu URL kayıtlarına gönderilmez ve sayfa açılınca adres çubuğundan
+silinir. Dosyanın yedi günlük yetkisi yalnızca bağlantı hazırlanırken mevcut
+olan en fazla 32 hazır incelemeyi kapsar. Sonradan eklenen incelemeler için
+yeni bağlantı gerekir. Sunucu sadece yetki özetlerini saklar; genel site
+şifresi dosyada bulunmaz. Yeni dosya UOA adresine sabitlenmiştir.
 
 Bir çalışmada en fazla dört iş, iş başına üç adet 120 saniyelik pencere;
 istek başına 20 saniye ve 8 MiB sınırı vardır. `--once` tek tur, `--check`

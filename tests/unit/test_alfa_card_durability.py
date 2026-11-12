@@ -76,6 +76,8 @@ _KNOWN_EXCEPTIONS: Final = {
 _APPEND_ONLY_TABLES: Final = {
     "alfa_theta_validation_request",  # Phase5.68: immutable exact-contract measurement requests
     "alfa_theta_validation_receipt",  # native packet receipts and server-recomputed outcomes
+    "alfa_theta_pairing_grant",  # Phase5.68.2: immutable hashed one-use download grants
+    "alfa_theta_connector_session",  # immutable hashed credentials and frozen scope reference
     "alfa_semantic_event",     # Phase5.66: bounded model ownership/raw grounded interpretation
     "alfa_semantic_receipt",   # physically confirmed availability, no historical backdate
     "alfa_fundamental_event",  # source-bound financial packets and quota ownership

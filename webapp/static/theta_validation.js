@@ -263,5 +263,21 @@
     create({source_kind: "manual_research", source_label: "Elle seçilmiş tarihsel kontrat", option_symbol: symbol, planned_entry_at: date.toISOString()}, byId("theta-manual-submit"));
   });
   byId("theta-refresh").addEventListener("click", refresh);
+  byId("theta-pairing-create").addEventListener("click", async () => {
+    const button = byId("theta-pairing-create");
+    const message = byId("theta-pairing-message");
+    button.disabled = true;
+    message.textContent = "Şifresiz bağlantı hazırlanıyor…";
+    try {
+      const pairing = await requestJSON("/api/theta/pairings", {});
+      if (!pairing || typeof pairing.pairing_token !== "string" || !/^[a-f0-9]{64}$/.test(pairing.pairing_token)) throw new Error("invalid_pairing_response");
+      window.location.assign("/theta-bagla#" + pairing.pairing_token);
+    } catch (error) {
+      message.textContent = error.status === 400 || error.status === 409 || error.status === 422
+        ? "Bağlantı hazırlanamadı. Önce bekleyen bir kontrat incelemesi ekle, ardından yeniden dene."
+        : "Bağlantı hazırlanamadı. Sayfayı yenileyip yeniden dene; hiçbir anahtar veya şifre girmen gerekmiyor.";
+      button.disabled = false;
+    }
+  });
   refresh();
 })();

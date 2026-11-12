@@ -8,9 +8,11 @@ run reloads once per board refresh cadence. Templates use Tailwind via CDN —
 no build step. Repo calls are wrapped in `_safe` and a global exception handler shows
 a clean error page, so a DB/feed blip degrades instead of 500-ing.
 
-Every route except ``GET /health`` is behind HTTP Basic auth (Phase 5.0.9):
+Private owner routes use HTTP Basic auth (Phase 5.0.9):
 credentials come from ``WEB_AUTH_USER`` / ``WEB_AUTH_PASSWORD`` at request
 time, and the gate fails closed (503) when either is unset or empty.
+Static public pages and the single-use Theta pairing handoff expose no private
+data; scoped connector credentials permit only their own jobs and uploads.
 """
 
 from __future__ import annotations
@@ -119,6 +121,7 @@ from webapp.shadow_capture import service as shadow_service
 from webapp.shadow_capture import view as shadow_view
 from webapp.shared_news.config import enabled as shared_news_enabled
 from webapp.storage_diagnostics import native_hint
+from webapp.theta_validation import pairing as theta_pairing
 from webapp.theta_validation import router as theta_router
 from webapp.theta_validation import storage as theta_storage
 from webapp.timed_measurement import service as timed_service
@@ -221,6 +224,7 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
     async def prepare_theta_storage() -> None:
         try:
             await asyncio.to_thread(theta_storage.ensure, _board_reader().engine)
+            await asyncio.to_thread(theta_pairing.ensure, _board_reader().engine)
         except Exception as exc:
             log_failure(_logger, "theta-storage", exc, "startup")
 
@@ -381,6 +385,33 @@ class _BasicAuthGate:
         if scope["type"] == "http" and scope["method"] == "GET" and scope["path"] in seo.PUBLIC_GET_PATHS:
             await self._app(scope, receive, send)
             return
+        if scope["type"] == "http":
+            method, path = scope["method"], scope["path"]
+            if (method == "GET" and path in {"/theta-bagla", "/assets/theta_pairing.js"}) or (
+                method == "POST" and path == "/api/theta/pairing/redeem"
+            ):
+                # No data here without the separate, expiring single-use grant.
+                await self._app(scope, receive, send)
+                return
+            scheme, _, token = Headers(scope=scope).get("authorization", "").partition(" ")
+            connector_read = method == "GET" and path == "/api/theta/jobs"
+            connector_write = method == "POST" and path.startswith("/api/theta/results/")
+            if scheme.lower() == "bearer" and (connector_read or connector_write):
+                try:
+                    allowed = await asyncio.to_thread(lambda: theta_pairing.authenticate(
+                        _board_reader().engine, token, _now(),
+                    ))
+                except Exception:
+                    await PlainTextResponse("connector authentication unavailable", status_code=503)(scope, receive, send)
+                    return
+                if allowed and (connector_read or path in {
+                    "/api/theta/results/" + request_id for request_id in allowed
+                }):
+                    scope["theta_connector_request_ids"] = allowed
+                    await self._app(scope, receive, send)
+                    return
+                await PlainTextResponse("connector authentication required", status_code=401)(scope, receive, send)
+                return
         failure = _auth_failure(Headers(scope=scope))
         if failure is None:
             await self._app(scope, receive, send)
@@ -497,6 +528,19 @@ def theta_connector_download() -> FileResponse:
         _BASE.parent / "scripts" / "theta_mac_connector.py",
         media_type="text/x-python", filename="uoa-theta-baglanti.py",
     )
+
+
+@app.get("/theta-bagla", response_class=HTMLResponse, include_in_schema=False)
+def theta_pairing_page(request: Request) -> Response:
+    return templates.TemplateResponse(request, "theta_pairing.html", {}, headers={
+        "Referrer-Policy": "no-referrer",
+        "Content-Security-Policy": "default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; img-src data:; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'",
+    })
+
+
+@app.get("/assets/theta_pairing.js", include_in_schema=False)
+def theta_pairing_script() -> FileResponse:
+    return FileResponse(_BASE / "static" / "theta_pairing.js", media_type="text/javascript")
 
 
 @app.exception_handler(OperationalError)
@@ -2052,5 +2096,5 @@ async def _health_http() -> dict[str, object]:
 
 
 app.include_router(theta_router.build_router(
-    lambda: _board_reader().engine, _same_origin, clock=_now,
+    lambda: _board_reader().engine, _same_origin, clock=lambda: _now(),
 ))

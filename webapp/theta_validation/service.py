@@ -176,7 +176,16 @@ def create_request(engine: Engine, spec: RequestSpec, now: datetime) -> dict[str
     )
 
 
-def pending_jobs(engine: Engine, now: datetime, limit: int) -> dict[str, Any]:
+def pending_jobs(
+    engine: Engine, now: datetime, limit: int,
+    allowed_request_ids: tuple[str, ...] | None = None,
+) -> dict[str, Any]:
+    if allowed_request_ids is not None:
+        return {
+            "status": "connector_authorized",
+            "jobs": storage.pending(engine, now, limit, allowed_request_ids),
+            "as_of": now.isoformat(),
+        }
     view = storage.view(engine, now=now)
     # Entry may wait 120s, then the60-minute exit may wait another120s.
     return {

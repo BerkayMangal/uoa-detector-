@@ -310,3 +310,86 @@ def test_job_count_and_watch_poll_are_bounded():
         client.jobs()
     with pytest.raises(SystemExit):
         connector.main(["--watch", "--poll-seconds", "59"])
+
+
+def test_personalized_download_markers_are_exact_and_unique():
+    source = Path(connector.__file__).read_text()
+    assert source.count('EMBEDDED_TOKEN = ""') == 1
+    assert source.count('EMBEDDED_UOA = ""') == 1
+
+
+def test_bearer_auth_does_not_require_basic_credentials_and_never_reaches_terminal():
+    token = "b" * 64
+    client = connector.Transport("https://uoa.example", "http://127.0.0.1:25503", bearer_token=token)
+    client._remote = FakeOpener(b'{"jobs":[]}')
+    client._local = FakeOpener(json.dumps(payload()).encode())
+    client.jobs()
+    client.window(connector.Contract.from_occ(SYMBOL), START, "entry")
+    assert client._remote.calls[0][0].get_header("Authorization") == "Bearer " + token
+    assert client._local.calls[0][0].get_header("Authorization") is None
+    assert token not in client._local.calls[0][0].full_url
+
+
+@pytest.mark.parametrize("token", ["", "short-secret", "A" * 64, "b" * 63, "b" * 64 + "\n"])
+def test_malformed_embedded_bearer_is_rejected_without_exposing_its_value(token):
+    with pytest.raises(connector.ConnectorError) as error:
+        connector.Transport("https://uoa.example", "http://127.0.0.1:25503", bearer_token=token)
+    assert str(error.value) == "invalid_request"
+
+
+def test_transport_cannot_forward_bearer_to_a_different_origin():
+    client = connector.Transport("https://uoa.example", "http://127.0.0.1:25503", bearer_token="b" * 64)
+    client._remote = FakeOpener()
+    with pytest.raises(connector.ConnectorError, match="invalid_request"):
+        client._request("https://different.example/api/theta/jobs")
+    assert client._remote.calls == []
+
+
+def test_embedded_mode_never_prompts_and_uses_its_pinned_origin(monkeypatch, capsys):
+    calls = []
+
+    class EmbeddedTransport:
+        def __init__(self, base, terminal, *args, **kwargs):
+            calls.append((base, terminal, args, kwargs))
+
+        def jobs(self):
+            return []
+
+    monkeypatch.setattr(connector, "EMBEDDED_TOKEN", "b" * 64)
+    monkeypatch.setattr(connector, "EMBEDDED_UOA", "https://uoa.example")
+    monkeypatch.delenv("UOA_BASE_URL", raising=False)
+    monkeypatch.setattr(connector, "Transport", EmbeddedTransport)
+    monkeypatch.setattr(connector.getpass, "getpass", lambda _: pytest.fail("personalized connector must not prompt"))
+    assert connector.main(["--once"]) == 0
+    assert calls[0][0] == "https://uoa.example" and calls[0][2] == ()
+    assert calls[0][3] == {"bearer_token": "b" * 64}
+    output = capsys.readouterr()
+    assert "b" * 64 not in output.out + output.err
+
+
+def test_embedded_mode_refuses_conflicting_base_url_before_sending_token(monkeypatch, capsys):
+    monkeypatch.setattr(connector, "EMBEDDED_TOKEN", "b" * 64)
+    monkeypatch.setattr(connector, "EMBEDDED_UOA", "https://uoa.example")
+    monkeypatch.setenv("UOA_BASE_URL", "https://different.example")
+    monkeypatch.setattr(connector, "Transport", lambda *a, **k: pytest.fail("must not send bearer to override"))
+    monkeypatch.setattr(connector.getpass, "getpass", lambda _: pytest.fail("must not prompt"))
+    assert connector.main(["--once"]) == 1
+    output = capsys.readouterr()
+    assert "invalid_request" in output.err and "b" * 64 not in output.out + output.err
+
+
+def test_expired_embedded_token_asks_for_new_download_without_password_prompt(monkeypatch, capsys):
+    class ExpiredTransport:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def jobs(self):
+            raise connector.ConnectorError("authentication_failed")
+
+    monkeypatch.setattr(connector, "EMBEDDED_TOKEN", "b" * 64)
+    monkeypatch.setattr(connector, "EMBEDDED_UOA", "https://uoa.example")
+    monkeypatch.delenv("UOA_BASE_URL", raising=False)
+    monkeypatch.setattr(connector, "Transport", ExpiredTransport)
+    monkeypatch.setattr(connector.getpass, "getpass", lambda _: pytest.fail("must not prompt"))
+    assert connector.main(["--once"]) == 1
+    assert "yeni bağlantı dosyasını indirin" in capsys.readouterr().err

@@ -169,7 +169,10 @@ def get_request(engine: Engine, key: str) -> dict[str, Any] | None:
         return request_view(row) if row else None
 
 
-def pending(engine: Engine, now: datetime, limit: int) -> list[dict[str, Any]]:
+def pending(
+    engine: Engine, now: datetime, limit: int,
+    allowed_request_ids: tuple[str, ...] | None = None,
+) -> list[dict[str, Any]]:
     if not available(engine):
         return []
     attempts = (
@@ -181,16 +184,14 @@ def pending(engine: Engine, now: datetime, limit: int) -> list[dict[str, Any]]:
         ThetaReceipt.request_id == ThetaRequest.request_id, ThetaReceipt.finalized == 1
     )
     with session_factory(engine)() as session:
-        rows = session.scalars(
-            select(ThetaRequest)
-            .where(
+        query = select(ThetaRequest).where(
                 ThetaRequest.planned_entry_at <= now - timedelta(minutes=64),
                 ~finished,
                 attempts < MAX_ATTEMPTS,
             )
-            .order_by(ThetaRequest.created_at, ThetaRequest.request_id)
-            .limit(limit)
-        )
+        if allowed_request_ids is not None:
+            query = query.where(ThetaRequest.request_id.in_(allowed_request_ids))
+        rows = session.scalars(query.order_by(ThetaRequest.created_at, ThetaRequest.request_id).limit(limit))
         return [request_view(row) for row in rows]
 
 
