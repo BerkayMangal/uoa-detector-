@@ -1,0 +1,89 @@
+{
+  "all_54_views": "all-54-candidate-views.csv",
+  "common_valid_fraction": 0.5508021390374331,
+  "common_valid_sessions": 103,
+  "conditioning": "Observed subsample with all nine fully certified streams; full-session volume quality uses later minutes and was not known intraday. Not the return on all scheduled sessions.",
+  "cost_views": {
+    "10": {
+      "baseline_policies": 54,
+      "baseline_positive_absolute_count": 0,
+      "candidate_absolute_additive_return_max": -0.01791043553165705,
+      "candidate_absolute_additive_return_median": -0.282519622377127,
+      "candidate_absolute_additive_return_min": -7.097289249113811,
+      "candidate_negative_absolute_count": 54,
+      "candidate_policies": 54,
+      "candidate_positive_absolute_count": 0,
+      "candidate_zero_absolute_count": 0,
+      "cost_saving_note": "Lower turnover reduces charged costs; incremental net improvement is not itself alpha.",
+      "paired_net_difference_median": 0.8061733415420074,
+      "positive_net_difference_without_positive_gross_difference_count": 24,
+      "positive_paired_gross_difference_count": 30,
+      "positive_paired_net_difference_count": 54
+    },
+    "20": {
+      "baseline_policies": 54,
+      "baseline_positive_absolute_count": 0,
+      "candidate_absolute_additive_return_max": -0.037765916516359334,
+      "candidate_absolute_additive_return_median": -0.5535751779326825,
+      "candidate_absolute_additive_return_min": -14.19806702689159,
+      "candidate_negative_absolute_count": 54,
+      "candidate_policies": 54,
+      "candidate_positive_absolute_count": 0,
+      "candidate_zero_absolute_count": 0,
+      "cost_saving_note": "Lower turnover reduces charged costs; incremental net improvement is not itself alpha.",
+      "paired_net_difference_median": 1.6105066748753407,
+      "positive_net_difference_without_positive_gross_difference_count": 24,
+      "positive_paired_gross_difference_count": 30,
+      "positive_paired_net_difference_count": 54
+    },
+    "5": {
+      "baseline_policies": 54,
+      "baseline_positive_absolute_count": 0,
+      "candidate_absolute_additive_return_max": -0.007910435531657049,
+      "candidate_absolute_additive_return_median": -0.14595192211840716,
+      "candidate_absolute_additive_return_min": -3.546900360224924,
+      "candidate_negative_absolute_count": 54,
+      "candidate_policies": 54,
+      "candidate_positive_absolute_count": 0,
+      "candidate_zero_absolute_count": 0,
+      "cost_saving_note": "Lower turnover reduces charged costs; incremental net improvement is not itself alpha.",
+      "paired_net_difference_median": 0.4027512986510568,
+      "positive_net_difference_without_positive_gross_difference_count": 24,
+      "positive_paired_gross_difference_count": 30,
+      "positive_paired_net_difference_count": 54
+    }
+  },
+  "dsr": "INSUFFICIENT_EVIDENCE",
+  "economic_basis": "Additive constant-notional stock reference returns with equal 1/9 symbol sleeves; quoted costs assumed; short borrow unverified.",
+  "evaluation_prices_read": false,
+  "expected_scheduled_sessions": 187,
+  "fold_status_counts": {
+    "BLOCKED_DATA": 6
+  },
+  "gross_trade_mean_bps_across_54_policy_means": {
+    "maximum": 2.5736283357626353,
+    "median": -0.03895065416975291,
+    "minimum": -2.545688683742314
+  },
+  "inference": {
+    "10": {
+      "eligible_block_starts": 2,
+      "reason": "insufficient_contiguous_block_support",
+      "status": "INSUFFICIENT_EVIDENCE",
+      "unsupported_session_count": 92
+    },
+    "5": {
+      "eligible_block_starts": 12,
+      "reason": "insufficient_contiguous_block_support",
+      "status": "INSUFFICIENT_EVIDENCE",
+      "unsupported_session_count": 71
+    }
+  },
+  "interpretation": "Each policy is an alternative fixed specification, not an ensemble or a separately independent experiment. All policies and costs retained; no best-policy selection.",
+  "news_predictive_filters_tested": false,
+  "options_tested": false,
+  "phase": "development",
+  "source_report_sha256": "043d150f5fc62abab598ea5748cd1f1d30a8cce0bb77a1d39755a7aa1370f075",
+  "source_run_seal_sha256": "d18471617ff4fcfb28cad4d37accfc89e2d0ed2eb97df974d979ff2f367d00ee",
+  "status": "DESCRIPTIVE_ONLY"
+}

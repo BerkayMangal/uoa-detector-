@@ -1,0 +1,14 @@
+{
+  "verified_at": "2026-11-12T16:52:59.449671+00:00",
+  "attempts": 1718,
+  "responses": 1718,
+  "all_raw_file_and_body_hashes_verified": true,
+  "all_call_ids_unique_and_accounted": true,
+  "decoded_response_bytes": 269062640,
+  "maximum_response_bytes": 188216,
+  "ledger_sha256": "df7a302c53dbd9adcc8df512dbf88d31fed09b59dbb1330053e828506576bfe8",
+  "attempts_sha256": "4644f0f6235930cd65468d40c3f06ec925b391fd488d83b52087c3eea4047cd5",
+  "minimum_recorded_utc_start_gap_initial_seconds": 0.423539,
+  "minimum_recorded_utc_start_gap_resumed_seconds": 0.742445,
+  "pacing_caveat": "Configured monotonic reservation spacing was0.51s initially and0.75s after recovery, but per-request monotonic clocks were not archived; recorded UTC starts contain jitter below those targets, so exact physical start spacing cannot be independently proven from ledger."
+}

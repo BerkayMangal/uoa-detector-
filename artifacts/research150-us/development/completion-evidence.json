@@ -1,0 +1,16 @@
+{
+  "all_registered_policies_retained": true,
+  "artifact_sha256": {
+    "all-54-candidate-views.csv": "0a1f64c760f754d82335c69ec00bc6b1b622f585623c7157a52421ae145ba732",
+    "analysis-coverage.json": "4c663cd7fa4043dc9e4324ccad1acc8e83065b6dc1e55eea0ff296e09543066d",
+    "development-overview.json": "7a5692efc627bec449aceb44c8664e578d734b36999a5809ed1e159f86a03f5e",
+    "report.json": "043d150f5fc62abab598ea5748cd1f1d30a8cce0bb77a1d39755a7aa1370f075",
+    "run-seal.json": "d18471617ff4fcfb28cad4d37accfc89e2d0ed2eb97df974d979ff2f367d00ee"
+  },
+  "completed_at": "2026-11-12T16:50:09.751619+00:00",
+  "evaluation_price_files_opened": false,
+  "frozen_engine_unchanged": true,
+  "interpretation": "All returns condition on103 retrospectively certified whole nine-symbol sessions. Additive fixed-reference-notional losses can exceed100 percent; these are not self-financing account returns.",
+  "phase": "development",
+  "reporter_sha256": "6df97ac0225153f2d874657a3644a82a9726a8b41ddbce0b3b51dc7d1302a062"
+}

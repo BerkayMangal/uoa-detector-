@@ -1,0 +1,17 @@
+{
+  "created_at": "2026-11-12T16:56:28.410288+00:00",
+  "source_file": "all-exclusion-volume-audit.json",
+  "source_sha256": "b431bb30e81d0f6630f053e0ef68fe5b55d0355e9617db1b5b6372d2d996b98d",
+  "source_created_at": "2026-11-12T16:51:45.408067+00:00",
+  "manifest_sha256": "15e2233104e751b0354f8389ea2c51a96f4ec1769d34929e1b8c8a01ac85528e",
+  "statistics": {
+    "excluded_sessions": 129,
+    "native_rth_unique_390_sessions": 129,
+    "invalid_volume_rows": 146,
+    "negative_volume_rows": 146,
+    "counter_delta_matching_rows": 146,
+    "other_quality_reasons": []
+  },
+  "interpretation": "Native cumulative-counter decreases, exact vendor correction semantics unverified. Quality exclusions are fixed; no strategy returns inspected.",
+  "scope": "Derived summary only; native per-minute volume values and private raw-source paths omitted. All 129 excluded sessions retain 390 unique native RTH timestamps. Certificate missing_timestamps describes absent VALID rows after volume rejection, not absent native price timestamps."
+}

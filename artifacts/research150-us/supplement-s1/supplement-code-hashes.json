@@ -1,0 +1,35 @@
+{
+  "code": {
+    "frozen_supplement_features.py": "ee8e78b5182b2618f0ada64330646c2460701c409e3c55f5a8142d837102543b",
+    "run_supplement.py": "03cec19dc3d99d8d05976627dfa0eb9a9c8b3b85fd35ee500b1d5f23e5ea2113",
+    "selftest_supplement_features.py": "e63d8df494423a80d22f48d1752f90bce0e722988e8a95029be985995f667914",
+    "selftest_supplement_runner.py": "3e03d4c0b2965d95507841f1542f0c901c223b4b505a61f1e5e2e0a6627a320c"
+  },
+  "created_at": "2026-11-12T17:02:49.007687+00:00",
+  "documents": {
+    "pilot-freeze-v2.json": "693cb156b36b5b76485389f641522236f4bf274c2fdb1ebb0324f2217f882571",
+    "pilot-protocol-v2.md": "456dfa9b66a3de453c1d3af46722c590c81adf30fc35738cfbcd992e3ca2ac29",
+    "pilot-registry-v2.json": "cb04d0c52d8a941ab622e69b2d21281fe72afbc6418dd0bf82f461435b8bcaa9",
+    "pilot-v2-implementation-clarification.md": "8821e884953b191c6846c464b003292d853138b45cdd912865c2a331289a2d99",
+    "pilot-v2-inference-gates.md": "dba8fa02830e9c8112da47c90cc1b55e2a4e22259ced86b7d24263838a02e23e",
+    "supplement-freeze-s1.json": "868ebc6e88dcbe3bfb1da229445d514970b3cf0b2ff82973fa31f5389a89222b",
+    "supplement-proposal.json": "8bd54e97616e24dbc6ea3a259860d56f1181523910e762d347218d55490cd754",
+    "supplement-proposal.md": "6de45085b58b77cc98293149f814ed429a257161153c479813906251bdc79b71",
+    "supplement-registry-s1.json": "c1594fbe4fef17261884dc30b6edbf593f4a388e919993c1d0bb3cf767e05e70"
+  },
+  "full_input_manifest_sha256": "15e2233104e751b0354f8389ea2c51a96f4ec1769d34929e1b8c8a01ac85528e",
+  "immutable_v2_code": {
+    "frozen_v2_features.py": "69403aa8dd919434c3ab2588f4fffb9c6ad7357454c38bd35747f3a6b0f8440b",
+    "inference.py": "1ad8c56ade2ba9a0b97533788ba47980c9bbb2845e4479e068ada75a9b9d3d57",
+    "research_engine.py": "cee80ed1cb33b0b549d2af261df8dff02c11d0668c8eb3df2928e7d777f2f7ff",
+    "run_pilot.py": "75b63d4722aafc8c0b1ce97c370458a0dadc078b732a93f935c575d2cdb138e5",
+    "selftest_engine.py": "2f0d45a7914d4606cf87531f7222504af5beb2ffbe2078cb61fd2f273f29322e",
+    "selftest_inference.py": "970a6f7be7e4260f1836a130abbacdda82d77a1470cd593ef51e5c60165414a2",
+    "selftest_runner.py": "df886db0b15420bbe1087765d7446d01035c295e523929d5baf1caf1f9b6575f"
+  },
+  "prior_outcome_access": "Runner author observed v2 development outcomes; S1 formula author reports no v2 outcome access; exploratory extension, not global pre-label confirmation.",
+  "run_seal_sha256": "eda6b774e23b4bbe8993a11d55d51c6d30c074a1766987c99d7f303f7d25e18d",
+  "status": "REVIEWED_SEALED_BEFORE_S1_FIRST_RUN",
+  "supplement_price_labels_opened": false,
+  "synthetic_checks_passed": 13
+}

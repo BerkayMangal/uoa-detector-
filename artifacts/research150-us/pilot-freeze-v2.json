@@ -1,0 +1,9 @@
+{
+  "created_at": "2026-11-12T16:22:54.207223+00:00",
+  "status": "frozen before this pilot outcome evaluation; no claimed prior-history blindness",
+  "files": {
+    "pilot-protocol-v2.md": "456dfa9b66a3de453c1d3af46722c590c81adf30fc35738cfbcd992e3ca2ac29",
+    "pilot-registry-v2.json": "cb04d0c52d8a941ab622e69b2d21281fe72afbc6418dd0bf82f461435b8bcaa9"
+  },
+  "source_hypotheses_sha256": "5948db58084f89c465a760dd6fbad884d304dde5d2dfac7366b0aff94ebbd7a4"
+}

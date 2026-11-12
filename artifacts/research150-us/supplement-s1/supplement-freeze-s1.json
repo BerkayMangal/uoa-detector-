@@ -1,0 +1,28 @@
+{
+  "version": "research150_supplement_s1",
+  "frozen_at": "2026-11-12T16:51:26.074469+00:00",
+  "outcome_access_statement": {
+    "supplement_author_pilot_outcomes_observed": false,
+    "supplement_outcomes_observed": false,
+    "v2_first_label_run_already_started_approximately": "2026-11-12T16:47:00Z",
+    "honest_label": "Definitions were completed after v2 label execution began, without observing its outcomes. This is exploratory prespecification before the supplement own run, not a global pre-label or fresh confirmatory freeze.",
+    "scope_decision": "Root requested assessment of all ten remaining ideas before v2 first-label execution; this final freeze is later."
+  },
+  "files": {
+    "/workspace/work/uoa-api-investigation/research150/supplement-proposal.json": "8bd54e97616e24dbc6ea3a259860d56f1181523910e762d347218d55490cd754",
+    "/workspace/work/uoa-api-investigation/research150/supplement-proposal.md": "6de45085b58b77cc98293149f814ed429a257161153c479813906251bdc79b71",
+    "/workspace/work/uoa-api-investigation/research150/supplement-registry-s1.json": "c1594fbe4fef17261884dc30b6edbf593f4a388e919993c1d0bb3cf767e05e70"
+  },
+  "source_sha256": "5948db58084f89c465a760dd6fbad884d304dde5d2dfac7366b0aff94ebbd7a4",
+  "v2_protocol_sha256": "456dfa9b66a3de453c1d3af46722c590c81adf30fc35738cfbcd992e3ca2ac29",
+  "counts": {
+    "candidate_or_falsification_policies": 90,
+    "source_directed_candidate_policies": 81,
+    "short_month_start_falsification_policies": 9,
+    "baseline_policy_entries": 126,
+    "all_policy_entries": 216,
+    "primary_contrasts": 126,
+    "policy_cost_views": 648,
+    "contrast_cost_views": 378
+  }
+}

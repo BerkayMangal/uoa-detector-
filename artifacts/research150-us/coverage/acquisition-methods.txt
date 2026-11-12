@@ -1,0 +1,119 @@
+Frozen scope
+------------
+US equities/ETFs only: SPY, QQQ, AAPL, NFLX, NVDA, TSLA, MSFT, META, AMZN.
+All 217 known NYSE sessions from 2026-01-02 through 2026-11-11, 1,953
+ticker-session requests before quality exclusions. The partial current session
+is excluded. Dataset selection was fixed before any strategy outcome analysis.
+The serialized repository calendar, profile hash, full date list and limits are
+in dataset-plan.json. Its original bytes remain dataset-plan.original.json.
+
+2026-01-02 through 2026-09-30 is development; 2026-10-01 through 2026-11-11
+is chronological evaluation, partly previously observed. It is not an untouched
+holdout. Prior Nov9-Nov11 OHLCV audits and repository historical work preclude
+that stronger claim. The label-only amendment did not alter dates or universe.
+
+Native endpoint and interpretation
+----------------------------------
+GET https://api.unusualwhales.com/api/stock/{ticker}/ohlc/1m
+Query date is the requested America/New_York session; limit=2500 is the
+documented maximum. Separate bounded probes established date filtering at
+multiple historical dates, including a date one year old. That establishes
+pointwise access, not completeness of every intervening date.
+
+Native OHLCV bars contain start_time, end_time, market_time, open, high,
+low, close, volume and total_volume. start_time/end_time are aware timestamps
+for the one-minute interval; the response arrives newest-first. Total_volume
+is not used as per-bar volume. Native negative volume corrections exist and
+are never turned positive or clamped. Regular-session negative/inexact volume
+invalidates that whole ticker-session under the predeclared quality rule.
+Extended-session negative corrections are counted but do not enter RTH data.
+
+The native interval end is an event-time close. Using it as a historical signal
+availability time is an explicit proxy assumption: the archive does not prove
+first-publication latency or values before later vendor corrections. Actual
+late acquisition receipt times are separately preserved in source metadata.
+Corporate-action adjustment semantics are unverified. No split or price repair
+has been inferred from the prices.
+
+Certification and consumption
+-----------------------------
+coverage-manifest.json lists every processed ticker-session. Consumers must
+filter status == complete and verify canonical_sha256 before use. Pending and
+invalid pairs are explicit; a finished acquisition is not a claim of 100%
+valid data. The latest verification report gives complete/invalid/pending
+counts by asset and partition plus dates with all nine assets certified.
+
+Complete means the entire known regular session is present exactly once,
+each start is on the exact one-minute calendar grid, each interval lasts
+60 seconds, all OHLC prices are finite/positive and ordered correctly, and
+volume is finite, nonnegative and integer. No forward fill, duplicate removal,
+interpolation or partial-session canonical file is permitted. Current dates
+in this panel each require 390 rows. DST conversion uses America/New_York.
+Exclusions may be nonrandom; this is a quality-screened vendor sample, not
+a complete or survivorship-free US stock universe. Whole-session certification
+is a retrospective data-quality filter: an intraday live entry cannot know
+whether later bars of that day will pass it. Any measured strategy performance
+is conditional on this selected panel, not unconditional live expectancy.
+
+canonical/1m/YYYY-MM-DD/TICKER.csv.gz contains:
+ticker,session,start_time,end_time,open,high,low,close,volume
+The timestamps are aware UTC; prices are decimal strings; volume is integer.
+gzip headers have deterministic mtime=0. Certificates contain hashes of both
+compressed bytes and uncompressed CSV. Each certificate references its raw
+source path/hash and exact request or verified historical capture packet.
+
+5m and 15m bars must be anchored at the native regular-session open and use
+first open, maximum high, minimum low, last close and summed per-minute volume.
+Every contiguous constituent minute is required. The certificate describes
+these aggregation boundaries and complete group counts. A separate SPY
+Nov11 audit compared native5m/15m responses with1m aggregation and found exact
+OHLCV equality for all78/26 regular bars, respectively.
+
+This is OHLCV, not individual trades, quote snapshots, order-book events or
+trade count. Exact tick bars, exact volume bars, ITCH/L2 hypotheses and option
+execution economics require other data. No stock or option PnL is computed
+by these acquisition tools.
+
+Provenance and operational bounds
+--------------------------------
+Existing June24-Sept18 cache packets were reused only after verifying sealed
+packet hash, profile identity, requested endpoint/ticker/date, native date
+evidence and full RTH validation. Exact original compressed packet bytes are
+preserved, correctly labeled cached_verified; they are not claimed to be
+original HTTP byte bodies. Existing probe raw bytes likewise require a
+matching request ledger hash and complete native coverage.
+
+Fresh responses retain exact decoded HTTP entity bytes in deterministic gzip,
+their SHA256 and compressed-file SHA256, requested_at/received_at, native Date
+and quota headers. Attempts are appended before requests so restarts count
+physical requests, including diagnostics, toward the global 2,000 GET cap.
+Only the official HTTPS host is used with inherited credentials/proxy/TLS.
+No credential value is copied to a report, request URL or log.
+
+The initial collector stopped immediately on one HTTP401. One previously
+started request subsequently completed successfully. Parent authorized exactly
+two fresh-client diagnostics: the SPY control and exact failed QQQ request
+both returned200. Original401, diagnostic packets and prior invalid certificate
+remain preserved. QQQ was certified from the successful diagnostic packet
+without another request. Cloud credential values can be placeholders replaced
+by the configured proxy; local placeholder syntax does not diagnose the real
+provider key.
+
+Authorized recovery is stricter than the original ceilings: one concurrent
+request, at least0.75 seconds between starts, a fresh normal httpx client per
+request, and a total20-second stream/read deadline. HTTP401/403 stops again;
+there is no automatic credential repair or repeated authentication loop.
+Retry-After on429 is honored with at most three attempts for a pair. Native
+daily quota count18,000 stops further research to preserve production quota.
+Operational source hashes and amendments are retained beside the collector.
+
+Independent exclusion audit
+---------------------------
+The deterministic first ten invalid ticker-sessions were checked against their
+archived native JSON and hashes. All had 390 contiguous raw RTH timestamps.
+Their thirteen rejected native volume rows were negative, and each exactly
+matched a decrease in total_volume from the immediately preceding minute.
+This supports a counter revision/correction interpretation; exact vendor
+semantics are unverified. In these cases the certificate missing_timestamps
+field identifies missing VALID rows after rejection, not absent source bars.
+Zero per-minute volume remains valid. See ../quality-exclusion-audit.json.

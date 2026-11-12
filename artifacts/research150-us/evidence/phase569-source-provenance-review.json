@@ -1,0 +1,156 @@
+{
+  "reviewed_at": "2026-11-12T16:57:44.551964+00:00",
+  "scope": "Coverage/source provenance and cautionary language only; no strategy outcome recomputation",
+  "docs_results_sha256_at_review": "00c526686e67a8325cc5472654efed0ab8f47ace2cd3bb7d9dc2da7709699058",
+  "archive_checks": [
+    {
+      "artifact": "pilot-protocol-v2.md",
+      "archive_digest_and_size_match": true
+    },
+    {
+      "artifact": "pilot-registry-v2.json",
+      "archive_digest_and_size_match": true
+    },
+    {
+      "artifact": "pilot-freeze-v2.json",
+      "archive_digest_and_size_match": true
+    },
+    {
+      "artifact": "pilot-v2-implementation-clarification.md",
+      "archive_digest_and_size_match": true
+    },
+    {
+      "artifact": "pilot-v2-inference-gates.md",
+      "archive_digest_and_size_match": true
+    },
+    {
+      "artifact": "engine-code-hashes.json",
+      "archive_digest_and_size_match": true
+    },
+    {
+      "artifact": "inventory.json",
+      "archive_digest_and_size_match": true
+    },
+    {
+      "artifact": "engine-source.zip",
+      "archive_digest_and_size_match": true
+    },
+    {
+      "artifact": "development-costs.png",
+      "archive_digest_and_size_match": true
+    },
+    {
+      "artifact": "development/development-overview.json",
+      "archive_digest_and_size_match": true
+    },
+    {
+      "artifact": "development/all-54-candidate-views.csv",
+      "archive_digest_and_size_match": true
+    },
+    {
+      "artifact": "development/run-seal.json",
+      "archive_digest_and_size_match": true
+    },
+    {
+      "artifact": "development/completion-evidence.json",
+      "archive_digest_and_size_match": true
+    },
+    {
+      "artifact": "development/joint-block-inference.json",
+      "archive_digest_and_size_match": true
+    },
+    {
+      "artifact": "development/purged-folds.json",
+      "archive_digest_and_size_match": true
+    },
+    {
+      "artifact": "development/per-trial-results.json.gz",
+      "archive_digest_and_size_match": true,
+      "decompressed_matches_original": true
+    },
+    {
+      "artifact": "evaluation/chronological_evaluation-overview.json",
+      "archive_digest_and_size_match": true
+    },
+    {
+      "artifact": "evaluation/all-54-candidate-views.csv",
+      "archive_digest_and_size_match": true
+    },
+    {
+      "artifact": "evaluation/run-seal.json",
+      "archive_digest_and_size_match": true
+    },
+    {
+      "artifact": "evaluation/joint-block-inference.json",
+      "archive_digest_and_size_match": true
+    },
+    {
+      "artifact": "evaluation/purged-folds.json",
+      "archive_digest_and_size_match": true
+    },
+    {
+      "artifact": "evaluation/per-trial-results.json.gz",
+      "archive_digest_and_size_match": true,
+      "decompressed_matches_original": true
+    },
+    {
+      "artifact": "evaluation/completion-evidence.json",
+      "archive_digest_and_size_match": true
+    },
+    {
+      "artifact": "coverage/acquisition-completion.json",
+      "archive_digest_and_size_match": true,
+      "private_source_byte_identical": true
+    },
+    {
+      "artifact": "coverage/acquisition-completion.txt",
+      "archive_digest_and_size_match": true,
+      "private_source_byte_identical": true
+    },
+    {
+      "artifact": "coverage/missingness-report.json",
+      "archive_digest_and_size_match": true,
+      "private_source_byte_identical": true
+    },
+    {
+      "artifact": "coverage/coverage-verification.json",
+      "archive_digest_and_size_match": true,
+      "private_source_byte_identical": true
+    },
+    {
+      "artifact": "coverage/request-ledger-verification.json",
+      "archive_digest_and_size_match": true,
+      "private_source_byte_identical": true
+    },
+    {
+      "artifact": "coverage/acquisition-methods.txt",
+      "archive_digest_and_size_match": true,
+      "private_source_byte_identical": true
+    },
+    {
+      "artifact": "coverage/exclusion-audit-summary.json",
+      "archive_digest_and_size_match": true
+    }
+  ],
+  "failures": [],
+  "claims_verified": {
+    "all129excluded_are_native_volume_quality": true,
+    "all129retain390native_rth_timestamps": true,
+    "all146negative_volumes_match_cumulative_drops": true,
+    "raw_request_accounting_12_plus1718": true,
+    "http401_evidence_preserved": true,
+    "common_coverage_122_equals103_plus19": true,
+    "all217calendar_sessions_reported": true,
+    "sealed_original_input_hashes_match": true,
+    "internal_run_input_serializations_semantically_identical": true,
+    "no_fresh_holdout_or_DSR_pass_claim": true
+  },
+  "observations": [
+    "Consolidated coverage/source section now accurately distinguishes volume-quality exclusions from missing native price bars",
+    "Local timestamps are explicitly not independently authenticated; native interval-end timing is a retrospective proxy",
+    "Full underlying raw data stays private; public exclusion summary omits per-row native values",
+    "Recorded request UTC start-gap caveat remains preserved in the archived ledger verification",
+    "Final package contents and docs may still change for news/supplemental sections; this approval covers reviewed source/coverage section only"
+  ],
+  "artifact_total_bytes_at_review": 1275225
+}

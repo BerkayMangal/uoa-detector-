@@ -1,0 +1,55 @@
+{
+  "artifact_version": "physical_news_native_coverage_v1",
+  "created_at": "2026-11-12T16:26:24.245945+00:00",
+  "requested_days": [
+    "2026-11-06",
+    "2026-11-07",
+    "2026-11-08",
+    "2026-11-09",
+    "2026-11-10",
+    "2026-11-11"
+  ],
+  "requested_symbols": [
+    "SPY",
+    "QQQ",
+    "AAPL",
+    "NFLX",
+    "NVDA",
+    "TSLA",
+    "MSFT",
+    "META",
+    "AMZN"
+  ],
+  "source": "Authenticated UOA native SELECT-only news endpoints; zero upstream/news-provider requests",
+  "full_daily_export_status": "NOT_OBTAINED: Nov6nativeexport exceeded55s client timeout; subsequentNov9\u201311full requests returned409export_busy. No full-export retries were piled onto server.",
+  "fallback_status": "8of8datedfallbackresponsesHTTP200",
+  "counts": {
+    "requested_symbol_candidate_records": 6,
+    "distinct_requested_symbols_observed": [
+      "AMZN",
+      "META",
+      "MSFT",
+      "TSLA"
+    ],
+    "physical_chronology_verified": 6,
+    "presence_known": 5,
+    "presence_true": 5,
+    "presence_false": 0,
+    "presence_unknown": 1,
+    "timely_source_bound_semantic": 2,
+    "capped_or_continuing_source_pages": 6,
+    "timely_semantic_with_nonunknown_direction": 0
+  },
+  "research150_v2_policy": "News remains explanatory context only. Predictive PF/PFN variants require separately registered experiments and sufficient prospective physically known coverage. Publication alone never qualifies.",
+  "limitations": [
+    "Fallback is limited to frozen candidate cohort, not all159/157/154/153scans or every requested symbol.",
+    "Absence of a symbol in diagnostic cohort is UNKNOWN coverage, not no news.",
+    "Metadata validates server-side hash/receipt chronology; rawfullpacket bodies and full-day exportedDataset were not obtained.",
+    "No inference/strategy profit or liveTheta connection is established.",
+    "Full-export timeout does not establish a missing database record; it is an operational export bottleneck.",
+    "Both timely completed semantic records have direction=unknown and reason=speculative_denied_or_unknown; completion is not a usable directional trading signal."
+  ],
+  "archive_scope": "Derived compact coverage summary; no native packets, article bodies, headlines or individual candidate records included.",
+  "original_file": "coverage-summary.json",
+  "original_sha256": "0a164a6b2cd1a26121b1b2d88ecb7d7eaa4ae3970c382744f9b59f222653a49d"
+}

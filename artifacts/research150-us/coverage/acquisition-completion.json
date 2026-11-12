@@ -1,0 +1,580 @@
+{
+  "completed_at": "2026-11-12T16:53:48.372217+00:00",
+  "status": "all_frozen_pairs_attempted_and_verified",
+  "universe": [
+    "SPY",
+    "QQQ",
+    "AAPL",
+    "NFLX",
+    "NVDA",
+    "TSLA",
+    "MSFT",
+    "META",
+    "AMZN"
+  ],
+  "sessions": 217,
+  "date_range": [
+    "2026-01-02",
+    "2026-11-11"
+  ],
+  "planned_and_attempted_pairs": 1953,
+  "certified_complete_pairs": 1824,
+  "excluded_pairs": 129,
+  "pending_pairs": 0,
+  "certified_1m_rows": 711360,
+  "native_rth_timestamp_complete_pairs": 1953,
+  "native_rth_rows": 761670,
+  "certified_5m_full_groups": 142272,
+  "certified_15m_full_groups": 47424,
+  "common_valid_days": 122,
+  "development_common_valid_days": 103,
+  "chronological_evaluation_common_valid_days": 19,
+  "chronological_evaluation_label": "Chronological evaluation, partly previously observed; not an untouched holdout",
+  "maximum_common_contiguous_sessions": 11,
+  "request_accounting": {
+    "initial_audit_gets": 12,
+    "bulk_and_diagnostic_gets": 1718,
+    "total_acquisition_gets": 1730,
+    "initial_reused_pairs": 237,
+    "reused_cached_packets": 229,
+    "reused_initial_probe_packets": 8,
+    "separate_successful_diagnostic_source_pairs": 1,
+    "bulk_http_statuses": {
+      "200": 1717,
+      "401": 1
+    },
+    "global_bulk_get_cap": 2000,
+    "last_native_daily_count": 14285,
+    "native_daily_limit": 30000,
+    "reserve_stop_threshold": 18000,
+    "no_further_requests_planned": true
+  },
+  "quality_exclusion_audit": {
+    "excluded_sessions": 129,
+    "native_rth_unique_390_sessions": 129,
+    "invalid_volume_rows": 146,
+    "negative_volume_rows": 146,
+    "counter_delta_matching_rows": 146,
+    "other_quality_reasons": []
+  },
+  "by_symbol": {
+    "SPY": {
+      "complete": 205,
+      "invalid": 12
+    },
+    "QQQ": {
+      "complete": 185,
+      "invalid": 32
+    },
+    "AAPL": {
+      "complete": 197,
+      "invalid": 20
+    },
+    "NFLX": {
+      "complete": 208,
+      "invalid": 9
+    },
+    "NVDA": {
+      "complete": 211,
+      "invalid": 6
+    },
+    "TSLA": {
+      "complete": 209,
+      "invalid": 8
+    },
+    "MSFT": {
+      "complete": 202,
+      "invalid": 15
+    },
+    "META": {
+      "complete": 202,
+      "invalid": 15
+    },
+    "AMZN": {
+      "complete": 205,
+      "invalid": 12
+    }
+  },
+  "by_partition": {
+    "development": {
+      "complete": 1569,
+      "invalid": 114
+    },
+    "chronological_evaluation": {
+      "complete": 255,
+      "invalid": 15
+    }
+  },
+  "by_month_and_symbol": {
+    "2026-01": {
+      "sessions": 20,
+      "all_nine_certified_sessions": 14,
+      "by_symbol": {
+        "SPY": {
+          "complete": 18,
+          "invalid": 2
+        },
+        "QQQ": {
+          "complete": 19,
+          "invalid": 1
+        },
+        "AAPL": {
+          "complete": 18,
+          "invalid": 2
+        },
+        "NFLX": {
+          "complete": 19,
+          "invalid": 1
+        },
+        "NVDA": {
+          "complete": 20
+        },
+        "TSLA": {
+          "complete": 19,
+          "invalid": 1
+        },
+        "MSFT": {
+          "complete": 20
+        },
+        "META": {
+          "complete": 20
+        },
+        "AMZN": {
+          "complete": 19,
+          "invalid": 1
+        }
+      }
+    },
+    "2026-02": {
+      "sessions": 19,
+      "all_nine_certified_sessions": 10,
+      "by_symbol": {
+        "SPY": {
+          "complete": 19
+        },
+        "QQQ": {
+          "complete": 18,
+          "invalid": 1
+        },
+        "AAPL": {
+          "complete": 17,
+          "invalid": 2
+        },
+        "NFLX": {
+          "complete": 18,
+          "invalid": 1
+        },
+        "NVDA": {
+          "complete": 19
+        },
+        "TSLA": {
+          "complete": 18,
+          "invalid": 1
+        },
+        "MSFT": {
+          "complete": 19
+        },
+        "META": {
+          "complete": 17,
+          "invalid": 2
+        },
+        "AMZN": {
+          "complete": 16,
+          "invalid": 3
+        }
+      }
+    },
+    "2026-03": {
+      "sessions": 22,
+      "all_nine_certified_sessions": 11,
+      "by_symbol": {
+        "SPY": {
+          "complete": 20,
+          "invalid": 2
+        },
+        "QQQ": {
+          "complete": 19,
+          "invalid": 3
+        },
+        "AAPL": {
+          "complete": 20,
+          "invalid": 2
+        },
+        "NFLX": {
+          "complete": 20,
+          "invalid": 2
+        },
+        "NVDA": {
+          "complete": 22
+        },
+        "TSLA": {
+          "complete": 22
+        },
+        "MSFT": {
+          "complete": 20,
+          "invalid": 2
+        },
+        "META": {
+          "complete": 20,
+          "invalid": 2
+        },
+        "AMZN": {
+          "complete": 21,
+          "invalid": 1
+        }
+      }
+    },
+    "2026-04": {
+      "sessions": 21,
+      "all_nine_certified_sessions": 14,
+      "by_symbol": {
+        "SPY": {
+          "complete": 21
+        },
+        "QQQ": {
+          "complete": 17,
+          "invalid": 4
+        },
+        "AAPL": {
+          "complete": 19,
+          "invalid": 2
+        },
+        "NFLX": {
+          "complete": 20,
+          "invalid": 1
+        },
+        "NVDA": {
+          "complete": 21
+        },
+        "TSLA": {
+          "complete": 21
+        },
+        "MSFT": {
+          "complete": 19,
+          "invalid": 2
+        },
+        "META": {
+          "complete": 20,
+          "invalid": 1
+        },
+        "AMZN": {
+          "complete": 21
+        }
+      }
+    },
+    "2026-05": {
+      "sessions": 20,
+      "all_nine_certified_sessions": 10,
+      "by_symbol": {
+        "SPY": {
+          "complete": 19,
+          "invalid": 1
+        },
+        "QQQ": {
+          "complete": 18,
+          "invalid": 2
+        },
+        "AAPL": {
+          "complete": 19,
+          "invalid": 1
+        },
+        "NFLX": {
+          "invalid": 1,
+          "complete": 19
+        },
+        "NVDA": {
+          "complete": 20
+        },
+        "TSLA": {
+          "complete": 19,
+          "invalid": 1
+        },
+        "MSFT": {
+          "complete": 17,
+          "invalid": 3
+        },
+        "META": {
+          "complete": 19,
+          "invalid": 1
+        },
+        "AMZN": {
+          "complete": 20
+        }
+      }
+    },
+    "2026-06": {
+      "sessions": 21,
+      "all_nine_certified_sessions": 13,
+      "by_symbol": {
+        "SPY": {
+          "complete": 20,
+          "invalid": 1
+        },
+        "QQQ": {
+          "invalid": 4,
+          "complete": 17
+        },
+        "AAPL": {
+          "complete": 18,
+          "invalid": 3
+        },
+        "NFLX": {
+          "complete": 21
+        },
+        "NVDA": {
+          "complete": 20,
+          "invalid": 1
+        },
+        "TSLA": {
+          "complete": 20,
+          "invalid": 1
+        },
+        "MSFT": {
+          "complete": 21
+        },
+        "META": {
+          "complete": 20,
+          "invalid": 1
+        },
+        "AMZN": {
+          "complete": 19,
+          "invalid": 2
+        }
+      }
+    },
+    "2026-07": {
+      "sessions": 22,
+      "all_nine_certified_sessions": 8,
+      "by_symbol": {
+        "SPY": {
+          "complete": 19,
+          "invalid": 3
+        },
+        "QQQ": {
+          "complete": 17,
+          "invalid": 5
+        },
+        "AAPL": {
+          "complete": 20,
+          "invalid": 2
+        },
+        "NFLX": {
+          "complete": 22
+        },
+        "NVDA": {
+          "complete": 21,
+          "invalid": 1
+        },
+        "TSLA": {
+          "complete": 20,
+          "invalid": 2
+        },
+        "MSFT": {
+          "complete": 20,
+          "invalid": 2
+        },
+        "META": {
+          "complete": 19,
+          "invalid": 3
+        },
+        "AMZN": {
+          "complete": 20,
+          "invalid": 2
+        }
+      }
+    },
+    "2026-08": {
+      "sessions": 21,
+      "all_nine_certified_sessions": 14,
+      "by_symbol": {
+        "SPY": {
+          "complete": 21
+        },
+        "QQQ": {
+          "complete": 20,
+          "invalid": 1
+        },
+        "AAPL": {
+          "complete": 18,
+          "invalid": 3
+        },
+        "NFLX": {
+          "complete": 19,
+          "invalid": 2
+        },
+        "NVDA": {
+          "complete": 19,
+          "invalid": 2
+        },
+        "TSLA": {
+          "complete": 19,
+          "invalid": 2
+        },
+        "MSFT": {
+          "complete": 18,
+          "invalid": 3
+        },
+        "META": {
+          "complete": 20,
+          "invalid": 1
+        },
+        "AMZN": {
+          "complete": 19,
+          "invalid": 2
+        }
+      }
+    },
+    "2026-09": {
+      "sessions": 21,
+      "all_nine_certified_sessions": 9,
+      "by_symbol": {
+        "SPY": {
+          "complete": 19,
+          "invalid": 2
+        },
+        "QQQ": {
+          "complete": 16,
+          "invalid": 5
+        },
+        "AAPL": {
+          "complete": 21
+        },
+        "NFLX": {
+          "complete": 21
+        },
+        "NVDA": {
+          "complete": 19,
+          "invalid": 2
+        },
+        "TSLA": {
+          "complete": 21
+        },
+        "MSFT": {
+          "invalid": 2,
+          "complete": 19
+        },
+        "META": {
+          "complete": 20,
+          "invalid": 1
+        },
+        "AMZN": {
+          "complete": 20,
+          "invalid": 1
+        }
+      }
+    },
+    "2026-10": {
+      "sessions": 22,
+      "all_nine_certified_sessions": 13,
+      "by_symbol": {
+        "SPY": {
+          "complete": 21,
+          "invalid": 1
+        },
+        "QQQ": {
+          "invalid": 4,
+          "complete": 18
+        },
+        "AAPL": {
+          "complete": 20,
+          "invalid": 2
+        },
+        "NFLX": {
+          "complete": 21,
+          "invalid": 1
+        },
+        "NVDA": {
+          "complete": 22
+        },
+        "TSLA": {
+          "complete": 22
+        },
+        "MSFT": {
+          "complete": 21,
+          "invalid": 1
+        },
+        "META": {
+          "complete": 19,
+          "invalid": 3
+        },
+        "AMZN": {
+          "complete": 22
+        }
+      }
+    },
+    "2026-11": {
+      "sessions": 8,
+      "all_nine_certified_sessions": 6,
+      "by_symbol": {
+        "SPY": {
+          "complete": 8
+        },
+        "QQQ": {
+          "invalid": 2,
+          "complete": 6
+        },
+        "AAPL": {
+          "complete": 7,
+          "invalid": 1
+        },
+        "NFLX": {
+          "complete": 8
+        },
+        "NVDA": {
+          "complete": 8
+        },
+        "TSLA": {
+          "complete": 8
+        },
+        "MSFT": {
+          "complete": 8
+        },
+        "META": {
+          "complete": 8
+        },
+        "AMZN": {
+          "complete": 8
+        }
+      }
+    }
+  },
+  "request_pacing_note": "Configured monotonic reservation spacing was0.51s initially and0.75s after recovery, but per-request monotonic clocks were not archived; recorded UTC starts contain jitter below those targets, so exact physical start spacing cannot be independently proven from ledger.",
+  "regression_validation": {
+    "tests_passed": 8,
+    "command": "/workspace/uoa-detector-/.venv/bin/python /workspace/work/uoa-api-investigation/research150/bulk/test_collect_panel.py",
+    "network_calls_in_tests": 0
+  },
+  "artifact_hashes": {
+    "dataset-plan.json": "519857050a9cc3459fd2c6809267758992d698a9c182d66a93a852820c7387db",
+    "dataset-plan.original.json": "3f925a505d7465e4f812c16d45dfc367558b6700b0abb9d411d6d68b34c07537",
+    "coverage-manifest.json": "15e2233104e751b0354f8389ea2c51a96f4ec1769d34929e1b8c8a01ac85528e",
+    "development-coverage-manifest.json": "59789e700a78a4d76e6fbaa4f2c9b46cb82ea00ac1f8358779a24d4bb8faa3a5",
+    "evaluation-coverage-manifest.json": "abdb4fe98d52a321771f4bde9132a86562d02fdb61d6519960588082788a024a",
+    "coverage-verification.json": "2b376d9540c11e938beddad172ee1b84cf200fee9752cfc0ee52db74e0474180",
+    "missingness-report.json": "76fd1de5f72e081c4bbbaab18d2ca16dd4af2e0794e0703a7de83660c5b2291d",
+    "all-exclusion-volume-audit.json": "b431bb30e81d0f6630f053e0ef68fe5b55d0355e9617db1b5b6372d2d996b98d",
+    "request-ledger-verification.json": "0570916c2d6a347886f6b35172e572a6b9d8770960a832a8c2546b5cb56c895e",
+    "requests.jsonl": "df7a302c53dbd9adcc8df512dbf88d31fed09b59dbb1330053e828506576bfe8",
+    "attempts.jsonl": "4644f0f6235930cd65468d40c3f06ec925b391fd488d83b52087c3eea4047cd5",
+    "collect_panel.py": "8db0823000389de68261ac7e347a1799dbfe4463bdce88bac272c12d34a5c847",
+    "collect_panel.run1.py": "cf4e6111eddcdbe0a8d9a8b5d5d5f2001e4d3646b5261130dcb8101584e1d5f1",
+    "test_collect_panel.py": "8c9e985913f3291eb92f4f2260925953f39b4bbc031b29f379814b78fd47da13",
+    "acquisition-methods.txt": "925cc65d208b1d7cd0a814fd90d9385d0d21d2375019a52b188c411a7297581a",
+    "operational-recovery-amendment.json": "6316637635c2b4690a4f370914ebc45063c5bc3d23666b8edfb1fe4f96886107",
+    "acquisition-completion.txt": "c4d0a9a7e277d5b2440b291e46bec8e75e1ce68add2c67bd4c4d21df9f66fb7e"
+  },
+  "limits": [
+    "Retrospective event-time OHLCV; first publication and later revision history unobserved",
+    "Native corporate-action adjustment semantics unverified",
+    "Fixed liquid US universe, not survivorship-free universe",
+    "Whole-session/common-universe quality exclusion is retrospective and potentially nonrandom",
+    "Exact tick, volume-bar, quote execution and order-book hypotheses are unavailable from aggregates",
+    "No strategy returns, labels or PnL inspected by acquisition work"
+  ],
+  "source_counts": {
+    "downloaded": 1715,
+    "diagnostic_verified": 1,
+    "probe_verified": 8,
+    "cached_verified": 229
+  }
+}

@@ -1,0 +1,42 @@
+{
+  "baselines": 126,
+  "chronological_evaluation_sessions": 19,
+  "combined_primary_contrasts": 180,
+  "common_sessions": 122,
+  "completed_at": "2026-11-12T17:15:56.292366+00:00",
+  "cost_views": 648,
+  "development_sessions": 103,
+  "falsification_only_controls": 9,
+  "frozen_S1_and_v2_code_and_documents_unchanged": true,
+  "full_input_manifest_sha256": "15e2233104e751b0354f8389ea2c51a96f4ec1769d34929e1b8c8a01ac85528e",
+  "gzip_bytes_equal_original_files": true,
+  "limitations": "Retrospective quality-conditioned samples. No tuning or new prices fetched. Full original policy results retained; public gzip contains exact original bytes. All inference descriptive/insufficient; no production promotion.",
+  "phase": "all",
+  "policies": 216,
+  "public_artifacts": {
+    "all-126-paired-contrasts-all-costs-periods.json.gz": {
+      "bytes": 35839,
+      "sha256": "d24cc78175213059ebf20bc58a6fc1cd106f557113f4a85e5cef981f935a40d8"
+    },
+    "all-216-policy-results.csv": {
+      "bytes": 90267,
+      "sha256": "3f384b3ebba6180d94bb487ecdad224630d6095ed0ec893c93ffcc799a6ef725"
+    },
+    "full-648-policy-cost-results.json.gz": {
+      "bytes": 746256,
+      "sha256": "897d7cca47fd61bd3b83f697cf072cb6f7fa1879ea712bac29dd6b02b32c5331"
+    },
+    "supplement-overview.json": {
+      "bytes": 18160,
+      "sha256": "1b15e775ba71cd3d2ba95280ec3d0ea931606545a0ed2ccc9b11188ea6e37364"
+    }
+  },
+  "report_sha256": "4697793a62eb505ca2af78b7e87ece76d6f38d3a3ba8d808e331d36c8eee0fd6",
+  "run_seal_sha256": "eda6b774e23b4bbe8993a11d55d51c6d30c074a1766987c99d7f303f7d25e18d",
+  "source_directed_candidates": 81,
+  "status": "S1_COMPLETED_UNCHANGED",
+  "uncompressed_originals": {
+    "all-126-paired-contrasts-all-costs-periods.json.gz": "0a073146221ab286b1c7d17f6f3929996e71b9565e5f736d0b18ebe73decac23",
+    "full-648-policy-cost-results.json.gz": "038119d54418885bcaa11b976ad9694549d26ae9dc00f8449ca96df02f739bb8"
+  }
+}

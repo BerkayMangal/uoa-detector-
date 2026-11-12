@@ -32,6 +32,15 @@ current subscription floor is 2026-06-24. Phase 5.51 captures 61 sessions throug
 2026-09-18; its twelve exploratory flow/price controls are negative, and its
 80-session full-selection gate is unmet (`docs/phase-5.51-results.md`). Phase5.66 adds5184 explicitly exploratory configurations on reused daily history; the selected result fails concentration/cost robustness, all ticker fits fall back globally, and no rule is promoted (`docs/phase-5.66-closeout.md`).
 
+**Endpoint-specific measurement, 2026-11-12.** Phase 5.69 captures stock 1m OHLCV
+for the fixed nine-symbol Jan 2–Nov 11 panel: 1,824/1,953 ticker-days pass strict
+volume quality, yielding 122 common sessions. All native price timestamps are
+present even in the 129 volume-excluded ticker-days. This stock-bar measurement
+does not revise the separately measured flow/enrichment historical floor;
+provider history depends on the endpoint. The first pilot and S1 cover eight families and find no
+validated edge (`docs/phase-5.69-results.md`,
+`docs/phase-5.69-S1-addendum-record.md`). The frozen quoted verdict is unchanged.
+
 | Clause | Evidence | Commits |
 |---|---|---|
 | Directional UOA confluence (v6): REJECTED | `docs/phase-3.6-closeout.md`; mechanical verdict `docs/phase-3.6-results.md` (`run-4cell --trades replay`; scenario 4: best cell `tier2_fusion` Sharpe 0.63, walk-forward 0.38) | `073218c`, `20d5988`, `ad2374a`, `b99a32f`, `d1bbfb7` |
@@ -292,6 +301,7 @@ A new study needs a fresh, non-overlapping window (`docs/next_studies.md`,
 
 | 5.68 | **ThetaData option validation** — owner explicitly requests integrating his Options Pro subscription into existing UOA, 2026-11-12. Bounded Terminal connector, authenticated request/result workflow, actual option quote economics, and capability research. Contract: `docs/phase-5.68-theta-option-validation-acceptance.md`. Live access remains unverified until a real Terminal response is ingested; no signal tuning or alpha claim. |
 | 5.68.2 | **Passwordless Mac connection** — remove repeated owner credential entry using a single-use pairing download and a seven-day connector credential restricted to existing request IDs. Contract: `docs/phase-5.68.2-passwordless-theta-acceptance.md`. Owner explicitly requested this usability repair after authorizing deployment. |
+| 5.69 | **US intraday research archive** — owner authorizes autonomous US research, 2026-11-12. Archival contract: `docs/phase-5.69-us-intraday-research-acceptance.md`; S1 exposure/specification: `docs/phase-5.69-S1-addendum-record.md`; results: `docs/phase-5.69-results.md`; delivery: `docs/phase-5.69-closeout.md`. Eight US adaptations, 135 source-directed candidates + 9 falsification controls + 180 baselines, 972 cost views. Development 103/187 common dates: all candidates negative at 5/10/20 bps; later 19/30 dates: 3/135 positive only at 5 bps, none at 10/20. Retrospective quality conditioning, insufficient inference, no validated edge. Full Study G CSV parsing for metadata inventory is disclosed; its prescribed experiment was not run. No live-policy change; real Theta ingestion remains external. |
 
 Detail for the 5.10–5.19 candidates:
 - **Falsification gates (D8).** `src/uoa_detector/backtest/falsification.py:79-81`
