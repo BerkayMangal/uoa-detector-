@@ -1,0 +1,222 @@
+{
+  "checked_at": "2026-11-12T16:28:53.059446+00:00",
+  "scope": [
+    "/workspace/uoa-design-review",
+    "/workspace/uoa-detector-",
+    "/workspace/uoa-history51-jun24",
+    "/workspace/uoa-horizon54-r1",
+    "/workspace/uoa-news56"
+  ],
+  "method": "Filename enumeration including ignored files, excluding .git/dependency/cache directories; schema, date, count and provenance inspection only. No strategy or outcome contents were opened.",
+  "additional_native_1m_archives_found": 0,
+  "known_existing_archive": {
+    "path": "/workspace/uoa-history51-jun24",
+    "native_packet_files": 244,
+    "first_day": "2026-06-24",
+    "last_day": "2026-09-18",
+    "symbols": {
+      "AAPL": {
+        "files": 61,
+        "first_day": "2026-06-24",
+        "last_day": "2026-09-18"
+      },
+      "NFLX": {
+        "files": 61,
+        "first_day": "2026-06-24",
+        "last_day": "2026-09-18"
+      },
+      "NVDA": {
+        "files": 61,
+        "first_day": "2026-06-24",
+        "last_day": "2026-09-18"
+      },
+      "SPY": {
+        "files": 61,
+        "first_day": "2026-06-24",
+        "last_day": "2026-09-18"
+      }
+    },
+    "sample_envelope_keys": [
+      "complete",
+      "date_evidence",
+      "day",
+      "kind",
+      "packet_hash",
+      "payload",
+      "profile_hash",
+      "quota",
+      "received_at",
+      "request",
+      "ticker"
+    ],
+    "sample_payload_keys": [
+      "data"
+    ],
+    "sample_row_keys": [
+      "close",
+      "end_time",
+      "high",
+      "low",
+      "market_time",
+      "open",
+      "start_time",
+      "total_volume",
+      "volume"
+    ],
+    "reuse_status": "CANDIDATE_ONLY_REQUIRE_NATIVE_HASH_DATE_RTH_COMPLETENESS_VERIFICATION"
+  },
+  "daily_files_excluded": [
+    {
+      "path": "/workspace/uoa-detector-/data/study_f/bars.csv",
+      "sha256": "ed1f6d8871e900f959793edb8ed7da4b52a1502da3c7974e2279e74e6a7205ca",
+      "rows": 17640,
+      "symbols_count": 70,
+      "days_count": 252,
+      "first_day": "2025-09-18",
+      "last_day": "2026-09-18",
+      "fields": [
+        "ticker",
+        "day",
+        "open",
+        "high",
+        "low",
+        "close",
+        "volume",
+        "total_volume"
+      ],
+      "unique_ticker_day": 17640,
+      "reuse_for_1m": false,
+      "reason": "One row per ticker/day; no intraday timestamp or native raw request envelope."
+    },
+    {
+      "path": "/workspace/uoa-detector-/data/study_g/bars.csv",
+      "sha256": "f3263839b00f882ebb97bd9b0ad1a08ff4bbec36654af076f30cb95e09148bad",
+      "rows": 140,
+      "symbols_count": 70,
+      "days_count": 2,
+      "first_day": "2026-09-21",
+      "last_day": "2026-09-22",
+      "fields": [
+        "ticker",
+        "day",
+        "open",
+        "high",
+        "low",
+        "close",
+        "volume",
+        "total_volume"
+      ],
+      "unique_ticker_day": 140,
+      "reuse_for_1m": false,
+      "reason": "One row per ticker/day; no intraday timestamp or native raw request envelope."
+    },
+    {
+      "path": "/workspace/uoa-news56/data/study_f/bars.csv",
+      "sha256": "ed1f6d8871e900f959793edb8ed7da4b52a1502da3c7974e2279e74e6a7205ca",
+      "rows": 17640,
+      "symbols_count": 70,
+      "days_count": 252,
+      "first_day": "2025-09-18",
+      "last_day": "2026-09-18",
+      "fields": [
+        "ticker",
+        "day",
+        "open",
+        "high",
+        "low",
+        "close",
+        "volume",
+        "total_volume"
+      ],
+      "unique_ticker_day": 17640,
+      "reuse_for_1m": false,
+      "reason": "One row per ticker/day; no intraday timestamp or native raw request envelope."
+    },
+    {
+      "path": "/workspace/uoa-news56/data/study_g/bars.csv",
+      "sha256": "f3263839b00f882ebb97bd9b0ad1a08ff4bbec36654af076f30cb95e09148bad",
+      "rows": 140,
+      "symbols_count": 70,
+      "days_count": 2,
+      "first_day": "2026-09-21",
+      "last_day": "2026-09-22",
+      "fields": [
+        "ticker",
+        "day",
+        "open",
+        "high",
+        "low",
+        "close",
+        "volume",
+        "total_volume"
+      ],
+      "unique_ticker_day": 140,
+      "reuse_for_1m": false,
+      "reason": "One row per ticker/day; no intraday timestamp or native raw request envelope."
+    }
+  ],
+  "dry_run_manifest": {
+    "paths": [
+      "/workspace/uoa-detector-/data/historical/dry-run/.manifest.json",
+      "/workspace/uoa-news56/data/historical/dry-run/.manifest.json"
+    ],
+    "claimed_range": [
+      "2026-04-01",
+      "2026-04-30"
+    ],
+    "claimed_files": 150,
+    "actual_data_files_present": 0,
+    "actual_directory_contents": [
+      ".manifest.json",
+      ".download_state.json"
+    ],
+    "reuse_status": "MISSING_ACTUAL_DATA_NO_REUSE"
+  },
+  "other_exclusions": [
+    {
+      "paths": [
+        "/workspace/uoa-detector-/tests/fixtures/historical/",
+        "/workspace/uoa-news56/tests/fixtures/historical/"
+      ],
+      "reason": "Three explicitly synthetic parquet fixtures in each checkout; not real market records."
+    },
+    {
+      "paths": [
+        "/workspace/uoa-horizon54-r1/units.json.gz",
+        "/workspace/uoa-detector-/artifacts/horizon-research-v1/units.json.gz",
+        "/workspace/uoa-news56/artifacts/horizon-research-v1/units.json.gz"
+      ],
+      "reason": "Derived research artifacts, not named native minute packets. Contents not opened."
+    },
+    {
+      "paths": [
+        "/workspace/uoa-design-review/phase51-uw-probe-2026-11-01.json",
+        "/workspace/uoa-design-review/phase51-uw-corrected-probe.json"
+      ],
+      "reason": "Schema holds request summaries/counts only, no raw bar payloads."
+    },
+    {
+      "paths": [
+        "/workspace/uoa-detector-/artifacts/options-alpha-v1/replay/2026-09-22/underlying.json"
+      ],
+      "reason": "Single daily underlying OHLC snapshot, not intraday tape."
+    },
+    {
+      "paths": [
+        "/workspace/uoa-design-review/*.db",
+        "/workspace/uoa-detector-/webapp/seed.db",
+        "/workspace/uoa-news56/webapp/seed.db"
+      ],
+      "reason": "Read-only table schema inspection found no minute/OHLC/raw-packet history table; trade/outcome rows were not queried."
+    }
+  ],
+  "mandatory_before_reuse": [
+    "Verify packet_hash against the native documented canonical hashing rule, not arbitrary reserialization.",
+    "Verify requested symbol/day/endpoint and every native UTC row timestamp.",
+    "Verify correct NY exchange calendar and exact RTH interval, including shortened sessions.",
+    "Check duplicate/missing/out-of-order minute rows, invalid OHLC/volume, and complete bucket coverage.",
+    "Keep reused research dates labelled exploratory; do not convert them into untouched validation."
+  ],
+  "network_requests": 0,
+  "repository_mutations": 0
+}

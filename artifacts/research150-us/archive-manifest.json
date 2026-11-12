@@ -1,0 +1,80 @@
+{
+  "archive_created_at": "2026-11-12T16:47:33.782276+00:00",
+  "scope": "Byte-preserved original research governance and inventory files plus deterministic snapshot of seven frozen engine/test files; no raw market data.",
+  "timing_rule": "Source filesystem mtime is an archival observation, not an independently authenticated creation or freeze timestamp. Embedded freeze records are preserved unchanged.",
+  "original_source_hypotheses_sha256": "5948db58084f89c465a760dd6fbad884d304dde5d2dfac7366b0aff94ebbd7a4",
+  "files": [
+    {
+      "file": "pilot-protocol-v2.md",
+      "bytes": 13814,
+      "sha256": "456dfa9b66a3de453c1d3af46722c590c81adf30fc35738cfbcd992e3ca2ac29",
+      "source_mtime_utc": "2026-11-12T16:22:54.206962+00:00"
+    },
+    {
+      "file": "pilot-registry-v2.json",
+      "bytes": 65438,
+      "sha256": "cb04d0c52d8a941ab622e69b2d21281fe72afbc6418dd0bf82f461435b8bcaa9",
+      "source_mtime_utc": "2026-11-12T16:22:54.211348+00:00"
+    },
+    {
+      "file": "pilot-freeze-v2.json",
+      "bytes": 459,
+      "sha256": "693cb156b36b5b76485389f641522236f4bf274c2fdb1ebb0324f2217f882571",
+      "source_mtime_utc": "2026-11-12T16:22:54.211776+00:00"
+    },
+    {
+      "file": "pilot-v2-implementation-clarification.md",
+      "bytes": 3418,
+      "sha256": "8821e884953b191c6846c464b003292d853138b45cdd912865c2a331289a2d99",
+      "source_mtime_utc": "2026-11-12T16:25:35.370224+00:00"
+    },
+    {
+      "file": "pilot-v2-inference-gates.md",
+      "bytes": 1754,
+      "sha256": "dba8fa02830e9c8112da47c90cc1b55e2a4e22259ced86b7d24263838a02e23e",
+      "source_mtime_utc": "2026-11-12T16:27:18.537012+00:00"
+    },
+    {
+      "file": "engine-code-hashes.json",
+      "bytes": 1508,
+      "sha256": "65c7cb765fcedf4f60e7a4f017b8e79f193c185fbbaefb2eae04f6dd376769dc",
+      "source_mtime_utc": "2026-11-12T16:41:05.566459+00:00"
+    },
+    {
+      "file": "inventory.json.gz",
+      "bytes": 24051,
+      "sha256": "9d3844ce8dd3f15ae8a12becf7725f0e6e18189e6255f0f60bee8adfd7935a83",
+      "source_mtime_utc": "2026-11-12T16:28:15.036473+00:00",
+      "original_file": "inventory.json",
+      "original_bytes": 227575,
+      "original_sha256": "81cfa00a63daf9b26436faceec5f6064a949b2d686a3cb7341d8443fd59f62d4",
+      "transformation": "gzip; mtime=0; empty filename; compression level9; exact decompressed source bytes"
+    }
+  ],
+  "derived_artifacts": [
+    {
+      "file": "engine-source.zip",
+      "bytes": 62799,
+      "sha256": "748bd66901de840506e57517a775fbb8adaf315ee7288af84c1b2aa045d0e57b",
+      "entries": [
+        "frozen_v2_features.py",
+        "inference.py",
+        "research_engine.py",
+        "run_pilot.py",
+        "selftest_engine.py",
+        "selftest_inference.py",
+        "selftest_runner.py"
+      ],
+      "entry_hash_authority": "engine-code-hashes.json code mapping",
+      "zip_format": "ZIP_STORED; sorted basename-only entries; fixed 2026-11-12T00:00:00 headers; Unix regular file mode 0644; no comments or extra fields"
+    },
+    {
+      "file": "development-costs.png",
+      "bytes": 116237,
+      "sha256": "af0e0bc0c44917ea15e002e6a49cd7c57953b170b149b5f5b2dcff9d435c3897",
+      "source": "development/all-54-candidate-views.csv",
+      "source_sha256": "0a1f64c760f754d82335c69ec00bc6b1b622f585623c7157a52421ae145ba732",
+      "description": "All 54 candidate policy mean gross returns per trade versus primary 5 bps cost; retrospective common-session sample."
+    }
+  ]
+}

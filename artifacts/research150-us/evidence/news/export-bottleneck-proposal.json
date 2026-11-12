@@ -1,0 +1,272 @@
+{
+  "status": "WORK_ONLY_PROPOSED_NOT_DEPLOYED",
+  "prepared_on": "2026-11-12",
+  "repository_changes_by_this_task": [],
+  "production_requests_by_this_task": 0,
+  "goal": "Make already-recorded physical news, price and flow source rows exportable in small auditable pages, without changing the frozen daily research experiment or making a profitability claim.",
+  "observed_evidence": {
+    "ledger": "/workspace/work/uoa-api-investigation/research150/news/requests.json",
+    "nov6_source_scans": 159,
+    "nov6_source_characters": 27399642,
+    "nov6_metadata_seconds": 3.512,
+    "nov6_full_export_client_timeout_seconds": 55.057,
+    "timeout_at": "2026-11-12T16:22:24.404423Z",
+    "later_full_exports": [
+      {
+        "day": "2026-11-09",
+        "status": 409,
+        "reason": "export_busy",
+        "elapsed_seconds": 0.08
+      },
+      {
+        "day": "2026-11-10",
+        "status": 409,
+        "reason": "export_busy",
+        "elapsed_seconds": 0.104
+      },
+      {
+        "day": "2026-11-11",
+        "status": 409,
+        "reason": "export_busy",
+        "elapsed_seconds": 0.082
+      }
+    ],
+    "no_heavy_retries": true,
+    "unknown": [
+      "Server worker completion time.",
+      "Per-stage production SQL/network/CPU timings.",
+      "Whether pool contention or another export contributed.",
+      "Live PostgreSQL index definitions and plans."
+    ]
+  },
+  "confirmed_mechanisms": [
+    {
+      "file": "webapp/news_export.py",
+      "lines": [
+        29,
+        116,
+        124,
+        135
+      ],
+      "finding": "A process-wide threading.Lock covers metadata, the entire adapter audit and final serialization. export_busy directly means another export holds this lock in the serving process. It is not a persisted database deadlock or a missing news result."
+    },
+    {
+      "file": "webapp/main.py",
+      "lines": [
+        946,
+        954
+      ],
+      "finding": "The route is synchronous. Client-side read timeout does not establish that its running worker stopped. The lock releases only after the function returns or raises. This design is consistent with the timeout followed by busy refusals; production worker tracing was not available to identify the exact holder."
+    },
+    {
+      "file": "webapp/news_research/adapter.py",
+      "lines": [
+        269,
+        272,
+        310,
+        320
+      ],
+      "finding": "The whole day of full snapshot strings is materialized, parsed, expanded across every flow ticker, then serialized for dataset hashing. The route has no ticker or page parameter."
+    },
+    {
+      "file": "webapp/news_research/storage.py",
+      "lines": [
+        160,
+        170,
+        176,
+        206
+      ],
+      "finding": "Each eligible scan/ticker introspects tables, selects up to two matching packets, fetches a receipt, and decompresses/hashes/validates the selected packet. These operations repeat for unchanged packet identities."
+    },
+    {
+      "file": "webapp/news_export.py",
+      "lines": [
+        90,
+        119,
+        132
+      ],
+      "finding": "Metadata is recomputed inside the full export; a text contains/min scan may touch older snapshots. Output-size refusal occurs only after all expansion and serialization. Raising the source budget admits more work; it does not bound runtime."
+    }
+  ],
+  "synthetic_profile": {
+    "artifact": "/workspace/work/uoa-api-investigation/research150/news/export-local-profile.json",
+    "unchanged_code": true,
+    "network_requests": 0,
+    "one_scan_nine_tickers_sql": 32,
+    "64_scans_nine_tickers_sql": 1733,
+    "64_scan_breakdown": {
+      "table_introspection": 578,
+      "packet_select": 576,
+      "receipt_select": 576,
+      "scan_select_or_aggregate": 3
+    },
+    "unique_packets": 9,
+    "interpretation": "N+1 growth is reproduced exactly on SQLite. These are query counts, not a prediction of PostgreSQL latency or a production bottleneck percentage."
+  },
+  "narrow_proposed_slice": {
+    "new_module": "webapp/news_export_pages.py",
+    "proposed_route": "POST /api/arastirma/haber/records",
+    "existing_export": "Leave /api/arastirma/haber/export and every webapp/news_research/*.py file unchanged.",
+    "auth": "Use the existing owner-auth and same-origin protection; no-store/noindex; fixed error codes. Cursor signing key must be a server secret in memory, with scope bound to owner, method, day, normalized tickers and immutable source manifest.",
+    "first_request": {
+      "day": "2026-11-06",
+      "tickers": [
+        "SPY",
+        "QQQ",
+        "AAPL",
+        "NFLX",
+        "NVDA",
+        "TSLA",
+        "MSFT",
+        "META",
+        "AMZN"
+      ],
+      "scan_limit": 4
+    },
+    "next_request": {
+      "cursor": "<opaque signed cursor>",
+      "scan_limit": 4
+    },
+    "caps": {
+      "tickers": 9,
+      "default_scan_limit": 4,
+      "max_scan_limit": 8,
+      "manifest_scan_limit": 256,
+      "source_characters_per_page": 2097152,
+      "compressed_packet_bytes_per_page": 2097152,
+      "suggested_uncompressed_packet_bytes_per_page": 8388608,
+      "proposed_serialized_response_bytes": 4194304,
+      "proposed_total_page_deadline_seconds": 10,
+      "proposed_single_sql_timeout_seconds": 3
+    },
+    "algorithm": [
+      "Freeze a source manifest ordered by (finished_at, scan_id), including source identities, character sizes and revision digests. The initial manifest query is bounded at 257 descriptors; refusal never silently truncates.",
+      "Choose at most 4 scans by default, at most 8 hard, and stop before the 2 MiB source-character cap. An individually oversized row returns a typed refusal and cannot be skipped as if complete.",
+      "Read only those snapshot rows; verify original digest and timestamps; emit requested ticker projections plus benchmark prices with SHA256 of each unchanged original snapshot.",
+      "Build at most 72 (scan_id,ticker,decision_at,application_checked_at) requests in memory. One SQL ranking query selects the original top two packets per request, received_at <= decision_at; retain ties for ambiguity detection.",
+      "Deduplicate packet identities, check compressed lengths before loading blobs, then fetch all selected packets and matching receipts in one query. Validate the receipt packet-binding checksum and payload hash once per unique immutable packet. Evaluate per-decision timing separately.",
+      "Return typed raw source associations and original receipt times; emit separate source completeness, manifest exhaustion and continuation fields. A page ending or a missing packet is never converted into no-news evidence.",
+      "Use a short read-only transaction and page admission limit; set database statement deadlines and check a monotonic page deadline between bounded stages. A client timeout cannot leave an unbounded day-sized task holding the new page slot."
+    ],
+    "source_semantics": [
+      "available_at is the stored original physical receipt time, with validated packet binding; it is not cryptographically authenticated by the existing signature() checksum. That checksum covers packet metadata and excludes available_at. Publisher created_at, application_checked_at, export time and cursor time cannot replace the stored physical receipt time.",
+      "Keep top-two packet ambiguity, missing receipt, late receipt, stale source, failed retrieval, hash mismatch and revised news UNKNOWN.",
+      "Prototype receipt_signature_valid means the existing unkeyed packet-binding checksum matched; it is not a digital signature or authentication of available_at. The association additionally checks stored receipt chronology. Neither result is an exhaustive absence result, a headline classifier, a complete frozen news flag or a trading signal.",
+      "Original snapshot and payload hashes identify exact observed versions. A revised original invalidates its page. New backfilled scans cannot enter an already frozen manifest.",
+      "Manifest exhausted means that manifest was read, not that historical source capture was exhaustive. Historical source_coverage remains UNKNOWN without independent poll/packet coverage.",
+      "Prices retain source timestamp and first known completed-scan time. Filter and deduplicate offline in chronological order; keep the earliest valid known_at, never page/export time."
+    ],
+    "not_a_replacement": "Do not page by passing an intraday since argument to frozen adapter.audit: adapter.py:181-195 deliberately rejects partial first sessions. The new output is a separate versioned source projection, never relabeled as the original whole-day Dataset or its identity.",
+    "downstream": "Under pilot-protocol-v2 news remains explanatory context. A later PF/PFN experiment needs a separately registered protocol, adequate physical-history coverage and model/prompt version proof. Theta option economics require real Terminal quote packets; none are fabricated by this export."
+  },
+  "prototype": {
+    "module": "/workspace/work/uoa-api-investigation/research150/news/paged_export_prototype.py",
+    "tests": "/workspace/work/uoa-api-investigation/research150/news/test_paged_export_prototype.py",
+    "response_example": "/workspace/work/uoa-api-investigation/research150/news/proposed-response-example.json",
+    "sql_count_per_page": "3 statements with packets: selected scans; top-two packets for all asofs; unique packets joined to receipts. The opening bounded manifest uses one additional query.",
+    "same_query_count_proven_for": [
+      "1 scan \u00d7 9 symbols",
+      "8 scans \u00d7 9 symbols (72 associations, 9 unique packets)"
+    ],
+    "uses_real_models": [
+      "LiveScan",
+      "Packet",
+      "Receipt"
+    ],
+    "production_ready": false,
+    "remaining_before_app_integration": [
+      "Add HTTP schema, owner-bound cursor scope, expiry, bounded encoded cursor length before decoding, response cap and safe fixed failures for every malformed source shape.",
+      "Add cumulative decompression budget and real PostgreSQL read-only transaction/statement timeout plus cooperative total deadline and request-admission handling. Prototype caps rows/source bytes/packet bytes but intentionally has no server runtime or response cap.",
+      "Verify PostgreSQL plans and query type behavior; test cancellation and slot release. SQLite test success is not PostgreSQL performance proof.",
+      "Use strong original revision digests where available. Prototype initial manifest uses PostgreSQL built-in MD5 as an accidental-revision detector and returns SHA256 per materialized original. SQLite registers MD5 only for tests; do not treat MD5 as an adversarial integrity guarantee.",
+      "Projection is a source export, not a fully reconstructible all-ticker frozen Dataset; retain originals in source DB and require a separately designed whole-day offline assembly/equivalence step before claiming v1 evaluator parity."
+    ]
+  },
+  "validation_completed": {
+    "synthetic_tests_passed": 13,
+    "cases": [
+      "Scan page cap and same-finished_at tie ordering without duplicates or omissions.",
+      "Exact decision boundary accepts available_at == decision; one microsecond late remains UNKNOWN.",
+      "Future received packet excluded despite old publication time.",
+      "Tied most-recent packets preserve ambiguity.",
+      "72 associations use three SELECT/WITH statements and no SQL writes.",
+      "Source cap refuses before any snapshot query; packet cap refuses before payload fetch.",
+      "Tampered cursor refuses before SQL.",
+      "Same-length original revision detected; backfilled scan cannot rewrite frozen manifest.",
+      "Zero, excessive, boolean and fractional page limits rejected."
+    ]
+  },
+  "validation_before_deploy": [
+    "Run existing test_news_export.py and test_news_adapter.py unchanged and verify frozen profile/implementation hashes remain identical.",
+    "Add partition equivalence fixtures comparing all page source associations to unchanged frozen evidence() for receipt/timing/hash/revision/staleness cases; do not assert full Dataset identity for ticker-filtered sources.",
+    "Test invalid/missing check clocks, bad payloads, missing tables, broken hashes, canceled requests, oversized single scans, empty manifests, cursor scope/date/owner/version mismatches, and exception slot release.",
+    "Use a synthetic 159-scan, 27.4-million-character PostgreSQL fixture with the actual page cap; measure query count, rows/bytes, page wall time and peak memory. Exclude setup writes from read-only assertions. Use fake-clock deadline tests instead of flaky timing assertions.",
+    "Read-only EXPLAIN on staging first. LiveScan.finished_at has no index declared in this model; actual production indexes remain unverified. A separate measured migration might add (finished_at,scan_id) and a compound Packet lookup index. Do not assume an index is absent from production or add it merely from this inspection.",
+    "After review and deployment, export one small page, verify source hashes/physical chronology, then progress sequentially within request budget. No full-day retry is needed."
+  ],
+  "reuse_and_change_points": [
+    {
+      "file": "webapp/news_export.py",
+      "reuse": "bounds() completed-day/calendar contract only; preserve existing full export."
+    },
+    {
+      "file": "webapp/live_alpha/store.py",
+      "reuse": "LiveScan mapping and immutable insert writer; do not change source rows."
+    },
+    {
+      "file": "webapp/news_research/storage.py",
+      "reuse": "Packet/Receipt mapping and signature format; retain frozen source semantics; do not edit this hashed module."
+    },
+    {
+      "file": "webapp/news_research/config.py",
+      "reuse": "Record profile_hash and implementation_hash in new output; file glob hashes every news_research/*.py, so new exporter belongs outside it."
+    },
+    {
+      "file": "webapp/main.py",
+      "proposed_change": "Add a separate private same-origin source-page route only after review."
+    },
+    {
+      "file": "tests/unit/test_news_export_pages.py",
+      "proposed_change": "New focused tests plus unchanged frozen export regression suite."
+    },
+    {
+      "file": "webapp/evidence_reads.py",
+      "reuse": "Optional request-local immutable lookup caching only; existing cache is not a substitute for batched queries or runtime caps. Never reuse a time-dependent verdict across asofs."
+    }
+  ],
+  "source_hashes": {
+    "full_export": {
+      "path": "/workspace/uoa-detector-/webapp/news_export.py",
+      "sha256": "33dff8ea41fb1a4a89b0bd90ede723afc336073a418f28854831a34a04e8136d"
+    },
+    "frozen_adapter": {
+      "path": "/workspace/uoa-detector-/webapp/news_research/adapter.py",
+      "sha256": "42fd34deee0b744d06db5153ea03086385b2a51f30fcbf7e4ca8105f39c97071"
+    },
+    "physical_news": {
+      "path": "/workspace/uoa-detector-/webapp/news_research/storage.py",
+      "sha256": "e0dc85f1dddf099973bf5dfbc65104fde1e990af39ad11863c8a97375f51def7"
+    },
+    "frozen_hash": {
+      "path": "/workspace/uoa-detector-/webapp/news_research/config.py",
+      "sha256": "4d09b4061b0b324fd5cae6c130481a134c06f9a657afc46ce289825dbd30f86c"
+    },
+    "source_writer": {
+      "path": "/workspace/uoa-detector-/webapp/live_alpha/store.py",
+      "sha256": "81e8af5a8b9f724a790061e8000589dd17bfbe9ef5726031f643a1f2718c2e16"
+    },
+    "route": {
+      "path": "/workspace/uoa-detector-/webapp/main.py",
+      "sha256": "5589bfbea7316323b8610b5687557785f04cdb055fc36639ff90b7b569f50e0e"
+    },
+    "read_scope": {
+      "path": "/workspace/uoa-detector-/webapp/evidence_reads.py",
+      "sha256": "9b5360ed3a744a9f1f713c6c4cc7350939675c51fffba5d65a169c2a9078517c"
+    }
+  },
+  "review_correction": {
+    "reason": "Independent review: storage.signature() is an unkeyed packet metadata checksum and excludes Receipt.available_at. Corrected wording only; original physical timestamps and frozen storage implementation are unchanged.",
+    "previous_proposal_sha256": "22efab597eb2276130c330d562d1430e7e5abc9409805c2f9b2f51230e231113",
+    "changed_runtime_semantics": false
+  }
+}

@@ -1,0 +1,80 @@
+{
+  "archived_at": "2026-11-12T16:57:29.965755+00:00",
+  "scope": "Unchanged final work-only export proposal, synthetic validation and undeployed source ZIP, mechanical/source verification and compact news coverage summary; no production change or raw provider packet.",
+  "files": [
+    {
+      "file": "real-run-mechanical-verification.json",
+      "bytes": 829,
+      "sha256": "57ded95496f95ec830bb50a3182ec1d01ef398a21f90e8035660635d3b9c2bfb",
+      "source_mtime_utc": "2026-11-12T16:55:57.655162+00:00",
+      "transformation": "none"
+    },
+    {
+      "file": "phase569-source-provenance-review.json",
+      "bytes": 5185,
+      "sha256": "e46644797974c8dc50bdd18547b5b9a16cc63141e31663dcf960c17bbe336535",
+      "source_mtime_utc": "2026-11-12T16:57:44.553440+00:00",
+      "transformation": "none"
+    },
+    {
+      "file": "news/export-bottleneck-proposal.json",
+      "bytes": 16073,
+      "sha256": "56801340c645450129003135b26bc1c6d1fc125269f3793b5b0218f13d00bf7e",
+      "source_mtime_utc": "2026-11-12T17:00:26.479778+00:00",
+      "transformation": "none"
+    },
+    {
+      "file": "news/prototype-validation.json",
+      "bytes": 2908,
+      "sha256": "c63938432285dd8047b6aef51265a0dd3f3b74660b2599d6eb983f54ba82d95d",
+      "source_mtime_utc": "2026-11-12T17:01:14.823329+00:00",
+      "transformation": "none"
+    },
+    {
+      "file": "news/news-source-page-prototype.zip",
+      "bytes": 10055,
+      "sha256": "1b3690fe87f819d0ed6e558d075a8bf5a620943d60eac57b9023a38aa8cef28a",
+      "source_mtime_utc": "2026-11-12T17:01:14.821347+00:00",
+      "transformation": "none"
+    },
+    {
+      "file": "additional-archive-search.json",
+      "bytes": 6698,
+      "sha256": "c99721c895e191aedbc7205f48ecf9f506ce14689f300e1e4a63137c36f97d84",
+      "source_mtime_utc": "2026-11-12T16:28:53.059909+00:00",
+      "transformation": "none"
+    },
+    {
+      "file": "repository-gate.json",
+      "bytes": 711,
+      "sha256": "354f97979ddd5307f61079df1569b38649695fa333d34d7d9e4d9b13857d2c49",
+      "source_mtime_utc": "2026-11-12T17:09:20.444849+00:00",
+      "transformation": "none"
+    },
+    {
+      "file": "final-review.json",
+      "bytes": 49153,
+      "sha256": "bb06811aac64b9061c0ea565a42061593a5ec73ced8823ad87331dba10c14549",
+      "source_mtime_utc": "2026-11-12T17:12:43.356329+00:00",
+      "transformation": "none"
+    },
+    {
+      "file": "final-all-policy-checks.csv.gz",
+      "bytes": 90785,
+      "sha256": "6a36d0aa32a950b9abd2a0f55b77b6381abcb8315e2e3400abc61f03efe2cc13",
+      "original_file": "final-all-policy-checks.csv",
+      "original_bytes": 384066,
+      "original_sha256": "078569305cf1ca003220acbb4a6850b09d891c775b8a1c54acf9fb836219e777",
+      "transformation": "gzip; mtime=0; empty filename; compression level9; exact decompressed source bytes"
+    }
+  ],
+  "derived_artifacts": [
+    {
+      "file": "news/coverage-summary-compact.json",
+      "bytes": 2394,
+      "sha256": "1d03d6b469b3edbf1f80bd4e4878cc93c437db62e78a8d3e19a2911fe2a4e4df",
+      "source_file": "news/coverage-summary.json",
+      "source_sha256": "0a164a6b2cd1a26121b1b2d88ecb7d7eaa4ae3970c382744f9b59f222653a49d"
+    }
+  ]
+}

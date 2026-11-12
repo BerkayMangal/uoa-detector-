@@ -1,0 +1,568 @@
+{
+  "version": "research150_remaining_ohlcv_supplement_s1",
+  "status": "FROZEN_DEFINITIONS_BEFORE_SUPPLEMENT_RUN_EXPLORATORY",
+  "frozen_at": "2026-11-12T16:51:26.074469+00:00",
+  "scope_original_ids": [
+    71,
+    75,
+    79,
+    80,
+    87,
+    139,
+    140,
+    143,
+    144,
+    146
+  ],
+  "executable_original_ids": [
+    79,
+    80,
+    139,
+    140,
+    144
+  ],
+  "source_originals_remain_untested": true,
+  "outcome_access_statement": {
+    "supplement_author_pilot_outcomes_observed": false,
+    "supplement_outcomes_observed": false,
+    "v2_first_label_run_already_started_approximately": "2026-11-12T16:47:00Z",
+    "honest_label": "Definitions were completed after v2 label execution began, without observing its outcomes. This is exploratory prespecification before the supplement own run, not a global pre-label or fresh confirmatory freeze.",
+    "scope_decision": "Root requested assessment of all ten remaining ideas before v2 first-label execution; this final freeze is later."
+  },
+  "references": {
+    "v2_protocol_path": "/workspace/work/uoa-api-investigation/research150/pilot-protocol-v2.md",
+    "v2_protocol_sha256": "456dfa9b66a3de453c1d3af46722c590c81adf30fc35738cfbcd992e3ca2ac29",
+    "dataset_plan_path": "/workspace/work/uoa-api-investigation/research150/bulk/dataset-plan.json",
+    "dataset_plan_sha256": "519857050a9cc3459fd2c6809267758992d698a9c182d66a93a852820c7387db",
+    "source_file": "/workspace/attachments/6c8f1c15-5331-4df7-be7f-eb41b848422a/Pasted text.txt",
+    "source_sha256": "5948db58084f89c465a760dd6fbad884d304dde5d2dfac7366b0aff94ebbd7a4"
+  },
+  "shared_framework": {
+    "universe": [
+      "SPY",
+      "QQQ",
+      "AAPL",
+      "NFLX",
+      "NVDA",
+      "TSLA",
+      "MSFT",
+      "META",
+      "AMZN"
+    ],
+    "range": [
+      "2026-01-02",
+      "2026-11-11"
+    ],
+    "development_end": "2026-09-30",
+    "chronological_evaluation_start": "2026-10-01",
+    "final_period_label": "Chronological evaluation, partly previously observed; not an untouched holdout.",
+    "signal_widths_minutes": [
+      1,
+      5,
+      15
+    ],
+    "holding_minutes": [
+      1,
+      5,
+      15
+    ],
+    "round_trip_cost_bps": [
+      5,
+      10,
+      20
+    ],
+    "primary_cost_bps": 5,
+    "sides": [
+      "long",
+      "short"
+    ],
+    "bar_formula": "r[k]=ln(C[k]/O[k]); within-bar log returns. Signal bars aggregate complete native1m bars anchored 09:30 America/New_York; correct session calendar, DST and early close.",
+    "eligibility": "All arms require current plus nine prior complete signal bars within the same RTH session. H139 requires sixteen prior bars instead; H144 additionally requires sixty complete native1m bars immediately BEFORE current signal-bar start. Use max(default history, family history); no cross-session histories or partial windows.",
+    "entry": "A bar ending t skips [t,t+1m); exact native1m open at t+1m is entry. Exit at exact native1m open entry+h minutes. Both strictly before same-session close. No forward scan.",
+    "quality": "Use unchanged sealed v2 data-quality rules: complete RTH sessions, matching source hashes, positive finite ordered OHLC, nonnegative integer volume, unique expected minute grid, no interpolation, no negative-volume clamping. Missing inputs/labels are UNKNOWN, not cash.",
+    "states": "Candidate and each fixed baseline have independent non-overlap state per ticker/policy. New entry at previous exit is allowed. Sides separate, no pyramiding.",
+    "economics": "Per-trade s*(exit/entry-1)-cost_bps/10000. Equal1/9 fixed symbol sleeves; unused slots cash without redistributing missing capital. Same constant-notional daily proxy and risk metrics as v2; stock price proxies, not executable option or short-borrow claims.",
+    "statistical_conventions": "Natural logs; Pearson correlation; sample SD ddof1; exact zeros/threshold equality handled as specified; finite checks everywhere. Sign(0)=0. No clipping or epsilon signal thresholds.",
+    "information_intervals": "Retain actual earliest input start and latest exit/availability for every candidate/baseline. For H139 feature_start=start[k-16]. For H144 include its full sixty-minute prior raw window and the default warm-up. Perform actual interval purge; do not reuse v2 maximum-lookback shorthand.",
+    "inference": "Same whole-session paired evaluation, expanding April–September development folds, no outcome-based fitting, 5-session moving-block bootstrap with10-session sensitivity,10000 resamples seed150,99% simultaneous one-sided lower bounds, minimum60 complete day clusters, UNKNOWN coverage retained. Jointly resample date×symbol×policy vectors.",
+    "calendar_caveat": "For calendar arms report the number of distinct active calendar-event days in addition to all available days. Do not count repeated intraday trades or zero-exposure days as independent event replication. Sparse event histories remain descriptive/insufficient-sample regardless of raw trade count.",
+    "multiplicity": "The 126 supplement contrasts append to the 54 v2 contrasts, giving180 registered primary5bps contrasts if presented together. Include all in joint selection correction; other costs, diagnostics and historical studies remain disclosed. Effective trial count remains unknown; DSR cannot become a pass from this registration.",
+    "promotion": "No live signal promotion. Existing allowed outcomes: BLOCKED_DATA, DESCRIPTIVE_ONLY, INSUFFICIENT_SAMPLE, REJECTED_AFTER_COSTS, CANDIDATE_FOR_NEW_FORWARD_PAPER. The current short final period cannot receive a confirmation pass."
+  },
+  "calendar_flags_full_month": {
+    "2026-01": {
+      "first_two": [
+        "2026-01-02",
+        "2026-01-05"
+      ],
+      "last_two": [
+        "2026-01-29",
+        "2026-01-30"
+      ]
+    },
+    "2026-02": {
+      "first_two": [
+        "2026-02-02",
+        "2026-02-03"
+      ],
+      "last_two": [
+        "2026-02-26",
+        "2026-02-27"
+      ]
+    },
+    "2026-03": {
+      "first_two": [
+        "2026-03-02",
+        "2026-03-03"
+      ],
+      "last_two": [
+        "2026-03-30",
+        "2026-03-31"
+      ]
+    },
+    "2026-04": {
+      "first_two": [
+        "2026-04-01",
+        "2026-04-02"
+      ],
+      "last_two": [
+        "2026-04-29",
+        "2026-04-30"
+      ]
+    },
+    "2026-05": {
+      "first_two": [
+        "2026-05-01",
+        "2026-05-04"
+      ],
+      "last_two": [
+        "2026-05-28",
+        "2026-05-29"
+      ]
+    },
+    "2026-06": {
+      "first_two": [
+        "2026-06-01",
+        "2026-06-02"
+      ],
+      "last_two": [
+        "2026-06-29",
+        "2026-06-30"
+      ]
+    },
+    "2026-07": {
+      "first_two": [
+        "2026-07-01",
+        "2026-07-02"
+      ],
+      "last_two": [
+        "2026-07-30",
+        "2026-07-31"
+      ]
+    },
+    "2026-08": {
+      "first_two": [
+        "2026-08-03",
+        "2026-08-04"
+      ],
+      "last_two": [
+        "2026-08-28",
+        "2026-08-31"
+      ]
+    },
+    "2026-09": {
+      "first_two": [
+        "2026-09-01",
+        "2026-09-02"
+      ],
+      "last_two": [
+        "2026-09-29",
+        "2026-09-30"
+      ]
+    },
+    "2026-10": {
+      "first_two": [
+        "2026-10-01",
+        "2026-10-02"
+      ],
+      "last_two": [
+        "2026-10-29",
+        "2026-10-30"
+      ]
+    },
+    "2026-11": {
+      "first_two": [
+        "2026-11-02",
+        "2026-11-03"
+      ],
+      "last_two": [
+        "2026-11-27",
+        "2026-11-30"
+      ]
+    }
+  },
+  "families": [
+    {
+      "original_id": 79,
+      "original_title": "Ay Sonu Kurumsal Rebalancing",
+      "original_text_exact": "Her ayın son 2 işlem gününde portföy dengeleme akışlarının yarattığı yönlü momentum.",
+      "source_section": "6. Vade Sonu, Takvim ve Makro Olay Etkileri",
+      "source_file": "/workspace/attachments/6c8f1c15-5331-4df7-be7f-eb41b848422a/Pasted text.txt",
+      "source_sha256": "5948db58084f89c465a760dd6fbad884d304dde5d2dfac7366b0aff94ebbd7a4",
+      "original_status": "NOT_TESTED",
+      "variant_id": "H079_US_S1",
+      "disposition": "EXECUTABLE_US_DIRECTIONAL_ADAPTATION",
+      "directions": [
+        "long",
+        "short"
+      ],
+      "signal_widths_minutes": [
+        1,
+        5,
+        15
+      ],
+      "holds_minutes": [
+        1,
+        5,
+        15
+      ],
+      "feature_lookback": {
+        "prior_signal_bars": 9,
+        "session_reset": true
+      },
+      "feature_formula": "M_s(k) = [s*ln(C[k]/C[k-3]) > 0] AND [s*r[k] > 0]. E(d)=1 iff d is one of the last two official US regular trading dates in the FULL calendar month containing d.",
+      "candidate_formula": "E(d) AND M_s(k)",
+      "baselines": [
+        {
+          "id": "momentum_no_calendar",
+          "formula": "M_s(k)"
+        }
+      ],
+      "invalid_rules": [
+        "Missing OHLCV or default warm-up makes every arm ineligible. Calendar classification cannot use the last two dates in the downloaded subset."
+      ],
+      "limitations": [
+        "Measures a last-two-session momentum filter; does not identify fund rebalancing orders or establish that rebalancing caused returns.",
+        "Baseline comparison changes exposure and turnover; improvement may reflect cash or fewer costs. It cannot alone identify a calendar-specific edge."
+      ]
+    },
+    {
+      "original_id": 80,
+      "original_title": "Yeni Ay İlk 2 Gün Akışı",
+      "original_text_exact": "Ayın ilk 2 işlem gününde yeni fon girişleriyle oluşan pozitif eğilim.",
+      "source_section": "6. Vade Sonu, Takvim ve Makro Olay Etkileri",
+      "source_file": "/workspace/attachments/6c8f1c15-5331-4df7-be7f-eb41b848422a/Pasted text.txt",
+      "source_sha256": "5948db58084f89c465a760dd6fbad884d304dde5d2dfac7366b0aff94ebbd7a4",
+      "original_status": "NOT_TESTED",
+      "variant_id": "H080_US_S1",
+      "disposition": "EXECUTABLE_US_POSITIVE_DRIFT_ADAPTATION_WITH_SHORT_FALSIFICATION",
+      "directions": [
+        "long",
+        "short"
+      ],
+      "signal_widths_minutes": [
+        1,
+        5,
+        15
+      ],
+      "holds_minutes": [
+        1,
+        5,
+        15
+      ],
+      "feature_lookback": {
+        "prior_signal_bars": 9,
+        "session_reset": true
+      },
+      "feature_formula": "B(d)=1 iff d is one of the first two official US regular trading dates in the FULL calendar month containing d.",
+      "candidate_formula": "B(d); enter the separately registered side s at each eligible non-overlapping decision.",
+      "baselines": [
+        {
+          "id": "always_same_side",
+          "formula": "TRUE at every data-eligible decision; same side s."
+        }
+      ],
+      "side_interpretation": {
+        "long": "Source-directed positive-drift hypothesis.",
+        "short": "Prespecified falsification diagnostic only. A successful short arm contradicts the stated positive tendency and cannot be relabelled support or promoted under this claim."
+      },
+      "invalid_rules": [
+        "Default complete nine-prior-bar warm-up is retained for both arms. No current-bar price-direction condition is introduced."
+      ],
+      "limitations": [
+        "Fund inflows are unobserved.",
+        "Filter-versus-always-active comparison changes exposure/turnover; lower friction alone is not proof of a month-start effect."
+      ]
+    },
+    {
+      "original_id": 139,
+      "original_title": "Hurst Üstel Katsayısı Rejim Filtresi",
+      "original_text_exact": "Kayan pencerede Hurst üssü > 0.55 iken trend takip, < 0.45 iken ortalamaya dönüş algoritmasını aktif etme.",
+      "source_section": "10. Volatilite, Rejim ve Mikro-Yapı Kırılımları",
+      "source_file": "/workspace/attachments/6c8f1c15-5331-4df7-be7f-eb41b848422a/Pasted text.txt",
+      "source_sha256": "5948db58084f89c465a760dd6fbad884d304dde5d2dfac7366b0aff94ebbd7a4",
+      "original_status": "NOT_TESTED",
+      "variant_id": "H139_US_S1",
+      "disposition": "EXECUTABLE_FINITE_SAMPLE_RS_ESTIMATOR_ADAPTATION",
+      "directions": [
+        "long",
+        "short"
+      ],
+      "signal_widths_minutes": [
+        1,
+        5,
+        15
+      ],
+      "holds_minutes": [
+        1,
+        5,
+        15
+      ],
+      "feature_lookback": {
+        "prior_signal_bars": 16,
+        "session_reset": true,
+        "first_ordinary_session_decision_ET": {
+          "1m": "09:47",
+          "5m": "10:55",
+          "15m": "13:45"
+        },
+        "feature_start": "start_time[k-16]"
+      },
+      "feature_formula": [
+        "x = r[k-16:k], exactly 16 prior completed signal-bar within-bar log returns, oldest first; exclude current r[k].",
+        "For each m in {4,8,16}, partition x into all consecutive non-overlapping blocks of m, beginning at x[0]; block counts are 4,2,1.",
+        "For a block b: mean_b=mean(b), Z[0]=0, Z[j]=sum_{i=1..j}(b[i]-mean_b), R_b=max(Z)-min(Z), S_b=sample_sd(b,ddof=1).",
+        "Q_m = arithmetic mean of R_b/S_b across EVERY block at that scale. Every block must have finite S_b>0 and R_b>0. Any invalid block makes candidate AND both baselines ineligible; do not omit blocks.",
+        "For a_m=ln(m), y_m=ln(Q_m), H_RS = sum((a_m-mean(a))*(y_m-mean(y)))/sum((a_m-mean(a))^2), the OLS slope with intercept across the three scales. No clipping or fitted correction.",
+        "d(k)=sign(r[k]) if H_RS>0.55; d(k)=-sign(r[k]) if H_RS<0.45; otherwise d(k)=0. Equality at either threshold means cash; r[k]=0 means cash."
+      ],
+      "candidate_formula": "d(k)==s",
+      "baselines": [
+        {
+          "id": "always_momentum",
+          "formula": "sign(r[k])==s"
+        },
+        {
+          "id": "always_contrarian",
+          "formula": "-sign(r[k])==s"
+        }
+      ],
+      "invalid_rules": [
+        "At least sixteen prior complete bars plus current bar in the same RTH session. Both fixed baselines use exactly the same estimator-valid roster."
+      ],
+      "limitations": [
+        "Original thresholds 0.55 and 0.45 are retained, but the 16-return, three-scale R/S estimator and base direction rule are newly declared conventions.",
+        "This tiny-window R/S proxy is biased and uncertain; it does not establish a true Hurst exponent, persistence, long memory, or a market regime. No threshold calibration is performed.",
+        "Both baseline contrasts must be shown; never choose the better-looking baseline after results."
+      ]
+    },
+    {
+      "original_id": 140,
+      "original_title": "Getiri Otokorelasyon İşaret Değişimi",
+      "original_text_exact": "15 dakikalık getirilerin 1. gecikmeli otokorelasyonu pozitifken momentum, negatifken contrarian çalışma.",
+      "source_section": "10. Volatilite, Rejim ve Mikro-Yapı Kırılımları",
+      "source_file": "/workspace/attachments/6c8f1c15-5331-4df7-be7f-eb41b848422a/Pasted text.txt",
+      "source_sha256": "5948db58084f89c465a760dd6fbad884d304dde5d2dfac7366b0aff94ebbd7a4",
+      "original_status": "NOT_TESTED",
+      "variant_id": "H140_US_S1",
+      "disposition": "EXECUTABLE_AUTOCORRELATION_SIGN_ADAPTATION",
+      "directions": [
+        "long",
+        "short"
+      ],
+      "signal_widths_minutes": [
+        1,
+        5,
+        15
+      ],
+      "holds_minutes": [
+        1,
+        5,
+        15
+      ],
+      "feature_lookback": {
+        "prior_signal_bars": 9,
+        "session_reset": true
+      },
+      "feature_formula": "rho(k)=Pearson(r[k-9:k-1], r[k-8:k]), exactly eight overlapping lag-1 pairs from the nine PRIOR completed signal-bar returns. d(k)=sign(rho(k))*sign(r[k]).",
+      "candidate_formula": "d(k)==s",
+      "baselines": [
+        {
+          "id": "always_momentum",
+          "formula": "sign(r[k])==s"
+        },
+        {
+          "id": "always_contrarian",
+          "formula": "-sign(r[k])==s"
+        }
+      ],
+      "invalid_rules": [
+        "Either lag array with zero/nonfinite variance makes every arm ineligible. Exactly zero rho or current return gives candidate cash, not a missing observation. All arms share the same valid prior-feature roster."
+      ],
+      "limitations": [
+        "The source explicitly specifies 15-minute returns. The 1m and 5m versions are separately registered timeframe adaptations, not replications of that wording.",
+        "Rolling window length, within-bar return convention and current-return direction rule were absent from the original and are fixed here without outcome access.",
+        "Both baseline contrasts must be reported."
+      ]
+    },
+    {
+      "original_id": 144,
+      "original_title": "Kuyruk Riski (Tail Imbalance)",
+      "original_text_exact": "1 dakikalık getirilerin pozitif kuyruk (en iyi %5) ve negatif kuyruk (en kötü %5) asimetrisinin yön belirlemesi.",
+      "source_section": "10. Volatilite, Rejim ve Mikro-Yapı Kırılımları",
+      "source_file": "/workspace/attachments/6c8f1c15-5331-4df7-be7f-eb41b848422a/Pasted text.txt",
+      "source_sha256": "5948db58084f89c465a760dd6fbad884d304dde5d2dfac7366b0aff94ebbd7a4",
+      "original_status": "NOT_TESTED",
+      "variant_id": "H144_US_S1",
+      "disposition": "EXECUTABLE_ONE_MINUTE_RANKED_TAIL_BALANCE_ADAPTATION",
+      "directions": [
+        "long",
+        "short"
+      ],
+      "signal_widths_minutes": [
+        1,
+        5,
+        15
+      ],
+      "holds_minutes": [
+        1,
+        5,
+        15
+      ],
+      "feature_lookback": {
+        "prior_native_1m_minutes": 60,
+        "prior_signal_bars_minimum": 9,
+        "session_reset": true,
+        "first_ordinary_session_decision_ET": {
+          "1m": "10:31",
+          "5m": "10:35",
+          "15m": "12:00"
+        }
+      },
+      "feature_formula": [
+        "Let a=start_time[k] of the CURRENT signal bar, not its end. Take exactly the 60 contiguous native 1m bars with start_time in [a-60 minutes,a), within the current RTH session. The whole current signal bar is excluded.",
+        "For each native minute j, u[j]=ln(close[j]/open[j]). Sort all 60 u ascending, retaining ties. L=mean(sorted_u[0:3]); U=mean(sorted_u[57:60]), exactly the bottom and top 5%.",
+        "If U>L, T=(U+L)/(U-L). Candidate direction is sign(T). No clipping; T may lie outside [-1,1] when both ranked tails have the same sign."
+      ],
+      "candidate_formula": "s*T>0; exactly T=0 means cash.",
+      "baselines": [
+        {
+          "id": "always_same_side",
+          "formula": "TRUE on the same valid-tail feature roster; same side s."
+        }
+      ],
+      "invalid_rules": [
+        "U<=L or any missing/nonfinite required minute makes every arm ineligible. Preserve the v2 minimum nine prior signal bars in addition to the sixty prior native minutes."
+      ],
+      "limitations": [
+        "Call this signed top/bottom-3-of-60 tail balance, not a conditional positive-versus-negative tail estimator; the worst three observations can still be positive.",
+        "Every cadence uses native 1m tails, preserving the source return granularity. 5m and 15m change only decision cadence, not tail sampling.",
+        "Window length, normalization and sign mapping are operational choices absent from the source."
+      ]
+    }
+  ],
+  "nonexecuted_remaining": [
+    {
+      "original_id": 71,
+      "original_title": "Saat Başı Mikroyapı Anomalisi",
+      "original_text_exact": "Her tam saatin ilk 2 dakikasında kurumsal TWAP/VWAP algoritmalarının devreye girmesiyle oluşan periyodik hacim sıçramaları.",
+      "source_section": "5. BIST VIOP Seans ve Saat İçi Mevsimsellik",
+      "source_file": "/workspace/attachments/6c8f1c15-5331-4df7-be7f-eb41b848422a/Pasted text.txt",
+      "source_sha256": "5948db58084f89c465a760dd6fbad884d304dde5d2dfac7366b0aff94ebbd7a4",
+      "original_status": "NOT_TESTED",
+      "disposition": "DESCRIPTIVE_ONLY_NO_ORIGINAL_TRADING_DIRECTION",
+      "exact_observable_proposal": "For each local full hour H=10:00,...,15:00 with complete native minutes, D_H=ln(1+V[H]+V[H+1m])-ln(1+V[H-2m]+V[H-1m]). Aggregate within ticker/day and then across the fixed nine sleeves; compare paired two-minute volume windows descriptively.",
+      "why_no_trade_rule": "The original predicts volume periodicity, not a long/short return. OHLCV cannot identify institutional TWAP/VWAP actors. Assigning a direction, 1/5/15m holding policy, or using 5m/15m bars to recover the exact first two minutes would introduce a new hypothesis. This descriptive formula is not registered for execution in S1."
+    },
+    {
+      "original_id": 75,
+      "original_title": "Gün İçi vs Gece Getiri Ayrışması",
+      "original_text_exact": "Gece negatif getiri üreten günlerde gün içi pozitif tepki, gece pozitif günlerde gün içi realizasyon eğilimi.",
+      "source_section": "5. BIST VIOP Seans ve Saat İçi Mevsimsellik",
+      "source_file": "/workspace/attachments/6c8f1c15-5331-4df7-be7f-eb41b848422a/Pasted text.txt",
+      "source_sha256": "5948db58084f89c465a760dd6fbad884d304dde5d2dfac7366b0aff94ebbd7a4",
+      "original_status": "NOT_TESTED",
+      "disposition": "BLOCKED_CORPORATE_ACTION_ADJUSTMENT",
+      "conditional_formula_not_registered": "With verified split factor S_d (new shares per previous share), cash entitlement D_d per previous share, prior scheduled-session close C_prev and current open O_d, economic overnight gap g=ln((S_d*O_d+D_d)/C_prev). A new fixed-hold contrarian US rule could set direction=-sign(g), with a same-clock unconditional baseline.",
+      "why_not_executable_now": "Vendor adjustment semantics and point-in-time split/dividend entitlements are unverified. Do not assume S=1,D=0 or compare stale last-available closes across missing sessions. Source describes whole-session overnight/intraday decomposition; 1/5/15m fixed holds would additionally be an explicit new horizon adaptation."
+    },
+    {
+      "original_id": 87,
+      "original_title": "Tatil Sonrası İlk İşlem Günü",
+      "original_text_exact": "Uzun tatil dönüşü ilk 1 saatte biriken emirlerin yarattığı aşırı oynaklık ve ortalamaya dönüş.",
+      "source_section": "6. Vade Sonu, Takvim ve Makro Olay Etkileri",
+      "source_file": "/workspace/attachments/6c8f1c15-5331-4df7-be7f-eb41b848422a/Pasted text.txt",
+      "source_sha256": "5948db58084f89c465a760dd6fbad884d304dde5d2dfac7366b0aff94ebbd7a4",
+      "original_status": "NOT_TESTED",
+      "disposition": "UNDERPOWERED_AND_FIRST_HOUR_WARMUP_CONFLICT",
+      "calendar_definition": "Long holiday reopening means the previous official regular session is at least four calendar days earlier, with at least one scheduled weekday exchange holiday in between.",
+      "observable_proposal_not_registered": "Compare first-hour realized variance from 60 completed native 1m within-bar returns against ordinary-session first-hour variance; mean-reversion would require a separately frozen reference-price and entry rule.",
+      "why_not_forced": "Only seven such reopening dates fall in this captured window. Source confines its event to the first hour. The unchanged v2 15m warm-up is not complete until 12:00, outside that window. Do not weaken warm-up or extend the event to fabricate 15m eligibility."
+    },
+    {
+      "original_id": 143,
+      "original_title": "Volatilite Kümelenmesi (GARCH Etkisi)",
+      "original_text_exact": "Yüksek volatiliteli bir saati takip eden 2 saatte pozisyon büyüklüğünü yarıya indirerek Sharpe oranını artırma.",
+      "source_section": "10. Volatilite, Rejim ve Mikro-Yapı Kırılımları",
+      "source_file": "/workspace/attachments/6c8f1c15-5331-4df7-be7f-eb41b848422a/Pasted text.txt",
+      "source_sha256": "5948db58084f89c465a760dd6fbad884d304dde5d2dfac7366b0aff94ebbd7a4",
+      "original_status": "NOT_TESTED",
+      "disposition": "DEFERRED_OVERLAY_SPECIFICATION",
+      "required_specification": [
+        "A frozen base strategy selected without its returns.",
+        "Exact high-volatility hour estimator/threshold and history.",
+        "Two-hour half-size activation/expiry and overlapping-trigger rules.",
+        "Capital, cash, transaction-cost scaling, and risk-adjusted paired baseline."
+      ],
+      "why_no_standalone_signal": "Position halving is a risk overlay, not a direction. The source does not supply the base policy or high-volatility definition. No overlay formula or engine run is authorized in S1."
+    },
+    {
+      "original_id": 146,
+      "original_title": "Shannon Entropisi ile Piyasa Verimliliği",
+      "original_text_exact": "Fiyat adımlarının entropisi maksimuma ulaştığında (tam rastgelelik) işlemi tamamen durdurup nakitte kalma.",
+      "source_section": "10. Volatilite, Rejim ve Mikro-Yapı Kırılımları",
+      "source_file": "/workspace/attachments/6c8f1c15-5331-4df7-be7f-eb41b848422a/Pasted text.txt",
+      "source_sha256": "5948db58084f89c465a760dd6fbad884d304dde5d2dfac7366b0aff94ebbd7a4",
+      "original_status": "NOT_TESTED",
+      "disposition": "DEFERRED_OVERLAY_AND_INVALID_RANDOMNESS_INFERENCE",
+      "required_specification": [
+        "Frozen base strategy, price-step granularity and bins.",
+        "Entropy sample length, definition of maximum/near-maximum, and zero-step handling.",
+        "Cash-filter timing and paired ungated baseline."
+      ],
+      "why_no_standalone_signal": "Marginal Shannon entropy does not prove temporal independence, full randomness, or market efficiency. Price steps and bins are unspecified, so a new named filter must be defined independently. No overlay formula or engine run is authorized in S1."
+    }
+  ],
+  "registry_path": "/workspace/work/uoa-api-investigation/research150/supplement-registry-s1.json",
+  "registry_counts": {
+    "candidate_or_falsification_policies": 90,
+    "source_directed_candidate_policies": 81,
+    "short_month_start_falsification_policies": 9,
+    "baseline_policy_entries": 126,
+    "all_policy_entries": 216,
+    "primary_contrasts": 126,
+    "policy_cost_views": 648,
+    "contrast_cost_views": 378
+  },
+  "trial_history_appendix": {
+    "prior_v2_candidate_contrasts": 54,
+    "new_supplement_primary_contrasts": 126,
+    "combined_current_registered_contrasts": 180,
+    "additional_known_prior_exploration_configurations": 5184,
+    "full150_inventory": "Idea inventory, not150 computed tests.",
+    "global_history_status": "Larger and incompletely known; current registration does not erase previous outcome exposure.",
+    "prohibited": "Do not tune these definitions from v2 results, choose a preferred baseline, select only successful arms/costs, or claim that a short H80 result supports positive month-start drift."
+  },
+  "independent_review": {
+    "reviewer": "/root/independent_review",
+    "review_type": "Pre-supplement-run formula review; no outcomes supplied.",
+    "incorporated": [
+      "Full-month official calendar rather than captured-range boundaries.",
+      "Every H139 R/S block must be valid; tiny-sample estimator limitation explicit.",
+      "H140 prior-only overlapping pairs, shared eligibility, exact-zero cash.",
+      "H144 unbounded ranked-tail balance, no conditional-positive/negative claim.",
+      "Calendar baseline exposure/turnover attribution caveat."
+    ]
+  },
+  "mutation_scope": "New research-only supplement artifacts. Frozen v2 protocol/registry/code/data untouched."
+}

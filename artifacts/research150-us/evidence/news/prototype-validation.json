@@ -1,0 +1,62 @@
+{
+  "status": "SYNTHETIC_LOCAL_VALIDATION_PASSED",
+  "tests_passed": 13,
+  "elapsed_seconds_last_run": 2.2,
+  "repository_files_modified_by_task": 0,
+  "production_requests_by_task": 0,
+  "original_source_hashes_unchanged": {
+    "webapp/news_export.py": true,
+    "webapp/news_research/adapter.py": true,
+    "webapp/news_research/storage.py": true,
+    "webapp/live_alpha/store.py": true
+  },
+  "prototype_query_count_per_page": 3,
+  "largest_test_associations": 72,
+  "largest_test_unique_packets": 9,
+  "manifest_open_queries": 1,
+  "frozen_experiment_executed": false,
+  "production_performance_measured": false,
+  "artifacts": {
+    "paged_export_prototype.py": "4394242d477841c9058c5953643496c03988eeea91be2a7308ac02886d7fb59d",
+    "test_paged_export_prototype.py": "b22acc4c7b867a411771b134bc9f38c096b55ddc3f08929d6abfa1e73ee00ea1",
+    "export-bottleneck-proposal.json": "56801340c645450129003135b26bc1c6d1fc125269f3793b5b0218f13d00bf7e",
+    "proposed-response-example.json": "4604ef0a539f6745b765aa2c9c0f8f858d8e7f8976c5e94ac7dcb38856963105",
+    "export-local-profile.json": "0c1c55fa7078f560de3933e3c977e2d48241c52e041a5d0882a06ed4dac3c561",
+    "build_export_proposal.py": "bc607cbe02bd26d5d404d64e8bc6720e6dedacfd1db5068afb3526c46e1ccaf3",
+    "build_prototype_zip.py": "ac70b8b0f65a3f6280693ecc5b8621a21d10ff0bed7b36b796eee1ce026f1ee7",
+    "news-source-page-prototype.zip": "1b3690fe87f819d0ed6e558d075a8bf5a620943d60eac57b9023a38aa8cef28a"
+  },
+  "review_correction": {
+    "scope": "Work-only proposal and generator wording; original storage and prototype behavior unchanged.",
+    "physical_receipt_time_cryptographically_bound": false,
+    "existing_binding_type": "Unkeyed SHA256 of packet metadata; available_at excluded.",
+    "previous_validation_sha256": "91e8a1c93f70a9ae58e8ac65f581f7fbc667ecd72c97b6bc2759637d33094c69"
+  },
+  "deterministic_source_bundle": {
+    "path": "/workspace/work/uoa-api-investigation/research150/news/news-source-page-prototype.zip",
+    "bytes": 10055,
+    "sha256": "1b3690fe87f819d0ed6e558d075a8bf5a620943d60eac57b9023a38aa8cef28a",
+    "two_independent_builds_byte_identical": true,
+    "safe_basename_entries": true,
+    "source_bytes_unchanged": true,
+    "source_manifest": {
+      "method": "uoa_news_source_page_prototype_bundle_v1",
+      "status": "WORK_ONLY_UNDEPLOYED",
+      "synthetic_tests_passed": 13,
+      "source_files": {
+        "paged_export_prototype.py": {
+          "sha256": "4394242d477841c9058c5953643496c03988eeea91be2a7308ac02886d7fb59d",
+          "bytes": 12227
+        },
+        "profile_export_local.py": {
+          "sha256": "6347d4f0961e4eaaa79bd8489b550e1ff9f4971afbe03858faa6ff0acbead9ac",
+          "bytes": 4936
+        },
+        "test_paged_export_prototype.py": {
+          "sha256": "b22acc4c7b867a411771b134bc9f38c096b55ddc3f08929d6abfa1e73ee00ea1",
+          "bytes": 6726
+        }
+      }
+    }
+  }
+}

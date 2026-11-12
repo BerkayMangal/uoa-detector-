@@ -1,0 +1,74 @@
+[
+  {
+    "evaluation_complete_sessions": 14,
+    "evaluation_expected_sessions": 21,
+    "evaluation_month": "2026-04",
+    "fitted_parameters": 0,
+    "purged_intervals": 0,
+    "status": "BLOCKED_DATA",
+    "training_complete_sessions": 35,
+    "training_expected_sessions": 61,
+    "training_intervals_after_purge": 118763,
+    "training_intervals_before_purge": 118763
+  },
+  {
+    "evaluation_complete_sessions": 10,
+    "evaluation_expected_sessions": 20,
+    "evaluation_month": "2026-05",
+    "fitted_parameters": 0,
+    "purged_intervals": 0,
+    "status": "BLOCKED_DATA",
+    "training_complete_sessions": 49,
+    "training_expected_sessions": 82,
+    "training_intervals_after_purge": 166277,
+    "training_intervals_before_purge": 166277
+  },
+  {
+    "evaluation_complete_sessions": 13,
+    "evaluation_expected_sessions": 21,
+    "evaluation_month": "2026-06",
+    "fitted_parameters": 0,
+    "purged_intervals": 0,
+    "status": "BLOCKED_DATA",
+    "training_complete_sessions": 59,
+    "training_expected_sessions": 102,
+    "training_intervals_after_purge": 200500,
+    "training_intervals_before_purge": 200500
+  },
+  {
+    "evaluation_complete_sessions": 8,
+    "evaluation_expected_sessions": 22,
+    "evaluation_month": "2026-07",
+    "fitted_parameters": 0,
+    "purged_intervals": 0,
+    "status": "BLOCKED_DATA",
+    "training_complete_sessions": 72,
+    "training_expected_sessions": 123,
+    "training_intervals_after_purge": 244767,
+    "training_intervals_before_purge": 244767
+  },
+  {
+    "evaluation_complete_sessions": 14,
+    "evaluation_expected_sessions": 21,
+    "evaluation_month": "2026-08",
+    "fitted_parameters": 0,
+    "purged_intervals": 0,
+    "status": "BLOCKED_DATA",
+    "training_complete_sessions": 80,
+    "training_expected_sessions": 145,
+    "training_intervals_after_purge": 272199,
+    "training_intervals_before_purge": 272199
+  },
+  {
+    "evaluation_complete_sessions": 9,
+    "evaluation_expected_sessions": 21,
+    "evaluation_month": "2026-09",
+    "fitted_parameters": 0,
+    "purged_intervals": 0,
+    "status": "BLOCKED_DATA",
+    "training_complete_sessions": 94,
+    "training_expected_sessions": 166,
+    "training_intervals_after_purge": 320291,
+    "training_intervals_before_purge": 320291
+  }
+]

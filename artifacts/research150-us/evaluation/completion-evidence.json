@@ -1,0 +1,16 @@
+{
+  "created_at": "2026-11-12T16:54:40.833930+00:00",
+  "phase": "chronological_evaluation",
+  "status": "completed",
+  "code_or_rule_changes_after_development": false,
+  "files": {
+    "run-seal.json": "c45b702ff3f2f3a122d0a7b2ae9fe93bcfbe5052194e139555593020ee0d2d82",
+    "report.json": "759b890586206770485781fb193673263cd382e3ccccf866979badbc1bcb236a",
+    "chronological_evaluation-overview.json": "d66a6626dd05295c5257df2da4da492776b2777122f311386993d847fd34d2b7",
+    "all-54-candidate-views.csv": "1c3746fdefed3504795fb334fa4ef476589c65a6a84195f72e50e7feb7acdf4d",
+    "joint-block-inference.json": "320798f4dedf96cce337792a5dc554baf1dbe56d6d8bceb648b2652e9cac121b",
+    "per-trial-results.json": "dcf9adca7b095410f1fbdb6858b3d5fea4c7bc5df2d7b6efb6ea410e08bd0d30",
+    "purged-folds.json": "e6fac165b406746bd289df383338c8412c6e6dc35b714d6106f75fdc07720512"
+  },
+  "operator_note": "An initial metadata-only attempt used system Python without pyarrow package metadata; no seal or outcomes were created. Metadata seal and run succeeded under the same repository venv as development."
+}

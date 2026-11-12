@@ -1,0 +1,25 @@
+{
+  "recorded_at": "2026-11-12T17:09:20.444002+00:00",
+  "base_commit": "807a3079a7b53620db0e1de8a1afa8777714b417",
+  "scope": "documentation, governance records and frozen research source archives; application runtime unchanged",
+  "pytest": {
+    "passed": 7257,
+    "skipped": 52,
+    "warnings": 2,
+    "elapsed_seconds": 426.22,
+    "provider_secrets_removed": true
+  },
+  "mypy_strict": {
+    "status": "PASS",
+    "source_files": 399
+  },
+  "ruff": {
+    "status": "PASS"
+  },
+  "uv_lock_check": {
+    "status": "PASS",
+    "resolved_packages": 80
+  },
+  "provider_integration_not_established_by_skipped_tests": true,
+  "final_artifact_hash_link_and_scope_review": "performed separately before commit"
+}

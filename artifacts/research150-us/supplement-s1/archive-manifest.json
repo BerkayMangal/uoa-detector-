@@ -1,0 +1,149 @@
+{
+  "archived_at": "2026-11-12T16:58:52.605164+00:00",
+  "scope": "Byte-preserved exploratory S1 definitions, final source hashes, run seal, full648 policy-cost summary records, all126 contrasts at every cost/period, compact overview and audit outputs; raw market data excluded. Some originals use lossless compressed transport with original digests.",
+  "timing_rule": "S1 specification freeze follows the start of v2 outcome execution; it is before the supplement own run, not a globally pre-label registration. Filesystem mtimes are archival observations.",
+  "files": [
+    {
+      "file": "supplement-proposal.md",
+      "bytes": 14643,
+      "sha256": "6de45085b58b77cc98293149f814ed429a257161153c479813906251bdc79b71",
+      "source_mtime_utc": "2026-11-12T16:51:26.104299+00:00",
+      "transformation": "none"
+    },
+    {
+      "file": "supplement-proposal.json",
+      "bytes": 27193,
+      "sha256": "8bd54e97616e24dbc6ea3a259860d56f1181523910e762d347218d55490cd754",
+      "source_mtime_utc": "2026-11-12T16:51:26.104118+00:00",
+      "transformation": "none"
+    },
+    {
+      "file": "supplement-registry-s1.json.gz",
+      "bytes": 3304,
+      "sha256": "0d1adc649597d3bf4ef7b8b92254177ab1485309d5740662b2e1392fa395f7cd",
+      "source_mtime_utc": "2026-11-12T16:51:26.106770+00:00",
+      "transformation": "gzip; mtime=0; empty filename; compression level9; exact decompressed source bytes",
+      "original_file": "supplement-registry-s1.json",
+      "original_bytes": 118768,
+      "original_sha256": "c1594fbe4fef17261884dc30b6edbf593f4a388e919993c1d0bb3cf767e05e70"
+    },
+    {
+      "file": "supplement-freeze-s1.json",
+      "bytes": 1653,
+      "sha256": "868ebc6e88dcbe3bfb1da229445d514970b3cf0b2ff82973fa31f5389a89222b",
+      "source_mtime_utc": "2026-11-12T16:51:26.110505+00:00",
+      "transformation": "none"
+    },
+    {
+      "file": "supplement-code-hashes.json",
+      "bytes": 2593,
+      "sha256": "a6d3e2079d6cf0abb2afe3ea4bb9759106a27a1b472acc748b116bb236901b0a",
+      "source_mtime_utc": "2026-11-12T17:02:49.008037+00:00",
+      "transformation": "none"
+    },
+    {
+      "file": "run-seal.json",
+      "bytes": 5314,
+      "sha256": "eda6b774e23b4bbe8993a11d55d51c6d30c074a1766987c99d7f303f7d25e18d",
+      "source_mtime_utc": "2026-11-12T17:02:08.851477+00:00",
+      "transformation": "none"
+    },
+    {
+      "file": "supplement-validation-proof.json",
+      "bytes": 2233,
+      "sha256": "950d9669bb843a2d3a65de473e1c17afd8aeafef260a739e9446be0bde9059e7",
+      "source_mtime_utc": "2026-11-12T17:04:28.539070+00:00",
+      "transformation": "none"
+    },
+    {
+      "file": "supplement-overview.json",
+      "bytes": 18160,
+      "sha256": "1b15e775ba71cd3d2ba95280ec3d0ea931606545a0ed2ccc9b11188ea6e37364",
+      "source_mtime_utc": "2026-11-12T17:14:25.292898+00:00",
+      "transformation": "none"
+    },
+    {
+      "file": "all-216-policy-results.csv",
+      "bytes": 90267,
+      "sha256": "3f384b3ebba6180d94bb487ecdad224630d6095ed0ec893c93ffcc799a6ef725",
+      "source_mtime_utc": "2026-11-12T17:14:25.284388+00:00",
+      "transformation": "none"
+    },
+    {
+      "file": "joint-combined180-inference.json",
+      "bytes": 45489,
+      "sha256": "0d0717bd5bb79dca8b8c38d4b9e7f4fb38ed3098cad165d5f15339bff7ac974f",
+      "source_mtime_utc": "2026-11-12T17:12:32.299713+00:00",
+      "transformation": "none"
+    },
+    {
+      "file": "purged-folds.json",
+      "bytes": 2267,
+      "sha256": "60e7684d7aa61b0ef66c328e4d86fc9f6dc72492677b9373850808f74ef22064",
+      "source_mtime_utc": "2026-11-12T17:12:32.299995+00:00",
+      "transformation": "none"
+    },
+    {
+      "file": "completion-evidence.json",
+      "bytes": 1926,
+      "sha256": "dacd34b2488bbe128a947fd8444df3a02f011f16ebbc3bbc780b8cbc9860f612",
+      "source_mtime_utc": "2026-11-12T17:15:56.294326+00:00",
+      "transformation": "none"
+    },
+    {
+      "file": "public-results-manifest.json",
+      "bytes": 1315,
+      "sha256": "c882eff6c8be47225b68a81ad829e45e25990c5fe8de2083d46a265ec4b62530",
+      "source_mtime_utc": "2026-11-12T17:14:25.730230+00:00",
+      "transformation": "none"
+    },
+    {
+      "file": "per-policy-results.json.xz",
+      "bytes": 542368,
+      "sha256": "6ce39e67947ed34b1793857b62fc9661b8b1a674d8c6f8e6fdf360c12e11ea91",
+      "original_file": "per-policy-results.json",
+      "original_bytes": 8041309,
+      "original_sha256": "038119d54418885bcaa11b976ad9694549d26ae9dc00f8449ca96df02f739bb8",
+      "transformation": "xz; exact decompressed original source bytes, no minification"
+    },
+    {
+      "file": "all-126-paired-contrasts-all-costs-periods.json.gz",
+      "bytes": 35839,
+      "sha256": "d24cc78175213059ebf20bc58a6fc1cd106f557113f4a85e5cef981f935a40d8",
+      "original_file": "paired-contrasts.json",
+      "original_bytes": 606717,
+      "original_sha256": "0a073146221ab286b1c7d17f6f3929996e71b9565e5f736d0b18ebe73decac23",
+      "transformation": "gzip; exact decompressed original source bytes, no minification"
+    }
+  ],
+  "derived_artifacts": [
+    {
+      "file": "supplement-engine-source.zip",
+      "bytes": 51078,
+      "sha256": "c8256079bf1a24342c9af29063b9c13f7270720d12c3873bae66343621bbd491",
+      "entries": [
+        "frozen_supplement_features.py",
+        "run_supplement.py",
+        "selftest_supplement_features.py",
+        "selftest_supplement_runner.py"
+      ],
+      "entry_hash_authority": "supplement-code-hashes.json code mapping",
+      "zip_format": "ZIP_STORED; sorted basename-only entries; fixed 2026-11-12T00:00:00 headers; Unix regular file mode0644; no comments or extra fields"
+    }
+  ],
+  "clean_extraction_verification": {
+    "recorded_at": "2026-11-12T17:10:47.893767+00:00",
+    "command": "python -m unittest discover -s supplement_engine -p selftest_supplement_*.py -q",
+    "result": "PASS",
+    "tests": 13,
+    "elapsed_seconds": 225.033,
+    "source_inputs": "Only archived v2/S1 source ZIPs, archived original documents and metadata-only dataset plan; synthetic data generated in a temporary directory.",
+    "runtime": {
+      "python": "3.12.14",
+      "numpy": "2.4.4",
+      "pandas": "3.0.2",
+      "pyarrow": "24.0.0"
+    },
+    "market_prices_opened": false
+  }
+}

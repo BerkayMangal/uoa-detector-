@@ -1,0 +1,59 @@
+{
+  "archived_at": "2026-11-12T16:51:44.719596+00:00",
+  "scope": "Development summary and audit outputs only; no price rows, feature matrices, trade packets or raw provider data.",
+  "source_run_seal_sha256": "d18471617ff4fcfb28cad4d37accfc89e2d0ed2eb97df974d979ff2f367d00ee",
+  "files": [
+    {
+      "file": "development-overview.json",
+      "bytes": 4200,
+      "sha256": "7a5692efc627bec449aceb44c8664e578d734b36999a5809ed1e159f86a03f5e",
+      "source_mtime_utc": "2026-11-12T16:49:16.084107+00:00",
+      "transformation": "none"
+    },
+    {
+      "file": "all-54-candidate-views.csv",
+      "bytes": 32623,
+      "sha256": "0a1f64c760f754d82335c69ec00bc6b1b622f585623c7157a52421ae145ba732",
+      "source_mtime_utc": "2026-11-12T16:49:16.082459+00:00",
+      "transformation": "none"
+    },
+    {
+      "file": "run-seal.json",
+      "bytes": 2268,
+      "sha256": "d18471617ff4fcfb28cad4d37accfc89e2d0ed2eb97df974d979ff2f367d00ee",
+      "source_mtime_utc": "2026-11-12T16:45:50.826585+00:00",
+      "transformation": "none"
+    },
+    {
+      "file": "completion-evidence.json",
+      "bytes": 1012,
+      "sha256": "82a78f2e08608eedc9072f53db2636ccb59c6ec9a7b08ca85ad2336d9e776dd1",
+      "source_mtime_utc": "2026-11-12T16:50:09.758550+00:00",
+      "transformation": "none"
+    },
+    {
+      "file": "joint-block-inference.json",
+      "bytes": 14871,
+      "sha256": "19d4bf269753a7d1f0a8237e530c31e8246e14f39f2ee54ce4b2f2587a096aaf",
+      "source_mtime_utc": "2026-11-12T16:48:48.654532+00:00",
+      "transformation": "none"
+    },
+    {
+      "file": "purged-folds.json",
+      "bytes": 2781,
+      "sha256": "ec95071d28d1d21e88325a2d34000d73888b88974ddad8c157adda4479bd39fc",
+      "source_mtime_utc": "2026-11-12T16:48:48.654663+00:00",
+      "transformation": "none"
+    },
+    {
+      "file": "per-trial-results.json.gz",
+      "bytes": 149092,
+      "sha256": "ef1f4c13ca45c60bc14f10462dc710c16194f412e72bde24d5f3d5c9c99846e3",
+      "original_file": "per-trial-results.json",
+      "original_bytes": 3067694,
+      "original_sha256": "d5c06b56150d78c741e01a6890927be63b4f96ddbb24996a174084e1f179b640",
+      "transformation": "gzip; mtime=0; empty filename; compression level9; exact decompressed source bytes"
+    }
+  ],
+  "note": "Completion evidence also references private analysis-coverage.json and report.json, whose original hashes were checked at archiving but whose bytes are not included in this subset."
+}

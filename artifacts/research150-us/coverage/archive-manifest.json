@@ -1,0 +1,70 @@
+{
+  "archived_at": "2026-11-12T16:56:28.410534+00:00",
+  "scope": "Original acquisition coverage and integrity summaries, plus compact derived exclusion audit; no raw prices or provider packets.",
+  "files": [
+    {
+      "file": "acquisition-completion.json",
+      "bytes": 13608,
+      "sha256": "2fe95cf0abf41fd13f5b6189a62b1a49a71a28b52c16aefdcd6a999f327d050d",
+      "source_mtime_utc": "2026-11-12T16:54:58.096771+00:00",
+      "transformation": "none"
+    },
+    {
+      "file": "acquisition-completion.txt",
+      "bytes": 2513,
+      "sha256": "c4d0a9a7e277d5b2440b291e46bec8e75e1ce68add2c67bd4c4d21df9f66fb7e",
+      "source_mtime_utc": "2026-11-12T16:54:19.470871+00:00",
+      "transformation": "none"
+    },
+    {
+      "file": "missingness-report.json.gz",
+      "bytes": 8072,
+      "sha256": "66e3e1262fff043903805d4f44102154d0e792101ce552439aa88e70bb64cdb9",
+      "source_mtime_utc": "2026-11-12T16:49:16.338044+00:00",
+      "transformation": "gzip; mtime=0; empty filename; compression level9; exact decompressed source bytes",
+      "original_file": "missingness-report.json",
+      "original_bytes": 241823,
+      "original_sha256": "76fd1de5f72e081c4bbbaab18d2ca16dd4af2e0794e0703a7de83660c5b2291d"
+    },
+    {
+      "file": "coverage-verification.json.gz",
+      "bytes": 5038,
+      "sha256": "006b58aa797820fe648637cec3247ba4b682e7cdd9d4fcd242ffe84a2390322d",
+      "source_mtime_utc": "2026-11-12T16:49:26.288283+00:00",
+      "transformation": "gzip; mtime=0; empty filename; compression level9; exact decompressed source bytes",
+      "original_file": "coverage-verification.json",
+      "original_bytes": 79334,
+      "original_sha256": "2b376d9540c11e938beddad172ee1b84cf200fee9752cfc0ee52db74e0474180"
+    },
+    {
+      "file": "request-ledger-verification.json",
+      "bytes": 857,
+      "sha256": "0570916c2d6a347886f6b35172e572a6b9d8770960a832a8c2546b5cb56c895e",
+      "source_mtime_utc": "2026-11-12T16:52:59.460666+00:00",
+      "transformation": "none"
+    },
+    {
+      "file": "acquisition-methods.txt",
+      "bytes": 7247,
+      "sha256": "925cc65d208b1d7cd0a814fd90d9385d0d21d2375019a52b188c411a7297581a",
+      "source_mtime_utc": "2026-11-12T16:36:52.975385+00:00",
+      "transformation": "none"
+    },
+    {
+      "file": "dataset-plan.json",
+      "bytes": 34885,
+      "sha256": "519857050a9cc3459fd2c6809267758992d698a9c182d66a93a852820c7387db",
+      "source_mtime_utc": "2026-11-12T16:22:36.552628+00:00",
+      "transformation": "none"
+    }
+  ],
+  "derived_artifacts": [
+    {
+      "file": "exclusion-audit-summary.json",
+      "bytes": 1034,
+      "sha256": "abb4c4ff56bb56b4f63f35c5a500eeedb9d44709c986480e103f67039b5da562",
+      "source_file": "all-exclusion-volume-audit.json",
+      "source_sha256": "b431bb30e81d0f6630f053e0ef68fe5b55d0355e9617db1b5b6372d2d996b98d"
+    }
+  ]
+}

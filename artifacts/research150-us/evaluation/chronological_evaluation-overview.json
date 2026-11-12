@@ -1,0 +1,89 @@
+{
+  "all_54_views": "all-54-candidate-views.csv",
+  "common_valid_fraction": 0.6333333333333333,
+  "common_valid_sessions": 19,
+  "conditioning": "Observed subsample with all nine fully certified streams; full-session volume quality uses later minutes and was not known intraday. Not the return on all scheduled sessions.",
+  "cost_views": {
+    "10": {
+      "baseline_policies": 54,
+      "baseline_positive_absolute_count": 0,
+      "candidate_absolute_additive_return_max": -0.001269486824288646,
+      "candidate_absolute_additive_return_median": -0.052972049035950604,
+      "candidate_absolute_additive_return_min": -1.292556302832562,
+      "candidate_negative_absolute_count": 54,
+      "candidate_policies": 54,
+      "candidate_positive_absolute_count": 0,
+      "candidate_zero_absolute_count": 0,
+      "cost_saving_note": "Lower turnover reduces charged costs; incremental net improvement is not itself alpha.",
+      "paired_net_difference_median": 0.14792219171567111,
+      "positive_net_difference_without_positive_gross_difference_count": 29,
+      "positive_paired_gross_difference_count": 25,
+      "positive_paired_net_difference_count": 54
+    },
+    "20": {
+      "baseline_policies": 54,
+      "baseline_positive_absolute_count": 0,
+      "candidate_absolute_additive_return_max": -0.003936153490955313,
+      "candidate_absolute_additive_return_median": -0.10344925035366148,
+      "candidate_absolute_additive_return_min": -2.585667413943673,
+      "candidate_negative_absolute_count": 54,
+      "candidate_policies": 54,
+      "candidate_positive_absolute_count": 0,
+      "candidate_zero_absolute_count": 0,
+      "cost_saving_note": "Lower turnover reduces charged costs; incremental net improvement is not itself alpha.",
+      "paired_net_difference_median": 0.29444608151454843,
+      "positive_net_difference_without_positive_gross_difference_count": 29,
+      "positive_paired_gross_difference_count": 25,
+      "positive_paired_net_difference_count": 54
+    },
+    "5": {
+      "baseline_policies": 54,
+      "baseline_positive_absolute_count": 0,
+      "candidate_absolute_additive_return_max": 6.384650904468729e-05,
+      "candidate_absolute_additive_return_median": -0.028821927484664226,
+      "candidate_absolute_additive_return_min": -0.6460007472770065,
+      "candidate_negative_absolute_count": 53,
+      "candidate_policies": 54,
+      "candidate_positive_absolute_count": 1,
+      "candidate_zero_absolute_count": 0,
+      "cost_saving_note": "Lower turnover reduces charged costs; incremental net improvement is not itself alpha.",
+      "paired_net_difference_median": 0.07500552504900443,
+      "positive_net_difference_without_positive_gross_difference_count": 29,
+      "positive_paired_gross_difference_count": 25,
+      "positive_paired_net_difference_count": 54
+    }
+  },
+  "dsr": "INSUFFICIENT_EVIDENCE",
+  "economic_basis": "Additive constant-notional stock reference returns with equal 1/9 symbol sleeves; quoted costs assumed; short borrow unverified.",
+  "evaluation_prices_read": true,
+  "expected_scheduled_sessions": 30,
+  "fold_status_counts": {
+    "BLOCKED_DATA": 6
+  },
+  "gross_trade_mean_bps_across_54_policy_means": {
+    "maximum": 5.239424408917578,
+    "median": -0.1421421834151689,
+    "minimum": -7.784697130841613
+  },
+  "inference": {
+    "10": {
+      "eligible_block_starts": null,
+      "reason": "fewer_than_60_complete_daily_clusters",
+      "status": "INSUFFICIENT_EVIDENCE",
+      "unsupported_session_count": 0
+    },
+    "5": {
+      "eligible_block_starts": null,
+      "reason": "fewer_than_60_complete_daily_clusters",
+      "status": "INSUFFICIENT_EVIDENCE",
+      "unsupported_session_count": 0
+    }
+  },
+  "interpretation": "Each policy is an alternative fixed specification, not an ensemble or a separately independent experiment. All policies and costs retained; no best-policy selection.",
+  "news_predictive_filters_tested": false,
+  "options_tested": false,
+  "phase": "chronological_evaluation",
+  "source_report_sha256": "759b890586206770485781fb193673263cd382e3ccccf866979badbc1bcb236a",
+  "source_run_seal_sha256": "c45b702ff3f2f3a122d0a7b2ae9fe93bcfbe5052194e139555593020ee0d2d82",
+  "status": "DESCRIPTIVE_ONLY"
+}

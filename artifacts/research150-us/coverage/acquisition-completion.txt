@@ -1,0 +1,45 @@
+Completed frozen US OHLCV acquisition and full integrity verification.
+
+Nine assets, 217 NYSE sessions, 2026-01-02 through 2026-11-11.
+All 1,953 ticker-sessions attempted: 1,824 certified, 129 excluded, zero pending.
+711,360 canonical 1m rows; 142,272 complete 5m groups; 47,424 complete 15m groups.
+
+All 1,953 raw sessions retain 390 native RTH timestamps. The 129 excluded sessions contain 146 negative per-minute volumes; all 146 exactly match drops in cumulative total_volume. Native correction semantics remain unverified.
+
+Common valid dates: 122 = 103 development + 19 chronological evaluation.
+Longest uninterrupted common block: 11 sessions. Evaluation is partly previously observed, not an untouched holdout. Whole-session quality selection is retrospective and may be nonrandom.
+
+Requests: 12 initial probes + 1,718 bulk/diagnostic GETs = 1,730 total.
+Initial reuse: 229 verified historical packets + 8 initial probes = 237 pairs.
+One additional QQQ pair uses a successful authentication diagnostic response.
+Bulk responses: 1,717 HTTP 200 and 1 preserved HTTP 401. Last native count: 14,285/30,000, below the 18,000 production-reserve threshold.
+
+Symbol | Certified | Excluded (out of 217 sessions)
+SPY | 205 | 12
+QQQ | 185 | 32
+AAPL | 197 | 20
+NFLX | 208 | 9
+NVDA | 211 | 6
+TSLA | 209 | 8
+MSFT | 202 | 15
+META | 202 | 15
+AMZN | 205 | 12
+
+Month | Expected sessions | Excluded ticker-sessions | Common valid dates
+2026-01 | 20 | 8 | 14
+2026-02 | 19 | 10 | 10
+2026-03 | 22 | 14 | 11
+2026-04 | 21 | 10 | 14
+2026-05 | 20 | 10 | 10
+2026-06 | 21 | 13 | 13
+2026-07 | 22 | 20 | 8
+2026-08 | 21 | 16 | 14
+2026-09 | 21 | 13 | 9
+2026-10 | 22 | 12 | 13
+2026-11 | 8 | 3 | 6
+
+missingness-report.json contains all 217 dated coverage entries, reasons, month-by-symbol counts and contiguous-session blocks. All raw body/file hashes, all certified CSV hashes and minute grids passed verification. Eight collector audit tests passed without network calls.
+
+Pacing: the collector configured monotonic reservation spacing of 0.51s initially and 0.75s after recovery. Recorded UTC starts have a minimum gap of 0.423539s initially and 0.742445s after recovery. Per-request monotonic clocks were not archived, so exact physical start spacing cannot be independently proven from the ledger.
+
+No API calls remain running or planned. No repository edits, strategy returns, labels or PnL were inspected by this acquisition task. See acquisition-methods.txt for clock, adjustment, quality-selection and aggregate-only limitations.

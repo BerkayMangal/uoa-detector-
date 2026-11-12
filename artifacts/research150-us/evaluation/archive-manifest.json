@@ -1,0 +1,59 @@
+{
+  "archived_at": "2026-11-12T16:55:05.371368+00:00",
+  "scope": "Chronological evaluation summary and audit outputs only; no price rows, feature matrices, trade packets or raw provider data.",
+  "source_run_seal_sha256": "c45b702ff3f2f3a122d0a7b2ae9fe93bcfbe5052194e139555593020ee0d2d82",
+  "files": [
+    {
+      "file": "chronological_evaluation-overview.json",
+      "bytes": 4221,
+      "sha256": "d66a6626dd05295c5257df2da4da492776b2777122f311386993d847fd34d2b7",
+      "source_mtime_utc": "2026-11-12T16:53:38.502528+00:00",
+      "transformation": "none"
+    },
+    {
+      "file": "all-54-candidate-views.csv",
+      "bytes": 33208,
+      "sha256": "1c3746fdefed3504795fb334fa4ef476589c65a6a84195f72e50e7feb7acdf4d",
+      "source_mtime_utc": "2026-11-12T16:53:38.498492+00:00",
+      "transformation": "none"
+    },
+    {
+      "file": "run-seal.json",
+      "bytes": 2269,
+      "sha256": "c45b702ff3f2f3a122d0a7b2ae9fe93bcfbe5052194e139555593020ee0d2d82",
+      "source_mtime_utc": "2026-11-12T16:51:23.548272+00:00",
+      "transformation": "none"
+    },
+    {
+      "file": "joint-block-inference.json",
+      "bytes": 11080,
+      "sha256": "320798f4dedf96cce337792a5dc554baf1dbe56d6d8bceb648b2652e9cac121b",
+      "source_mtime_utc": "2026-11-12T16:52:30.827577+00:00",
+      "transformation": "none"
+    },
+    {
+      "file": "purged-folds.json",
+      "bytes": 2719,
+      "sha256": "e6fac165b406746bd289df383338c8412c6e6dc35b714d6106f75fdc07720512",
+      "source_mtime_utc": "2026-11-12T16:52:30.827772+00:00",
+      "transformation": "none"
+    },
+    {
+      "file": "per-trial-results.json.gz",
+      "bytes": 136706,
+      "sha256": "8ca99e7e08f6e050c8f70b5e08391a5b5218db7570cce88f8530fbe9b92c0f99",
+      "original_file": "per-trial-results.json",
+      "original_bytes": 2032057,
+      "original_sha256": "dcf9adca7b095410f1fbdb6858b3d5fea4c7bc5df2d7b6efb6ea410e08bd0d30",
+      "transformation": "gzip; mtime=0; empty filename; compression level9; exact decompressed source bytes"
+    },
+    {
+      "file": "completion-evidence.json",
+      "bytes": 1093,
+      "sha256": "9bc77274f777f452976b4a1248cf09e969ee8cfd84adb88bfa412700976e4487",
+      "source_mtime_utc": "2026-11-12T16:54:40.850525+00:00",
+      "transformation": "none"
+    }
+  ],
+  "note": "Summary fold_status_counts/purged-folds refer to empty development folds in this phase-specific runner, not six evaluation folds. Completion-evidence source report.json hash was verified; its bytes are not included in this subset."
+}

@@ -1,0 +1,412 @@
+{
+  "code_written_after_v2_development_outcomes": true,
+  "conditioning": "Only dates with nine fully certified streams; full-session volume quality uses later minutes and was not known intraday. No extrapolation to all scheduled dates.",
+  "dsr": "INSUFFICIENT_EVIDENCE",
+  "economics": "Stock reference open prices, fixed1/9 sleeves, assumed5/10/20bps total roundtrip costs. Additive fixed-notional losses can exceed100%; these are not self-financing account returns. Borrow unverified.",
+  "interpretation": "All81 source-directed candidates,9 falsification controls and126 baselines retained. Lower turnover/cost is not alpha; H80short cannot support a positive-drift claim.",
+  "multiplicity": "180 combined current primary contrasts;5184 known prior exploratory configurations and additional unknown history remain. DSR insufficient.",
+  "news_predictive_filters_tested": false,
+  "options_tested": false,
+  "periods": {
+    "chronological_evaluation": {
+      "calendar_event_days": {
+        "H079_US_S1": {
+          "candidate_or_control_policy_count": 18,
+          "distinct_active_days_maximum": 1,
+          "distinct_active_days_minimum": 1,
+          "interpretation": "Days with actual selected trades; repeated trades are not independent event replications."
+        },
+        "H080_US_S1": {
+          "candidate_or_control_policy_count": 18,
+          "distinct_active_days_maximum": 2,
+          "distinct_active_days_minimum": 2,
+          "interpretation": "Days with actual selected trades; repeated trades are not independent event replications."
+        }
+      },
+      "combined180_inference": {
+        "10": {
+          "eligible_block_starts": null,
+          "reason": "fewer_than_60_complete_daily_clusters",
+          "status": "INSUFFICIENT_EVIDENCE",
+          "unsupported_session_count": 0
+        },
+        "5": {
+          "eligible_block_starts": null,
+          "reason": "fewer_than_60_complete_daily_clusters",
+          "status": "INSUFFICIENT_EVIDENCE",
+          "unsupported_session_count": 0
+        }
+      },
+      "common_valid_sessions": 19,
+      "cost_views": {
+        "10": {
+          "baselines_126": {
+            "active_day_count_maximum": 19,
+            "active_day_count_minimum": 19,
+            "additive_return_maximum": -0.06864026099418319,
+            "additive_return_median": -0.43007158519456384,
+            "additive_return_minimum": -7.216449786385146,
+            "gross_mean_bps_maximum": 1.931395789076411,
+            "gross_mean_bps_median": 0.006552880350063545,
+            "gross_mean_bps_minimum": -2.761045375823098,
+            "negative_absolute_count": 126,
+            "no_trade_policy_count": 0,
+            "policies": 126,
+            "positive_absolute_count": 0,
+            "traded_exactly_zero_return_count": 0,
+            "zero_absolute_count": 0
+          },
+          "falsification_only_9": {
+            "active_day_count_maximum": 2,
+            "active_day_count_minimum": 2,
+            "additive_return_maximum": -0.033406307863918364,
+            "additive_return_median": -0.05552589197601725,
+            "additive_return_minimum": -0.7619226331971982,
+            "gross_mean_bps_maximum": 0.33990043058232644,
+            "gross_mean_bps_median": -0.3684969590298276,
+            "gross_mean_bps_minimum": -1.6805089943092426,
+            "negative_absolute_count": 9,
+            "no_trade_policy_count": 0,
+            "policies": 9,
+            "positive_absolute_count": 0,
+            "traded_exactly_zero_return_count": 0,
+            "zero_absolute_count": 0
+          },
+          "positive_gross_contrasts": 66,
+          "positive_net_contrasts": 107,
+          "positive_net_without_positive_gross": 45,
+          "source_directed_81": {
+            "active_day_count_maximum": 19,
+            "active_day_count_minimum": 1,
+            "additive_return_maximum": -0.0020015387201741,
+            "additive_return_median": -0.1489439880440507,
+            "additive_return_minimum": -3.5452327055558235,
+            "gross_mean_bps_maximum": 7.27062901794441,
+            "gross_mean_bps_median": 0.05801152614607569,
+            "gross_mean_bps_minimum": -6.802646827494898,
+            "negative_absolute_count": 81,
+            "no_trade_policy_count": 0,
+            "policies": 81,
+            "positive_absolute_count": 0,
+            "traded_exactly_zero_return_count": 0,
+            "zero_absolute_count": 0
+          }
+        },
+        "20": {
+          "baselines_126": {
+            "active_day_count_maximum": 19,
+            "active_day_count_minimum": 19,
+            "additive_return_maximum": -0.14252914988307208,
+            "additive_return_median": -0.8545545453646446,
+            "additive_return_minimum": -14.398449786385143,
+            "gross_mean_bps_maximum": 1.931395789076411,
+            "gross_mean_bps_median": 0.006552880350063545,
+            "gross_mean_bps_minimum": -2.761045375823098,
+            "negative_absolute_count": 126,
+            "no_trade_policy_count": 0,
+            "policies": 126,
+            "positive_absolute_count": 0,
+            "traded_exactly_zero_return_count": 0,
+            "zero_absolute_count": 0
+          },
+          "falsification_only_9": {
+            "active_day_count_maximum": 2,
+            "active_day_count_minimum": 2,
+            "additive_return_maximum": -0.06340630786391838,
+            "additive_return_median": -0.10552589197601725,
+            "additive_return_minimum": -1.5179226331971982,
+            "gross_mean_bps_maximum": 0.33990043058232644,
+            "gross_mean_bps_median": -0.3684969590298276,
+            "gross_mean_bps_minimum": -1.6805089943092426,
+            "negative_absolute_count": 9,
+            "no_trade_policy_count": 0,
+            "policies": 9,
+            "positive_absolute_count": 0,
+            "traded_exactly_zero_return_count": 0,
+            "zero_absolute_count": 0
+          },
+          "positive_gross_contrasts": 66,
+          "positive_net_contrasts": 110,
+          "positive_net_without_positive_gross": 49,
+          "source_directed_81": {
+            "active_day_count_maximum": 19,
+            "active_day_count_minimum": 1,
+            "additive_return_maximum": -0.005401277744186253,
+            "additive_return_median": -0.2944725456145526,
+            "additive_return_minimum": -7.083578729791104,
+            "gross_mean_bps_maximum": 7.27062901794441,
+            "gross_mean_bps_median": 0.05801152614607569,
+            "gross_mean_bps_minimum": -6.802646827494898,
+            "negative_absolute_count": 81,
+            "no_trade_policy_count": 0,
+            "policies": 81,
+            "positive_absolute_count": 0,
+            "traded_exactly_zero_return_count": 0,
+            "zero_absolute_count": 0
+          }
+        },
+        "5": {
+          "baselines_126": {
+            "active_day_count_maximum": 19,
+            "active_day_count_minimum": 19,
+            "additive_return_maximum": -0.03169581654973874,
+            "additive_return_median": -0.2153362111263544,
+            "additive_return_minimum": -3.6254497863851465,
+            "gross_mean_bps_maximum": 1.931395789076411,
+            "gross_mean_bps_median": 0.006552880350063545,
+            "gross_mean_bps_minimum": -2.761045375823098,
+            "negative_absolute_count": 126,
+            "no_trade_policy_count": 0,
+            "policies": 126,
+            "positive_absolute_count": 0,
+            "traded_exactly_zero_return_count": 0,
+            "zero_absolute_count": 0
+          },
+          "falsification_only_9": {
+            "active_day_count_maximum": 2,
+            "active_day_count_minimum": 2,
+            "additive_return_maximum": -0.018406307863918368,
+            "additive_return_median": -0.030525891976017253,
+            "additive_return_minimum": -0.38392263319719827,
+            "gross_mean_bps_maximum": 0.33990043058232644,
+            "gross_mean_bps_median": -0.3684969590298276,
+            "gross_mean_bps_minimum": -1.6805089943092426,
+            "negative_absolute_count": 9,
+            "no_trade_policy_count": 0,
+            "policies": 9,
+            "positive_absolute_count": 0,
+            "traded_exactly_zero_return_count": 0,
+            "zero_absolute_count": 0
+          },
+          "positive_gross_contrasts": 66,
+          "positive_net_contrasts": 107,
+          "positive_net_without_positive_gross": 43,
+          "source_directed_81": {
+            "active_day_count_maximum": 19,
+            "active_day_count_minimum": 1,
+            "additive_return_maximum": 0.0016651279464925672,
+            "additive_return_median": -0.07267188763273487,
+            "additive_return_minimum": -1.7850660388891564,
+            "gross_mean_bps_maximum": 7.27062901794441,
+            "gross_mean_bps_median": 0.05801152614607569,
+            "gross_mean_bps_minimum": -6.802646827494898,
+            "negative_absolute_count": 79,
+            "no_trade_policy_count": 0,
+            "policies": 81,
+            "positive_absolute_count": 2,
+            "traded_exactly_zero_return_count": 0,
+            "zero_absolute_count": 0
+          }
+        }
+      },
+      "expected_sessions": 30
+    },
+    "development": {
+      "calendar_event_days": {
+        "H079_US_S1": {
+          "candidate_or_control_policy_count": 18,
+          "distinct_active_days_maximum": 13,
+          "distinct_active_days_minimum": 13,
+          "interpretation": "Days with actual selected trades; repeated trades are not independent event replications."
+        },
+        "H080_US_S1": {
+          "candidate_or_control_policy_count": 18,
+          "distinct_active_days_maximum": 9,
+          "distinct_active_days_minimum": 9,
+          "interpretation": "Days with actual selected trades; repeated trades are not independent event replications."
+        }
+      },
+      "combined180_inference": {
+        "10": {
+          "eligible_block_starts": 2,
+          "reason": "insufficient_contiguous_block_support",
+          "status": "INSUFFICIENT_EVIDENCE",
+          "unsupported_session_count": 92
+        },
+        "5": {
+          "eligible_block_starts": 12,
+          "reason": "insufficient_contiguous_block_support",
+          "status": "INSUFFICIENT_EVIDENCE",
+          "unsupported_session_count": 71
+        }
+      },
+      "common_valid_sessions": 103,
+      "cost_views": {
+        "10": {
+          "baselines_126": {
+            "active_day_count_maximum": 103,
+            "active_day_count_minimum": 103,
+            "additive_return_maximum": -0.3866781785013141,
+            "additive_return_median": -2.3553644980651347,
+            "additive_return_minimum": -38.957378962883155,
+            "gross_mean_bps_maximum": 0.5892276730345413,
+            "gross_mean_bps_median": -0.0019661315447023846,
+            "gross_mean_bps_minimum": -0.5892276730345413,
+            "negative_absolute_count": 126,
+            "no_trade_policy_count": 0,
+            "policies": 126,
+            "positive_absolute_count": 0,
+            "traded_exactly_zero_return_count": 0,
+            "zero_absolute_count": 0
+          },
+          "falsification_only_9": {
+            "active_day_count_maximum": 9,
+            "active_day_count_minimum": 9,
+            "additive_return_maximum": -0.12998618065366113,
+            "additive_return_median": -0.2571304029187247,
+            "additive_return_minimum": -3.435617419387978,
+            "gross_mean_bps_maximum": 0.37139402565473295,
+            "gross_mean_bps_median": -0.04269417299282011,
+            "gross_mean_bps_minimum": -1.4280179074988737,
+            "negative_absolute_count": 9,
+            "no_trade_policy_count": 0,
+            "policies": 9,
+            "positive_absolute_count": 0,
+            "traded_exactly_zero_return_count": 0,
+            "zero_absolute_count": 0
+          },
+          "positive_gross_contrasts": 63,
+          "positive_net_contrasts": 110,
+          "positive_net_without_positive_gross": 50,
+          "source_directed_81": {
+            "active_day_count_maximum": 103,
+            "active_day_count_minimum": 9,
+            "additive_return_maximum": -0.06428217714696874,
+            "additive_return_median": -0.8370298671856633,
+            "additive_return_minimum": -19.22194283098972,
+            "gross_mean_bps_maximum": 1.4280179074988737,
+            "gross_mean_bps_median": -0.007950501329809739,
+            "gross_mean_bps_minimum": -2.7974917929328837,
+            "negative_absolute_count": 81,
+            "no_trade_policy_count": 0,
+            "policies": 81,
+            "positive_absolute_count": 0,
+            "traded_exactly_zero_return_count": 0,
+            "zero_absolute_count": 0
+          }
+        },
+        "20": {
+          "baselines_126": {
+            "active_day_count_maximum": 103,
+            "active_day_count_minimum": 103,
+            "additive_return_maximum": -0.797567067390203,
+            "additive_return_median": -4.695428125818332,
+            "additive_return_minimum": -77.89137896288315,
+            "gross_mean_bps_maximum": 0.5892276730345413,
+            "gross_mean_bps_median": -0.0019661315447023846,
+            "gross_mean_bps_minimum": -0.5892276730345413,
+            "negative_absolute_count": 126,
+            "no_trade_policy_count": 0,
+            "policies": 126,
+            "positive_absolute_count": 0,
+            "traded_exactly_zero_return_count": 0,
+            "zero_absolute_count": 0
+          },
+          "falsification_only_9": {
+            "active_day_count_maximum": 9,
+            "active_day_count_minimum": 9,
+            "additive_return_maximum": -0.26498618065366114,
+            "additive_return_median": -0.4821304029187246,
+            "additive_return_minimum": -6.837617419387978,
+            "gross_mean_bps_maximum": 0.37139402565473295,
+            "gross_mean_bps_median": -0.04269417299282011,
+            "gross_mean_bps_minimum": -1.4280179074988737,
+            "negative_absolute_count": 9,
+            "no_trade_policy_count": 0,
+            "policies": 9,
+            "positive_absolute_count": 0,
+            "traded_exactly_zero_return_count": 0,
+            "zero_absolute_count": 0
+          },
+          "positive_gross_contrasts": 63,
+          "positive_net_contrasts": 110,
+          "positive_net_without_positive_gross": 52,
+          "source_directed_81": {
+            "active_day_count_maximum": 103,
+            "active_day_count_minimum": 9,
+            "additive_return_maximum": -0.13429517757989332,
+            "additive_return_median": -1.6782520894078854,
+            "additive_return_minimum": -38.41791220396458,
+            "gross_mean_bps_maximum": 1.4280179074988737,
+            "gross_mean_bps_median": -0.007950501329809739,
+            "gross_mean_bps_minimum": -2.7974917929328837,
+            "negative_absolute_count": 81,
+            "no_trade_policy_count": 0,
+            "policies": 81,
+            "positive_absolute_count": 0,
+            "traded_exactly_zero_return_count": 0,
+            "zero_absolute_count": 0
+          }
+        },
+        "5": {
+          "baselines_126": {
+            "active_day_count_maximum": 103,
+            "active_day_count_minimum": 103,
+            "additive_return_maximum": -0.18123373405686966,
+            "additive_return_median": -1.1756700536206905,
+            "additive_return_minimum": -19.49037896288315,
+            "gross_mean_bps_maximum": 0.5892276730345413,
+            "gross_mean_bps_median": -0.0019661315447023846,
+            "gross_mean_bps_minimum": -0.5892276730345413,
+            "negative_absolute_count": 126,
+            "no_trade_policy_count": 0,
+            "policies": 126,
+            "positive_absolute_count": 0,
+            "traded_exactly_zero_return_count": 0,
+            "zero_absolute_count": 0
+          },
+          "falsification_only_9": {
+            "active_day_count_maximum": 9,
+            "active_day_count_minimum": 9,
+            "additive_return_maximum": -0.062486180653661114,
+            "additive_return_median": -0.14463040291872467,
+            "additive_return_minimum": -1.7346174193879778,
+            "gross_mean_bps_maximum": 0.37139402565473295,
+            "gross_mean_bps_median": -0.04269417299282011,
+            "gross_mean_bps_minimum": -1.4280179074988737,
+            "negative_absolute_count": 9,
+            "no_trade_policy_count": 0,
+            "policies": 9,
+            "positive_absolute_count": 0,
+            "traded_exactly_zero_return_count": 0,
+            "zero_absolute_count": 0
+          },
+          "positive_gross_contrasts": 63,
+          "positive_net_contrasts": 104,
+          "positive_net_without_positive_gross": 42,
+          "source_directed_81": {
+            "active_day_count_maximum": 103,
+            "active_day_count_minimum": 9,
+            "additive_return_maximum": -0.02783773270252428,
+            "additive_return_median": -0.41895185154958486,
+            "additive_return_minimum": -9.635942830989718,
+            "gross_mean_bps_maximum": 1.4280179074988737,
+            "gross_mean_bps_median": -0.007950501329809739,
+            "gross_mean_bps_minimum": -2.7974917929328837,
+            "negative_absolute_count": 81,
+            "no_trade_policy_count": 0,
+            "policies": 81,
+            "positive_absolute_count": 0,
+            "traded_exactly_zero_return_count": 0,
+            "zero_absolute_count": 0
+          }
+        }
+      },
+      "expected_sessions": 187
+    }
+  },
+  "registry_counts": {
+    "all_policy_entries": 216,
+    "baseline_policy_entries": 126,
+    "candidate_or_falsification_policies": 90,
+    "contrast_cost_views": 378,
+    "policy_cost_views": 648,
+    "primary_contrasts": 126,
+    "short_month_start_falsification_policies": 9,
+    "source_directed_candidate_policies": 81
+  },
+  "source_full_manifest_sha256": "15e2233104e751b0354f8389ea2c51a96f4ec1769d34929e1b8c8a01ac85528e",
+  "source_report_sha256": "4697793a62eb505ca2af78b7e87ece76d6f38d3a3ba8d808e331d36c8eee0fd6",
+  "source_run_seal_sha256": "eda6b774e23b4bbe8993a11d55d51c6d30c074a1766987c99d7f303f7d25e18d",
+  "status": "DESCRIPTIVE_ONLY"
+}

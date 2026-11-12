@@ -1,0 +1,1356 @@
+{
+  "created_at": "2026-11-12T17:12:43.353311+00:00",
+  "reviewer": "/root/independent_review",
+  "status": "PASS_DESCRIPTIVE_REPORT_INTEGRITY_NO_EDGE_VALIDATION",
+  "scope": "Exhaustive frozen policy/cost counts, daily arithmetic, paired cost decomposition, provenance hashes and inference gates; no new hypotheses or tuning",
+  "review_outcome_access_authorized_after_all_protocols_and_code_frozen": true,
+  "checks_passed": 11964,
+  "checks_failed": 0,
+  "policy_summary_rows_checked": 1944,
+  "all_policy_table": "/workspace/work/uoa-api-investigation/research150/final-all-policy-checks.csv",
+  "runs": [
+    {
+      "directory": "development-v2-run-20261112",
+      "version": "v2",
+      "policy_count": 108,
+      "cost_views": 324,
+      "coverage": {
+        "expected_sessions": 187,
+        "certified_ticker_sessions": 1569,
+        "complete_nine_symbol_sessions": 103,
+        "ticker_session_status_counts": {
+          "complete": 1569,
+          "invalid": 114
+        }
+      },
+      "periods": {
+        "development": {
+          "complete_sessions": 103,
+          "costs": {
+            "5": {
+              "absolute_sign_counts_by_role": {
+                "candidate": {
+                  "positive": 0,
+                  "negative": 54,
+                  "zero": 0,
+                  "total": 54
+                },
+                "baseline": {
+                  "positive": 0,
+                  "negative": 54,
+                  "zero": 0,
+                  "total": 54
+                }
+              },
+              "absolute_sign_counts_by_family_and_role": {
+                "H138_US_V2": {
+                  "candidate": {
+                    "positive": 0,
+                    "negative": 18,
+                    "zero": 0,
+                    "total": 18
+                  },
+                  "baseline": {
+                    "positive": 0,
+                    "negative": 18,
+                    "zero": 0,
+                    "total": 18
+                  }
+                },
+                "H142_US_V2": {
+                  "candidate": {
+                    "positive": 0,
+                    "negative": 18,
+                    "zero": 0,
+                    "total": 18
+                  },
+                  "baseline": {
+                    "positive": 0,
+                    "negative": 18,
+                    "zero": 0,
+                    "total": 18
+                  }
+                },
+                "H145_US_V2": {
+                  "candidate": {
+                    "positive": 0,
+                    "negative": 18,
+                    "zero": 0,
+                    "total": 18
+                  },
+                  "baseline": {
+                    "positive": 0,
+                    "negative": 18,
+                    "zero": 0,
+                    "total": 18
+                  }
+                }
+              },
+              "paired_cost_decomposition": {
+                "comparisons": 54,
+                "net_improvements": 54,
+                "gross_improvements": 30,
+                "net_improvements_without_positive_gross": 24,
+                "net_improvements_with_nonpositive_candidate_absolute": 54
+              }
+            },
+            "10": {
+              "absolute_sign_counts_by_role": {
+                "candidate": {
+                  "positive": 0,
+                  "negative": 54,
+                  "zero": 0,
+                  "total": 54
+                },
+                "baseline": {
+                  "positive": 0,
+                  "negative": 54,
+                  "zero": 0,
+                  "total": 54
+                }
+              },
+              "absolute_sign_counts_by_family_and_role": {
+                "H138_US_V2": {
+                  "candidate": {
+                    "positive": 0,
+                    "negative": 18,
+                    "zero": 0,
+                    "total": 18
+                  },
+                  "baseline": {
+                    "positive": 0,
+                    "negative": 18,
+                    "zero": 0,
+                    "total": 18
+                  }
+                },
+                "H142_US_V2": {
+                  "candidate": {
+                    "positive": 0,
+                    "negative": 18,
+                    "zero": 0,
+                    "total": 18
+                  },
+                  "baseline": {
+                    "positive": 0,
+                    "negative": 18,
+                    "zero": 0,
+                    "total": 18
+                  }
+                },
+                "H145_US_V2": {
+                  "candidate": {
+                    "positive": 0,
+                    "negative": 18,
+                    "zero": 0,
+                    "total": 18
+                  },
+                  "baseline": {
+                    "positive": 0,
+                    "negative": 18,
+                    "zero": 0,
+                    "total": 18
+                  }
+                }
+              },
+              "paired_cost_decomposition": {
+                "comparisons": 54,
+                "net_improvements": 54,
+                "gross_improvements": 30,
+                "net_improvements_without_positive_gross": 24,
+                "net_improvements_with_nonpositive_candidate_absolute": 54
+              }
+            },
+            "20": {
+              "absolute_sign_counts_by_role": {
+                "candidate": {
+                  "positive": 0,
+                  "negative": 54,
+                  "zero": 0,
+                  "total": 54
+                },
+                "baseline": {
+                  "positive": 0,
+                  "negative": 54,
+                  "zero": 0,
+                  "total": 54
+                }
+              },
+              "absolute_sign_counts_by_family_and_role": {
+                "H138_US_V2": {
+                  "candidate": {
+                    "positive": 0,
+                    "negative": 18,
+                    "zero": 0,
+                    "total": 18
+                  },
+                  "baseline": {
+                    "positive": 0,
+                    "negative": 18,
+                    "zero": 0,
+                    "total": 18
+                  }
+                },
+                "H142_US_V2": {
+                  "candidate": {
+                    "positive": 0,
+                    "negative": 18,
+                    "zero": 0,
+                    "total": 18
+                  },
+                  "baseline": {
+                    "positive": 0,
+                    "negative": 18,
+                    "zero": 0,
+                    "total": 18
+                  }
+                },
+                "H145_US_V2": {
+                  "candidate": {
+                    "positive": 0,
+                    "negative": 18,
+                    "zero": 0,
+                    "total": 18
+                  },
+                  "baseline": {
+                    "positive": 0,
+                    "negative": 18,
+                    "zero": 0,
+                    "total": 18
+                  }
+                }
+              },
+              "paired_cost_decomposition": {
+                "comparisons": 54,
+                "net_improvements": 54,
+                "gross_improvements": 30,
+                "net_improvements_without_positive_gross": 24,
+                "net_improvements_with_nonpositive_candidate_absolute": 54
+              }
+            }
+          }
+        }
+      },
+      "inference": {
+        "chronological_evaluation": {
+          "10": {
+            "status": "INSUFFICIENT_EVIDENCE",
+            "reason": "fewer_than_60_complete_daily_clusters",
+            "complete_paired_sessions": 0,
+            "contrasts": 54,
+            "eligible_block_starts": null,
+            "calendar_gaps": null,
+            "unsupported_session_count": 0,
+            "non_null_lower_bounds": 0
+          },
+          "5": {
+            "status": "INSUFFICIENT_EVIDENCE",
+            "reason": "fewer_than_60_complete_daily_clusters",
+            "complete_paired_sessions": 0,
+            "contrasts": 54,
+            "eligible_block_starts": null,
+            "calendar_gaps": null,
+            "unsupported_session_count": 0,
+            "non_null_lower_bounds": 0
+          }
+        },
+        "development": {
+          "10": {
+            "status": "INSUFFICIENT_EVIDENCE",
+            "reason": "insufficient_contiguous_block_support",
+            "complete_paired_sessions": 103,
+            "contrasts": 54,
+            "eligible_block_starts": 2,
+            "calendar_gaps": 41,
+            "unsupported_session_count": 92,
+            "non_null_lower_bounds": 0
+          },
+          "5": {
+            "status": "INSUFFICIENT_EVIDENCE",
+            "reason": "insufficient_contiguous_block_support",
+            "complete_paired_sessions": 103,
+            "contrasts": 54,
+            "eligible_block_starts": 12,
+            "calendar_gaps": 41,
+            "unsupported_session_count": 71,
+            "non_null_lower_bounds": 0
+          }
+        }
+      }
+    },
+    {
+      "directory": "evaluation-v2-run-20261112",
+      "version": "v2",
+      "policy_count": 108,
+      "cost_views": 324,
+      "coverage": {
+        "expected_sessions": 30,
+        "certified_ticker_sessions": 255,
+        "complete_nine_symbol_sessions": 19,
+        "ticker_session_status_counts": {
+          "complete": 255,
+          "invalid": 15
+        }
+      },
+      "periods": {
+        "chronological_evaluation": {
+          "complete_sessions": 19,
+          "costs": {
+            "5": {
+              "absolute_sign_counts_by_role": {
+                "candidate": {
+                  "positive": 1,
+                  "negative": 53,
+                  "zero": 0,
+                  "total": 54
+                },
+                "baseline": {
+                  "positive": 0,
+                  "negative": 54,
+                  "zero": 0,
+                  "total": 54
+                }
+              },
+              "absolute_sign_counts_by_family_and_role": {
+                "H138_US_V2": {
+                  "candidate": {
+                    "positive": 0,
+                    "negative": 18,
+                    "zero": 0,
+                    "total": 18
+                  },
+                  "baseline": {
+                    "positive": 0,
+                    "negative": 18,
+                    "zero": 0,
+                    "total": 18
+                  }
+                },
+                "H142_US_V2": {
+                  "candidate": {
+                    "positive": 1,
+                    "negative": 17,
+                    "zero": 0,
+                    "total": 18
+                  },
+                  "baseline": {
+                    "positive": 0,
+                    "negative": 18,
+                    "zero": 0,
+                    "total": 18
+                  }
+                },
+                "H145_US_V2": {
+                  "candidate": {
+                    "positive": 0,
+                    "negative": 18,
+                    "zero": 0,
+                    "total": 18
+                  },
+                  "baseline": {
+                    "positive": 0,
+                    "negative": 18,
+                    "zero": 0,
+                    "total": 18
+                  }
+                }
+              },
+              "paired_cost_decomposition": {
+                "comparisons": 54,
+                "net_improvements": 54,
+                "gross_improvements": 25,
+                "net_improvements_without_positive_gross": 29,
+                "net_improvements_with_nonpositive_candidate_absolute": 53
+              }
+            },
+            "10": {
+              "absolute_sign_counts_by_role": {
+                "candidate": {
+                  "positive": 0,
+                  "negative": 54,
+                  "zero": 0,
+                  "total": 54
+                },
+                "baseline": {
+                  "positive": 0,
+                  "negative": 54,
+                  "zero": 0,
+                  "total": 54
+                }
+              },
+              "absolute_sign_counts_by_family_and_role": {
+                "H138_US_V2": {
+                  "candidate": {
+                    "positive": 0,
+                    "negative": 18,
+                    "zero": 0,
+                    "total": 18
+                  },
+                  "baseline": {
+                    "positive": 0,
+                    "negative": 18,
+                    "zero": 0,
+                    "total": 18
+                  }
+                },
+                "H142_US_V2": {
+                  "candidate": {
+                    "positive": 0,
+                    "negative": 18,
+                    "zero": 0,
+                    "total": 18
+                  },
+                  "baseline": {
+                    "positive": 0,
+                    "negative": 18,
+                    "zero": 0,
+                    "total": 18
+                  }
+                },
+                "H145_US_V2": {
+                  "candidate": {
+                    "positive": 0,
+                    "negative": 18,
+                    "zero": 0,
+                    "total": 18
+                  },
+                  "baseline": {
+                    "positive": 0,
+                    "negative": 18,
+                    "zero": 0,
+                    "total": 18
+                  }
+                }
+              },
+              "paired_cost_decomposition": {
+                "comparisons": 54,
+                "net_improvements": 54,
+                "gross_improvements": 25,
+                "net_improvements_without_positive_gross": 29,
+                "net_improvements_with_nonpositive_candidate_absolute": 54
+              }
+            },
+            "20": {
+              "absolute_sign_counts_by_role": {
+                "candidate": {
+                  "positive": 0,
+                  "negative": 54,
+                  "zero": 0,
+                  "total": 54
+                },
+                "baseline": {
+                  "positive": 0,
+                  "negative": 54,
+                  "zero": 0,
+                  "total": 54
+                }
+              },
+              "absolute_sign_counts_by_family_and_role": {
+                "H138_US_V2": {
+                  "candidate": {
+                    "positive": 0,
+                    "negative": 18,
+                    "zero": 0,
+                    "total": 18
+                  },
+                  "baseline": {
+                    "positive": 0,
+                    "negative": 18,
+                    "zero": 0,
+                    "total": 18
+                  }
+                },
+                "H142_US_V2": {
+                  "candidate": {
+                    "positive": 0,
+                    "negative": 18,
+                    "zero": 0,
+                    "total": 18
+                  },
+                  "baseline": {
+                    "positive": 0,
+                    "negative": 18,
+                    "zero": 0,
+                    "total": 18
+                  }
+                },
+                "H145_US_V2": {
+                  "candidate": {
+                    "positive": 0,
+                    "negative": 18,
+                    "zero": 0,
+                    "total": 18
+                  },
+                  "baseline": {
+                    "positive": 0,
+                    "negative": 18,
+                    "zero": 0,
+                    "total": 18
+                  }
+                }
+              },
+              "paired_cost_decomposition": {
+                "comparisons": 54,
+                "net_improvements": 54,
+                "gross_improvements": 25,
+                "net_improvements_without_positive_gross": 29,
+                "net_improvements_with_nonpositive_candidate_absolute": 54
+              }
+            }
+          }
+        }
+      },
+      "inference": {
+        "chronological_evaluation": {
+          "10": {
+            "status": "INSUFFICIENT_EVIDENCE",
+            "reason": "fewer_than_60_complete_daily_clusters",
+            "complete_paired_sessions": 19,
+            "contrasts": 54,
+            "eligible_block_starts": null,
+            "calendar_gaps": null,
+            "unsupported_session_count": 0,
+            "non_null_lower_bounds": 0
+          },
+          "5": {
+            "status": "INSUFFICIENT_EVIDENCE",
+            "reason": "fewer_than_60_complete_daily_clusters",
+            "complete_paired_sessions": 19,
+            "contrasts": 54,
+            "eligible_block_starts": null,
+            "calendar_gaps": null,
+            "unsupported_session_count": 0,
+            "non_null_lower_bounds": 0
+          }
+        },
+        "development": {
+          "10": {
+            "status": "INSUFFICIENT_EVIDENCE",
+            "reason": "fewer_than_60_complete_daily_clusters",
+            "complete_paired_sessions": 0,
+            "contrasts": 54,
+            "eligible_block_starts": null,
+            "calendar_gaps": null,
+            "unsupported_session_count": 0,
+            "non_null_lower_bounds": 0
+          },
+          "5": {
+            "status": "INSUFFICIENT_EVIDENCE",
+            "reason": "fewer_than_60_complete_daily_clusters",
+            "complete_paired_sessions": 0,
+            "contrasts": 54,
+            "eligible_block_starts": null,
+            "calendar_gaps": null,
+            "unsupported_session_count": 0,
+            "non_null_lower_bounds": 0
+          }
+        }
+      }
+    },
+    {
+      "directory": "supplement-s1-all-run-20261112",
+      "version": "S1",
+      "policy_count": 216,
+      "cost_views": 648,
+      "coverage": {
+        "expected_sessions": 217,
+        "certified_ticker_sessions": 1824,
+        "complete_nine_symbol_sessions": 122,
+        "ticker_session_status_counts": {
+          "complete": 1824,
+          "invalid": 129
+        }
+      },
+      "periods": {
+        "development": {
+          "complete_sessions": 103,
+          "costs": {
+            "5": {
+              "absolute_sign_counts_by_role": {
+                "candidate": {
+                  "positive": 0,
+                  "negative": 81,
+                  "zero": 0,
+                  "total": 81
+                },
+                "baseline": {
+                  "positive": 0,
+                  "negative": 126,
+                  "zero": 0,
+                  "total": 126
+                },
+                "falsification_diagnostic": {
+                  "positive": 0,
+                  "negative": 9,
+                  "zero": 0,
+                  "total": 9
+                }
+              },
+              "absolute_sign_counts_by_family_and_role": {
+                "H079_US_S1": {
+                  "candidate": {
+                    "positive": 0,
+                    "negative": 18,
+                    "zero": 0,
+                    "total": 18
+                  },
+                  "baseline": {
+                    "positive": 0,
+                    "negative": 18,
+                    "zero": 0,
+                    "total": 18
+                  }
+                },
+                "H080_US_S1": {
+                  "candidate": {
+                    "positive": 0,
+                    "negative": 9,
+                    "zero": 0,
+                    "total": 9
+                  },
+                  "baseline": {
+                    "positive": 0,
+                    "negative": 18,
+                    "zero": 0,
+                    "total": 18
+                  },
+                  "falsification_diagnostic": {
+                    "positive": 0,
+                    "negative": 9,
+                    "zero": 0,
+                    "total": 9
+                  }
+                },
+                "H139_US_S1": {
+                  "candidate": {
+                    "positive": 0,
+                    "negative": 18,
+                    "zero": 0,
+                    "total": 18
+                  },
+                  "baseline": {
+                    "positive": 0,
+                    "negative": 36,
+                    "zero": 0,
+                    "total": 36
+                  }
+                },
+                "H140_US_S1": {
+                  "candidate": {
+                    "positive": 0,
+                    "negative": 18,
+                    "zero": 0,
+                    "total": 18
+                  },
+                  "baseline": {
+                    "positive": 0,
+                    "negative": 36,
+                    "zero": 0,
+                    "total": 36
+                  }
+                },
+                "H144_US_S1": {
+                  "candidate": {
+                    "positive": 0,
+                    "negative": 18,
+                    "zero": 0,
+                    "total": 18
+                  },
+                  "baseline": {
+                    "positive": 0,
+                    "negative": 18,
+                    "zero": 0,
+                    "total": 18
+                  }
+                }
+              },
+              "paired_cost_decomposition": {
+                "comparisons": 126,
+                "net_improvements": 104,
+                "gross_improvements": 63,
+                "net_improvements_without_positive_gross": 42,
+                "net_improvements_with_nonpositive_candidate_absolute": 104
+              }
+            },
+            "10": {
+              "absolute_sign_counts_by_role": {
+                "candidate": {
+                  "positive": 0,
+                  "negative": 81,
+                  "zero": 0,
+                  "total": 81
+                },
+                "baseline": {
+                  "positive": 0,
+                  "negative": 126,
+                  "zero": 0,
+                  "total": 126
+                },
+                "falsification_diagnostic": {
+                  "positive": 0,
+                  "negative": 9,
+                  "zero": 0,
+                  "total": 9
+                }
+              },
+              "absolute_sign_counts_by_family_and_role": {
+                "H079_US_S1": {
+                  "candidate": {
+                    "positive": 0,
+                    "negative": 18,
+                    "zero": 0,
+                    "total": 18
+                  },
+                  "baseline": {
+                    "positive": 0,
+                    "negative": 18,
+                    "zero": 0,
+                    "total": 18
+                  }
+                },
+                "H080_US_S1": {
+                  "candidate": {
+                    "positive": 0,
+                    "negative": 9,
+                    "zero": 0,
+                    "total": 9
+                  },
+                  "baseline": {
+                    "positive": 0,
+                    "negative": 18,
+                    "zero": 0,
+                    "total": 18
+                  },
+                  "falsification_diagnostic": {
+                    "positive": 0,
+                    "negative": 9,
+                    "zero": 0,
+                    "total": 9
+                  }
+                },
+                "H139_US_S1": {
+                  "candidate": {
+                    "positive": 0,
+                    "negative": 18,
+                    "zero": 0,
+                    "total": 18
+                  },
+                  "baseline": {
+                    "positive": 0,
+                    "negative": 36,
+                    "zero": 0,
+                    "total": 36
+                  }
+                },
+                "H140_US_S1": {
+                  "candidate": {
+                    "positive": 0,
+                    "negative": 18,
+                    "zero": 0,
+                    "total": 18
+                  },
+                  "baseline": {
+                    "positive": 0,
+                    "negative": 36,
+                    "zero": 0,
+                    "total": 36
+                  }
+                },
+                "H144_US_S1": {
+                  "candidate": {
+                    "positive": 0,
+                    "negative": 18,
+                    "zero": 0,
+                    "total": 18
+                  },
+                  "baseline": {
+                    "positive": 0,
+                    "negative": 18,
+                    "zero": 0,
+                    "total": 18
+                  }
+                }
+              },
+              "paired_cost_decomposition": {
+                "comparisons": 126,
+                "net_improvements": 110,
+                "gross_improvements": 63,
+                "net_improvements_without_positive_gross": 50,
+                "net_improvements_with_nonpositive_candidate_absolute": 110
+              }
+            },
+            "20": {
+              "absolute_sign_counts_by_role": {
+                "candidate": {
+                  "positive": 0,
+                  "negative": 81,
+                  "zero": 0,
+                  "total": 81
+                },
+                "baseline": {
+                  "positive": 0,
+                  "negative": 126,
+                  "zero": 0,
+                  "total": 126
+                },
+                "falsification_diagnostic": {
+                  "positive": 0,
+                  "negative": 9,
+                  "zero": 0,
+                  "total": 9
+                }
+              },
+              "absolute_sign_counts_by_family_and_role": {
+                "H079_US_S1": {
+                  "candidate": {
+                    "positive": 0,
+                    "negative": 18,
+                    "zero": 0,
+                    "total": 18
+                  },
+                  "baseline": {
+                    "positive": 0,
+                    "negative": 18,
+                    "zero": 0,
+                    "total": 18
+                  }
+                },
+                "H080_US_S1": {
+                  "candidate": {
+                    "positive": 0,
+                    "negative": 9,
+                    "zero": 0,
+                    "total": 9
+                  },
+                  "baseline": {
+                    "positive": 0,
+                    "negative": 18,
+                    "zero": 0,
+                    "total": 18
+                  },
+                  "falsification_diagnostic": {
+                    "positive": 0,
+                    "negative": 9,
+                    "zero": 0,
+                    "total": 9
+                  }
+                },
+                "H139_US_S1": {
+                  "candidate": {
+                    "positive": 0,
+                    "negative": 18,
+                    "zero": 0,
+                    "total": 18
+                  },
+                  "baseline": {
+                    "positive": 0,
+                    "negative": 36,
+                    "zero": 0,
+                    "total": 36
+                  }
+                },
+                "H140_US_S1": {
+                  "candidate": {
+                    "positive": 0,
+                    "negative": 18,
+                    "zero": 0,
+                    "total": 18
+                  },
+                  "baseline": {
+                    "positive": 0,
+                    "negative": 36,
+                    "zero": 0,
+                    "total": 36
+                  }
+                },
+                "H144_US_S1": {
+                  "candidate": {
+                    "positive": 0,
+                    "negative": 18,
+                    "zero": 0,
+                    "total": 18
+                  },
+                  "baseline": {
+                    "positive": 0,
+                    "negative": 18,
+                    "zero": 0,
+                    "total": 18
+                  }
+                }
+              },
+              "paired_cost_decomposition": {
+                "comparisons": 126,
+                "net_improvements": 110,
+                "gross_improvements": 63,
+                "net_improvements_without_positive_gross": 52,
+                "net_improvements_with_nonpositive_candidate_absolute": 110
+              }
+            }
+          }
+        },
+        "chronological_evaluation": {
+          "complete_sessions": 19,
+          "costs": {
+            "5": {
+              "absolute_sign_counts_by_role": {
+                "candidate": {
+                  "positive": 2,
+                  "negative": 79,
+                  "zero": 0,
+                  "total": 81
+                },
+                "baseline": {
+                  "positive": 0,
+                  "negative": 126,
+                  "zero": 0,
+                  "total": 126
+                },
+                "falsification_diagnostic": {
+                  "positive": 0,
+                  "negative": 9,
+                  "zero": 0,
+                  "total": 9
+                }
+              },
+              "absolute_sign_counts_by_family_and_role": {
+                "H079_US_S1": {
+                  "candidate": {
+                    "positive": 2,
+                    "negative": 16,
+                    "zero": 0,
+                    "total": 18
+                  },
+                  "baseline": {
+                    "positive": 0,
+                    "negative": 18,
+                    "zero": 0,
+                    "total": 18
+                  }
+                },
+                "H080_US_S1": {
+                  "candidate": {
+                    "positive": 0,
+                    "negative": 9,
+                    "zero": 0,
+                    "total": 9
+                  },
+                  "baseline": {
+                    "positive": 0,
+                    "negative": 18,
+                    "zero": 0,
+                    "total": 18
+                  },
+                  "falsification_diagnostic": {
+                    "positive": 0,
+                    "negative": 9,
+                    "zero": 0,
+                    "total": 9
+                  }
+                },
+                "H139_US_S1": {
+                  "candidate": {
+                    "positive": 0,
+                    "negative": 18,
+                    "zero": 0,
+                    "total": 18
+                  },
+                  "baseline": {
+                    "positive": 0,
+                    "negative": 36,
+                    "zero": 0,
+                    "total": 36
+                  }
+                },
+                "H140_US_S1": {
+                  "candidate": {
+                    "positive": 0,
+                    "negative": 18,
+                    "zero": 0,
+                    "total": 18
+                  },
+                  "baseline": {
+                    "positive": 0,
+                    "negative": 36,
+                    "zero": 0,
+                    "total": 36
+                  }
+                },
+                "H144_US_S1": {
+                  "candidate": {
+                    "positive": 0,
+                    "negative": 18,
+                    "zero": 0,
+                    "total": 18
+                  },
+                  "baseline": {
+                    "positive": 0,
+                    "negative": 18,
+                    "zero": 0,
+                    "total": 18
+                  }
+                }
+              },
+              "paired_cost_decomposition": {
+                "comparisons": 126,
+                "net_improvements": 107,
+                "gross_improvements": 66,
+                "net_improvements_without_positive_gross": 43,
+                "net_improvements_with_nonpositive_candidate_absolute": 105
+              }
+            },
+            "10": {
+              "absolute_sign_counts_by_role": {
+                "candidate": {
+                  "positive": 0,
+                  "negative": 81,
+                  "zero": 0,
+                  "total": 81
+                },
+                "baseline": {
+                  "positive": 0,
+                  "negative": 126,
+                  "zero": 0,
+                  "total": 126
+                },
+                "falsification_diagnostic": {
+                  "positive": 0,
+                  "negative": 9,
+                  "zero": 0,
+                  "total": 9
+                }
+              },
+              "absolute_sign_counts_by_family_and_role": {
+                "H079_US_S1": {
+                  "candidate": {
+                    "positive": 0,
+                    "negative": 18,
+                    "zero": 0,
+                    "total": 18
+                  },
+                  "baseline": {
+                    "positive": 0,
+                    "negative": 18,
+                    "zero": 0,
+                    "total": 18
+                  }
+                },
+                "H080_US_S1": {
+                  "candidate": {
+                    "positive": 0,
+                    "negative": 9,
+                    "zero": 0,
+                    "total": 9
+                  },
+                  "baseline": {
+                    "positive": 0,
+                    "negative": 18,
+                    "zero": 0,
+                    "total": 18
+                  },
+                  "falsification_diagnostic": {
+                    "positive": 0,
+                    "negative": 9,
+                    "zero": 0,
+                    "total": 9
+                  }
+                },
+                "H139_US_S1": {
+                  "candidate": {
+                    "positive": 0,
+                    "negative": 18,
+                    "zero": 0,
+                    "total": 18
+                  },
+                  "baseline": {
+                    "positive": 0,
+                    "negative": 36,
+                    "zero": 0,
+                    "total": 36
+                  }
+                },
+                "H140_US_S1": {
+                  "candidate": {
+                    "positive": 0,
+                    "negative": 18,
+                    "zero": 0,
+                    "total": 18
+                  },
+                  "baseline": {
+                    "positive": 0,
+                    "negative": 36,
+                    "zero": 0,
+                    "total": 36
+                  }
+                },
+                "H144_US_S1": {
+                  "candidate": {
+                    "positive": 0,
+                    "negative": 18,
+                    "zero": 0,
+                    "total": 18
+                  },
+                  "baseline": {
+                    "positive": 0,
+                    "negative": 18,
+                    "zero": 0,
+                    "total": 18
+                  }
+                }
+              },
+              "paired_cost_decomposition": {
+                "comparisons": 126,
+                "net_improvements": 107,
+                "gross_improvements": 66,
+                "net_improvements_without_positive_gross": 45,
+                "net_improvements_with_nonpositive_candidate_absolute": 107
+              }
+            },
+            "20": {
+              "absolute_sign_counts_by_role": {
+                "candidate": {
+                  "positive": 0,
+                  "negative": 81,
+                  "zero": 0,
+                  "total": 81
+                },
+                "baseline": {
+                  "positive": 0,
+                  "negative": 126,
+                  "zero": 0,
+                  "total": 126
+                },
+                "falsification_diagnostic": {
+                  "positive": 0,
+                  "negative": 9,
+                  "zero": 0,
+                  "total": 9
+                }
+              },
+              "absolute_sign_counts_by_family_and_role": {
+                "H079_US_S1": {
+                  "candidate": {
+                    "positive": 0,
+                    "negative": 18,
+                    "zero": 0,
+                    "total": 18
+                  },
+                  "baseline": {
+                    "positive": 0,
+                    "negative": 18,
+                    "zero": 0,
+                    "total": 18
+                  }
+                },
+                "H080_US_S1": {
+                  "candidate": {
+                    "positive": 0,
+                    "negative": 9,
+                    "zero": 0,
+                    "total": 9
+                  },
+                  "baseline": {
+                    "positive": 0,
+                    "negative": 18,
+                    "zero": 0,
+                    "total": 18
+                  },
+                  "falsification_diagnostic": {
+                    "positive": 0,
+                    "negative": 9,
+                    "zero": 0,
+                    "total": 9
+                  }
+                },
+                "H139_US_S1": {
+                  "candidate": {
+                    "positive": 0,
+                    "negative": 18,
+                    "zero": 0,
+                    "total": 18
+                  },
+                  "baseline": {
+                    "positive": 0,
+                    "negative": 36,
+                    "zero": 0,
+                    "total": 36
+                  }
+                },
+                "H140_US_S1": {
+                  "candidate": {
+                    "positive": 0,
+                    "negative": 18,
+                    "zero": 0,
+                    "total": 18
+                  },
+                  "baseline": {
+                    "positive": 0,
+                    "negative": 36,
+                    "zero": 0,
+                    "total": 36
+                  }
+                },
+                "H144_US_S1": {
+                  "candidate": {
+                    "positive": 0,
+                    "negative": 18,
+                    "zero": 0,
+                    "total": 18
+                  },
+                  "baseline": {
+                    "positive": 0,
+                    "negative": 18,
+                    "zero": 0,
+                    "total": 18
+                  }
+                }
+              },
+              "paired_cost_decomposition": {
+                "comparisons": 126,
+                "net_improvements": 110,
+                "gross_improvements": 66,
+                "net_improvements_without_positive_gross": 49,
+                "net_improvements_with_nonpositive_candidate_absolute": 110
+              }
+            }
+          }
+        }
+      },
+      "inference": {
+        "chronological_evaluation": {
+          "10": {
+            "status": "INSUFFICIENT_EVIDENCE",
+            "reason": "fewer_than_60_complete_daily_clusters",
+            "complete_paired_sessions": 19,
+            "contrasts": 180,
+            "eligible_block_starts": null,
+            "calendar_gaps": null,
+            "unsupported_session_count": 0,
+            "non_null_lower_bounds": 0
+          },
+          "5": {
+            "status": "INSUFFICIENT_EVIDENCE",
+            "reason": "fewer_than_60_complete_daily_clusters",
+            "complete_paired_sessions": 19,
+            "contrasts": 180,
+            "eligible_block_starts": null,
+            "calendar_gaps": null,
+            "unsupported_session_count": 0,
+            "non_null_lower_bounds": 0
+          }
+        },
+        "development": {
+          "10": {
+            "status": "INSUFFICIENT_EVIDENCE",
+            "reason": "insufficient_contiguous_block_support",
+            "complete_paired_sessions": 103,
+            "contrasts": 180,
+            "eligible_block_starts": 2,
+            "calendar_gaps": 41,
+            "unsupported_session_count": 92,
+            "non_null_lower_bounds": 0
+          },
+          "5": {
+            "status": "INSUFFICIENT_EVIDENCE",
+            "reason": "insufficient_contiguous_block_support",
+            "complete_paired_sessions": 103,
+            "contrasts": 180,
+            "eligible_block_starts": 12,
+            "calendar_gaps": 41,
+            "unsupported_session_count": 71,
+            "non_null_lower_bounds": 0
+          }
+        }
+      }
+    }
+  ],
+  "combined_current_family": {
+    "v2_candidates": 54,
+    "S1_source_directed_candidates": 81,
+    "S1_short_H080_falsification_controls": 9,
+    "all_policies": 324,
+    "cost_views": 972,
+    "primary_contrasts": 180
+  },
+  "StudyG_access_disclosure": {
+    "raw_CSV_bytes_and_all_columns_were_loaded_during_archive_inventory": true,
+    "analysis_and_display_were_limited_to_schema_ticker_date_count_hash_metadata": true,
+    "prescribed_StudyG_runner_features_residual_labels_or_return_experiment_computed": false,
+    "source": "archive inventory plus api_inventory implementation disclosure: csv.DictReader rows=list(reader) and read_bytes for SHA256",
+    "no_new_StudyG_file_access_by_this_final_audit": true
+  },
+  "interpretation_checks": {
+    "positive_paired_difference_is_not_positive_absolute_profit": true,
+    "calendar_exposure_and_cost_changes_are_not_calendar_alpha": true,
+    "H080_short_controls_are_not_positive_drift_support": true,
+    "stock_open_price_proxies_are_not_option_or_live_execution_results": true,
+    "costs_are_assumed_roundtrip_bps_and_short_borrow_is_unverified": true,
+    "whole_session_quality_selection_is_retrospective_and_may_be_nonrandom": true,
+    "chronological_evaluation_partly_observed_not_untouched": true,
+    "underlying_dates_overlap_StudyG_and_raw_G_csv_bytes_were_parsed_during_archive_inventory": true,
+    "StudyG_inventory_analysis_was_schema_ticker_date_count_hash_metadata_only_not_its_prescribed_feature_label_return_experiment": true,
+    "DSR_and_cluster_inference_have_no_pass": true,
+    "no_selective_winner_or_hypothesis_tuning": true
+  },
+  "source_sha256": {
+    "inventory.json": "81cfa00a63daf9b26436faceec5f6064a949b2d686a3cb7341d8443fd59f62d4",
+    "bulk/coverage-manifest.json": "15e2233104e751b0354f8389ea2c51a96f4ec1769d34929e1b8c8a01ac85528e",
+    "bulk/acquisition-completion.json": "2fe95cf0abf41fd13f5b6189a62b1a49a71a28b52c16aefdcd6a999f327d050d",
+    "bulk/all-exclusion-volume-audit.json": "b431bb30e81d0f6630f053e0ef68fe5b55d0355e9617db1b5b6372d2d996b98d",
+    "bulk/request-ledger-verification.json": "0570916c2d6a347886f6b35172e572a6b9d8770960a832a8c2546b5cb56c895e",
+    "additional-archive-search.json": "c99721c895e191aedbc7205f48ecf9f506ce14689f300e1e4a63137c36f97d84",
+    "development-v2-run-20261112/report.json": "043d150f5fc62abab598ea5748cd1f1d30a8cce0bb77a1d39755a7aa1370f075",
+    "development-v2-run-20261112/run-seal.json": "d18471617ff4fcfb28cad4d37accfc89e2d0ed2eb97df974d979ff2f367d00ee",
+    "development-v2-run-20261112/evaluated-registry.json": "b795a2ff62806dfed15f3a35272dc5d2c53cd3041aad3b426e9ddc8f38990cca",
+    "development-v2-run-20261112/joint-block-inference.json": "19d4bf269753a7d1f0a8237e530c31e8246e14f39f2ee54ce4b2f2587a096aaf",
+    "development-v2-run-20261112/paired-contrasts.json": "e1c8c3ebccbccce56ff52b45d1dbaa896e469fb5ed897c5ad51ade0a1e027991",
+    "development-v2-run-20261112/per-month-results.json": "7c020cb5f6000d790f6efe96371e19cabf1033279bd39ba1e43aff5088b0989b",
+    "development-v2-run-20261112/per-trial-results.json": "d5c06b56150d78c741e01a6890927be63b4f96ddbb24996a174084e1f179b640",
+    "development-v2-run-20261112/purged-folds.json": "ec95071d28d1d21e88325a2d34000d73888b88974ddad8c157adda4479bd39fc",
+    "development-v2-run-20261112/input-coverage-manifest.json": "3697f61f0dbc99cd0d2145375443b6b21b7beed191f1046221d4ccbc189324b5",
+    "development-v2-run-20261112/input-dataset-plan.json": "0cf37ff8a6ceca675f26b81b1c7097b19ff84556112635c3a5bdae6ac91c9504",
+    "pilot-registry-v2.json": "cb04d0c52d8a941ab622e69b2d21281fe72afbc6418dd0bf82f461435b8bcaa9",
+    "development-v2-run-20261112/daily_proxy_returns_cost05.parquet": "f728af324c5c30294aa5a2182fe44e6cc57bc25a6871beeddaec3fee92ba2e98",
+    "development-v2-run-20261112/daily_proxy_returns_cost10.parquet": "9ae624a3cceb01a02e1e014d8e273e6194aa5e8f1e958be8f6226f9b4bda760d",
+    "development-v2-run-20261112/daily_proxy_returns_cost20.parquet": "997f77dc588ee971de145c2854bcb4c3f82618057cb91a79ae2e298e598ca1fc",
+    "evaluation-v2-run-20261112/report.json": "759b890586206770485781fb193673263cd382e3ccccf866979badbc1bcb236a",
+    "evaluation-v2-run-20261112/run-seal.json": "c45b702ff3f2f3a122d0a7b2ae9fe93bcfbe5052194e139555593020ee0d2d82",
+    "evaluation-v2-run-20261112/evaluated-registry.json": "b795a2ff62806dfed15f3a35272dc5d2c53cd3041aad3b426e9ddc8f38990cca",
+    "evaluation-v2-run-20261112/joint-block-inference.json": "320798f4dedf96cce337792a5dc554baf1dbe56d6d8bceb648b2652e9cac121b",
+    "evaluation-v2-run-20261112/paired-contrasts.json": "b77b2cdaf56d25e2553dc5e8b6e0c5def21b2a44ee3bc083ea04d4bee9fe4632",
+    "evaluation-v2-run-20261112/per-month-results.json": "9f96ef85ab495edbc9d2b7899ec63d53a9b2f2e013bd19a429badf2e4b9313e8",
+    "evaluation-v2-run-20261112/per-trial-results.json": "dcf9adca7b095410f1fbdb6858b3d5fea4c7bc5df2d7b6efb6ea410e08bd0d30",
+    "evaluation-v2-run-20261112/purged-folds.json": "e6fac165b406746bd289df383338c8412c6e6dc35b714d6106f75fdc07720512",
+    "evaluation-v2-run-20261112/input-coverage-manifest.json": "c6ff46ef5d6143f631d441c9ea78581701c6087b12e7bc82d4f498eea02bad12",
+    "evaluation-v2-run-20261112/input-dataset-plan.json": "0cf37ff8a6ceca675f26b81b1c7097b19ff84556112635c3a5bdae6ac91c9504",
+    "evaluation-v2-run-20261112/daily_proxy_returns_cost05.parquet": "94baf6a415ca8fcc4292bddc35745625435df03d4f179b64430acd0c9a961caa",
+    "evaluation-v2-run-20261112/daily_proxy_returns_cost10.parquet": "7db056684411d2d4582dd7a87c038fa51da381eeee0a448094ced2d1913b42e0",
+    "evaluation-v2-run-20261112/daily_proxy_returns_cost20.parquet": "9248e9c8dca43c21e2235dfdc0dcaf22f42abf6ac08da515fa8af2e56aaff5d1",
+    "supplement-s1-all-run-20261112/report.json": "4697793a62eb505ca2af78b7e87ece76d6f38d3a3ba8d808e331d36c8eee0fd6",
+    "supplement-s1-all-run-20261112/run-seal.json": "eda6b774e23b4bbe8993a11d55d51c6d30c074a1766987c99d7f303f7d25e18d",
+    "supplement-s1-all-run-20261112/evaluated-registry.json": "8d4892eaa13afe6735d9a89d93ec3e0495827beee9edd22e4bc6ca68aaced168",
+    "supplement-s1-all-run-20261112/joint-combined180-inference.json": "0d0717bd5bb79dca8b8c38d4b9e7f4fb38ed3098cad165d5f15339bff7ac974f",
+    "supplement-s1-all-run-20261112/paired-contrasts.json": "0a073146221ab286b1c7d17f6f3929996e71b9565e5f736d0b18ebe73decac23",
+    "supplement-s1-all-run-20261112/per-month-results.json": "b280e1e4c9d0f8a7918db5099a4aa7324c0cc5d98f075571f9991779e2d18a72",
+    "supplement-s1-all-run-20261112/per-policy-results.json": "038119d54418885bcaa11b976ad9694549d26ae9dc00f8449ca96df02f739bb8",
+    "supplement-s1-all-run-20261112/purged-folds.json": "60e7684d7aa61b0ef66c328e4d86fc9f6dc72492677b9373850808f74ef22064",
+    "supplement-s1-all-run-20261112/input-coverage-manifest.json": "c6ff46ef5d6143f631d441c9ea78581701c6087b12e7bc82d4f498eea02bad12",
+    "supplement-s1-all-run-20261112/input-dataset-plan.json": "0cf37ff8a6ceca675f26b81b1c7097b19ff84556112635c3a5bdae6ac91c9504",
+    "supplement-s1-all-run-20261112/v2_0_daily_proxy_returns_cost05.parquet": "f728af324c5c30294aa5a2182fe44e6cc57bc25a6871beeddaec3fee92ba2e98",
+    "supplement-s1-all-run-20261112/v2_0_input-coverage-manifest.json": "3697f61f0dbc99cd0d2145375443b6b21b7beed191f1046221d4ccbc189324b5",
+    "supplement-s1-all-run-20261112/v2_0_per-trial-results.json": "d5c06b56150d78c741e01a6890927be63b4f96ddbb24996a174084e1f179b640",
+    "supplement-s1-all-run-20261112/v2_0_report.json": "043d150f5fc62abab598ea5748cd1f1d30a8cce0bb77a1d39755a7aa1370f075",
+    "supplement-s1-all-run-20261112/v2_0_run-seal.json": "d18471617ff4fcfb28cad4d37accfc89e2d0ed2eb97df974d979ff2f367d00ee",
+    "supplement-s1-all-run-20261112/v2_1_daily_proxy_returns_cost05.parquet": "94baf6a415ca8fcc4292bddc35745625435df03d4f179b64430acd0c9a961caa",
+    "supplement-s1-all-run-20261112/v2_1_input-coverage-manifest.json": "c6ff46ef5d6143f631d441c9ea78581701c6087b12e7bc82d4f498eea02bad12",
+    "supplement-s1-all-run-20261112/v2_1_per-trial-results.json": "dcf9adca7b095410f1fbdb6858b3d5fea4c7bc5df2d7b6efb6ea410e08bd0d30",
+    "supplement-s1-all-run-20261112/v2_1_report.json": "759b890586206770485781fb193673263cd382e3ccccf866979badbc1bcb236a",
+    "supplement-s1-all-run-20261112/v2_1_run-seal.json": "c45b702ff3f2f3a122d0a7b2ae9fe93bcfbe5052194e139555593020ee0d2d82",
+    "supplement-registry-s1.json": "c1594fbe4fef17261884dc30b6edbf593f4a388e919993c1d0bb3cf767e05e70",
+    "supplement-s1-all-run-20261112/daily_proxy_returns_cost05.parquet": "ed66e3ee27276051df986be92436058add6933824c209951877ec3a7c3a04e7d",
+    "supplement-s1-all-run-20261112/daily_proxy_returns_cost10.parquet": "ce0ebd2031e3fbb4dadbef6f512e13b3079d0b64cdc220d284aa7a2fe7c899e9",
+    "supplement-s1-all-run-20261112/daily_proxy_returns_cost20.parquet": "8c14b50bdcb1842fffa20316ce78d4e9880f67f094fd2a93210948e5d67aa94b",
+    "supplement-s1-all-run-20261112/combined180_daily_contrasts_cost05.parquet": "0c15dbe7c85a579c8331660cc7a7f7c57a2ecf6efe75428309fdaf4903fcd41e",
+    "final-all-policy-checks.csv": "078569305cf1ca003220acbb4a6850b09d891c775b8a1c54acf9fb836219e777",
+    "build_final_review.py": "4f50c4b81c2b1171c21a1bf80c018f9bc75e1198168a0b25ede7ca907073c22a"
+  }
+}

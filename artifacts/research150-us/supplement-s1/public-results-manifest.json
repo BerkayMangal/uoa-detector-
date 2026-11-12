@@ -1,0 +1,28 @@
+{
+  "all_policies_retained": true,
+  "files": {
+    "all-126-paired-contrasts-all-costs-periods.json.gz": {
+      "bytes": 35839,
+      "sha256": "d24cc78175213059ebf20bc58a6fc1cd106f557113f4a85e5cef981f935a40d8"
+    },
+    "all-216-policy-results.csv": {
+      "bytes": 90267,
+      "sha256": "3f384b3ebba6180d94bb487ecdad224630d6095ed0ec893c93ffcc799a6ef725"
+    },
+    "full-648-policy-cost-results.json.gz": {
+      "bytes": 746256,
+      "sha256": "897d7cca47fd61bd3b83f697cf072cb6f7fa1879ea712bac29dd6b02b32c5331"
+    },
+    "supplement-overview.json": {
+      "bytes": 18160,
+      "sha256": "1b15e775ba71cd3d2ba95280ec3d0ea931606545a0ed2ccc9b11188ea6e37364"
+    }
+  },
+  "original_uncompressed_sha256": {
+    "all-126-paired-contrasts-all-costs-periods.json.gz": "0a073146221ab286b1c7d17f6f3929996e71b9565e5f736d0b18ebe73decac23",
+    "full-648-policy-cost-results.json.gz": "038119d54418885bcaa11b976ad9694549d26ae9dc00f8449ca96df02f739bb8"
+  },
+  "reporter_sha256": "4aaf465ecf8609e00c6f0f1bb88012029dd712c4ce5200f221bf471099ec23dc",
+  "scope": "Exact original bytes of all648 per-policy-cost result records; all126 comparisons at3costs and both periods. Deterministic gzip mtime0. Monthly detail, raw trades, features and native inputs remain in complete local run artifacts.",
+  "total_bytes": 890522
+}

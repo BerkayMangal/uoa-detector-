@@ -1,0 +1,24 @@
+{
+  "status": "PASS",
+  "checks": [
+    {
+      "run": "development-v2-run-20261112",
+      "registry_policy_files": 108,
+      "selected_trade_rows_checked": 1827019,
+      "native_price_lookups_checked": 18,
+      "artifact_hashes_verified": true,
+      "entry_delay_horizon_nonoverlap_gross_arithmetic_passed": true,
+      "input_and_strategy_changes": false
+    },
+    {
+      "run": "evaluation-v2-run-20261112",
+      "registry_policy_files": 108,
+      "selected_trade_rows_checked": 335237,
+      "native_price_lookups_checked": 18,
+      "artifact_hashes_verified": true,
+      "entry_delay_horizon_nonoverlap_gross_arithmetic_passed": true,
+      "input_and_strategy_changes": false
+    }
+  ],
+  "meaning": "Independent mechanical consistency checks; no inference, profit guarantee, or actual execution established."
+}
