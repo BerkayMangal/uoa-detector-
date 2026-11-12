@@ -8,7 +8,8 @@ import json
 from pathlib import Path
 
 from ruamel.yaml import YAML
-from webapp.history_capture.capture import ROOT, capture, settings
+from webapp.history_capture.capture import ROOT
+from webapp.history_capture.capture_v2 import capture, settings
 
 
 def main() -> int:

@@ -1,0 +1,1013 @@
+{
+  "generated_at": "2026-11-12",
+  "live_theta_verified": false,
+  "uw_read_attempts": 66,
+  "uw_daily_limit_observed": 30000,
+  "quote_diagnostic": {
+    "protocol": {
+      "created_at": "2026-11-12T11:40:39.455348+00:00",
+      "purpose": "Retrospective feasibility and cost audit of eight previously recorded stock candidates; not original option selections or forward option PnL",
+      "cohort_dates": [
+        "2026-11-09",
+        "2026-11-10",
+        "2026-11-11"
+      ],
+      "selection": "For each existing motor report row, select highest total_premium historical CALL alert created_at strictly before source_started_at and after regular session open; require total_ask_side_prem/total_premium >=0.8, has_multileg false, DTE 7 through45; break ties by created_at then id. No reselection based on quote availability or outcomes. Retain missing candidates.",
+      "entry": "First valid contract-flow NBBO event at or after original stock planned entry target, within120 seconds, both quote ages0..5 seconds and both sizes>=1, regular session only. Only use provider intervals with established coverage.",
+      "exit": "Same rule +15 or+60 minutes after actual entry event; separate alternatives",
+      "costs": {
+        "entry": "ask +0.01",
+        "exit": "max(0,bid-0.01)",
+        "commission_per_contract_per_side_usd": 0.65,
+        "contracts": 1,
+        "multiplier": 100
+      },
+      "inference": "NONE; only3 sessions, contract mapping selected retrospectively, downloadable data missingness possible. No live strategy replacement."
+    },
+    "selection_sha256": "6a6a3363e546bf465c7e013317ac712ab75082300ba52e8380ce0f5fb801de11",
+    "window_requests": 8,
+    "inference": "NONE",
+    "rows": [
+      {
+        "option_symbol": "GOOGL261120C00300000",
+        "session": "2026-11-09",
+        "planned_entry_at": "2026-11-09T14:51:21.276701+00:00",
+        "received_at": "2026-11-12T11:44:23.940123+00:00",
+        "status": "UNKNOWN",
+        "reason": "incomplete_source_coverage",
+        "coverage_complete": false,
+        "rejected_rows": {},
+        "entry_quote": null,
+        "entry_delay_seconds": null,
+        "modeled_entry_price": null,
+        "entry_same_quote_roundtrip_friction_usd": null,
+        "contracts": 1,
+        "assumed_standard_multiplier": 100,
+        "slippage_per_share_per_side": "0.01",
+        "fee_per_contract_per_side_usd": "0.65",
+        "max_quote_age_seconds": 5,
+        "max_wait_seconds": 120,
+        "data_use": "retrospective_quote_markout",
+        "executable_fill_proven": false,
+        "markouts": [
+          {
+            "horizon_minutes": 15,
+            "status": "UNKNOWN",
+            "reason": "incomplete_source_coverage",
+            "target_at": null,
+            "exit_quote": null,
+            "exit_delay_seconds": null,
+            "modeled_exit_price": null,
+            "quote_gross_pnl_usd": null,
+            "modeled_gross_pnl_usd": null,
+            "modeled_net_pnl_usd": null,
+            "modeled_return_pct": null
+          },
+          {
+            "horizon_minutes": 60,
+            "status": "UNKNOWN",
+            "reason": "incomplete_source_coverage",
+            "target_at": null,
+            "exit_quote": null,
+            "exit_delay_seconds": null,
+            "modeled_exit_price": null,
+            "quote_gross_pnl_usd": null,
+            "modeled_gross_pnl_usd": null,
+            "modeled_net_pnl_usd": null,
+            "modeled_return_pct": null
+          }
+        ],
+        "limitations": [
+          "Later-downloaded trade-attached NBBO is not a historical availability record.",
+          "Displayed size and fresh NBBO do not prove a broker fill or available liquidity.",
+          "Standard 100-share deliverable is assumed and unverified; regex cannot prove deliverables.",
+          "15- and 60-minute markouts are alternative holds and must not be added together."
+        ],
+        "coverage_reason": "Nov9 contract history empty; Nov10 history truncated after required entry; latest-day tape endpoint explicitly rejects historical dates.",
+        "candidate_key": "50bb89103b894ff46cb9ac29a8a1a5219291c8bd01ebb65ac5986076a3d66f68",
+        "ticker": "GOOGL",
+        "day": "2026-11-09",
+        "source_started_at": "2026-11-09T14:50:09.055670Z",
+        "contract_selected_retrospectively": true
+      },
+      {
+        "option_symbol": "MSFT261127C00485000",
+        "session": "2026-11-09",
+        "planned_entry_at": "2026-11-09T15:23:20.765788+00:00",
+        "received_at": "2026-11-12T11:44:23.943622+00:00",
+        "status": "UNKNOWN",
+        "reason": "incomplete_source_coverage",
+        "coverage_complete": false,
+        "rejected_rows": {},
+        "entry_quote": null,
+        "entry_delay_seconds": null,
+        "modeled_entry_price": null,
+        "entry_same_quote_roundtrip_friction_usd": null,
+        "contracts": 1,
+        "assumed_standard_multiplier": 100,
+        "slippage_per_share_per_side": "0.01",
+        "fee_per_contract_per_side_usd": "0.65",
+        "max_quote_age_seconds": 5,
+        "max_wait_seconds": 120,
+        "data_use": "retrospective_quote_markout",
+        "executable_fill_proven": false,
+        "markouts": [
+          {
+            "horizon_minutes": 15,
+            "status": "UNKNOWN",
+            "reason": "incomplete_source_coverage",
+            "target_at": null,
+            "exit_quote": null,
+            "exit_delay_seconds": null,
+            "modeled_exit_price": null,
+            "quote_gross_pnl_usd": null,
+            "modeled_gross_pnl_usd": null,
+            "modeled_net_pnl_usd": null,
+            "modeled_return_pct": null
+          },
+          {
+            "horizon_minutes": 60,
+            "status": "UNKNOWN",
+            "reason": "incomplete_source_coverage",
+            "target_at": null,
+            "exit_quote": null,
+            "exit_delay_seconds": null,
+            "modeled_exit_price": null,
+            "quote_gross_pnl_usd": null,
+            "modeled_gross_pnl_usd": null,
+            "modeled_net_pnl_usd": null,
+            "modeled_return_pct": null
+          }
+        ],
+        "limitations": [
+          "Later-downloaded trade-attached NBBO is not a historical availability record.",
+          "Displayed size and fresh NBBO do not prove a broker fill or available liquidity.",
+          "Standard 100-share deliverable is assumed and unverified; regex cannot prove deliverables.",
+          "15- and 60-minute markouts are alternative holds and must not be added together."
+        ],
+        "coverage_reason": "Nov9 contract history empty; Nov10 history truncated after required entry; latest-day tape endpoint explicitly rejects historical dates.",
+        "candidate_key": "246844d8c366958279b0da8bc6420b763b2c54a3a89c1974535655d7c162ac3b",
+        "ticker": "MSFT",
+        "day": "2026-11-09",
+        "source_started_at": "2026-11-09T15:22:12.254304Z",
+        "contract_selected_retrospectively": true
+      },
+      {
+        "option_symbol": "AMZN261120C00265000",
+        "session": "2026-11-10",
+        "planned_entry_at": "2026-11-10T14:51:26.204803+00:00",
+        "received_at": "2026-11-12T11:44:23.943771+00:00",
+        "status": "UNKNOWN",
+        "reason": "incomplete_source_coverage",
+        "coverage_complete": false,
+        "rejected_rows": {},
+        "entry_quote": null,
+        "entry_delay_seconds": null,
+        "modeled_entry_price": null,
+        "entry_same_quote_roundtrip_friction_usd": null,
+        "contracts": 1,
+        "assumed_standard_multiplier": 100,
+        "slippage_per_share_per_side": "0.01",
+        "fee_per_contract_per_side_usd": "0.65",
+        "max_quote_age_seconds": 5,
+        "max_wait_seconds": 120,
+        "data_use": "retrospective_quote_markout",
+        "executable_fill_proven": false,
+        "markouts": [
+          {
+            "horizon_minutes": 15,
+            "status": "UNKNOWN",
+            "reason": "incomplete_source_coverage",
+            "target_at": null,
+            "exit_quote": null,
+            "exit_delay_seconds": null,
+            "modeled_exit_price": null,
+            "quote_gross_pnl_usd": null,
+            "modeled_gross_pnl_usd": null,
+            "modeled_net_pnl_usd": null,
+            "modeled_return_pct": null
+          },
+          {
+            "horizon_minutes": 60,
+            "status": "UNKNOWN",
+            "reason": "incomplete_source_coverage",
+            "target_at": null,
+            "exit_quote": null,
+            "exit_delay_seconds": null,
+            "modeled_exit_price": null,
+            "quote_gross_pnl_usd": null,
+            "modeled_gross_pnl_usd": null,
+            "modeled_net_pnl_usd": null,
+            "modeled_return_pct": null
+          }
+        ],
+        "limitations": [
+          "Later-downloaded trade-attached NBBO is not a historical availability record.",
+          "Displayed size and fresh NBBO do not prove a broker fill or available liquidity.",
+          "Standard 100-share deliverable is assumed and unverified; regex cannot prove deliverables.",
+          "15- and 60-minute markouts are alternative holds and must not be added together."
+        ],
+        "coverage_reason": "Nov9 contract history empty; Nov10 history truncated after required entry; latest-day tape endpoint explicitly rejects historical dates.",
+        "candidate_key": "5e084ef7d7dffc698d20f88cb48c466fa0be2ecfa014e66aebeaa31d4de75db5",
+        "ticker": "AMZN",
+        "day": "2026-11-10",
+        "source_started_at": "2026-11-10T14:50:10.554193Z",
+        "contract_selected_retrospectively": true
+      },
+      {
+        "option_symbol": "META261218C00705000",
+        "session": "2026-11-10",
+        "planned_entry_at": "2026-11-10T15:07:52.941298+00:00",
+        "received_at": "2026-11-12T11:44:23.943951+00:00",
+        "status": "UNKNOWN",
+        "reason": "incomplete_source_coverage",
+        "coverage_complete": false,
+        "rejected_rows": {},
+        "entry_quote": null,
+        "entry_delay_seconds": null,
+        "modeled_entry_price": null,
+        "entry_same_quote_roundtrip_friction_usd": null,
+        "contracts": 1,
+        "assumed_standard_multiplier": 100,
+        "slippage_per_share_per_side": "0.01",
+        "fee_per_contract_per_side_usd": "0.65",
+        "max_quote_age_seconds": 5,
+        "max_wait_seconds": 120,
+        "data_use": "retrospective_quote_markout",
+        "executable_fill_proven": false,
+        "markouts": [
+          {
+            "horizon_minutes": 15,
+            "status": "UNKNOWN",
+            "reason": "incomplete_source_coverage",
+            "target_at": null,
+            "exit_quote": null,
+            "exit_delay_seconds": null,
+            "modeled_exit_price": null,
+            "quote_gross_pnl_usd": null,
+            "modeled_gross_pnl_usd": null,
+            "modeled_net_pnl_usd": null,
+            "modeled_return_pct": null
+          },
+          {
+            "horizon_minutes": 60,
+            "status": "UNKNOWN",
+            "reason": "incomplete_source_coverage",
+            "target_at": null,
+            "exit_quote": null,
+            "exit_delay_seconds": null,
+            "modeled_exit_price": null,
+            "quote_gross_pnl_usd": null,
+            "modeled_gross_pnl_usd": null,
+            "modeled_net_pnl_usd": null,
+            "modeled_return_pct": null
+          }
+        ],
+        "limitations": [
+          "Later-downloaded trade-attached NBBO is not a historical availability record.",
+          "Displayed size and fresh NBBO do not prove a broker fill or available liquidity.",
+          "Standard 100-share deliverable is assumed and unverified; regex cannot prove deliverables.",
+          "15- and 60-minute markouts are alternative holds and must not be added together."
+        ],
+        "coverage_reason": "Nov9 contract history empty; Nov10 history truncated after required entry; latest-day tape endpoint explicitly rejects historical dates.",
+        "candidate_key": "11f5a63dcb41240809eaf887ac528f92b0e560791a3d27ade88c60a52aed0406",
+        "ticker": "META",
+        "day": "2026-11-10",
+        "source_started_at": "2026-11-10T15:06:37.614590Z",
+        "contract_selected_retrospectively": true
+      },
+      {
+        "option_symbol": "RIOT261211C00018500",
+        "session": "2026-11-11",
+        "planned_entry_at": "2026-11-11T14:46:11.227963+00:00",
+        "received_at": "2026-11-12T11:44:24.282739+00:00",
+        "status": "UNKNOWN",
+        "reason": "missing_eligible_entry_quote",
+        "coverage_complete": true,
+        "rejected_rows": {},
+        "entry_quote": null,
+        "entry_delay_seconds": null,
+        "modeled_entry_price": null,
+        "entry_same_quote_roundtrip_friction_usd": null,
+        "contracts": 1,
+        "assumed_standard_multiplier": 100,
+        "slippage_per_share_per_side": "0.01",
+        "fee_per_contract_per_side_usd": "0.65",
+        "max_quote_age_seconds": 5,
+        "max_wait_seconds": 120,
+        "data_use": "retrospective_quote_markout",
+        "executable_fill_proven": false,
+        "markouts": [
+          {
+            "horizon_minutes": 15,
+            "status": "UNKNOWN",
+            "reason": "missing_eligible_entry_quote",
+            "target_at": null,
+            "exit_quote": null,
+            "exit_delay_seconds": null,
+            "modeled_exit_price": null,
+            "quote_gross_pnl_usd": null,
+            "modeled_gross_pnl_usd": null,
+            "modeled_net_pnl_usd": null,
+            "modeled_return_pct": null
+          },
+          {
+            "horizon_minutes": 60,
+            "status": "UNKNOWN",
+            "reason": "missing_eligible_entry_quote",
+            "target_at": null,
+            "exit_quote": null,
+            "exit_delay_seconds": null,
+            "modeled_exit_price": null,
+            "quote_gross_pnl_usd": null,
+            "modeled_gross_pnl_usd": null,
+            "modeled_net_pnl_usd": null,
+            "modeled_return_pct": null
+          }
+        ],
+        "limitations": [
+          "Later-downloaded trade-attached NBBO is not a historical availability record.",
+          "Displayed size and fresh NBBO do not prove a broker fill or available liquidity.",
+          "Standard 100-share deliverable is assumed and unverified; regex cannot prove deliverables.",
+          "15- and 60-minute markouts are alternative holds and must not be added together."
+        ],
+        "coverage_reason": "Verified contract and timestamp bounds on unsaturated provider window responses; this is vendor response coverage, not independently verified consolidated tape completeness.",
+        "candidate_key": "dd50ebca302dbe7093220f9eb202a7611b33c2133539b4bf83b44371053b6acc",
+        "ticker": "RIOT",
+        "day": "2026-11-11",
+        "source_started_at": "2026-11-11T14:45:00.101126Z",
+        "contract_selected_retrospectively": true
+      },
+      {
+        "option_symbol": "GOOGL261127C00305000",
+        "session": "2026-11-11",
+        "planned_entry_at": "2026-11-11T15:18:52.868611+00:00",
+        "received_at": "2026-11-12T11:44:24.441866+00:00",
+        "status": "UNKNOWN",
+        "reason": "missing_eligible_entry_quote",
+        "coverage_complete": true,
+        "rejected_rows": {},
+        "entry_quote": null,
+        "entry_delay_seconds": null,
+        "modeled_entry_price": null,
+        "entry_same_quote_roundtrip_friction_usd": null,
+        "contracts": 1,
+        "assumed_standard_multiplier": 100,
+        "slippage_per_share_per_side": "0.01",
+        "fee_per_contract_per_side_usd": "0.65",
+        "max_quote_age_seconds": 5,
+        "max_wait_seconds": 120,
+        "data_use": "retrospective_quote_markout",
+        "executable_fill_proven": false,
+        "markouts": [
+          {
+            "horizon_minutes": 15,
+            "status": "UNKNOWN",
+            "reason": "missing_eligible_entry_quote",
+            "target_at": null,
+            "exit_quote": null,
+            "exit_delay_seconds": null,
+            "modeled_exit_price": null,
+            "quote_gross_pnl_usd": null,
+            "modeled_gross_pnl_usd": null,
+            "modeled_net_pnl_usd": null,
+            "modeled_return_pct": null
+          },
+          {
+            "horizon_minutes": 60,
+            "status": "UNKNOWN",
+            "reason": "missing_eligible_entry_quote",
+            "target_at": null,
+            "exit_quote": null,
+            "exit_delay_seconds": null,
+            "modeled_exit_price": null,
+            "quote_gross_pnl_usd": null,
+            "modeled_gross_pnl_usd": null,
+            "modeled_net_pnl_usd": null,
+            "modeled_return_pct": null
+          }
+        ],
+        "limitations": [
+          "Later-downloaded trade-attached NBBO is not a historical availability record.",
+          "Displayed size and fresh NBBO do not prove a broker fill or available liquidity.",
+          "Standard 100-share deliverable is assumed and unverified; regex cannot prove deliverables.",
+          "15- and 60-minute markouts are alternative holds and must not be added together."
+        ],
+        "coverage_reason": "Verified contract and timestamp bounds on unsaturated provider window responses; this is vendor response coverage, not independently verified consolidated tape completeness.",
+        "candidate_key": "423850e6a0022228aa13b1542685f1a11c84efdc7a2f33cfe52f890c3cdafc74",
+        "ticker": "GOOGL",
+        "day": "2026-11-11",
+        "source_started_at": "2026-11-11T15:17:35.575829Z",
+        "contract_selected_retrospectively": true
+      },
+      {
+        "option_symbol": "TSLA261127C00410000",
+        "session": "2026-11-11",
+        "planned_entry_at": "2026-11-11T15:24:20.645997+00:00",
+        "received_at": "2026-11-12T11:44:24.771346+00:00",
+        "status": "PARTIAL",
+        "reason": "one_or_more_horizons_unknown",
+        "coverage_complete": true,
+        "rejected_rows": {},
+        "entry_quote": {
+          "event_id": "01a1cb35-e199-77d1-bfc8-ea063349593c",
+          "executed_at": "2026-11-11T15:24:28.390000+00:00",
+          "bid_time": "2026-11-11T15:24:28.340000+00:00",
+          "ask_time": "2026-11-11T15:24:28.296000+00:00",
+          "bid_age_seconds": 0.05,
+          "ask_age_seconds": 0.094,
+          "bid": "7.15",
+          "ask": "7.35",
+          "bid_size": 22,
+          "ask_size": 81,
+          "quoted_spread_usd": "20.00"
+        },
+        "entry_delay_seconds": 7.744003,
+        "modeled_entry_price": "7.36",
+        "entry_same_quote_roundtrip_friction_usd": "23.30",
+        "contracts": 1,
+        "assumed_standard_multiplier": 100,
+        "slippage_per_share_per_side": "0.01",
+        "fee_per_contract_per_side_usd": "0.65",
+        "max_quote_age_seconds": 5,
+        "max_wait_seconds": 120,
+        "data_use": "retrospective_quote_markout",
+        "executable_fill_proven": false,
+        "markouts": [
+          {
+            "horizon_minutes": 15,
+            "status": "UNKNOWN",
+            "reason": "missing_eligible_exit_quote",
+            "target_at": "2026-11-11T15:39:28.390000+00:00",
+            "exit_quote": null,
+            "exit_delay_seconds": null,
+            "modeled_exit_price": null,
+            "quote_gross_pnl_usd": null,
+            "modeled_gross_pnl_usd": null,
+            "modeled_net_pnl_usd": null,
+            "modeled_return_pct": null
+          },
+          {
+            "horizon_minutes": 60,
+            "status": "EVALUATED",
+            "reason": null,
+            "target_at": "2026-11-11T16:24:28.390000+00:00",
+            "exit_quote": {
+              "event_id": "01a1cb6d-50b9-7930-aef8-1d6585891d7c",
+              "executed_at": "2026-11-11T16:25:01.326000+00:00",
+              "bid_time": "2026-11-11T16:25:01.325000+00:00",
+              "ask_time": "2026-11-11T16:25:01.324000+00:00",
+              "bid_age_seconds": 0.001,
+              "ask_age_seconds": 0.002,
+              "bid": "6.50",
+              "ask": "6.60",
+              "bid_size": 74,
+              "ask_size": 1,
+              "quoted_spread_usd": "10.00"
+            },
+            "exit_delay_seconds": 32.936,
+            "modeled_exit_price": "6.49",
+            "quote_gross_pnl_usd": "-85.00",
+            "modeled_gross_pnl_usd": "-87.00",
+            "modeled_net_pnl_usd": "-88.30",
+            "modeled_return_pct": "-11.98669653159573746012353221"
+          }
+        ],
+        "limitations": [
+          "Later-downloaded trade-attached NBBO is not a historical availability record.",
+          "Displayed size and fresh NBBO do not prove a broker fill or available liquidity.",
+          "Standard 100-share deliverable is assumed and unverified; regex cannot prove deliverables.",
+          "15- and 60-minute markouts are alternative holds and must not be added together."
+        ],
+        "coverage_reason": "Verified contract and timestamp bounds on unsaturated provider window responses; this is vendor response coverage, not independently verified consolidated tape completeness.",
+        "candidate_key": "7d58101ee38ac5390f863d60319f07fa2010c23ecff51b5049229208f147c671",
+        "ticker": "TSLA",
+        "day": "2026-11-11",
+        "source_started_at": "2026-11-11T15:23:08.156685Z",
+        "contract_selected_retrospectively": true
+      },
+      {
+        "option_symbol": "META261120C00650000",
+        "session": "2026-11-11",
+        "planned_entry_at": "2026-11-11T17:48:09.204205+00:00",
+        "received_at": "2026-11-12T11:44:25.072799+00:00",
+        "status": "PARTIAL",
+        "reason": "one_or_more_horizons_unknown",
+        "coverage_complete": true,
+        "rejected_rows": {},
+        "entry_quote": {
+          "event_id": "01a1cbb9-875d-7cb3-90ed-259313ab02a2",
+          "executed_at": "2026-11-11T17:48:16.068000+00:00",
+          "bid_time": "2026-11-11T17:48:15.972000+00:00",
+          "ask_time": "2026-11-11T17:48:16.020000+00:00",
+          "bid_age_seconds": 0.096,
+          "ask_age_seconds": 0.048,
+          "bid": "14.05",
+          "ask": "14.70",
+          "bid_size": 164,
+          "ask_size": 131,
+          "quoted_spread_usd": "65.00"
+        },
+        "entry_delay_seconds": 6.863795,
+        "modeled_entry_price": "14.71",
+        "entry_same_quote_roundtrip_friction_usd": "68.30",
+        "contracts": 1,
+        "assumed_standard_multiplier": 100,
+        "slippage_per_share_per_side": "0.01",
+        "fee_per_contract_per_side_usd": "0.65",
+        "max_quote_age_seconds": 5,
+        "max_wait_seconds": 120,
+        "data_use": "retrospective_quote_markout",
+        "executable_fill_proven": false,
+        "markouts": [
+          {
+            "horizon_minutes": 15,
+            "status": "UNKNOWN",
+            "reason": "missing_eligible_exit_quote",
+            "target_at": "2026-11-11T18:03:16.068000+00:00",
+            "exit_quote": null,
+            "exit_delay_seconds": null,
+            "modeled_exit_price": null,
+            "quote_gross_pnl_usd": null,
+            "modeled_gross_pnl_usd": null,
+            "modeled_net_pnl_usd": null,
+            "modeled_return_pct": null
+          },
+          {
+            "horizon_minutes": 60,
+            "status": "EVALUATED",
+            "reason": null,
+            "target_at": "2026-11-11T18:48:16.068000+00:00",
+            "exit_quote": {
+              "event_id": "01a1cbf1-97bf-71f2-bb26-e40172e2ef34",
+              "executed_at": "2026-11-11T18:49:30.267000+00:00",
+              "bid_time": "2026-11-11T18:49:28.608000+00:00",
+              "ask_time": "2026-11-11T18:49:28.608000+00:00",
+              "bid_age_seconds": 1.659,
+              "ask_age_seconds": 1.659,
+              "bid": "12.45",
+              "ask": "12.95",
+              "bid_size": 107,
+              "ask_size": 113,
+              "quoted_spread_usd": "50.00"
+            },
+            "exit_delay_seconds": 74.199,
+            "modeled_exit_price": "12.44",
+            "quote_gross_pnl_usd": "-225.00",
+            "modeled_gross_pnl_usd": "-227.00",
+            "modeled_net_pnl_usd": "-228.30",
+            "modeled_return_pct": "-15.51319946998267251044745694"
+          }
+        ],
+        "limitations": [
+          "Later-downloaded trade-attached NBBO is not a historical availability record.",
+          "Displayed size and fresh NBBO do not prove a broker fill or available liquidity.",
+          "Standard 100-share deliverable is assumed and unverified; regex cannot prove deliverables.",
+          "15- and 60-minute markouts are alternative holds and must not be added together."
+        ],
+        "coverage_reason": "Verified contract and timestamp bounds on unsaturated provider window responses; this is vendor response coverage, not independently verified consolidated tape completeness.",
+        "candidate_key": "95bd044ebac103252ae87be0e6a341eeb9d323e0cc2869b545bf4eaf06b27599",
+        "ticker": "META",
+        "day": "2026-11-11",
+        "source_started_at": "2026-11-11T17:46:58.885940Z",
+        "contract_selected_retrospectively": true
+      }
+    ],
+    "limitations": [
+      "These are retrospective contract choices attached to pre-existing stock signals, not the original strategy option trades.",
+      "Historical missing data and sparse contracts prevent a complete cohort result.",
+      "Window coverage means non-saturated validated provider responses only; no independent consolidated tape attestation.",
+      "No combined PnL is reported for incomplete cohort. Horizon alternatives are not summed."
+    ]
+  },
+  "chain_pagination": {
+    "legacy_first_page": {
+      "rows": 500,
+      "expiries": {
+        "2026-09-18": 214,
+        "2026-09-21": 96,
+        "2026-09-23": 96,
+        "2026-09-25": 94
+      },
+      "contracts_in_profile_14_to_60_dte_band": 0
+    },
+    "paginated": {
+      "rows": 3498,
+      "expiries": {
+        "2026-09-18": 214,
+        "2026-09-21": 96,
+        "2026-09-23": 96,
+        "2026-09-25": 158,
+        "2026-09-28": 94,
+        "2026-09-30": 94,
+        "2026-10-02": 152,
+        "2026-10-09": 122,
+        "2026-10-16": 158,
+        "2026-10-23": 122,
+        "2026-10-30": 122,
+        "2026-11-20": 168,
+        "2026-12-18": 184,
+        "2027-01-15": 194,
+        "2027-02-19": 160,
+        "2027-03-19": 154,
+        "2027-04-16": 102,
+        "2027-06-17": 160,
+        "2027-09-17": 162,
+        "2027-12-17": 208,
+        "2028-01-21": 148,
+        "2028-03-17": 122,
+        "2028-12-15": 146,
+        "2029-01-19": 162
+      },
+      "contracts_in_profile_14_to_60_dte_band": 676
+    },
+    "legacy_symbols_present_in_paginated": 500,
+    "missing_fraction": 0.8570611778158947,
+    "scope": "Vendor response exhaustion for AAPL2026-09-18 only, daily qualityB, does not prove exchange-complete quote coverage."
+  },
+  "friction": {
+    "scope": "Historical stored replay cards only, not a current trading recommendation",
+    "formula": "(entry_debit - sum(long bids minus short asks)) * 100 * quantity + roundtrip commission",
+    "entry_slippage": "Already included in stored entry debit",
+    "exit_slippage": "Additional exit slippage not included; adding it would worsen friction",
+    "source_quality": "Daily NBBO snapshots without separate quote timestamps; same-snapshot comparison is diagnostic, not execution proof",
+    "rows": [
+      {
+        "source": "artifacts/options-alpha-v1/replay/2026-09-08/paper_card_QQQ.json",
+        "session": "2026-09-08",
+        "ticker": "QQQ",
+        "entry_debit_per_share": "0.41",
+        "immediate_liquidation_per_share_before_exit_slippage": "0.10",
+        "structures": 2,
+        "roundtrip_fees": "5.20",
+        "immediate_roundtrip_loss_usd": "67.20",
+        "max_risk_usd": "87.20",
+        "friction_as_percent_of_max_risk": 77.06422018348624
+      },
+      {
+        "source": "artifacts/options-alpha-v1/replay/2026-09-08/paper_card_SPY.json",
+        "session": "2026-09-08",
+        "ticker": "SPY",
+        "entry_debit_per_share": "0.62",
+        "immediate_liquidation_per_share_before_exit_slippage": "0.51",
+        "structures": 1,
+        "roundtrip_fees": "2.60",
+        "immediate_roundtrip_loss_usd": "13.60",
+        "max_risk_usd": "64.60",
+        "friction_as_percent_of_max_risk": 21.05263157894737
+      },
+      {
+        "source": "artifacts/options-alpha-v1/replay/2026-09-22/paper_card_QQQ.json",
+        "session": "2026-09-22",
+        "ticker": "QQQ",
+        "entry_debit_per_share": "0.48",
+        "immediate_liquidation_per_share_before_exit_slippage": "0.32",
+        "structures": 1,
+        "roundtrip_fees": "2.60",
+        "immediate_roundtrip_loss_usd": "18.60",
+        "max_risk_usd": "50.60",
+        "friction_as_percent_of_max_risk": 36.758893280632414
+      },
+      {
+        "source": "artifacts/options-alpha-v1/replay/2026-09-22/paper_card_SPY.json",
+        "session": "2026-09-22",
+        "ticker": "SPY",
+        "entry_debit_per_share": "0.58",
+        "immediate_liquidation_per_share_before_exit_slippage": "0.52",
+        "structures": 1,
+        "roundtrip_fees": "2.60",
+        "immediate_roundtrip_loss_usd": "8.60",
+        "max_risk_usd": "60.60",
+        "friction_as_percent_of_max_risk": 14.191419141914192
+      }
+    ]
+  },
+  "theta_http_integration_test": {
+    "evidence_kind": "SYNTHETIC_HTTP_INTEGRATION_TEST_NOT_PROVIDER_VERIFICATION",
+    "theta_gets": [
+      {
+        "path": "/v3/option/history/quote",
+        "params": {
+          "symbol": [
+            "TSLA"
+          ],
+          "expiration": [
+            "20261127"
+          ],
+          "strike": [
+            "410"
+          ],
+          "right": [
+            "call"
+          ],
+          "date": [
+            "20261111"
+          ],
+          "interval": [
+            "tick"
+          ],
+          "format": [
+            "json"
+          ],
+          "start_time": [
+            "10:24:20.000000"
+          ],
+          "end_time": [
+            "10:26:20.000000"
+          ]
+        },
+        "phase": "entry",
+        "authorization_received": false
+      },
+      {
+        "path": "/v3/option/history/quote",
+        "params": {
+          "symbol": [
+            "TSLA"
+          ],
+          "expiration": [
+            "20261127"
+          ],
+          "strike": [
+            "410"
+          ],
+          "right": [
+            "call"
+          ],
+          "date": [
+            "20261111"
+          ],
+          "interval": [
+            "tick"
+          ],
+          "format": [
+            "json"
+          ],
+          "start_time": [
+            "10:39:21.000000"
+          ],
+          "end_time": [
+            "10:41:21.000000"
+          ]
+        },
+        "phase": "m15",
+        "authorization_received": false
+      },
+      {
+        "path": "/v3/option/history/quote",
+        "params": {
+          "symbol": [
+            "TSLA"
+          ],
+          "expiration": [
+            "20261127"
+          ],
+          "strike": [
+            "410"
+          ],
+          "right": [
+            "call"
+          ],
+          "date": [
+            "20261111"
+          ],
+          "interval": [
+            "tick"
+          ],
+          "format": [
+            "json"
+          ],
+          "start_time": [
+            "11:24:21.000000"
+          ],
+          "end_time": [
+            "11:26:21.000000"
+          ]
+        },
+        "phase": "m60",
+        "authorization_received": false
+      }
+    ],
+    "server_recomputed_result": {
+      "contracts": 1,
+      "data_use": "retrospective_quote_markout",
+      "entry_delay_seconds": 1.0,
+      "entry_quote": {
+        "ask": "7.35",
+        "ask_size": 50,
+        "ask_update_age_seconds": null,
+        "bid": "7.15",
+        "bid_size": 25,
+        "bid_update_age_seconds": null,
+        "event_type": "quote",
+        "option_symbol": "TSLA261127C00410000",
+        "quote_at": "2026-11-11T15:24:21+00:00",
+        "quote_time_basis": "composite_quote_snapshot",
+        "received_at": "2026-11-12T12:06:43.625874+00:00",
+        "source": "thetadata",
+        "source_timestamp": "2026-11-11T10:24:21"
+      },
+      "entry_same_quote_roundtrip_friction_usd": "23.30",
+      "event_type": "quote",
+      "executable_fill_proven": false,
+      "fee_per_contract_per_side_usd": "0.65",
+      "limitations": [
+        "Later-downloaded native quote snapshots do not prove historical system availability or fills.",
+        "Composite quote time does not establish individual bid/ask update ages.",
+        "The fetch client requests tick data; request provenance and current endpoint behavior require a live check.",
+        "15- and 60-minute holds are alternatives, not additive portfolio returns."
+      ],
+      "markouts": [
+        {
+          "exit_delay_seconds": 1.0,
+          "exit_quote": {
+            "ask": "7.55",
+            "ask_size": 50,
+            "ask_update_age_seconds": null,
+            "bid": "7.50",
+            "bid_size": 25,
+            "bid_update_age_seconds": null,
+            "event_type": "quote",
+            "option_symbol": "TSLA261127C00410000",
+            "quote_at": "2026-11-11T15:39:22+00:00",
+            "quote_time_basis": "composite_quote_snapshot",
+            "received_at": "2026-11-12T12:06:43.628310+00:00",
+            "source": "thetadata",
+            "source_timestamp": "2026-11-11T10:39:22"
+          },
+          "horizon_minutes": 15,
+          "modeled_exit_price": "7.49",
+          "modeled_gross_pnl_usd": "13.00",
+          "modeled_net_pnl_usd": "11.70",
+          "modeled_return_pct": "1.588271227855833842394624313",
+          "quote_gross_pnl_usd": "15.00",
+          "reason": null,
+          "status": "EVALUATED",
+          "target_at": "2026-11-11T15:39:21+00:00"
+        },
+        {
+          "exit_delay_seconds": 1.0,
+          "exit_quote": {
+            "ask": "6.60",
+            "ask_size": 50,
+            "ask_update_age_seconds": null,
+            "bid": "6.50",
+            "bid_size": 25,
+            "bid_update_age_seconds": null,
+            "event_type": "quote",
+            "option_symbol": "TSLA261127C00410000",
+            "quote_at": "2026-11-11T16:24:22+00:00",
+            "quote_time_basis": "composite_quote_snapshot",
+            "received_at": "2026-11-12T12:06:43.629980+00:00",
+            "source": "thetadata",
+            "source_timestamp": "2026-11-11T11:24:22"
+          },
+          "horizon_minutes": 60,
+          "modeled_exit_price": "6.49",
+          "modeled_gross_pnl_usd": "-87.00",
+          "modeled_net_pnl_usd": "-88.30",
+          "modeled_return_pct": "-11.98669653159573746012353221",
+          "quote_gross_pnl_usd": "-85.00",
+          "reason": null,
+          "status": "EVALUATED",
+          "target_at": "2026-11-11T16:24:21+00:00"
+        }
+      ],
+      "modeled_entry_price": "7.36",
+      "option_symbol": "TSLA261127C00410000",
+      "planned_entry_at": "2026-11-11T15:24:20+00:00",
+      "provider_packets": [
+        {
+          "coverage_basis": "bounded_terminal_response_without_continuation_or_rejected_rows",
+          "coverage_complete": true,
+          "endpoint": "/v3/option/history/quote",
+          "event_type": "quote",
+          "executable_fill_proven": false,
+          "hash_basis": "canonical_json",
+          "http_status": 200,
+          "interval_verified_by_payload": false,
+          "option_symbol": "TSLA261127C00410000",
+          "quotes": [
+            {
+              "ask": "7.35",
+              "ask_size": 50,
+              "ask_update_age_seconds": null,
+              "bid": "7.15",
+              "bid_size": 25,
+              "bid_update_age_seconds": null,
+              "event_type": "quote",
+              "option_symbol": "TSLA261127C00410000",
+              "quote_at": "2026-11-11T15:24:21+00:00",
+              "quote_time_basis": "composite_quote_snapshot",
+              "received_at": "2026-11-12T12:06:43.625874+00:00",
+              "source": "thetadata",
+              "source_timestamp": "2026-11-11T10:24:21"
+            }
+          ],
+          "raw_sha256": "500dbfa93eb0b3926111a92ba0c318ec6dba10170cba645d8d043a96d186041e",
+          "reason": null,
+          "received_at": "2026-11-12T12:06:43.625874+00:00",
+          "rejected_rows": {},
+          "requested_interval": "tick",
+          "session": "2026-11-11",
+          "source": "thetadata",
+          "status": "ok",
+          "window_end": "2026-11-11T15:26:20+00:00",
+          "window_start": "2026-11-11T15:24:20+00:00"
+        },
+        {
+          "coverage_basis": "bounded_terminal_response_without_continuation_or_rejected_rows",
+          "coverage_complete": true,
+          "endpoint": "/v3/option/history/quote",
+          "event_type": "quote",
+          "executable_fill_proven": false,
+          "hash_basis": "canonical_json",
+          "http_status": 200,
+          "interval_verified_by_payload": false,
+          "option_symbol": "TSLA261127C00410000",
+          "quotes": [
+            {
+              "ask": "7.55",
+              "ask_size": 50,
+              "ask_update_age_seconds": null,
+              "bid": "7.50",
+              "bid_size": 25,
+              "bid_update_age_seconds": null,
+              "event_type": "quote",
+              "option_symbol": "TSLA261127C00410000",
+              "quote_at": "2026-11-11T15:39:22+00:00",
+              "quote_time_basis": "composite_quote_snapshot",
+              "received_at": "2026-11-12T12:06:43.628310+00:00",
+              "source": "thetadata",
+              "source_timestamp": "2026-11-11T10:39:22"
+            }
+          ],
+          "raw_sha256": "da6ff838460e9a0286ce374477e2f28b5e0fc992e92bb0276cc8dd26bdc4064b",
+          "reason": null,
+          "received_at": "2026-11-12T12:06:43.628310+00:00",
+          "rejected_rows": {},
+          "requested_interval": "tick",
+          "session": "2026-11-11",
+          "source": "thetadata",
+          "status": "ok",
+          "window_end": "2026-11-11T15:41:21+00:00",
+          "window_start": "2026-11-11T15:39:21+00:00"
+        },
+        {
+          "coverage_basis": "bounded_terminal_response_without_continuation_or_rejected_rows",
+          "coverage_complete": true,
+          "endpoint": "/v3/option/history/quote",
+          "event_type": "quote",
+          "executable_fill_proven": false,
+          "hash_basis": "canonical_json",
+          "http_status": 200,
+          "interval_verified_by_payload": false,
+          "option_symbol": "TSLA261127C00410000",
+          "quotes": [
+            {
+              "ask": "6.60",
+              "ask_size": 50,
+              "ask_update_age_seconds": null,
+              "bid": "6.50",
+              "bid_size": 25,
+              "bid_update_age_seconds": null,
+              "event_type": "quote",
+              "option_symbol": "TSLA261127C00410000",
+              "quote_at": "2026-11-11T16:24:22+00:00",
+              "quote_time_basis": "composite_quote_snapshot",
+              "received_at": "2026-11-12T12:06:43.629980+00:00",
+              "source": "thetadata",
+              "source_timestamp": "2026-11-11T11:24:22"
+            }
+          ],
+          "raw_sha256": "ea2c7260d5800257a9b0968f7ffb55e08c543b2f61ed822584082df60cb8e8b6",
+          "reason": null,
+          "received_at": "2026-11-12T12:06:43.629980+00:00",
+          "rejected_rows": {},
+          "requested_interval": "tick",
+          "session": "2026-11-11",
+          "source": "thetadata",
+          "status": "ok",
+          "window_end": "2026-11-11T16:26:21+00:00",
+          "window_start": "2026-11-11T16:24:21+00:00"
+        }
+      ],
+      "quote_time_basis": "composite_quote_snapshot",
+      "reason": null,
+      "request_hash": "189a4183375adbae3952ecb6cd03d59350d871ad71ae79f8efb41ab138225cd6",
+      "request_id": "theta_189a4183375adbae3952ecb6cd03d593",
+      "session": "2026-11-11",
+      "side_update_age_seconds": null,
+      "slippage_per_share_per_side": "0.01",
+      "source": "thetadata",
+      "source_identity_independently_verified": false,
+      "source_kind": "manual_research",
+      "source_label": "TEST \u2014 sentetik u\u00e7tan uca do\u011frulama",
+      "standard_deliverable": "100_shares_assumed_unverified",
+      "status": "EVALUATED",
+      "uploaded_at": "2026-11-12T12:06:43.631989+00:00"
+    },
+    "passed": true,
+    "jobs_after_completion": 0
+  }
+}

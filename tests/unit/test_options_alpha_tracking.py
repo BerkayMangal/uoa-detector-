@@ -127,11 +127,22 @@ def test_the_stop_fires_on_the_package_value(settings: OptionsAlphaSettings) -> 
     assert result.resolved
     assert result.plan.reason is ExitReason.STOP
     assert result.plan.exit_day == days[0]
+    # The daily NBBO package is 0.40 - 0.15 = 0.25. The 0.29 stop
+    # is a trigger, not proof of an executable fill at that higher value.
+    assert result.plan.exit_value == Decimal("0.25")
+    assert result.plan.pnl_usd == Decimal("-71.20")  # (0.25 - 0.58) * 200 - 5.20
 
 
-def test_the_tracker_reproduces_score_card_on_the_two_real_cards(settings: OptionsAlphaSettings) -> None:
-    """Real UW quotes, recorded 2026-09-23: the tracker must land on the same net P&L
-    as the committed score_card outcomes, for every variant, for both 2026-09-08 cards."""
+def test_the_tracker_prices_real_cards_and_exposes_the_historical_stop_fill_error(
+    settings: OptionsAlphaSettings,
+) -> None:
+    """Real UW quotes, recorded 2026-09-23, with historical artifacts preserved.
+
+    QQQ's first daily mark is 11.13 long bid - 11.00 short ask = 0.13.
+    The old stop variants substituted the unobserved 0.20 stop for that mark.
+    Corrected P&L is (0.13 - 0.41) * 100 * 2 - 5.20 = -61.20, rather
+    than -47.20. All other outcomes are unchanged.
+    """
     import json
 
     fixture = json.loads(pathlib.Path(
@@ -148,4 +159,9 @@ def test_the_tracker_reproduces_score_card_on_the_two_real_cards(settings: Optio
         for variant in ExitVariantId:
             got = result.outcomes[variant].pnl_usd
             assert got is not None
-            assert str(got) == expected[variant.value]["pnl_usd"], (underlying, variant)
+            if underlying == "QQQ" and variant is not ExitVariantId.TIME_ONLY:
+                assert expected[variant.value]["pnl_usd"] == "-47.20"
+                assert result.outcomes[variant].exit_value == Decimal("0.13")
+                assert got == Decimal("-61.20")
+            else:
+                assert str(got) == expected[variant.value]["pnl_usd"], (underlying, variant)

@@ -1,0 +1,15 @@
+# New acquisition version: v1 receipts and their profile remain unchanged.
+version: history_capture_v2
+start: 2026-05-13
+end: 2026-09-18
+tickers: [NFLX, AAPL, NVDA]
+benchmark: SPY
+max_requests: 2500
+quota_reserve: 5000
+spacing_seconds: 0.75
+timeout_seconds: 30
+max_flow_pages: 20
+flow_page_limit: 200
+# A capped or stalled chain is sealed INCOMPLETE, never used as a full universe.
+max_chain_pages: 40
+chain_page_limit: 500

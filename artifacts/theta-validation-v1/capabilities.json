@@ -1,0 +1,1782 @@
+{
+  "generated_at": "2026-11-12T11:56:54.087175+00:00",
+  "scope": "Options data plan only;user reports paidProfessional subscription,actual login/plan/endpoint permissions unverified.",
+  "source": {
+    "kind": "third_party_copy_of_Theta_v3_OpenAPI",
+    "url": "https://github.com/ashler-herrick/py-theta-client/blob/bd03b1449d9013f94fcb0a3c2bb17a5b2f342c50/openapiv3.yaml",
+    "sha256": "d20ade898c1f2b1ce78485b639d72b2ecc209421cf17a73dc55a604d0337d996",
+    "official_docs_fresh_access": "BLOCKED_BY_NETWORK_POLICY_403",
+    "current_account_entitlements": "UNVERIFIED",
+    "lookback_and_rate_limits": "UNVERIFIED_DO_NOT_REUSE_OLD_PLAN_TABLES"
+  },
+  "priority_capabilities": [
+    {
+      "priority": 1,
+      "capability": "NBBO quote history independent of trades",
+      "paths": [
+        "/v3/option/history/quote"
+      ],
+      "uoa_use": "Price every frozen CALL/PUT candidate using quoted ask entry and bid exit, with sizes/time/conditions. Fetch only small windows first, then cache bounded daily partitions.",
+      "current_gap_addressed": "UW /flow is trade-attached,capped and missing some dates;quiet contracts may have quotes without prints.",
+      "limitations": "NBBO events are not guaranteed fills;zero trades does not prove absent quotes or healthy liquidity. Request interval=tick;do not equate sampled interval timestamps to original updates.",
+      "status": "DOCUMENTED_NOT_LIVE_VERIFIED"
+    },
+    {
+      "priority": 2,
+      "capability": "NBBO snapshot and at-time references",
+      "paths": [
+        "/v3/option/snapshot/quote",
+        "/v3/option/at_time/quote"
+      ],
+      "uoa_use": "Show live spread,quoted size and quote age;retrieve last quote at a scheduled decision time.",
+      "current_gap_addressed": "User needs instrument-level actionability,not stock direction alone.",
+      "limitations": "Snapshot caches reset midnightET and can be empty off-session;at-time returns preceding quote,so explicitly reject stale observations.",
+      "status": "DOCUMENTED_NOT_LIVE_VERIFIED"
+    },
+    {
+      "priority": 3,
+      "capability": "Complete trade tape and matched trade/quote",
+      "paths": [
+        "/v3/option/history/trade",
+        "/v3/option/history/trade_quote"
+      ],
+      "uoa_use": "Verify whether UW alert aggregation matches executions;compute ask/bid-side classification against strictly preceding quote and isolate duplicates/corrections.",
+      "current_gap_addressed": "UW alert data aggregates prints and does not identify execution quality continuously.",
+      "limitations": "Set exclusive=true;retain trade and quote timestamps. Trade side does not prove opening positions,informed trading,or customer/dealer inventory.",
+      "status": "DOCUMENTED_NOT_LIVE_VERIFIED"
+    },
+    {
+      "priority": 4,
+      "capability": "Quoted-versus-traded contract universe",
+      "paths": [
+        "/v3/option/list/contracts/{request_type}",
+        "/v3/option/list/expirations",
+        "/v3/option/list/strikes",
+        "/v3/option/list/dates/{request_type}"
+      ],
+      "uoa_use": "Build an as-of universe via request_type=quote and separately trade;check requested expiries/strikes exist and measure history coverage before downloads.",
+      "current_gap_addressed": "Avoid selecting only contracts that happened to trade or only first500 chain rows.",
+      "limitations": "Lists update overnight except contracts realtime;expiry/strike lists alone are not guaranteed historical as-of availability. No wildcard bulk request in initial probe.",
+      "status": "DOCUMENTED_NOT_LIVE_VERIFIED"
+    },
+    {
+      "priority": 5,
+      "capability": "First-order Greeks and bid/mid/ask IV",
+      "paths": [
+        "/v3/option/history/greeks/first_order",
+        "/v3/option/history/greeks/implied_volatility",
+        "/v3/option/snapshot/greeks/first_order",
+        "/v3/option/snapshot/greeks/implied_volatility"
+      ],
+      "uoa_use": "Explain option price moves using direction,IV and decay;show how bid-to-ask IV range affects claimed cheapness.",
+      "current_gap_addressed": "Stock gains can coexist with option losses because volatility and time change.",
+      "limitations": "Model outputs are not executable prices. Verify greek units,annual_dividend,rate_type,rate_value,version and underlying timestamp;IV error semantics need verification.",
+      "status": "DOCUMENTED_NOT_LIVE_VERIFIED"
+    },
+    {
+      "priority": 6,
+      "capability": "Pro-level higher-order and per-trade Greeks",
+      "paths": [
+        "/v3/option/history/greeks/all",
+        "/v3/option/history/greeks/second_order",
+        "/v3/option/history/greeks/third_order",
+        "/v3/option/history/trade_greeks/all"
+      ],
+      "uoa_use": "Use gamma,vanna,charm,vomma and per-trade sensitivity to attribute nonlinear risks;test incremental benefit over first-order/spread/liquidity controls.",
+      "current_gap_addressed": "Pro-specific features can explain failure modes and test whether extra features earn their complexity.",
+      "limitations": "Higher order inputs are model-dependent and correlated;do not label dealerGEX sign or hedge direction as observed fact. Third-order data low priority until quote economics validated.",
+      "status": "DOCUMENTED_NOT_LIVE_VERIFIED"
+    },
+    {
+      "priority": 7,
+      "capability": "Daily open interest and publication timing",
+      "paths": [
+        "/v3/option/history/open_interest",
+        "/v3/option/snapshot/open_interest"
+      ],
+      "uoa_use": "Record next-morning OI confirmation and separate opening-position hypothesis from same-day volume.",
+      "current_gap_addressed": "Avoid treating intraday volume>OI as proven new positioning.",
+      "limitations": "Approx06:30ET release reflects previous close;missing OI message can occur with no OI. Never insert next-morning OI into yesterday decision. Existing H03failed;new hypothesis needs independent sample/design.",
+      "status": "DOCUMENTED_NOT_LIVE_VERIFIED"
+    },
+    {
+      "priority": 8,
+      "capability": "EOD chains and OHLC",
+      "paths": [
+        "/v3/option/history/eod",
+        "/v3/option/history/ohlc",
+        "/v3/option/history/greeks/eod"
+      ],
+      "uoa_use": "Reconcile day-end marks,enumerate complete expiring-risk panels,and schedule bounded nightly caches.",
+      "current_gap_addressed": "Useful independent cross-check of UW daily/reference records and candidate survivorship.",
+      "limitations": "EOD generated17:15ET;not16:00executable close. OHLC bar timestamp is bar start;does not establish order of stop/target or spread fills.",
+      "status": "DOCUMENTED_NOT_LIVE_VERIFIED"
+    },
+    {
+      "priority": 9,
+      "capability": "Adjusted contracts and corporate actions",
+      "paths": [],
+      "uoa_use": "Gate nonstandard roots/deliverables/multipliers before any100-share optionPnL calculation;reconcile using authoritative OCC adjustment metadata when available.",
+      "current_gap_addressed": "Unusual adjusted contracts can make dollarPnL and underlying exposure wrong.",
+      "limitations": "No options split-adjustment/deliverable endpoint found in this copied spec. Do not assume optionsPro includes stock splits,index data,or normalized deliverables. Root symbols alone insufficient.",
+      "status": "DOCUMENTED_NOT_LIVE_VERIFIED"
+    }
+  ],
+  "research_protocols": [
+    {
+      "id": "T1_quote_coverage",
+      "priority": 1,
+      "question": "Does Theta resolve currently unpriceable candidate entry/exit windows?",
+      "cohort": "All8frozen retrospective mappings retained;then consecutive prospective UW-selected contracts frozen before outcomes.",
+      "primary_metric": "Complete valid entry and both planned exit-window coverage;report numerator/denominator,quote age,spread and missingness by provider.",
+      "design": "Same exact contract,session,time window;no reselection to liquid winners. Preserve separate UW/Theta prices and disagreements.",
+      "falsification": "No coverage improvement or material contract/time mismatch;do not claim benefit from more rows alone.",
+      "profitability_inference": false
+    },
+    {
+      "id": "T2_net_option_economics",
+      "priority": 2,
+      "question": "Does a fixed UW CALL/PUT entry rule earn positive net optionPnL after executable-side pricing and costs?",
+      "cohort": "New consecutive sessions with immutable candidate/contract selection;separate calls/puts and disjoint chronological validation after design freeze.",
+      "primary_metric": "Session-clustered mean netPnL under fixed risk budget at15min(primary),60minsecondary;fees,slippage and entire spread included;unpriced remainsUNKNOWN.",
+      "design": "Register universe,DTE/delta eligibility,timing,position sizing,fee/slippage,minimum independent sessions and pass criteria before outcomes. Report coverage,drawdown,best-trade removal,20/40/60s latency sensitivity without selecting winner.",
+      "falsification": "Negative or uncertain net expectation,dependence on one ticker/trade,or deterioration under modest cost/latency stress.",
+      "profitability_inference": "Only after fresh complete holdout;8current mappings cannot establish edge."
+    },
+    {
+      "id": "T3_premium_and_decay",
+      "priority": 3,
+      "question": "Does observed bid/mid/askIV plus spread/Greek context reduce losses beyond a fixed flow baseline?",
+      "cohort": "Same prospective candidate universe and entry contract choices asT2;fit on training period only.",
+      "primary_metric": "Held-out incremental netPnL of one preregistered filter compared on common candidates;separate selection effect from capital allocation.",
+      "design": "At decision-time only use available quote/underlying/model versions;matched DTE,moneyness,liquidity and event regime. Approximate delta/gamma/vega/theta attribution includes residual.",
+      "falsification": "No held-out gain after costs or improvement disappears after liquidity/DTE matching;do not threshold-search heldout.",
+      "profitability_inference": "Conditional and unproven."
+    },
+    {
+      "id": "T4_alert_execution_quality",
+      "priority": 4,
+      "question": "Does apparent ask-side urgency survive strict pre-trade quote matching and corrections?",
+      "cohort": "All sampled UW alerts over fixed dates plus matched non-alert trade controls;no hindsight outcome sampling.",
+      "primary_metric": "Disagreement rate between vendor-side tags and strictly-prior-NBBO classification;then preregistered incremental forward markout.",
+      "design": "Use exclusive=true,condition/cancel filters,quote age,size and timestamp tie policy. Separate multi-leg/complex trades where available.",
+      "falsification": "Direction flips frequently,quotes stale,or tag alone has no net predictive value.",
+      "profitability_inference": false
+    },
+    {
+      "id": "T5_oi_confirmation",
+      "priority": 5,
+      "question": "Does next-morning OI information improve next-session option decisions independent of volume selection?",
+      "cohort": "New data;avoid reused H03panel and mechanically coupled volume>OI eligibility.",
+      "primary_metric": "Common-candidate next-session netPnL difference with independent selection and OI treatment.",
+      "design": "OI available_at pinned after actual publication;trade only afterward;matched controls with adequatecounts before outcomes.",
+      "falsification": "Insufficient matched sample,negative netPnL,or uncertainty includes no incremental benefit.",
+      "profitability_inference": "New preregistration required;previous failed result remains unchanged."
+    }
+  ],
+  "endpoint_count": 34,
+  "endpoints": [
+    {
+      "method": "GET",
+      "path": "/v3/option/list/symbols",
+      "summary": "Symbols",
+      "documented_minimum_options_tier": "free",
+      "account_entitlement": "UNVERIFIED",
+      "required_parameters": [],
+      "optional_parameters": [
+        "format"
+      ],
+      "response_fields": [
+        "symbol"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/v3/option/list/dates/{request_type}",
+      "summary": "Dates",
+      "documented_minimum_options_tier": "free",
+      "account_entitlement": "UNVERIFIED",
+      "required_parameters": [
+        "request_type",
+        "symbol",
+        "expiration"
+      ],
+      "optional_parameters": [
+        "strike",
+        "right",
+        "format"
+      ],
+      "response_fields": [
+        "date"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/v3/option/list/expirations",
+      "summary": "Expirations",
+      "documented_minimum_options_tier": "free",
+      "account_entitlement": "UNVERIFIED",
+      "required_parameters": [
+        "symbol"
+      ],
+      "optional_parameters": [
+        "format"
+      ],
+      "response_fields": [
+        "symbol",
+        "expiration"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/v3/option/list/strikes",
+      "summary": "Strikes",
+      "documented_minimum_options_tier": "free",
+      "account_entitlement": "UNVERIFIED",
+      "required_parameters": [
+        "symbol",
+        "expiration"
+      ],
+      "optional_parameters": [
+        "format"
+      ],
+      "response_fields": [
+        "symbol",
+        "strike"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/v3/option/list/contracts/{request_type}",
+      "summary": "Contracts",
+      "documented_minimum_options_tier": "value",
+      "account_entitlement": "UNVERIFIED",
+      "required_parameters": [
+        "request_type",
+        "date"
+      ],
+      "optional_parameters": [
+        "symbol",
+        "max_dte",
+        "format"
+      ],
+      "response_fields": [
+        "symbol",
+        "expiration",
+        "strike",
+        "right"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/v3/option/snapshot/ohlc",
+      "summary": "Open High Low Close",
+      "documented_minimum_options_tier": "value",
+      "account_entitlement": "UNVERIFIED",
+      "required_parameters": [
+        "symbol",
+        "expiration"
+      ],
+      "optional_parameters": [
+        "strike",
+        "right",
+        "max_dte",
+        "strike_range",
+        "min_time",
+        "format"
+      ],
+      "response_fields": [
+        "timestamp",
+        "symbol",
+        "expiration",
+        "strike",
+        "right",
+        "open",
+        "high",
+        "low",
+        "close",
+        "volume",
+        "count"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/v3/option/snapshot/trade",
+      "summary": "Trade",
+      "documented_minimum_options_tier": "standard",
+      "account_entitlement": "UNVERIFIED",
+      "required_parameters": [
+        "symbol",
+        "expiration"
+      ],
+      "optional_parameters": [
+        "strike",
+        "right",
+        "strike_range",
+        "min_time",
+        "format"
+      ],
+      "response_fields": [
+        "symbol",
+        "expiration",
+        "strike",
+        "right",
+        "timestamp",
+        "sequence",
+        "ext_condition1",
+        "ext_condition2",
+        "ext_condition3",
+        "ext_condition4",
+        "condition",
+        "size",
+        "exchange",
+        "price"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/v3/option/snapshot/quote",
+      "summary": "Quote",
+      "documented_minimum_options_tier": "value",
+      "account_entitlement": "UNVERIFIED",
+      "required_parameters": [
+        "symbol",
+        "expiration"
+      ],
+      "optional_parameters": [
+        "strike",
+        "right",
+        "max_dte",
+        "strike_range",
+        "min_time",
+        "format"
+      ],
+      "response_fields": [
+        "timestamp",
+        "symbol",
+        "expiration",
+        "strike",
+        "right",
+        "bid_size",
+        "bid_exchange",
+        "bid",
+        "bid_condition",
+        "ask_size",
+        "ask_exchange",
+        "ask",
+        "ask_condition"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/v3/option/snapshot/open_interest",
+      "summary": "Open Interest",
+      "documented_minimum_options_tier": "value",
+      "account_entitlement": "UNVERIFIED",
+      "required_parameters": [
+        "symbol",
+        "expiration"
+      ],
+      "optional_parameters": [
+        "strike",
+        "right",
+        "max_dte",
+        "strike_range",
+        "min_time",
+        "format"
+      ],
+      "response_fields": [
+        "timestamp",
+        "symbol",
+        "expiration",
+        "strike",
+        "right",
+        "open_interest"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/v3/option/snapshot/market_value",
+      "summary": "Market Value",
+      "documented_minimum_options_tier": "standard",
+      "account_entitlement": "UNVERIFIED",
+      "required_parameters": [
+        "symbol",
+        "expiration"
+      ],
+      "optional_parameters": [
+        "strike",
+        "right",
+        "max_dte",
+        "strike_range",
+        "min_time",
+        "format"
+      ],
+      "response_fields": [
+        "timestamp",
+        "symbol",
+        "expiration",
+        "strike",
+        "right",
+        "market_bid",
+        "market_ask",
+        "market_price"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/v3/option/snapshot/greeks/implied_volatility",
+      "summary": "Implied Volatility",
+      "documented_minimum_options_tier": "standard",
+      "account_entitlement": "UNVERIFIED",
+      "required_parameters": [
+        "symbol",
+        "expiration"
+      ],
+      "optional_parameters": [
+        "strike",
+        "right",
+        "annual_dividend",
+        "rate_type",
+        "rate_value",
+        "stock_price",
+        "version",
+        "max_dte",
+        "strike_range",
+        "min_time",
+        "format"
+      ],
+      "response_fields": [
+        "symbol",
+        "expiration",
+        "strike",
+        "right",
+        "timestamp",
+        "bid",
+        "ask",
+        "implied_vol",
+        "iv_error",
+        "underlying_timestamp",
+        "underlying_price"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/v3/option/snapshot/greeks/all",
+      "summary": "All Greeks",
+      "documented_minimum_options_tier": "professional",
+      "account_entitlement": "UNVERIFIED",
+      "required_parameters": [
+        "symbol",
+        "expiration"
+      ],
+      "optional_parameters": [
+        "strike",
+        "right",
+        "annual_dividend",
+        "rate_type",
+        "rate_value",
+        "stock_price",
+        "version",
+        "max_dte",
+        "strike_range",
+        "min_time",
+        "format"
+      ],
+      "response_fields": [
+        "symbol",
+        "expiration",
+        "strike",
+        "right",
+        "timestamp",
+        "bid",
+        "ask",
+        "delta",
+        "theta",
+        "vega",
+        "rho",
+        "epsilon",
+        "lambda",
+        "gamma",
+        "vanna",
+        "charm",
+        "vomma",
+        "veta",
+        "vera",
+        "speed",
+        "zomma",
+        "color",
+        "ultima",
+        "d1",
+        "d2",
+        "dual_delta",
+        "dual_gamma",
+        "implied_vol",
+        "iv_error",
+        "underlying_timestamp",
+        "underlying_price"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/v3/option/snapshot/greeks/first_order",
+      "summary": "First Order Greeks",
+      "documented_minimum_options_tier": "standard",
+      "account_entitlement": "UNVERIFIED",
+      "required_parameters": [
+        "symbol",
+        "expiration"
+      ],
+      "optional_parameters": [
+        "strike",
+        "right",
+        "annual_dividend",
+        "rate_type",
+        "rate_value",
+        "stock_price",
+        "version",
+        "max_dte",
+        "strike_range",
+        "min_time",
+        "format"
+      ],
+      "response_fields": [
+        "symbol",
+        "expiration",
+        "strike",
+        "right",
+        "timestamp",
+        "bid",
+        "ask",
+        "delta",
+        "theta",
+        "vega",
+        "rho",
+        "epsilon",
+        "lambda",
+        "implied_vol",
+        "iv_error",
+        "underlying_timestamp",
+        "underlying_price"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/v3/option/snapshot/greeks/second_order",
+      "summary": "Second Order Greeks",
+      "documented_minimum_options_tier": "professional",
+      "account_entitlement": "UNVERIFIED",
+      "required_parameters": [
+        "symbol",
+        "expiration"
+      ],
+      "optional_parameters": [
+        "strike",
+        "right",
+        "annual_dividend",
+        "rate_type",
+        "rate_value",
+        "stock_price",
+        "version",
+        "max_dte",
+        "strike_range",
+        "min_time",
+        "format"
+      ],
+      "response_fields": [
+        "symbol",
+        "expiration",
+        "strike",
+        "right",
+        "timestamp",
+        "bid",
+        "ask",
+        "gamma",
+        "vanna",
+        "charm",
+        "vomma",
+        "veta",
+        "implied_vol",
+        "iv_error",
+        "underlying_timestamp",
+        "underlying_price"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/v3/option/snapshot/greeks/third_order",
+      "summary": "Third Order Greeks",
+      "documented_minimum_options_tier": "professional",
+      "account_entitlement": "UNVERIFIED",
+      "required_parameters": [
+        "symbol",
+        "expiration"
+      ],
+      "optional_parameters": [
+        "strike",
+        "right",
+        "annual_dividend",
+        "rate_type",
+        "rate_value",
+        "stock_price",
+        "version",
+        "max_dte",
+        "strike_range",
+        "min_time",
+        "format"
+      ],
+      "response_fields": [
+        "symbol",
+        "expiration",
+        "strike",
+        "right",
+        "timestamp",
+        "bid",
+        "ask",
+        "speed",
+        "zomma",
+        "color",
+        "ultima",
+        "implied_vol",
+        "iv_error",
+        "underlying_timestamp",
+        "underlying_price"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/v3/option/history/eod",
+      "summary": "End of Day",
+      "documented_minimum_options_tier": "free",
+      "account_entitlement": "UNVERIFIED",
+      "required_parameters": [
+        "start_date",
+        "end_date",
+        "symbol",
+        "expiration"
+      ],
+      "optional_parameters": [
+        "strike",
+        "right",
+        "max_dte",
+        "strike_range",
+        "format"
+      ],
+      "response_fields": [
+        "symbol",
+        "expiration",
+        "strike",
+        "right",
+        "created",
+        "last_trade",
+        "open",
+        "high",
+        "low",
+        "close",
+        "volume",
+        "count",
+        "bid_size",
+        "bid_exchange",
+        "bid",
+        "bid_condition",
+        "ask_size",
+        "ask_exchange",
+        "ask",
+        "ask_condition"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/v3/option/history/ohlc",
+      "summary": "Open High Low Close",
+      "documented_minimum_options_tier": "value",
+      "account_entitlement": "UNVERIFIED",
+      "required_parameters": [
+        "symbol",
+        "expiration",
+        "interval"
+      ],
+      "optional_parameters": [
+        "date",
+        "strike",
+        "right",
+        "start_time",
+        "end_time",
+        "strike_range",
+        "format",
+        "start_date",
+        "end_date"
+      ],
+      "response_fields": [
+        "symbol",
+        "expiration",
+        "strike",
+        "right",
+        "timestamp",
+        "open",
+        "high",
+        "low",
+        "close",
+        "volume",
+        "count",
+        "vwap"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/v3/option/history/trade",
+      "summary": "Trade",
+      "documented_minimum_options_tier": "standard",
+      "account_entitlement": "UNVERIFIED",
+      "required_parameters": [
+        "symbol",
+        "expiration"
+      ],
+      "optional_parameters": [
+        "date",
+        "strike",
+        "right",
+        "start_time",
+        "end_time",
+        "max_dte",
+        "strike_range",
+        "format",
+        "start_date",
+        "end_date"
+      ],
+      "response_fields": [
+        "symbol",
+        "expiration",
+        "strike",
+        "right",
+        "timestamp",
+        "sequence",
+        "ext_condition1",
+        "ext_condition2",
+        "ext_condition3",
+        "ext_condition4",
+        "condition",
+        "size",
+        "exchange",
+        "price"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/v3/option/history/quote",
+      "summary": "Quote",
+      "documented_minimum_options_tier": "value",
+      "account_entitlement": "UNVERIFIED",
+      "required_parameters": [
+        "symbol",
+        "expiration",
+        "interval"
+      ],
+      "optional_parameters": [
+        "date",
+        "strike",
+        "right",
+        "start_time",
+        "end_time",
+        "max_dte",
+        "strike_range",
+        "format",
+        "start_date",
+        "end_date"
+      ],
+      "response_fields": [
+        "symbol",
+        "expiration",
+        "strike",
+        "right",
+        "timestamp",
+        "bid_size",
+        "bid_exchange",
+        "bid",
+        "bid_condition",
+        "ask_size",
+        "ask_exchange",
+        "ask",
+        "ask_condition"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/v3/option/history/trade_quote",
+      "summary": "Trade Quote",
+      "documented_minimum_options_tier": "standard",
+      "account_entitlement": "UNVERIFIED",
+      "required_parameters": [
+        "symbol",
+        "expiration"
+      ],
+      "optional_parameters": [
+        "date",
+        "strike",
+        "right",
+        "start_time",
+        "end_time",
+        "exclusive",
+        "max_dte",
+        "strike_range",
+        "format",
+        "start_date",
+        "end_date"
+      ],
+      "response_fields": [
+        "symbol",
+        "expiration",
+        "strike",
+        "right",
+        "trade_timestamp",
+        "quote_timestamp",
+        "sequence",
+        "ext_condition1",
+        "ext_condition2",
+        "ext_condition3",
+        "ext_condition4",
+        "condition",
+        "size",
+        "exchange",
+        "price",
+        "bid_size",
+        "bid_exchange",
+        "bid",
+        "bid_condition",
+        "ask_size",
+        "ask_exchange",
+        "ask",
+        "ask_condition"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/v3/option/history/open_interest",
+      "summary": "Open Interest",
+      "documented_minimum_options_tier": "value",
+      "account_entitlement": "UNVERIFIED",
+      "required_parameters": [
+        "symbol",
+        "expiration"
+      ],
+      "optional_parameters": [
+        "date",
+        "strike",
+        "right",
+        "max_dte",
+        "strike_range",
+        "format",
+        "start_date",
+        "end_date"
+      ],
+      "response_fields": [
+        "symbol",
+        "expiration",
+        "strike",
+        "right",
+        "timestamp",
+        "open_interest"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/v3/option/history/greeks/eod",
+      "summary": "End of Day Greeks",
+      "documented_minimum_options_tier": "standard",
+      "account_entitlement": "UNVERIFIED",
+      "required_parameters": [
+        "symbol",
+        "expiration",
+        "start_date",
+        "end_date"
+      ],
+      "optional_parameters": [
+        "strike",
+        "right",
+        "annual_dividend",
+        "rate_type",
+        "rate_value",
+        "version",
+        "underlyer_use_nbbo",
+        "max_dte",
+        "strike_range",
+        "format"
+      ],
+      "response_fields": [
+        "symbol",
+        "expiration",
+        "strike",
+        "right",
+        "timestamp",
+        "open",
+        "high",
+        "low",
+        "close",
+        "volume",
+        "count",
+        "bid_size",
+        "bid_exchange",
+        "bid",
+        "bid_condition",
+        "ask_size",
+        "ask_exchange",
+        "ask",
+        "ask_condition",
+        "delta",
+        "theta",
+        "vega",
+        "rho",
+        "epsilon",
+        "lambda",
+        "gamma",
+        "vanna",
+        "charm",
+        "vomma",
+        "veta",
+        "vera",
+        "speed",
+        "zomma",
+        "color",
+        "ultima",
+        "d1",
+        "d2",
+        "dual_delta",
+        "dual_gamma",
+        "implied_vol",
+        "iv_error",
+        "underlying_timestamp",
+        "underlying_price"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/v3/option/history/greeks/all",
+      "summary": "All Greeks",
+      "documented_minimum_options_tier": "professional",
+      "account_entitlement": "UNVERIFIED",
+      "required_parameters": [
+        "symbol",
+        "expiration",
+        "interval"
+      ],
+      "optional_parameters": [
+        "date",
+        "strike",
+        "right",
+        "start_time",
+        "end_time",
+        "annual_dividend",
+        "rate_type",
+        "rate_value",
+        "version",
+        "strike_range",
+        "format",
+        "start_date",
+        "end_date"
+      ],
+      "response_fields": [
+        "symbol",
+        "expiration",
+        "strike",
+        "right",
+        "timestamp",
+        "bid",
+        "ask",
+        "delta",
+        "theta",
+        "vega",
+        "rho",
+        "epsilon",
+        "lambda",
+        "gamma",
+        "vanna",
+        "charm",
+        "vomma",
+        "veta",
+        "vera",
+        "speed",
+        "zomma",
+        "color",
+        "ultima",
+        "d1",
+        "d2",
+        "dual_delta",
+        "dual_gamma",
+        "implied_vol",
+        "iv_error",
+        "underlying_timestamp",
+        "underlying_price"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/v3/option/history/trade_greeks/all",
+      "summary": "All Trade Greeks",
+      "documented_minimum_options_tier": "professional",
+      "account_entitlement": "UNVERIFIED",
+      "required_parameters": [
+        "symbol",
+        "expiration"
+      ],
+      "optional_parameters": [
+        "date",
+        "strike",
+        "right",
+        "start_time",
+        "end_time",
+        "annual_dividend",
+        "rate_type",
+        "rate_value",
+        "version",
+        "max_dte",
+        "strike_range",
+        "format",
+        "start_date",
+        "end_date"
+      ],
+      "response_fields": [
+        "symbol",
+        "expiration",
+        "strike",
+        "right",
+        "timestamp",
+        "sequence",
+        "ext_condition1",
+        "ext_condition2",
+        "ext_condition3",
+        "ext_condition4",
+        "condition",
+        "size",
+        "exchange",
+        "price",
+        "delta",
+        "theta",
+        "vega",
+        "rho",
+        "epsilon",
+        "lambda",
+        "gamma",
+        "vanna",
+        "charm",
+        "vomma",
+        "veta",
+        "vera",
+        "speed",
+        "zomma",
+        "color",
+        "ultima",
+        "d1",
+        "d2",
+        "dual_delta",
+        "dual_gamma",
+        "implied_vol",
+        "iv_error",
+        "underlying_timestamp",
+        "underlying_price"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/v3/option/history/greeks/first_order",
+      "summary": "First Order Greeks",
+      "documented_minimum_options_tier": "standard",
+      "account_entitlement": "UNVERIFIED",
+      "required_parameters": [
+        "symbol",
+        "expiration",
+        "interval"
+      ],
+      "optional_parameters": [
+        "date",
+        "strike",
+        "right",
+        "start_time",
+        "end_time",
+        "annual_dividend",
+        "rate_type",
+        "rate_value",
+        "version",
+        "strike_range",
+        "format",
+        "start_date",
+        "end_date"
+      ],
+      "response_fields": [
+        "symbol",
+        "expiration",
+        "strike",
+        "right",
+        "timestamp",
+        "bid",
+        "ask",
+        "delta",
+        "theta",
+        "vega",
+        "rho",
+        "epsilon",
+        "lambda",
+        "implied_vol",
+        "iv_error",
+        "underlying_timestamp",
+        "underlying_price"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/v3/option/history/trade_greeks/first_order",
+      "summary": "First Order Trade Greeks",
+      "documented_minimum_options_tier": "professional",
+      "account_entitlement": "UNVERIFIED",
+      "required_parameters": [
+        "symbol",
+        "expiration"
+      ],
+      "optional_parameters": [
+        "date",
+        "strike",
+        "right",
+        "start_time",
+        "end_time",
+        "annual_dividend",
+        "rate_type",
+        "rate_value",
+        "version",
+        "max_dte",
+        "strike_range",
+        "format",
+        "start_date",
+        "end_date"
+      ],
+      "response_fields": [
+        "symbol",
+        "expiration",
+        "strike",
+        "right",
+        "timestamp",
+        "sequence",
+        "ext_condition1",
+        "ext_condition2",
+        "ext_condition3",
+        "ext_condition4",
+        "condition",
+        "size",
+        "exchange",
+        "price",
+        "delta",
+        "theta",
+        "vega",
+        "rho",
+        "epsilon",
+        "lambda",
+        "implied_vol",
+        "iv_error",
+        "underlying_timestamp",
+        "underlying_price"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/v3/option/history/greeks/second_order",
+      "summary": "Second Order Greeks",
+      "documented_minimum_options_tier": "professional",
+      "account_entitlement": "UNVERIFIED",
+      "required_parameters": [
+        "symbol",
+        "expiration",
+        "interval"
+      ],
+      "optional_parameters": [
+        "date",
+        "strike",
+        "right",
+        "start_time",
+        "end_time",
+        "annual_dividend",
+        "rate_type",
+        "rate_value",
+        "version",
+        "strike_range",
+        "format",
+        "start_date",
+        "end_date"
+      ],
+      "response_fields": [
+        "symbol",
+        "expiration",
+        "strike",
+        "right",
+        "timestamp",
+        "bid",
+        "ask",
+        "gamma",
+        "vanna",
+        "charm",
+        "vomma",
+        "veta",
+        "implied_vol",
+        "iv_error",
+        "underlying_timestamp",
+        "underlying_price"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/v3/option/history/trade_greeks/second_order",
+      "summary": "Second Order Trade Greeks",
+      "documented_minimum_options_tier": "professional",
+      "account_entitlement": "UNVERIFIED",
+      "required_parameters": [
+        "symbol",
+        "expiration"
+      ],
+      "optional_parameters": [
+        "date",
+        "strike",
+        "right",
+        "start_time",
+        "end_time",
+        "annual_dividend",
+        "rate_type",
+        "rate_value",
+        "version",
+        "max_dte",
+        "strike_range",
+        "format",
+        "start_date",
+        "end_date"
+      ],
+      "response_fields": [
+        "symbol",
+        "expiration",
+        "strike",
+        "right",
+        "timestamp",
+        "sequence",
+        "ext_condition1",
+        "ext_condition2",
+        "ext_condition3",
+        "ext_condition4",
+        "condition",
+        "size",
+        "exchange",
+        "price",
+        "gamma",
+        "vanna",
+        "charm",
+        "vomma",
+        "veta",
+        "implied_vol",
+        "iv_error",
+        "underlying_timestamp",
+        "underlying_price"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/v3/option/history/greeks/third_order",
+      "summary": "Third Order Greeks",
+      "documented_minimum_options_tier": "professional",
+      "account_entitlement": "UNVERIFIED",
+      "required_parameters": [
+        "symbol",
+        "expiration",
+        "interval"
+      ],
+      "optional_parameters": [
+        "date",
+        "strike",
+        "right",
+        "start_time",
+        "end_time",
+        "annual_dividend",
+        "rate_type",
+        "rate_value",
+        "version",
+        "strike_range",
+        "format",
+        "start_date",
+        "end_date"
+      ],
+      "response_fields": [
+        "symbol",
+        "expiration",
+        "strike",
+        "right",
+        "timestamp",
+        "bid",
+        "ask",
+        "speed",
+        "zomma",
+        "color",
+        "ultima",
+        "implied_vol",
+        "iv_error",
+        "underlying_timestamp",
+        "underlying_price"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/v3/option/history/trade_greeks/third_order",
+      "summary": "Third Order Trade Greeks",
+      "documented_minimum_options_tier": "professional",
+      "account_entitlement": "UNVERIFIED",
+      "required_parameters": [
+        "symbol",
+        "expiration"
+      ],
+      "optional_parameters": [
+        "date",
+        "strike",
+        "right",
+        "start_time",
+        "end_time",
+        "annual_dividend",
+        "rate_type",
+        "rate_value",
+        "version",
+        "max_dte",
+        "strike_range",
+        "format",
+        "start_date",
+        "end_date"
+      ],
+      "response_fields": [
+        "symbol",
+        "expiration",
+        "strike",
+        "right",
+        "timestamp",
+        "sequence",
+        "ext_condition1",
+        "ext_condition2",
+        "ext_condition3",
+        "ext_condition4",
+        "condition",
+        "size",
+        "exchange",
+        "price",
+        "speed",
+        "zomma",
+        "color",
+        "ultima",
+        "implied_vol",
+        "iv_error",
+        "underlying_timestamp",
+        "underlying_price"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/v3/option/history/greeks/implied_volatility",
+      "summary": "Implied Volatility",
+      "documented_minimum_options_tier": "standard",
+      "account_entitlement": "UNVERIFIED",
+      "required_parameters": [
+        "symbol",
+        "expiration",
+        "interval"
+      ],
+      "optional_parameters": [
+        "date",
+        "strike",
+        "right",
+        "start_time",
+        "end_time",
+        "annual_dividend",
+        "rate_type",
+        "rate_value",
+        "version",
+        "strike_range",
+        "format",
+        "start_date",
+        "end_date"
+      ],
+      "response_fields": [
+        "symbol",
+        "expiration",
+        "strike",
+        "right",
+        "timestamp",
+        "bid",
+        "bid_implied_vol",
+        "midpoint",
+        "implied_vol",
+        "ask",
+        "ask_implied_vol",
+        "iv_error",
+        "underlying_timestamp",
+        "underlying_price"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/v3/option/history/trade_greeks/implied_volatility",
+      "summary": "Trade Implied Volatility",
+      "documented_minimum_options_tier": "professional",
+      "account_entitlement": "UNVERIFIED",
+      "required_parameters": [
+        "symbol",
+        "expiration"
+      ],
+      "optional_parameters": [
+        "date",
+        "strike",
+        "right",
+        "start_time",
+        "end_time",
+        "annual_dividend",
+        "rate_type",
+        "rate_value",
+        "version",
+        "max_dte",
+        "strike_range",
+        "format",
+        "start_date",
+        "end_date"
+      ],
+      "response_fields": [
+        "symbol",
+        "expiration",
+        "strike",
+        "right",
+        "timestamp",
+        "sequence",
+        "ext_condition1",
+        "ext_condition2",
+        "ext_condition3",
+        "ext_condition4",
+        "condition",
+        "size",
+        "exchange",
+        "price",
+        "implied_vol",
+        "iv_error",
+        "underlying_timestamp",
+        "underlying_price"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/v3/option/at_time/trade",
+      "summary": "Trade",
+      "documented_minimum_options_tier": "standard",
+      "account_entitlement": "UNVERIFIED",
+      "required_parameters": [
+        "symbol",
+        "start_date",
+        "end_date",
+        "time_of_day",
+        "expiration"
+      ],
+      "optional_parameters": [
+        "strike",
+        "right",
+        "max_dte",
+        "strike_range",
+        "format"
+      ],
+      "response_fields": [
+        "symbol",
+        "expiration",
+        "strike",
+        "right",
+        "timestamp",
+        "sequence",
+        "ext_condition1",
+        "ext_condition2",
+        "ext_condition3",
+        "ext_condition4",
+        "condition",
+        "size",
+        "exchange",
+        "price"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/v3/option/at_time/quote",
+      "summary": "Quote",
+      "documented_minimum_options_tier": "value",
+      "account_entitlement": "UNVERIFIED",
+      "required_parameters": [
+        "symbol",
+        "start_date",
+        "end_date",
+        "time_of_day",
+        "expiration"
+      ],
+      "optional_parameters": [
+        "strike",
+        "right",
+        "max_dte",
+        "strike_range",
+        "format"
+      ],
+      "response_fields": [
+        "symbol",
+        "expiration",
+        "strike",
+        "right",
+        "timestamp",
+        "bid_size",
+        "bid_exchange",
+        "bid",
+        "bid_condition",
+        "ask_size",
+        "ask_exchange",
+        "ask",
+        "ask_condition"
+      ]
+    }
+  ],
+  "shared_parameter_reference": {
+    "format": {
+      "description": "The format of the data when returned to the user.",
+      "schema": {
+        "type": "string",
+        "enum": [
+          "csv",
+          "json",
+          "ndjson",
+          "html"
+        ],
+        "default": "csv"
+      }
+    },
+    "request_type": {
+      "description": "The request type.",
+      "schema": {
+        "type": "string",
+        "enum": [
+          "trade",
+          "quote"
+        ]
+      }
+    },
+    "symbol": {
+      "description": "The stock or index symbol, or underlying symbol for options.",
+      "schema": {
+        "type": "string"
+      }
+    },
+    "expiration": {
+      "description": "The expiration of the contract in `YYYY-MM-DD` or `YYYYMMDD` format.",
+      "schema": {
+        "type": "string",
+        "format": "date"
+      }
+    },
+    "strike": {
+      "description": "The strike price of the contract in dollars (ie `100.00` for `$100.00`), or `*` for all strikes.",
+      "schema": {
+        "type": "string",
+        "default": "*"
+      }
+    },
+    "right": {
+      "description": "The right (call or put) of the contract.",
+      "schema": {
+        "type": "string",
+        "enum": [
+          "call",
+          "put",
+          "both"
+        ],
+        "default": "both"
+      }
+    },
+    "date": {
+      "description": "The date to fetch data for.",
+      "schema": {
+        "type": "string",
+        "format": "date"
+      }
+    },
+    "max_dte": {
+      "description": "If specified, only contracts with a full calendar day 'Days to Expiration' (DTE) less than or equal to this number will be returned.",
+      "schema": {
+        "minimum": 0,
+        "type": "integer",
+        "format": "int32"
+      }
+    },
+    "strike_range": {
+      "description": "Used to specify a filter to limit the number of contracts returned relative to the underlying's spot price. Will return the specified number of strikes above and below the spot price, as well as the at-the-money strike.",
+      "schema": {
+        "minimum": 1,
+        "type": "integer",
+        "format": "int32"
+      }
+    },
+    "min_time": {
+      "description": "Filters snapshots to include only data with a timestamp greater or equal to the specified value (HH:mm:ss.SSS format).",
+      "schema": {
+        "type": "string",
+        "format": "time"
+      }
+    },
+    "annual_dividend": {
+      "description": "The annualized expected dividend amount to be used in Greeks calculations.",
+      "schema": {
+        "type": "number",
+        "format": "float"
+      }
+    },
+    "rate_type": {
+      "description": "The interest rate type to be used in a Greeks calculation.",
+      "schema": {
+        "type": "string",
+        "enum": [
+          "sofr",
+          "treasury_m1",
+          "treasury_m3",
+          "treasury_m6",
+          "treasury_y1",
+          "treasury_y2",
+          "treasury_y3",
+          "treasury_y5",
+          "treasury_y7",
+          "treasury_y10",
+          "treasury_y20",
+          "treasury_y30"
+        ],
+        "default": "sofr"
+      }
+    },
+    "rate_value": {
+      "description": "The interest rate, as a percent, to be used in a Greeks calculation.",
+      "schema": {
+        "type": "number",
+        "format": "float"
+      }
+    },
+    "stock_price": {
+      "description": "The underlying stock price to be used in the Greeks calculation.",
+      "schema": {
+        "type": "number",
+        "format": "float"
+      }
+    },
+    "version": {
+      "description": "Used to adjust Greeks calculation methodology. \"1\" uses a fixed .15 DTE for 0DTE; \"latest\" uses real TTE (down to a minimum of 1 hour)",
+      "schema": {
+        "type": "string",
+        "enum": [
+          "latest",
+          "1"
+        ],
+        "default": "latest"
+      }
+    },
+    "start_date": {
+      "description": "The start date (inclusive).",
+      "schema": {
+        "type": "string",
+        "format": "date"
+      }
+    },
+    "end_date": {
+      "description": "The end date (inclusive).",
+      "schema": {
+        "type": "string",
+        "format": "date"
+      }
+    },
+    "interval": {
+      "description": "The size of the time interval must be one of the available options listed below. Intervals less than 1m are available only for single-day requests.",
+      "schema": {
+        "type": "string",
+        "enum": [
+          "tick",
+          "10ms",
+          "100ms",
+          "500ms",
+          "1s",
+          "5s",
+          "10s",
+          "15s",
+          "30s",
+          "1m",
+          "5m",
+          "10m",
+          "15m",
+          "30m",
+          "1h"
+        ],
+        "default": "1s"
+      }
+    },
+    "start_time": {
+      "description": "The start time (inclusive) in the specified day.",
+      "schema": {
+        "type": "string",
+        "format": "time",
+        "default": "09:30:00"
+      }
+    },
+    "end_time": {
+      "description": "The end time (inclusive) in the specified day.",
+      "schema": {
+        "type": "string",
+        "format": "time",
+        "default": "16:00:00"
+      }
+    },
+    "exclusive": {
+      "description": "If you prefer to match quotes with timestamps that are < the trade timestamp.",
+      "schema": {
+        "type": "boolean",
+        "default": true
+      }
+    },
+    "underlyer_use_nbbo": {
+      "description": "Used to select underlyer pricing for Greeks calculation. \"true\" uses the midpoint of the NBBO; \"false\" uses the last trade price.",
+      "schema": {
+        "type": "boolean",
+        "default": true
+      }
+    },
+    "time_of_day": {
+      "description": "The time of the day to fetch data for; assumed to be America/New_York.",
+      "schema": {
+        "type": "string",
+        "format": "time"
+      }
+    }
+  },
+  "safe_probe": {
+    "script": "/workspace/work/probe_theta_capabilities.py",
+    "default": "DRY_RUN_NO_NETWORK",
+    "maximum_requests": 10,
+    "exact_contract_window_seconds": 10,
+    "max_window_seconds": 30,
+    "max_response_bytes_per_request": 4194304,
+    "retries": 0,
+    "credentials": "Provider login handled only byTerminal;script reads onlyTHETADATA_BASE_URL",
+    "blocked_statuses": [
+      "AUTH_REQUIRED",
+      "ACCESS_DENIED",
+      "NO_DATA",
+      "RATE_LIMITED",
+      "REQUEST_OR_ENDPOINT_UNSUPPORTED",
+      "TRANSPORT_ERROR"
+    ],
+    "no_actual_calls_performed": true
+  },
+  "cost_effective_acquisition_order": [
+    "Verify exact-contract capabilities with10smallreads.",
+    "Resolve8frozen candidate entry/exit windows,cache once by immutable query.",
+    "Collect prospective selected-contract quote windows and original signal evidence daily.",
+    "Use interval1s/1m for exploratory surfaces, tick only for execution or ambiguous windows.",
+    "Expand chosen symbols/dates/expiries only after measuring sample coverage,requestlimits,storage and research power.",
+    "Avoid all-market wildcard tick histories,duplicate refreshes,unbounded retries,and repeatedly mining already rejected panels."
+  ],
+  "plan_boundaries": [
+    "OptionsProfessional does not prove stock/index/SIP data rights.",
+    "Underlying prices embedded in Greeks are model inputs with timestamps,not independent licensedstockquote series.",
+    "No contract deliverable/multiplier adjustment endpoint verified.",
+    "Terms,quotas,andconcurrency must be observed from liveTerminal/providerdocumentation before sustained collection.",
+    "Data use increases evidence;it does not guarantee a profitable strategy."
+  ]
+}
