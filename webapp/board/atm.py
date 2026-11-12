@@ -48,7 +48,7 @@ from uoa_detector.sources.unusual_whales.client import (
 from webapp.board.db import AlfaBase
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable, Mapping, Sequence
+    from collections.abc import Callable, Iterable, Mapping, Sequence
 
     from sqlalchemy import Table
     from sqlalchemy.engine import Engine
@@ -231,6 +231,7 @@ async def refresh_atm_chains(
     wanted: Mapping[str, Sequence[date]],
     settings: BoardSettings,
     now: datetime,
+    clock: Callable[[], datetime] | None = None,
 ) -> AtmRefreshReport:
     """Cycle job: one atm-chains call per ticker for up to ``refresh.atm_expiries`` expiries.
 
@@ -238,6 +239,10 @@ async def refresh_atm_chains(
     first (the dominant contracts' expiries). Each is snapped to a listed expiry;
     free slots are filled with the nearest listed expiries. Rows of expired
     expiries are removed for the ticker.
+
+    ``clock`` records each decoded response's acquisition completion, not the
+    vendor's quote observation time. Historical callers retain the supplied
+    ``now`` when no completion clock is provided.
     """
     fetched_at = _as_utc(now)
     today = fetched_at.astimezone(_ET).date()
@@ -276,11 +281,12 @@ async def refresh_atm_chains(
         except _DEGRADED:
             degraded.append(ticker)
             continue
+        received_at = _as_utc(clock() if clock is not None else now)
         pairs, bad = _parse_atm_rows(resp.get("data"), ticker=ticker)
         malformed += bad
         with sessions() as session, session.begin():
             for pair in pairs.values():
-                _upsert_atm(session, pair, fetched_at=fetched_at)
+                _upsert_atm(session, pair, fetched_at=received_at)
                 stored_rows += 1
             session.execute(
                 delete(AlfaAtm).where(AlfaAtm.ticker == ticker, AlfaAtm.expiry < today),

@@ -11,27 +11,28 @@
   <style>
     :root{color-scheme:light;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#f6f4ee;color:#202d2c}*{box-sizing:border-box}body{margin:0;border-top:4px solid #254c43;line-height:1.6}main{max-width:650px;margin:0 auto;padding:48px 24px 56px}.brand{font-size:15px;letter-spacing:.13em;font-weight:700;color:#254c43;margin:0 0 40px}.eyebrow{font-size:12px;letter-spacing:.09em;color:#596660;font-weight:650;margin:0 0 10px}h1{font-family:Georgia,"Times New Roman",serif;font-size:38px;line-height:1.15;letter-spacing:-.03em;font-weight:400;margin:0 0 18px}.intro{font-size:16px;color:#596660;margin:0 0 26px}.card{border:1px solid #d8d9d0;background:#fffefa;border-radius:6px;padding:24px}.card h2{font-size:18px;margin:0 0 10px}.card p{font-size:14px;color:#596660;margin:0 0 18px}button{display:block;width:100%;min-height:48px;padding:12px 18px;border:1px solid #254c43;border-radius:4px;background:#254c43;color:#fff;font:inherit;font-size:15px;font-weight:650;cursor:pointer}button:disabled{opacity:.5;cursor:not-allowed}button:focus-visible,a:focus-visible{outline:3px solid #568fbb;outline-offset:4px}.message{margin:16px 0 0!important;font-weight:600;color:#254c43!important}.message[data-error=true]{color:#a43e36!important}.steps{padding-left:22px;margin:28px 0 0}.steps li{padding-left:5px;margin-bottom:18px;font-size:14px}.steps strong{display:block;margin-bottom:6px}pre{font-size:13px;white-space:pre-wrap;overflow-wrap:anywhere;padding:14px;border-radius:4px;background:#e9eee8;margin:10px 0}code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}.note{border-top:1px solid #d8d9d0;margin-top:28px;padding-top:18px;font-size:12px;color:#596660}a{color:#254c43;font-weight:650}.hidden{display:none}@media(max-width:480px){main{padding:32px 18px}h1{font-size:33px}.card{padding:20px}.brand{margin-bottom:30px}}
   </style>
-  <script src="/assets/theta_pairing.js?v=1" defer></script>
+  <script src="/assets/theta_pairing.js?v=2" defer></script>
 </head>
 <body>
-  <main id="theta-pairing">
+  {% set automatic_mode = auto_mode | default(false) %}
+  <main id="theta-pairing" data-automatic-mode="{{ 'true' if automatic_mode else 'false' }}">
     <p class="brand">UOA / PİYASA MASASI</p>
     <p class="eyebrow">THETADATA · MAC BAĞLANTISI</p>
-    <h1>Şifre girmeden bağlan.</h1>
-    <p class="intro">Bu dosya, Mac’te açık olan ThetaData Terminal’den seçilmiş opsiyon incelemelerini alıp UOA’ya aktarır.</p>
+    <h1>{{ 'Mac’i bir kez bağla.' if automatic_mode else 'Şifre girmeden bağlan.' }}</h1>
+    <p class="intro">{% if automatic_mode %}Uygun yeni girişler kendiliğinden sıraya girsin; ThetaData kotasyonları geldikçe UOA sonuçları ölçsün.{% else %}Bu dosya, Mac’te açık olan ThetaData Terminal’den seçilmiş opsiyon incelemelerini alıp UOA’ya aktarır.{% endif %}</p>
     <section class="card" aria-labelledby="theta-pairing-title">
       <h2 id="theta-pairing-title">Bağlantı dosyanı indir</h2>
-      <p id="theta-pairing-detail">İndirme bağlantısı tek kullanımlıktır ve hazırlandığı andan itibaren iki saat geçerlidir.</p>
+      <p id="theta-pairing-detail">İndirme bağlantısı tek kullanımlıktır ve hazırlandığı andan itibaren {{ '24 saat' if automatic_mode else 'iki saat' }} geçerlidir.</p>
       <button id="theta-pairing-download" type="button" disabled>Bağlantı dosyasını indir</button>
       <p id="theta-pairing-status" class="message" role="status" aria-live="polite"></p>
       <p id="theta-pairing-renew" class="hidden"><a href="/opsiyon-dogrulama">UOA’dan yeni bağlantı hazırla</a></p>
     </section>
     <ol class="steps">
       <li><strong>ThetaData Terminal açık kalsın.</strong>Mac’teki mevcut ThetaData oturumunu kullanır.</li>
-      <li><strong>Yeni indirdiğin dosyayı çalıştır.</strong>İndirmeden sonra aşağıda beliren, bu dosyaya özel komutu Mac Terminal’e yapıştır:<pre><code id="theta-pairing-command">Dosyayı indirdikten sonra komut burada görünecek.</code></pre></li>
-      <li><strong>Sonuçlar UOA’ya gelir.</strong>Kontratların giriş, +15 ve +60 dakika kotasyonları ölçülür. UOA kullanıcı adı, UOA şifresi veya ThetaData anahtarı sorulmaz.</li>
+      <li><strong>{{ 'Kurulumu bir kez çalıştır.' if automatic_mode else 'Yeni indirdiğin dosyayı çalıştır.' }}</strong>İndirmeden sonra aşağıda beliren, bu dosyaya özel komutu Mac Terminal’e yapıştır:<pre><code id="theta-pairing-command">Dosyayı indirdikten sonra komut burada görünecek.</code></pre><button id="theta-pairing-copy" type="button" disabled>Komutu kopyala</button></li>
+      <li><strong>{{ 'Bağlantıyı UOA’da kontrol et.' if automatic_mode else 'Sonuçlar UOA’ya gelir.' }}</strong>{% if automatic_mode %}Dosya indirmek bağlantı kurmaz. Kurulum tamamlanınca UOA’da son bağlantı zamanı görünür. Program Mac’te oturum açıldığında yeniden başlar; ThetaData Terminal açık olmalı. {% else %}Kontratların giriş, +15 ve +60 dakika kotasyonları ölçülür. {% endif %}UOA kullanıcı adı, UOA şifresi veya ThetaData anahtarı sorulmaz.{% if automatic_mode %}<p><a href="/opsiyon-dogrulama">Otomatik ölçümü aç →</a></p>{% endif %}</li>
     </ol>
-    <p class="note">İndirdiğin bağlantı dosyası 7 gün geçerlidir ve yalnızca bağlantı hazırlanırken seçilmiş incelemeleri kapsar. Süre dolduğunda veya yeni inceleme eklediğinde yeni bağlantı hazırla. Mac kapalıyken veri aktarılmaz; otomatik emir gönderilmez.</p>
+    <p class="note">{% if automatic_mode %}Yeni ölçümler için tekrar dosya indirmen gerekmez. Bağlantıyı UOA’dan kaldırabilirsin. Kurulum için Mac’te Python 3.9 veya üzeri gerekir. {% else %}İndirdiğin bağlantı dosyası 7 gün geçerlidir ve yalnızca bağlantı hazırlanırken seçilmiş incelemeleri kapsar. Süre dolduğunda veya yeni inceleme eklediğinde yeni bağlantı hazırla. {% endif %}Mac kapalıyken veri aktarılmaz; otomatik emir gönderilmez.</p>
     <noscript><p>İndirme için JavaScript’i etkinleştir ve sana verilen bağlantıyı yeniden aç.</p></noscript>
   </main>
 </body>

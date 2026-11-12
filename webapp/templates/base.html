@@ -33,12 +33,12 @@
     {% if path != '/hakkinda' %}
     <nav class="desk-nav" aria-label="Ana gezinme">
       <div class="desk-nav-primary">
-      {% for href, label, active in [('/', 'Bugün', path == '/' or path.startswith('/canli')), ('/acilis', 'Açılış masası', path == '/acilis'), ('/pozisyonlar', 'Pozisyonlarım', path == '/pozisyonlar'), ('/sonuclar', 'Sonuçlar', path == '/sonuclar')] %}
+      {% for href, label, active in [('/', 'Bugün', path == '/' or path.startswith('/canli')), ('/opsiyon-dogrulama', 'Otomatik takip', path == '/opsiyon-dogrulama'), ('/acilis', 'Açılış masası', path == '/acilis'), ('/pozisyonlar', 'Pozisyonlarım', path == '/pozisyonlar'), ('/sonuclar', 'Sonuçlar', path == '/sonuclar')] %}
       <a href="{{ href }}" {% if active %}aria-current="page"{% endif %}>{{ label }}</a>
       {% endfor %}
       </div>
       <div class="desk-nav-secondary" role="group" aria-label="Araştırma ve kayıt ekranları">
-      {% for href, label, active in [('/olcum', 'Günlük ölçüm', path == '/olcum'), ('/karne', 'Çağrı karneleri', path.startswith('/karne')), ('/haberler', 'Haber kaynakları', path == '/haberler'), ('/arastirma', 'Yeni hipotezler', path == '/arastirma'), ('/laboratuvar', 'Alfa lab', path == '/laboratuvar'), ('/stratejiler', 'Strateji masası', path == '/stratejiler'), ('/journal', 'İşlemlerim', path.startswith('/journal')), ('/defter', 'Karar defteri', path.startswith('/defter') or path.startswith('/kart')), ('/alfa', 'Akış', path.startswith('/alfa')), ('/gamma', 'Gamma & vol', path.startswith('/gamma')), ('/opsiyon', 'Opsiyon', path.startswith('/opsiyon'))] %}
+      {% for href, label, active in [('/olcum', 'Günlük ölçüm', path == '/olcum'), ('/karne', 'Çağrı karneleri', path.startswith('/karne')), ('/haberler', 'Haber kaynakları', path == '/haberler'), ('/arastirma', 'Yeni hipotezler', path == '/arastirma'), ('/laboratuvar', 'Alfa lab', path == '/laboratuvar'), ('/stratejiler', 'Strateji masası', path == '/stratejiler'), ('/journal', 'İşlemlerim', path.startswith('/journal')), ('/defter', 'Karar defteri', path.startswith('/defter') or path.startswith('/kart')), ('/alfa', 'Akış', path.startswith('/alfa')), ('/gamma', 'Gamma & vol', path.startswith('/gamma')), ('/opsiyon', 'Opsiyon', path == '/opsiyon')] %}
       <a href="{{ href }}" {% if active %}aria-current="page"{% endif %}>{{ label }}</a>
       {% endfor %}
       </div>

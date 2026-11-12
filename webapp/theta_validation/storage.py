@@ -11,6 +11,7 @@ from typing import Any, cast
 from sqlalchemy import (
     DateTime,
     Integer,
+    LargeBinary,
     String,
     Table,
     Text,
@@ -20,9 +21,10 @@ from sqlalchemy import (
     inspect,
     select,
 )
+from sqlalchemy import cast as sql_cast
 from sqlalchemy.engine import Engine
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, load_only, mapped_column
 
 from webapp.board.db import AlfaBase, session_factory
 
@@ -56,6 +58,8 @@ class ThetaReceipt(AlfaBase):
 
 TABLES = (ThetaRequest, ThetaReceipt)
 MAX_ATTEMPTS = 3
+MAX_AUTOMATIC_RETRIES = 8
+MAX_STATUS_RESULT_BYTES = 8 * 1024 * 1024
 
 
 def ensure(engine: Engine) -> None:
@@ -96,6 +100,7 @@ def request_view(row: ThetaRequest) -> dict[str, Any]:
         "source_label": row.source_label,
         "session_close_at": payload.get("session_close_at"),
         "retry_of": payload.get("retry_of"),
+        **({"source_expires_at": payload["source_expires_at"]} if "source_expires_at" in payload else {}),
         "data_use": "retrospective_one_contract_quote_markout",
     }
 
@@ -106,7 +111,8 @@ def retry_request(engine: Engine, request_id: str, now: datetime) -> dict[str, A
         if parent is None:
             raise ValueError("request_not_found")
         receipts = list(
-            session.scalars(select(ThetaReceipt).where(ThetaReceipt.request_id == request_id))
+            session.scalars(select(ThetaReceipt).options(load_only(ThetaReceipt.finalized))
+                            .where(ThetaReceipt.request_id == request_id))
         )
         if any(row.finalized for row in receipts):
             raise ValueError("completed_result_is_immutable")
@@ -114,6 +120,13 @@ def retry_request(engine: Engine, request_id: str, now: datetime) -> dict[str, A
             raise ValueError("retry_not_needed")
         payload = json.loads(parent.payload_json)
         payload["retry_of"] = request_id
+        if parent.source_kind == "opening_entry":
+            existing = session.scalar(select(ThetaRequest.request_id).where(
+                ThetaRequest.request_hash == digest(canonical(payload))))
+            count = session.scalar(select(func.count()).select_from(ThetaRequest).where(
+                ThetaRequest.source_kind == "opening_entry", ThetaRequest.source_id == parent.source_id))
+            if existing is None and int(count or 0) >= MAX_AUTOMATIC_RETRIES + 1:
+                raise ValueError("automatic_retry_lineage_limit")
     return add_request(engine, payload, now)
 
 
@@ -274,6 +287,9 @@ def view(engine: Engine, *, now: datetime, limit: int = 32) -> dict[str, Any]:
             list(
                 session.scalars(
                     select(ThetaReceipt)
+                    .options(load_only(ThetaReceipt.receipt_id, ThetaReceipt.request_id, ThetaReceipt.attempt,
+                                       ThetaReceipt.received_at, ThetaReceipt.upload_sha256,
+                                       ThetaReceipt.status, ThetaReceipt.finalized))
                     .where(ThetaReceipt.request_id.in_(keys))
                     .order_by(ThetaReceipt.received_at.desc())
                 )
@@ -281,9 +297,8 @@ def view(engine: Engine, *, now: datetime, limit: int = 32) -> dict[str, Any]:
             if keys
             else []
         )
-        last = session.scalar(
-            select(ThetaReceipt).order_by(ThetaReceipt.received_at.desc()).limit(1)
-        )
+        last = session.execute(select(ThetaReceipt.received_at, ThetaReceipt.finalized)
+                               .order_by(ThetaReceipt.received_at.desc()).limit(1)).first()
         jobs = []
         for row in requests:
             attempts = [receipt for receipt in receipts if receipt.request_id == row.request_id]
@@ -306,11 +321,30 @@ def view(engine: Engine, *, now: datetime, limit: int = 32) -> dict[str, Any]:
             if last is None
             else ("data_received" if last.finalized else "connection_or_data_error")
         )
+        recent_results = []
+        remaining = MAX_STATUS_RESULT_BYTES
+        for receipt in receipts[:12]:
+            length = (func.octet_length(ThetaReceipt.result_json) if engine.dialect.name == "postgresql"
+                      else func.length(sql_cast(ThetaReceipt.result_json, LargeBinary)))
+            size = int(session.scalar(select(length).where(ThetaReceipt.receipt_id == receipt.receipt_id)) or 0)
+            if size <= remaining:
+                # Load only an explicitly budgeted result; native upload bodies
+                # are never selected by this periodically polled status view.
+                result_body = session.scalar(select(ThetaReceipt.result_json).where(ThetaReceipt.receipt_id == receipt.receipt_id))
+                result = json.loads(result_body or "{}")
+                remaining -= size
+            else:
+                result = {"status": receipt.status, "markouts": [], "result_details_omitted": True,
+                          "reason": "status_result_byte_limit"}
+            recent_results.append({"receipt_id": receipt.receipt_id, "request_id": receipt.request_id,
+                                   "attempt": receipt.attempt, "received_at": utc(receipt.received_at).isoformat(),
+                                   "upload_sha256": receipt.upload_sha256, "status": receipt.status,
+                                   "finalized": bool(receipt.finalized), "result": result})
         return {
             "status": status,
             "as_of": now.isoformat(),
             "jobs": jobs,
-            "recent_results": [receipt_view(row) for row in receipts[:12]],
+            "recent_results": recent_results,
             "last_connector_contact": utc(last.received_at).isoformat() if last else None,
             "execution_enabled": False,
             "source": "owner_connected_thetadata_terminal",
