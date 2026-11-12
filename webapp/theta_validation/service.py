@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any, Literal
 from zoneinfo import ZoneInfo
@@ -217,10 +218,16 @@ def _failure_result(request: dict[str, Any], reason: str) -> dict[str, Any]:
     }
 
 
-def ingest(engine: Engine, request_id: str, upload: UploadSpec, now: datetime) -> dict[str, Any]:
-    request = storage.get_request(engine, request_id)
-    if request is None:
-        raise ValueError("request_not_found")
+@dataclass(frozen=True)
+class Evaluation:
+    result: dict[str, Any]
+    status: str
+    finalized: bool
+
+
+def evaluate_upload(request: dict[str, Any], upload: UploadSpec, now: datetime) -> Evaluation:
+    """Pure replay of retained native packets; never fetch or append a receipt."""
+    request_id = str(request["request_id"])
     if upload.request_hash != request["request_hash"]:
         raise ValueError("request_hash_mismatch")
     if upload.attempted_at is not None and upload.attempted_at > now:
@@ -232,15 +239,7 @@ def ingest(engine: Engine, request_id: str, upload: UploadSpec, now: datetime) -
         if upload.packets:
             raise ValueError("failure_upload_must_not_contain_packets")
         result = _failure_result(request, upload.status)
-        return storage.append_receipt(
-            engine,
-            request_id=request_id,
-            upload=body,
-            result=result,
-            status=upload.status,
-            finalized=False,
-            now=now,
-        )
+        return Evaluation(result=result, status=upload.status, finalized=False)
     packets: dict[str, PacketSpec] = {packet.label: packet for packet in upload.packets}
     if len(packets) != len(upload.packets) or "entry" not in packets:
         raise ValueError("unique_entry_packet_required")
@@ -309,6 +308,11 @@ def ingest(engine: Engine, request_id: str, upload: UploadSpec, now: datetime) -
     elif set(packets) != {"entry"}:
         raise ValueError("exit_packets_without_valid_entry")
     result = evaluate_theta_long_option(entry_batch=entry, exit_batches=exits, calendar=calendar)
+    expires_at = request.get("source_expires_at")
+    if expires_at is not None and selected is not None:
+        deadline = datetime.fromisoformat(expires_at)
+        if deadline.tzinfo is None or selected.quote_at >= deadline:
+            result = _failure_result(request, "source_plan_expired_before_entry_quote")
     result.update(
         {
             "request_id": request_id,
@@ -324,12 +328,15 @@ def ingest(engine: Engine, request_id: str, upload: UploadSpec, now: datetime) -
         }
     )
     finalized = all(batch.status in {"ok", "no_quotes"} for batch in [entry, *exits.values()])
+    return Evaluation(result=result, status=str(result["status"]), finalized=finalized)
+
+
+def ingest(engine: Engine, request_id: str, upload: UploadSpec, now: datetime) -> dict[str, Any]:
+    request = storage.get_request(engine, request_id)
+    if request is None:
+        raise ValueError("request_not_found")
+    evaluated = evaluate_upload(request, upload, now)
     return storage.append_receipt(
-        engine,
-        request_id=request_id,
-        upload=body,
-        result=result,
-        status=str(result["status"]),
-        finalized=finalized,
-        now=now,
+        engine, request_id=request_id, upload=upload.model_dump(mode="json"),
+        result=evaluated.result, status=evaluated.status, finalized=evaluated.finalized, now=now,
     )

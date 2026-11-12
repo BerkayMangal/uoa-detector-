@@ -156,7 +156,7 @@ def test_actual_measurement_gets_are_select_only_and_empty_is_not_a_zero_return(
     assert writes == []
 
 
-def test_measurement_page_preserves_all_fifteen_navigation_destinations(
+def test_measurement_page_preserves_prior_navigation_and_adds_automatic_tracking(
     stored_desk: tuple[TestClient, Engine, dict[str, str], list[str]],
 ) -> None:
     class Navigation(HTMLParser):
@@ -182,10 +182,13 @@ def test_measurement_page_preserves_all_fifteen_navigation_destinations(
     assert response.status_code == 200
     nav = Navigation()
     nav.feed(response.text)
-    assert len(nav.links) == 15
+    # Phase5.70 adds automatic tracking while preserving all fifteen existing
+    # destinations, including the separate stock-measurement and option pages.
+    assert len(nav.links) == 16
     assert set(nav.links) == {
         "/", "/acilis", "/pozisyonlar", "/sonuclar", "/olcum", "/karne", "/haberler",
         "/arastirma", "/laboratuvar", "/stratejiler", "/journal", "/defter", "/alfa", "/gamma", "/opsiyon",
+        "/opsiyon-dogrulama",
     }
     assert writes == []
 

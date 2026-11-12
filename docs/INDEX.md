@@ -292,6 +292,9 @@ A new study needs a fresh, non-overlapping window (`docs/next_studies.md`,
 
 | 5.68 | **ThetaData option validation** — owner explicitly requests integrating his Options Pro subscription into existing UOA, 2026-11-12. Bounded Terminal connector, authenticated request/result workflow, actual option quote economics, and capability research. Contract: `docs/phase-5.68-theta-option-validation-acceptance.md`. Live access remains unverified until a real Terminal response is ingested; no signal tuning or alpha claim. |
 | 5.68.2 | **Passwordless Mac connection** — remove repeated owner credential entry using a single-use pairing download and a seven-day connector credential restricted to existing request IDs. Contract: `docs/phase-5.68.2-passwordless-theta-acceptance.md`. Owner explicitly requested this usability repair after authorizing deployment. |
+| 5.69 | **US intraday research archive** — allocated on separate PR #150; frozen archive and results remain on that branch until merged. No validated edge or strategy promotion. |
+| 5.70 | **Automatic Theta measurement** — owner requests automatic collection, signal measurement and repeatable research after the first Mac workflow failed. Contract: `docs/phase-5.70-automatic-theta-acceptance.md`. Separate persistent device enrollment preserves v1 scopes; no strategy tuning or execution. |
+| 5.70.1 | **ATM receipt clock repair** — per-response acquisition time replaces the prematurely sampled batch clock in the production refresher. Contract: `docs/phase-5.70.1-atm-receipt-clock-acceptance.md`. Provider observation times and freshness thresholds remain unchanged. |
 
 Detail for the 5.10–5.19 candidates:
 - **Falsification gates (D8).** `src/uoa_detector/backtest/falsification.py:79-81`

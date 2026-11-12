@@ -121,6 +121,10 @@ from webapp.shadow_capture import service as shadow_service
 from webapp.shadow_capture import view as shadow_view
 from webapp.shared_news.config import enabled as shared_news_enabled
 from webapp.storage_diagnostics import native_hint
+from webapp.theta_validation import automatic as theta_automatic
+from webapp.theta_validation import automatic_router as theta_automatic_router
+from webapp.theta_validation import device_router as theta_device_router
+from webapp.theta_validation import devices as theta_devices
 from webapp.theta_validation import pairing as theta_pairing
 from webapp.theta_validation import router as theta_router
 from webapp.theta_validation import storage as theta_storage
@@ -222,11 +226,17 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
     # Additive, independent measurement tables. A database outage must not block
     # liveness or start provider requests; the private page exposes missing storage.
     async def prepare_theta_storage() -> None:
-        try:
-            await asyncio.to_thread(theta_storage.ensure, _board_reader().engine)
-            await asyncio.to_thread(theta_pairing.ensure, _board_reader().engine)
-        except Exception as exc:
-            log_failure(_logger, "theta-storage", exc, "startup")
+        while True:
+            try:
+                await asyncio.to_thread(theta_storage.ensure, _board_reader().engine)
+                await asyncio.to_thread(theta_pairing.ensure, _board_reader().engine)
+                await asyncio.to_thread(theta_devices.ensure, _board_reader().engine)
+                await asyncio.to_thread(theta_automatic.ensure, _board_reader().engine)
+            except Exception as exc:
+                log_failure(_logger, "theta-storage", exc, "startup")
+                await asyncio.sleep(30)
+            else:
+                return
 
     tasks.append(asyncio.create_task(prepare_theta_storage(), name="theta-storage"))
     if config is not None:
@@ -258,6 +268,12 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
         # thread and event loop (with its own UW client and engine), so its synchronous
         # database reads can never stall the web server's loop.
         _start_live_alpha_thread(str(config["database_url"]))
+        tasks.append(asyncio.create_task(_supervise(
+            lambda: run_service(str(config["database_url"]),
+                                lambda: theta_automatic.loop(str(config["database_url"])),
+                                "theta-automatic"),
+            "theta-automatic",
+        )))
         if shared_news_enabled():
             tasks.append(asyncio.create_task(_supervise(
                 lambda: run_service(str(config["database_url"]),
@@ -387,13 +403,27 @@ class _BasicAuthGate:
             return
         if scope["type"] == "http":
             method, path = scope["method"], scope["path"]
-            if (method == "GET" and path in {"/theta-bagla", "/assets/theta_pairing.js"}) or (
-                method == "POST" and path == "/api/theta/pairing/redeem"
+            if (method == "GET" and path in {"/theta-bagla", "/theta-otomatik", "/assets/theta_pairing.js"}) or (
+                method == "POST" and path in {"/api/theta/pairing/redeem", "/api/theta/device/redeem"}
             ):
                 # No data here without the separate, expiring single-use grant.
                 await self._app(scope, receive, send)
                 return
             scheme, _, token = Headers(scope=scope).get("authorization", "").partition(" ")
+            if scheme.lower() == "bearer" and theta_devices.authorized_path(method, path):
+                try:
+                    device_id = await asyncio.to_thread(lambda: theta_devices.authenticate(
+                        _board_reader().engine, token, _now(),
+                    ))
+                except Exception:
+                    await PlainTextResponse("connector authentication unavailable", status_code=503)(scope, receive, send)
+                    return
+                if device_id is not None:
+                    scope["theta_device_id"] = device_id
+                    await self._app(scope, receive, send)
+                    return
+                await PlainTextResponse("connector authentication required", status_code=401)(scope, receive, send)
+                return
             connector_read = method == "GET" and path == "/api/theta/jobs"
             connector_write = method == "POST" and path.startswith("/api/theta/results/")
             if scheme.lower() == "bearer" and (connector_read or connector_write):
@@ -532,7 +562,15 @@ def theta_connector_download() -> FileResponse:
 
 @app.get("/theta-bagla", response_class=HTMLResponse, include_in_schema=False)
 def theta_pairing_page(request: Request) -> Response:
-    return templates.TemplateResponse(request, "theta_pairing.html", {}, headers={
+    return templates.TemplateResponse(request, "theta_pairing.html", {"auto_mode": False}, headers={
+        "Referrer-Policy": "no-referrer",
+        "Content-Security-Policy": "default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; img-src data:; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'",
+    })
+
+
+@app.get("/theta-otomatik", response_class=HTMLResponse, include_in_schema=False)
+def theta_device_pairing_page(request: Request) -> Response:
+    return templates.TemplateResponse(request, "theta_pairing.html", {"auto_mode": True}, headers={
         "Referrer-Policy": "no-referrer",
         "Content-Security-Policy": "default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; img-src data:; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'",
     })
@@ -2096,5 +2134,11 @@ async def _health_http() -> dict[str, object]:
 
 
 app.include_router(theta_router.build_router(
+    lambda: _board_reader().engine, _same_origin, clock=lambda: _now(),
+))
+app.include_router(theta_device_router.build_router(
+    lambda: _board_reader().engine, _same_origin, clock=lambda: _now(),
+))
+app.include_router(theta_automatic_router.build_router(
     lambda: _board_reader().engine, _same_origin, clock=lambda: _now(),
 ))

@@ -6,10 +6,18 @@ Bu cloud oturumunda ThetaData anahtarı veya Mac Terminal bağlantısı bulunmuy
 
 ## Eklenen ürün işlevi
 
-`/opsiyon-dogrulama`: kayıtlı UOA kararının kontratını seç veya açıkça geriye
-dönük bir kontrat/saat incelemesi ekle. Mac bağlantı programı Terminal’den
-giriş ve alternatif +15/+60 dakika kotasyonlarını alır. UOA ham paketleri
-doğrular, maliyetleri kendisi hesaplar ve değiştirilmeyen sonuç kaydı oluşturur.
+Phase 5.70 ile `/opsiyon-dogrulama`, ana menüdeki **Otomatik takip** ekranıdır.
+Mevcut giriş kararının uygun tek kontratlı opsiyon planı otomatik kaydedilir.
+Mac bağlantı programı Terminal’den giriş ve alternatif +15/+60 dakika
+kotasyonlarını alır. UOA ham paketleri doğrular, maliyetleri kendisi hesaplar
+ve değiştirilmeyen sonuç kaydı oluşturur. Ekran durumunu kendiliğinden yeniler.
+Bu belge kod davranışını anlatır; canlı sürüm ve gerçek veri doğrulaması
+ilgili aşamanın kapanış raporunda ayrıca belirtilir.
+
+Kaynak günün/hissenin ilk kaydedilmiş AL planıdır. Hisse veya spread planı,
+eksik sözleşme ve geçersiz kaynak ayrı gerekçeyle kapsam dışında kalır.
+Sonradan daha iyi sonuç veren kontrat seçilmez. Hiç uygun giriş yoksa ekran
+bunu söyler; taramanın çalışması mutlaka yeni giriş oluşacağı anlamına gelmez.
 
 Bir standart kontrat varsayılır. Alış ask + $0,01/hisse; satış bid − $0,01/hisse;
 komisyon taraf başına $0,65. Girişten sonraki 120 saniyede uygun kotasyon
@@ -20,39 +28,71 @@ doğrulanmadığından 100 hisse çarpanı bir varsayımdır.
 
 ## Mac bağlantısı
 
-Phase 5.68.2, kullanıcının tekrar UOA kullanıcı adı/şifresi giremediği geri
-bildirimi üzerine bu adımı kaldırır. Yeni sürümde:
+Phase 5.70 sürekli bağlantısı:
 
 1. ThetaData Terminal açık ve hesabına bağlı kalsın.
 2. Sana verilen tek kullanımlık bağlantıyı aç veya açık UOA oturumunda
-   Opsiyon doğrulama → Şifresiz Mac bağlantısı hazırla seçeneğini kullan.
+   **Otomatik takip → Mac’i bir kez bağla** seçeneğini kullan.
 3. Bağlantı sayfasındaki indirme düğmesine bas. Yeni dosya benzersiz bir ad
    alır; böylece daha önce indirilmiş, şifre isteyen dosya ile karışmaz.
 4. İndirme tamamlanınca sayfada görünen **o dosyaya ait komutu** Mac Terminal’e
-   yapıştır. Kullanıcı adı, UOA şifresi ve ThetaData anahtarı sorulmaz.
-   Sağlayıcı girişini zaten açık olan Theta Terminal yönetir.
+   yapıştır. `--install` kullanıcı oturumunda otomatik çalışan yardımcıyı
+   kurar. Kullanıcı adı, UOA şifresi ve ThetaData anahtarı sorulmaz. Sağlayıcı
+   girişini zaten açık olan Theta Terminal yönetir.
 
-İncelemeler bağlantı hazırlanmasından önce kaydedilmiş ve ölçüm pencereleri
-tamamlanmış olmalıdır. İlk sekiz inceleme bunun için önceden hazırlanmıştır.
+İş olmadan bağlantı kurulabilir. Sonradan eklenen incelemeler ve otomatik
+kayıtlar aynı bağlantıyla alınır; tekrar dosya indirmek gerekmez. Bağlantı
+koptuğunda program sınırlı aralıklarla yeniden dener. Terminal kapalıyken
+işlerin deneme hakkını tüketmez. Mac açık ve kullanıcı oturumu çalışır durumda
+olmalıdır; uyku sırasında aktarım durur, yeniden çalışınca devam eder.
 
 Python 3.9+ yeterlidir; ek Python paketi gerekmez. Varsayılan Terminal
 `http://127.0.0.1:25503`, site mevcut UOA adresidir. Program dışarıya HTTPS
 bağlantısı açar; Mac’in Terminal portunu internete açmaz, üretim veritabanı
-parolası istemez. Mac veya program kapalıysa yeni sonuç gelmez.
+parolası istemez. Python kurulu değilse bu bağımlılık hâlâ bir kurulum adımıdır;
+imzalı bağımsız Mac uygulaması bu sürümün parçası değildir.
 
-İndirme bağlantısı iki saat içinde bir kez kullanılabilir; adresin `#` sonrası
-parçası sunucu URL kayıtlarına gönderilmez ve sayfa açılınca adres çubuğundan
-silinir. Dosyanın yedi günlük yetkisi yalnızca bağlantı hazırlanırken mevcut
-olan en fazla 32 hazır incelemeyi kapsar. Sonradan eklenen incelemeler için
-yeni bağlantı gerekir. Sunucu sadece yetki özetlerini saklar; genel site
-şifresi dosyada bulunmaz. Yeni dosya UOA adresine sabitlenmiştir.
+İndirme bağlantısı 24 saat içinde bir kez kullanılabilir. Sürekli cihaz yetkisi
+ekrandan iptal edilene kadar mevcut ve gelecek doğrulama işlerini kapsar;
+raporları, kullanıcı yönetimini veya genel site erişimini kapsamaz. Sunucu
+sadece yetki özetlerini saklar. Mac’te yetki içeren dosyalar kullanıcıya özel
+izinlerle saklanır. Genel site şifresi dosyada bulunmaz; UOA adresi sabittir.
 
 Bir çalışmada en fazla dört iş, iş başına üç adet 120 saniyelik pencere;
-istek başına 20 saniye ve 8 MiB sınırı vardır. `--once` tek tur, `--check`
-yalnızca site erişimi ve Terminal port kontrolüdür. Portun açık olması
-sağlayıcı girişini veya fiyat erişimini kanıtlamaz. Bir pencerenin taşıma hatası
-o denemeyi UNKNOWN yapar; diğer başarılı paketler o denemede yayımlanmaz.
-Üç başarısız denemeden sonra ekrandan açıkça yeniden deneme başlatılır.
+istek başına 20 saniye ve 8 MiB sınırı vardır. İlk cihaz bildirimi yalnızca
+yardımcı programın siteye ulaştığını gösterir. Terminal portunun açık olması
+sağlayıcı girişini veya fiyat erişimini kanıtlamaz; gerçek kotasyon başarısı
+ayrı gösterilir. Gönderimi belirsiz kalan paketin aynı içeriği yeniden
+gönderilir; yeni sonuç uydurulmaz.
+
+Eski Phase 5.68.2 bağlantıları değişmez: iki saatlik indirme, yedi günlük
+dosya yetkisi ve yalnızca başlangıçtaki en fazla 32 olgunlaşmış iş. Bu sınırlı
+akış geçmiş inceleme bölümünde kalır. Sürekli izleme için yeni cihaz kurulur.
+
+## Kayıtlı veriden tekrar ölçüm
+
+Günü seç; **Kayıtlı veriden yeniden hesapla** ile kaydedilmiş paketlerden aynı
+sabit maliyetli ölçümü üret. **Tam gün kaydını indir** bekleyen, eksik ve
+kapsam dışı kayıtları da kaynak kimlikleriyle verir. Raporun kapsam ve yöntem
+özetleri aynı veriyle tekrarı denetlemeyi sağlar. Bu işlem yeni fiyat indiren
+veya kazanan strateji arayan sınırsız bir backtest değildir. Yeni hipotezler
+ayrı protokolle ve bütün denemeler kaydedilerek sınanır.
+
+Üç başarısız veri denemesinden sonra açık yeniden deneme işlemi asıl sözleşme
+ve saati koruyan bağlı bir istek açar. Eski denemeler raporda kalır; en fazla
+sekiz böyle tekrar mümkündür. Kesinleşmiş bir sonuç, eksik fiyat nedeniyle
+UNKNOWN olsa bile, daha iyi sonuç seçmek için yeniden açılmaz.
+
+Yeni kayıtlar ilk kalıcı gözlemden sonraki sabit giriş gecikmesini kullanır.
+Geçmişten alınan sınırlı kayıtlar geriye dönük olarak işaretlenir; tarihsel
+yayın saati, verinin o anda fiziksel olarak elde olduğunu kanıtlamaz.
+
+İşletim notu: mevcut canlı servis yapılandırması varsa otomatik gözlemci
+varsayılan olarak çalışır; `THETA_AUTOMATIC_ENABLED=false` yeni gözlemi durdurur.
+Bu ayar geçmiş kayıtları veya ölçüm sonuçlarını silmez. Bağlantı iptali ayrı bir
+işlemdir. Dışa aktarımın `include_packets=true` seçeneği, boyut sınırı içindeki
+ham kotasyon paketlerini de verir; normal indirme bütün kapsamın kimliklerini,
+durumlarını ve kaynak özetlerini içerir.
 
 ## Abonelikten çıkarılabilecek işler
 
