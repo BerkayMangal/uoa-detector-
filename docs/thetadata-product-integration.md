@@ -1,0 +1,107 @@
+# ThetaData → UOA: kullanım ve gerçek durum
+
+12 Kasım 2026. Kullanıcının doğruladığı abonelik Options Pro.
+Çalışan Terminal kullanıcının Mac’inde.
+Bu cloud oturumunda ThetaData anahtarı veya Mac Terminal bağlantısı bulunmuyor.
+
+## Eklenen ürün işlevi
+
+`/opsiyon-dogrulama`: kayıtlı UOA kararının kontratını seç veya açıkça geriye
+dönük bir kontrat/saat incelemesi ekle. Mac bağlantı programı Terminal’den
+giriş ve alternatif +15/+60 dakika kotasyonlarını alır. UOA ham paketleri
+doğrular, maliyetleri kendisi hesaplar ve değiştirilmeyen sonuç kaydı oluşturur.
+
+Bir standart kontrat varsayılır. Alış ask + $0,01/hisse; satış bid − $0,01/hisse;
+komisyon taraf başına $0,65. Girişten sonraki 120 saniyede uygun kotasyon
+aranır; çıkış hedefi bulunan giriş kotasyonundan hesaplanır. Eksik fiyat sıfır
+getiri değildir. Sonradan indirilen kotasyonlar gerçekleşmiş broker işlemi veya
+o gün uygulamanın bildiği veri sayılmaz. Ayarlanmış kontrat teslimatı ayrıca
+doğrulanmadığından 100 hisse çarpanı bir varsayımdır.
+
+## Mac bağlantısı
+
+Bu adımlar yeni sürüm canlıya alındıktan sonra geçerlidir:
+
+1. ThetaData Terminal açık ve hesabına bağlı kalsın.
+2. UOA → Opsiyon → Opsiyon doğrulama → Mac bağlantısını kur bölümünden
+   `uoa-theta-baglanti.py` dosyasını indir.
+3. Mac Terminal uygulamasında çalıştır:
+
+   ```bash
+   python3 ~/Downloads/uoa-theta-baglanti.py --watch
+   ```
+
+4. İstendiğinde **UOA site kullanıcı adı ve şifresini** yerel gizli isteme gir.
+   ThetaData anahtarı bu programa girilmez; sağlayıcı girişini Theta Terminal
+   yönetir. Site şifresi Theta Terminal’e gönderilmez.
+5. UOA’da bir inceleme kaydet. Geçmiş incelemeler sonraki kontrolde alınır;
+   yeni zamanların tüm ölçüm pencereleri kapanana kadar beklenir.
+
+Python 3.9+ yeterlidir; ek Python paketi gerekmez. Varsayılan Terminal
+`http://127.0.0.1:25503`, site mevcut UOA adresidir. Program dışarıya HTTPS
+bağlantısı açar; Mac’in Terminal portunu internete açmaz, üretim veritabanı
+parolası istemez. Mac veya program kapalıysa yeni sonuç gelmez.
+
+Bir çalışmada en fazla dört iş, iş başına üç adet 120 saniyelik pencere;
+istek başına 20 saniye ve 8 MiB sınırı vardır. `--once` tek tur, `--check`
+yalnızca site erişimi ve Terminal port kontrolüdür. Portun açık olması
+sağlayıcı girişini veya fiyat erişimini kanıtlamaz. Bir pencerenin taşıma hatası
+o denemeyi UNKNOWN yapar; diğer başarılı paketler o denemede yayımlanmaz.
+Üç başarısız denemeden sonra ekrandan açıkça yeniden deneme başlatılır.
+
+## Abonelikten çıkarılabilecek işler
+
+İncelenen v3 şema kopyasında 34 opsiyon işlemi, minimum Professional olarak
+etiketlenmiş 11 işlem var. Bu **doküman envanteridir**; hesabın güncel erişim,
+geçmiş derinliği ve limitleri henüz gerçek ThetaData isteğiyle doğrulanmadı.
+Resmî dokümana bu cloud ağından erişim engellendi; üçüncü taraf şema kopyası
+[kaynak commit](https://github.com/ashler-herrick/py-theta-client/blob/bd03b1449d9013f94fcb0a3c2bb17a5b2f342c50/openapiv3.yaml).
+
+| Veri | Mevcut UOA’da somut kullanım |
+|---|---|
+| Tick NBBO kotasyon geçmişi | İşlem geçmeyen anlarda giriş/çıkış fiyatı; mevcut UW ölçüm boşluklarını sınamak |
+| İşlem + eşlenmiş kotasyon | Akışın gerçek spreadi ve alış/satış tarafı; büyük primin tek başına yanıltıcılığını ölçmek |
+| Tarihsel IV ve birinci derece Greeks | Yön doğruyken opsiyonun neden zarar ettiğini delta, theta ve IV ile açıklamak |
+| İkinci/üçüncü derece ve işlem bazlı Greeks | Yalnızca temel IV/delta modeline ek ölçülebilir katkı sağlıyorsa kullanmak |
+| EOD, açık pozisyon, vade ve strike listeleri | Zincir kapsamını doğrulamak; ertesi gün OI değişimiyle açılış hipotezini sınamak |
+| Snapshot / belirli an kotasyonu | Güncel maliyet kontrolü; önceki kotasyonun yaşı bilinmeden onu işlem fiyatı saymamak |
+
+Stock/index ve şirket aksiyonu yetkileri Options Pro’dan otomatik çıkarılmaz.
+İkinci sağlayıcı eklemek sinyal kalitesini otomatik artırmaz; ölçüm hatasını
+gidermek ve hangi filtrenin masraflardan sonra katkı verdiğini sınamak içindir.
+
+## İlk araştırma sırası
+
+1. Dondurulmuş sekiz Kasım adayındaki veri eksiklerini aynı kontrat/saatlerle
+   tamamla; eksik kaldı diye kontrat değiştirme.
+2. Aynı gözlemlerde UW/Theta fiyat ve zaman farklarını ölç. Uyuşmazlıkları
+   getiriye göre sağlayıcı seçerek kapatma.
+3. Spread, komisyon ve gecikme maliyetini sabit tutarak yeni, önceden seçilmiş
+   seanslarda CALL ve PUT sonuçlarını ayrı değerlendir.
+4. Aynı kohortta IV/Greeks ve ertesi gün OI bilgisinin **karardan önce mevcut**
+   olan kısmıyla ek katkı sınaması yap. Sonradan bilinen OI eski karara eklenmez.
+5. Maliyet, gecikme, en iyi işlem/hisse çıkarma kontrolleri geçmeden canlı
+   kuralları değiştirme. Bu çalışmada seçilmiş veya kanıtlanmış kazanan yok.
+
+`scripts/probe_theta_capabilities.py` bu ihtiyaçlar için on küçük, salt okunur
+istek planlar; varsayılanı ağ çağrısı yapmayan dry-run’dır. `--execute` ve
+yetkili Terminal adresi verilince ham cevapları ve durumları kaydeder.
+
+## Bu oturumda gerçek veride bulunanlar
+
+- 66 UW API GET denemesi; ayrıca mevcut ürünün salt okunur raporları incelendi.
+- AAPL 18 Eylül: ilk sayfa 500, yedi sayfa 3.498 kontrat. İlk sayfada 14–60 DTE
+  sıfır, tam cevapta 676 kontrat. Tarihsel indirici düzeltildi; eski kayıtlar
+  değiştirilmedi. 183 eski 500 satırlık arşivin tamlık iddiası doğrulanmamış.
+  Canlı aday yolu ayrı `/option-contracts` sorgularında açık kontrat listeleri
+  kullanıyor; bu tarihsel hata canlı kayıpların nedeni olarak gösterilemez.
+- Eski QQQ örneğinde varsayılan stop fiyatı −$47,20, gözlenen günlük kotasyon
+  −$61,20 verir. Motor artık günlük kotasyonda görülmeyen daha iyi fill yazmaz.
+- Sekiz eski hisse adayına geriye dönük, sonuç görülmeden seçilen CALL
+  eşlemesinde yalnız iki +60 dakika sonucu fiyatlanabildi: TSLA −$88,30,
+  META −$228,30. Altı diğer aday ve bütün +15 sonuçları UNKNOWN. Bunlar gerçek
+  emir veya eksiksiz portföy sonucu değildir; toplam getiri çıkarılmadı.
+
+**ThetaData canlı doğrulaması:** henüz yapılmadı. Yerel gerçek HTTP taşıma testi
+sentetik sağlayıcı cevaplarıyla geçti; bu test kullanıcı hesabına erişim kanıtı
+değildir. Canlıya alma ve gerçek Mac bağlantısından sonra bu durum güncellenir.

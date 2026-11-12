@@ -18,8 +18,11 @@ say what happened inside the day. So:
 * If a day's value would trigger BOTH the target and the stop, the order is
   **unknowable**. This module refuses to guess, marks the outcome ambiguous, and
   applies the **stop** — the conservative branch — rather than booking the profit.
-* A threshold seen on day D is exited at day D's value, and the delay between
-  seeing and transacting is recorded as an explicit assumption, not hidden.
+* With close-only data, a threshold seen on day D is exited at day D's observed
+  value. The threshold itself is not an observed fill: a daily mark below a stop
+  cannot establish that the position could have sold at the higher stop price.
+  A full daily range can support a threshold-fill simulation, but still cannot
+  prove execution. A range entirely below a stop cannot support that fill either.
 * MFE and MAE are the best and worst the position was ever worth inside the hold,
   which is what makes "it was up 40% before it stopped out" visible instead of
   collapsing into a single closing number.
@@ -178,9 +181,11 @@ def evaluate_exit(
         value = observation.exit_value
         # Thresholds are tested against the day's RANGE, not its close. A level
         # touched and given back still happened.
-        high = observation.high_value if observation.high_value is not None else value
-        low = observation.low_value if observation.low_value is not None else value
         ranged = observation.high_value is not None and observation.low_value is not None
+        # A single endpoint is not a complete range. Mixing it with the close
+        # could invent an ambiguous intraday touch and then an unobserved fill.
+        high = observation.high_value if ranged and observation.high_value is not None else value
+        low = observation.low_value if ranged and observation.low_value is not None else value
 
         mfe = high if mfe is None else max(mfe, high)
         mae = low if mae is None else min(mae, low)
@@ -194,6 +199,10 @@ def evaluate_exit(
             notes.append(
                 f"{observation.day}: yalnizca kapanis vardi, gun ici dokunuslar gorunmez"
             )
+            notes.append(
+                f"{observation.day}: gozlenen kapanis degeriyle cikis varsayimi; "
+                "esik seviyesinden gerceklesme kaniti yok"
+            )
 
         if hits_target and hits_stop:
             # Both levels inside one daily bar. Which came first is genuinely
@@ -203,10 +212,20 @@ def evaluate_exit(
             notes.append("ayni gun hem hedef hem stop dokunuldu — sira bilinmiyor, muhafazakar senaryo")
             break
         if hits_stop:
-            exit_day, exit_value, reason = observation.day, stop_level, ExitReason.STOP
+            # A close-only breach is detected at the close, so use that observed
+            # value. Even a full range cannot justify a stop fill above its high
+            # (for example, an overnight gap through the stop).
+            stop_fill = stop_level if ranged and high >= stop_level else value
+            if ranged and high < stop_level:
+                notes.append(
+                    f"{observation.day}: gunun tum araligi stop altinda; "
+                    "esik yerine gozlenen kapanis degeri kullanildi"
+                )
+            exit_day, exit_value, reason = observation.day, stop_fill, ExitReason.STOP
             break
         if hits_target:
-            exit_day, exit_value, reason = observation.day, target_level, ExitReason.TARGET
+            target_fill = target_level if ranged else value
+            exit_day, exit_value, reason = observation.day, target_fill, ExitReason.TARGET
             break
         if observation.dte <= dte_floor:
             exit_day, exit_value, reason = observation.day, value, ExitReason.DTE_FLOOR

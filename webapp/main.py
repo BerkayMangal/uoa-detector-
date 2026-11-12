@@ -119,6 +119,8 @@ from webapp.shadow_capture import service as shadow_service
 from webapp.shadow_capture import view as shadow_view
 from webapp.shared_news.config import enabled as shared_news_enabled
 from webapp.storage_diagnostics import native_hint
+from webapp.theta_validation import router as theta_router
+from webapp.theta_validation import storage as theta_storage
 from webapp.timed_measurement import service as timed_service
 from webapp.timed_measurement import view as timed_view
 from webapp.vol_board import VolBoardRow, build_vol_board, vol_board_summary
@@ -214,6 +216,15 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
     config = live_config_from_env()
     hotlist = load_hotlist_settings()  # Phase 5.27: already validated by _load_board_profiles
     tasks: list[asyncio.Task[None]] = []
+    # Additive, independent measurement tables. A database outage must not block
+    # liveness or start provider requests; the private page exposes missing storage.
+    async def prepare_theta_storage() -> None:
+        try:
+            await asyncio.to_thread(theta_storage.ensure, _board_reader().engine)
+        except Exception as exc:
+            log_failure(_logger, "theta-storage", exc, "startup")
+
+    tasks.append(asyncio.create_task(prepare_theta_storage(), name="theta-storage"))
     if config is not None:
         _logger.info("starting live worker + gamma refresh for %s", config["tickers"])
         tasks.append(asyncio.create_task(_supervise(
@@ -470,6 +481,24 @@ def live_desk_script() -> FileResponse:
     return FileResponse(_BASE / "static" / "live-desk.js", media_type="text/javascript")
 
 
+@app.get("/assets/theta_validation.js", include_in_schema=False)
+def theta_validation_script() -> FileResponse:
+    return FileResponse(_BASE / "static" / "theta_validation.js", media_type="text/javascript")
+
+
+@app.get("/assets/theta_validation.css", include_in_schema=False)
+def theta_validation_stylesheet() -> FileResponse:
+    return FileResponse(_BASE / "static" / "theta_validation.css", media_type="text/css")
+
+
+@app.get("/api/theta/connector", include_in_schema=False)
+def theta_connector_download() -> FileResponse:
+    return FileResponse(
+        _BASE.parent / "scripts" / "theta_mac_connector.py",
+        media_type="text/x-python", filename="uoa-theta-baglanti.py",
+    )
+
+
 @app.exception_handler(OperationalError)
 async def _database_unavailable(request: Request, exc: OperationalError) -> Response:
     _logger.error("database operation unavailable on %s", request.url.path,
@@ -717,6 +746,14 @@ def options_page(request: Request) -> HTMLResponse:
     )
     return templates.TemplateResponse(
         request, "opsiyon.html", {"board": board, "tracker": tracker, **_EXPLAIN},
+    )
+
+
+@app.get("/opsiyon-dogrulama", response_class=HTMLResponse)
+def theta_validation_page(request: Request) -> HTMLResponse:
+    """Private stored-result workbench; rendering never contacts a provider."""
+    return templates.TemplateResponse(
+        request, "theta_validation.html", {**_EXPLAIN, "glossary": ()},
     )
 
 
@@ -2012,3 +2049,8 @@ def health() -> dict[str, object]:
 async def _health_http() -> dict[str, object]:
     """Memory-only liveness must not queue behind synchronous database requests."""
     return health()
+
+
+app.include_router(theta_router.build_router(
+    lambda: _board_reader().engine, _same_origin, clock=_now,
+))

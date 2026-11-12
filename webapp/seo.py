@@ -23,6 +23,7 @@ TITLES = {
     "/": "Bugün", "/alfa": "Alfa Board", "/gamma": "Gamma ve volatilite",
     "/journal": "İşlem günlüğü", "/sonuclar": "Sonuçlar", "/defter": "Karar defteri",
     "/opsiyon": "Opsiyon", "/hakkinda": "Opsiyon akışı ve kişisel piyasa çalışma masası",
+    "/opsiyon-dogrulama": "Opsiyon doğrulama",
 }
 DESCRIPTION = "UOA, ABD hisseleri ve opsiyon akışını fiyat, haber ve risk bağlamında bir araya getiren kişisel piyasa çalışma masasıdır. İşlem kararları kullanıcıya aittir."
 

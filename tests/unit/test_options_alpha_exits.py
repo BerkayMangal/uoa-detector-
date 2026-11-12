@@ -155,6 +155,60 @@ def test_a_close_only_day_says_intraday_touches_are_invisible(
     assert any("gun ici dokunuslar gorunmez" in note for note in out.notes)
 
 
+@pytest.mark.parametrize("variant", (ExitVariantId.TIME_AND_STOP, ExitVariantId.TIME_TARGET_STOP))
+def test_a_close_only_stop_uses_the_observed_quote_not_an_unseen_better_fill(
+    settings: OptionsAlphaSettings, variant: ExitVariantId,
+) -> None:
+    """0.20 is the only observed sale value; a 0.29 stop is not a fill guarantee.
+
+    (0.20 - 0.58) * 100 - 2.60 = -40.60, not the old -31.60.
+    """
+    out = run(variant, (obs(23, "0.20"),), settings)
+    assert out.reason is ExitReason.STOP
+    assert out.exit_value == Decimal("0.20")
+    assert out.pnl_usd == Decimal("-40.60")
+
+
+def test_a_full_day_below_the_stop_does_not_invent_a_fill_above_its_high(
+    settings: OptionsAlphaSettings,
+) -> None:
+    out = run(
+        ExitVariantId.TIME_AND_STOP,
+        (obs(23, "0.20", high="0.25", low="0.10"),),
+        settings,
+    )
+    assert out.reason is ExitReason.STOP
+    assert out.exit_value == Decimal("0.20")
+    assert out.pnl_usd == Decimal("-40.60")
+
+
+@pytest.mark.parametrize("partial_range", ({"high": "1.30"}, {"low": "0.10"}))
+def test_an_incomplete_range_uses_only_the_observed_close(
+    settings: OptionsAlphaSettings, partial_range: dict[str, str],
+) -> None:
+    out = run(ExitVariantId.TIME_TARGET_STOP, (obs(23, "0.20", **partial_range),), settings)
+    assert out.reason is ExitReason.STOP
+    assert not out.ambiguous_same_day_touch
+    assert out.exit_value == Decimal("0.20")
+    assert out.pnl_usd == Decimal("-40.60")
+
+
+def test_a_close_only_target_uses_the_observed_value_for_a_daily_exit(
+    settings: OptionsAlphaSettings,
+) -> None:
+    """A bare long's only observation is 1.30; target 1.16 was not observed."""
+    out = evaluate_exit(
+        variant=ExitVariantId.TIME_TARGET_STOP,
+        entry_debit=ENTRY,
+        observations=(obs(23, "1.30"),),
+        settings=settings,
+        commission_usd=COMMISSION,
+    )
+    assert out.reason is ExitReason.TARGET
+    assert out.exit_value == Decimal("1.30")
+    assert out.pnl_usd == Decimal("69.40")
+
+
 def test_an_unpriceable_day_is_counted_never_treated_as_zero(
     settings: OptionsAlphaSettings,
 ) -> None:

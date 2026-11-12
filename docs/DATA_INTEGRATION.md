@@ -1,5 +1,12 @@
 # Data Integration Guide
 
+**Phase 5.68 update:** the new authenticated `/opsiyon-dogrulama` feature accepts
+bounded native ThetaData quote packets from a connector beside an authenticated
+Mac Terminal. See [ThetaData product integration](thetadata-product-integration.md).
+The webapp still does not use `THETADATA_API_KEY` directly: Terminal owns provider
+authentication, while the connector uses the existing UOA site credentials.
+Code availability is separate from deployed/live provider verification.
+
 Operator-facing setup for the live + historical data sources the
 detector consumes. Phase 3.3 (3.3.1–3.3.5) shipped:
 
