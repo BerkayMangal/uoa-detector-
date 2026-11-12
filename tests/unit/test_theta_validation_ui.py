@@ -37,8 +37,12 @@ def test_initial_page_is_private_and_waiting_for_real_connection() -> None:
     assert "Gerçek emir veya gerçekleşmiş işlem değildir" in text
     assert "UTC olarak kaydedilir" in text
     assert 'type="password"' not in text
-    assert "/api/theta/connector" in text
-    assert "python3 ~/Downloads/uoa-theta-baglanti.py --watch" in text
+    assert 'id="theta-pairing-create"' in text
+    assert "Şifresiz Mac bağlantısı hazırla" in text
+    assert "UOA şifresi veya ThetaData anahtarı sorulmaz" in text
+    assert "bağlantı dosyası 7 gün geçerlidir" in text
+    assert "yeni dosyana özel komutu" in text
+    assert "python3 ~/Downloads/uoa-theta-baglanti.py" not in text
 
 
 HARNESS = r"""
@@ -61,10 +65,12 @@ const connection=new E(); connection.className='theta-connection'; root.append(c
 global.document={getElementById:node,createElement:tag=>new E(tag)};
 const scenario=JSON.parse(process.argv[2]);
 const calls=[];
+const navigations=[];
+global.window={location:{assign:value=>navigations.push(value)}};
 global.fetch=async(url,options)=>{
   calls.push({url,options});
   if (scenario.fail) return {ok:false,status:503};
-  return {ok:true,status:200,json:async()=>url.endsWith('/status')?scenario.status:url.endsWith('/sources')?{sources:scenario.sources||[]}:{} };
+  return {ok:true,status:200,json:async()=>url.endsWith('/status')?scenario.status:url.endsWith('/sources')?{sources:scenario.sources||[]}:url.endsWith('/pairings')?scenario.pairing:{} };
 };
 eval(fs.readFileSync(process.argv[1],'utf8'));
 const settle=()=>new Promise(resolve=>setImmediate(resolve));
@@ -82,7 +88,11 @@ const settle=()=>new Promise(resolve=>setImmediate(resolve));
     retry.listeners.click();
     await settle(); await settle();
   }
-  console.log(JSON.stringify({text:Object.fromEntries(Object.entries(nodes).map(([k,v])=>[k,v.textContent])),calls,connection:connection.dataset}));
+  if (scenario.pairing) {
+    node('theta-pairing-create').listeners.click();
+    await settle(); await settle();
+  }
+  console.log(JSON.stringify({text:Object.fromEntries(Object.entries(nodes).map(([k,v])=>[k,v.textContent])),calls,connection:connection.dataset,navigations}));
 })();
 """
 
@@ -172,3 +182,17 @@ def test_retry_limit_requires_click_and_posts_only_to_linked_retry_endpoint() ->
     posts = [call for call in clicked["calls"] if call["options"]["method"] == "POST"]
     assert len(posts) == 1
     assert posts[0]["url"] == "/api/theta/requests/theta_test/retry"
+
+
+def test_authenticated_page_hands_pairing_token_over_only_in_fragment() -> None:
+    token = "a" * 64
+    value = run_ui({
+        "status": {"status": "awaiting_connection", "jobs": [], "recent_results": []},
+        "pairing": {"pairing_token": token, "expires_at": "2026-11-12T15:00:00Z", "request_count": 2},
+    })
+    posts = [call for call in value["calls"] if call["options"]["method"] == "POST"]
+    assert len(posts) == 1
+    assert posts[0]["url"] == "/api/theta/pairings"
+    assert posts[0]["options"]["credentials"] == "same-origin"
+    assert value["navigations"] == ["/theta-bagla#" + token]
+    assert token not in json.dumps(value["text"])

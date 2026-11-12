@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Run beside an authenticated Theta Terminal; Python 3.9+, standard library only.
 
-UOA credentials come from UOA_USERNAME/UOA_PASSWORD or hidden interactive prompts.
-They are sent only to the configured UOA origin, never to Theta Terminal. The
-connector uploads provider packets; the application calculates all results.
+A personalized download embeds a scoped connector token and its trusted UOA
+origin, so no password prompt is needed. Unpersonalized copies retain Basic
+authentication through environment variables or hidden prompts. Credentials are
+never sent to Theta Terminal. The application calculates all results.
 """
 
 from __future__ import annotations
@@ -34,6 +35,9 @@ UTC = timezone.utc  # noqa: UP017 -- standalone connector supports Python 3.9.
 ET = ZoneInfo("America/New_York")
 DEFAULT_UOA = "https://uoa-detector-production.up.railway.app"
 DEFAULT_TERMINAL = "http://127.0.0.1:25503"
+# The authenticated download route replaces each exact marker once.
+EMBEDDED_TOKEN = ""
+EMBEDDED_UOA = ""
 MAX_BYTES = 8 * 1024 * 1024
 MAX_JOBS = 4
 MAX_ROWS = 50_000
@@ -255,17 +259,29 @@ def bad_constant(value: str) -> None:
 
 
 class Transport:
-    def __init__(self, base_url: str, terminal_url: str, username: str, password: str) -> None:
+    def __init__(
+        self, base_url: str, terminal_url: str, username: str = "", password: str = "",
+        *, bearer_token: str | None = None,
+    ) -> None:
         self.base = origin(base_url)
         self.terminal = origin(terminal_url, terminal=True)
-        if not username or not password or ":" in username:
-            raise ConnectorError("invalid_request")
-        self._authorization = "Basic " + base64.b64encode((username + ":" + password).encode()).decode()
+        if bearer_token is not None:
+            if not re.fullmatch(r"[0-9a-f]{64}", bearer_token):
+                raise ConnectorError("invalid_request")
+            self._authorization = "Bearer " + bearer_token
+        else:
+            if not username or not password or ":" in username:
+                raise ConnectorError("invalid_request")
+            self._authorization = "Basic " + base64.b64encode((username + ":" + password).encode()).decode()
         self._remote = build_opener(NoRedirect(), HTTPSHandler(context=ssl.create_default_context()))
         self._local = build_opener(ProxyHandler({}), NoRedirect(),
                                    HTTPSHandler(context=ssl.create_default_context()))
 
     def _request(self, url: str, *, terminal: bool = False, data: bytes | None = None) -> tuple[int, object]:
+        destination = urlsplit(url)
+        expected = self.terminal if terminal else self.base
+        if origin(destination.scheme + "://" + destination.netloc, terminal=terminal) != expected:
+            raise ConnectorError("invalid_request")
         headers = {"Accept": "application/json"}
         if not terminal:
             headers["Authorization"] = self._authorization
@@ -397,11 +413,18 @@ def main(argv: list[str] | None = None) -> int:
     if args.poll_seconds < 60:
         parser.error("--poll-seconds must be at least 60")
     try:
-        base = origin(os.environ.get("UOA_BASE_URL", DEFAULT_UOA))
         terminal = origin(os.environ.get("THETA_TERMINAL_URL", DEFAULT_TERMINAL), terminal=True)
-        username = os.environ.get("UOA_USERNAME") or getpass.getpass("UOA username (hidden): ")
-        password = os.environ.get("UOA_PASSWORD") or getpass.getpass("UOA password (hidden): ")
-        transport = Transport(base, terminal, username, password)
+        if EMBEDDED_TOKEN:
+            base = origin(EMBEDDED_UOA)
+            override = os.environ.get("UOA_BASE_URL")
+            if override is not None and origin(override) != base:
+                raise ConnectorError("invalid_request")
+            transport = Transport(base, terminal, bearer_token=EMBEDDED_TOKEN)
+        else:
+            base = origin(os.environ.get("UOA_BASE_URL", DEFAULT_UOA))
+            username = os.environ.get("UOA_USERNAME") or getpass.getpass("UOA username (hidden): ")
+            password = os.environ.get("UOA_PASSWORD") or getpass.getpass("UOA password (hidden): ")
+            transport = Transport(base, terminal, username, password)
         if args.check:
             transport.jobs()
             transport.check_terminal()
@@ -420,6 +443,10 @@ def main(argv: list[str] | None = None) -> int:
         print("Connector stopped.")
         return 130
     except ConnectorError as error:
+        if EMBEDDED_TOKEN and error.status == "authentication_failed":
+            print("Bağlantı anahtarı geçersiz veya süresi dolmuş. UOA'dan yeni bağlantı dosyasını indirin.",
+                  file=sys.stderr)
+            return 1
         print(f"Connector stopped: {error.status}. Check UOA access and Theta Terminal, then run again.",
               file=sys.stderr)
         return 1

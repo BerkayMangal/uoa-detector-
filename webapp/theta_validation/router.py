@@ -3,16 +3,19 @@
 from __future__ import annotations
 
 import json
+import secrets
 from collections.abc import Callable
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi import APIRouter, HTTPException, Query, Request, Response
 from pydantic import ValidationError
 from sqlalchemy.engine import Engine
 from starlette.concurrency import run_in_threadpool
 
-from webapp.theta_validation import service, storage
+from webapp import seo
+from webapp.theta_validation import pairing, service, storage
 
 MAX_UPLOAD_BYTES = 8 * 1024 * 1024
 
@@ -73,8 +76,45 @@ def build_router(
         return service.sources(engine_provider(), clock())
 
     @router.get("/jobs")
-    def jobs(limit: int = Query(default=4, ge=1, le=4)) -> dict[str, Any]:
-        return service.pending_jobs(engine_provider(), clock(), limit)
+    def jobs(request: Request, limit: int = Query(default=4, ge=1, le=4)) -> dict[str, Any]:
+        allowed = request.scope.get("theta_connector_request_ids")
+        return service.pending_jobs(engine_provider(), clock(), limit, allowed)
+
+    @router.post("/pairings")
+    async def issue_pairing(request: Request) -> dict[str, Any]:
+        if not same_origin(request):
+            raise HTTPException(403, "same_origin_required")
+        if await _body(request, 4096) != {}:
+            raise HTTPException(422, "invalid_pairing_request")
+        try:
+            grant = await run_in_threadpool(pairing.issue, engine_provider(), clock())
+        except ValueError as error:
+            raise _failure(error) from None
+        if not grant.request_count:
+            raise HTTPException(409, "no_mature_pending_requests")
+        return {"pairing_token": grant.token, "expires_at": grant.expires_at.isoformat(),
+                "request_count": grant.request_count}
+
+    @router.post("/pairing/redeem")
+    async def redeem_pairing(request: Request) -> Response:
+        if not same_origin(request):
+            raise HTTPException(403, "same_origin_required")
+        body = await _body(request, 4096)
+        if not isinstance(body, dict) or set(body) != {"pairing_token"} or not isinstance(body["pairing_token"], str):
+            raise HTTPException(422, "invalid_pairing_request")
+        source = (Path(__file__).resolve().parents[2] / "scripts" / "theta_mac_connector.py").read_text()
+        try:
+            # Validate the packaged template before consuming the one-use grant.
+            pairing.personalize_source(source, "0" * 64, seo.ORIGIN)
+            connector = await run_in_threadpool(pairing.redeem, engine_provider(), body["pairing_token"], clock())
+            result = pairing.personalize_source(source, connector.token, seo.ORIGIN)
+        except ValueError as error:
+            code = 410 if str(error) == "pairing_token_expired" else 409 if str(error) == "pairing_token_consumed" else 422
+            raise HTTPException(code, str(error)) from None
+        return Response(result, media_type="text/x-python", headers={
+            "Content-Disposition": 'attachment; filename="uoa-theta-hazir-' + secrets.token_hex(6) + '.py"',
+            "Cache-Control": "private, no-store", "Referrer-Policy": "no-referrer",
+        })
 
     @router.post("/requests")
     async def create(request: Request) -> dict[str, Any]:

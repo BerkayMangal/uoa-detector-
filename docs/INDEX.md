@@ -291,6 +291,7 @@ A new study needs a fresh, non-overlapping window (`docs/next_studies.md`,
 | 5.67.2 | **Maintenance lock connection headroom** — `docs/phase-5.67.2-maintenance-pool.md`; native verified reader needs a third bounded connection while advisory lock and Session are held; preserve all other limits/verifiers. |
 
 | 5.68 | **ThetaData option validation** — owner explicitly requests integrating his Options Pro subscription into existing UOA, 2026-11-12. Bounded Terminal connector, authenticated request/result workflow, actual option quote economics, and capability research. Contract: `docs/phase-5.68-theta-option-validation-acceptance.md`. Live access remains unverified until a real Terminal response is ingested; no signal tuning or alpha claim. |
+| 5.68.2 | **Passwordless Mac connection** — remove repeated owner credential entry using a single-use pairing download and a seven-day connector credential restricted to existing request IDs. Contract: `docs/phase-5.68.2-passwordless-theta-acceptance.md`. Owner explicitly requested this usability repair after authorizing deployment. |
 
 Detail for the 5.10–5.19 candidates:
 - **Falsification gates (D8).** `src/uoa_detector/backtest/falsification.py:79-81`
