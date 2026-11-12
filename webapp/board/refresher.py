@@ -701,7 +701,9 @@ async def run_atm_cycle(
             requests=requests, written=written, degraded_fetches=degraded, skipped_non_critical=True,
         )
     try:
-        chains = await refresh_atm_chains(client, sessions, wanted=wanted, settings=settings, now=now)
+        chains = await refresh_atm_chains(
+            client, sessions, wanted=wanted, settings=settings, now=now, clock=clock,
+        )
     except UnusualWhalesAuthError as exc:
         if is_key_failure(exc):
             raise

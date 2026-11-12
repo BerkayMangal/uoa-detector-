@@ -31,6 +31,11 @@ _PUBLIC_GETS = {"/health", "/hakkinda", "/robots.txt", "/sitemap.xml", "/assets/
 # a one-use capability and same-origin check, tested in test_theta_pairing_app.
 _PAIRING_HANDOFF = {("GET", "/theta-bagla"), ("GET", "/assets/theta_pairing.js"),
                     ("POST", "/api/theta/pairing/redeem")}
+# Phase5.70 adds a separate continuous-device handoff. Its public page has no
+# owner data; redeem still requires a one-use grant and same-origin check.
+# Exact route/method isolation and grant authentication are covered through
+# the real application in test_theta_auto_app, independently of this registry.
+_AUTOMATIC_HANDOFF = {("GET", "/theta-otomatik"), ("POST", "/api/theta/device/redeem")}
 
 
 def _route_cases() -> list[tuple[str, str]]:
@@ -43,7 +48,8 @@ def _route_cases() -> list[tuple[str, str]]:
         methods = getattr(route, "methods", None) or {"GET"}
         cases.extend((method, path) for method in sorted(methods)
                      if not (method == "GET" and path in _PUBLIC_GETS)
-                     and (method, path) not in _PAIRING_HANDOFF)
+                     and (method, path) not in _PAIRING_HANDOFF
+                     and (method, path) not in _AUTOMATIC_HANDOFF)
     return cases
 
 

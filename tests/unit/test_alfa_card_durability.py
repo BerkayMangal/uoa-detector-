@@ -78,6 +78,11 @@ _APPEND_ONLY_TABLES: Final = {
     "alfa_theta_validation_receipt",  # native packet receipts and server-recomputed outcomes
     "alfa_theta_pairing_grant",  # Phase5.68.2: immutable hashed one-use download grants
     "alfa_theta_connector_session",  # immutable hashed credentials and frozen scope reference
+    "alfa_theta_device_grant",  # Phase5.70: immutable hashed continuous-device enrollment
+    "alfa_theta_device",  # durable identity/revocation; latest health advances, never rebuild/reset
+    "alfa_theta_automatic_activation",  # prospective boundary and bounded catch-up scope
+    "alfa_theta_automatic_admission",  # immutable source decisions and exclusions
+    "alfa_theta_automatic_report",  # reproducible cohort/receipt-bound stored-data reruns
     "alfa_semantic_event",     # Phase5.66: bounded model ownership/raw grounded interpretation
     "alfa_semantic_receipt",   # physically confirmed availability, no historical backdate
     "alfa_fundamental_event",  # source-bound financial packets and quota ownership

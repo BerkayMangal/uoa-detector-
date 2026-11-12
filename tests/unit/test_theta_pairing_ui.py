@@ -46,6 +46,7 @@ class Element {
 const node=id=>nodes[id]||(nodes[id]=new Element());
 global.document={getElementById:node,createElement:tag=>new Element(tag),body:{append(){}}};
 global.window={location:{hash:scenario.hash,pathname:'/theta-bagla'},history:{replaceState:(state,title,path)=>{replacements.push(path);window.location.hash='';}}};
+if(scenario.automatic){node('theta-pairing').dataset.automaticMode='true';window.location.pathname='/theta-otomatik';}
 global.localStorage=new Proxy({}, {get(){throw new Error('persistent storage forbidden');}});
 global.sessionStorage=global.localStorage;
 global.URL={createObjectURL:()=> 'blob:local-download',revokeObjectURL:value=>revoked.push(value)};
@@ -146,3 +147,33 @@ def test_malformed_attachment_never_downloads_or_displays_a_runnable_command(
     assert result["downloads"] == [] and result["revoked"] == []
     assert "python3" not in result["nodes"]["theta-pairing-command"]["text"]
     assert "adı doğrulanamadı" in result["nodes"]["theta-pairing-status"]["text"]
+
+
+def test_automatic_landing_has_one_local_install_action_and_no_job_prerequisite() -> None:
+    env = Environment(loader=FileSystemLoader(ROOT / "webapp/templates"), undefined=StrictUndefined)
+    text = env.get_template("theta_pairing.html").render(auto_mode=True)
+    assert 'data-automatic-mode="true"' in text
+    assert "24 saat" in text and "7 gün" not in text
+    assert "Kurulumu bir kez çalıştır" in text
+    assert "Dosya indirmek bağlantı kurmaz" in text
+    assert "Yeni ölçümler için tekrar dosya indirmen gerekmez" in text
+    assert "Python 3.9" in text
+    assert "<input" not in text and "<form" not in text
+
+
+def test_automatic_download_uses_device_endpoint_and_exact_install_command() -> None:
+    filename = "uoa-theta-otomatik-012345abcdef.py"
+    result = run_pairing(automatic=True, click=True, disposition=f'attachment; filename="{filename}"')
+    assert result["requests"][0]["url"] == "/api/theta/device/redeem"
+    assert result["requests"][0]["options"]["credentials"] == "omit"
+    assert result["replacements"] == ["/theta-otomatik"]
+    assert result["downloads"][0]["download"] == filename
+    assert result["nodes"]["theta-pairing-command"]["text"] == f"python3 ~/Downloads/{filename} --install"
+    assert "henüz bağlantı kurulmadı" in result["nodes"]["theta-pairing-status"]["text"]
+    assert TOKEN not in json.dumps(result["nodes"])
+
+
+def test_automatic_download_rejects_legacy_filename_before_showing_command() -> None:
+    result = run_pairing(automatic=True, click=True)
+    assert result["downloads"] == []
+    assert "python3" not in result["nodes"]["theta-pairing-command"]["text"]

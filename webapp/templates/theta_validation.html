@@ -1,68 +1,73 @@
 {% extends "base.html" %}
 {% block head %}
-<link rel="stylesheet" href="/assets/theta_validation.css?v=1">
-<script src="/assets/theta_validation.js?v=1" defer></script>
+<link rel="stylesheet" href="/assets/theta_validation.css?v=2">
+<script src="/assets/theta_validation.js?v=2" defer></script>
 {% endblock %}
 {% block content %}
 <div class="theta-page" id="theta-validation">
   <header class="desk-intro">
     <div>
-      <p class="eyebrow">UW + THETADATA</p>
-      <h1 class="desk-intro-title">Opsiyon doğrulama</h1>
-      <p class="theta-intro">UOA’daki bir kontratın, gerçek opsiyon kotasyonlarıyla maliyet sonrası sonucunu incele.</p>
+      <p class="eyebrow">UOA + THETADATA</p>
+      <h1 class="desk-intro-title">Otomatik opsiyon ölçümü</h1>
+      <p class="theta-intro">UOA giriş kararlarını kaydeder. Uygun opsiyonların +15 ve +60 dakika sonuçları, maliyetleriyle birlikte ölçülür.</p>
     </div>
-    <a class="theta-back" href="/opsiyon">Opsiyon kayıtlarına dön →</a>
+    <nav class="theta-shortcuts" aria-label="Sinyal ve ölçüm sayfaları"><a class="theta-back" href="/">Güncel sinyaller →</a><a class="theta-back" href="/olcum">Günlük ölçüm →</a></nav>
   </header>
 
   <section class="theta-connection" aria-labelledby="theta-connection-title" data-connection-state="awaiting_connection">
     <div>
-      <p class="theta-kicker">VERİ BAĞLANTISI</p>
+      <p class="theta-kicker">MAC BAĞLANTISI</p>
       <h2 id="theta-connection-title">ThetaData bağlantısı bekleniyor</h2>
-      <p id="theta-connection-detail">Henüz doğrulanmış ThetaData kotasyonu alınmadı. Bir inceleme kaydedebilir, veri geldiğinde sonucunu burada görebilirsin.</p>
+      <p id="theta-connection-detail">Henüz doğrulanmış ThetaData kotasyonu alınmadı. Mac’te bağlantıyı bir kez kur; sonraki uygun kararlar kendiliğinden sıraya girsin.</p>
+      <p id="theta-device-evidence" class="theta-help">Dosya indirmek, bağlantının çalıştığı anlamına gelmez.</p>
     </div>
-    <button class="theta-secondary" id="theta-refresh" type="button">Durumu yenile</button>
+    <div class="theta-connection-actions"><button class="theta-primary" id="theta-device-pairing-create" type="button">Mac’i bir kez bağla</button><button class="theta-secondary" id="theta-refresh" type="button">Durumu yenile</button></div>
   </section>
+  <p id="theta-device-message" class="theta-message" role="status" aria-live="polite"></p>
+  <div id="theta-devices" class="theta-devices"></div>
 
-  <ol class="theta-flow" aria-label="Ölçüm adımları">
-    <li><span>1</span><div><strong>UOA kontratı</strong><p>Kayıtlı karar veya seçtiğin tarihsel kontrat.</p></div></li>
-    <li><span>2</span><div><strong>ThetaData kotasyonu</strong><p>Giriş ve çıkış zamanındaki alış / satış fiyatları.</p></div></li>
-    <li><span>3</span><div><strong>Maliyet sonrası sonuç</strong><p>Bir kontrat için ayrı +15 ve +60 dakika ölçümleri.</p></div></li>
+  <ol class="theta-flow" aria-label="Otomatik ölçüm adımları">
+    <li><span>1</span><div><strong>Sinyal oluşur</strong><p>Mevcut UOA kuralları giriş kararını ve opsiyon planını kaydeder.</p></div></li>
+    <li><span>2</span><div><strong>Kendiliğinden sıraya girer</strong><p>Uygun tek kontratlı plan için ayrıca inceleme açman gerekmez.</p></div></li>
+    <li><span>3</span><div><strong>Sonrası ölçülür</strong><p>ThetaData kotasyonları geldiğinde +15 / +60 dakika sonuçları görünür.</p></div></li>
   </ol>
 
-  <section class="theta-panel" aria-labelledby="theta-create-title">
-    <div class="theta-section-heading"><h2 id="theta-create-title">İncelenecek kontratı seç</h2><span>Geriye dönük inceleme</span></div>
-    <form id="theta-source-form" class="theta-source-form">
-      <label for="theta-source">UOA karar defterinden</label>
-      <div class="theta-inline-form">
-        <select id="theta-source" name="source_id" disabled><option value="">Kayıtlar yükleniyor…</option></select>
-        <button class="theta-primary" id="theta-source-submit" type="submit" disabled>İncelemeye ekle</button>
-      </div>
-      <p class="theta-help" id="theta-source-help">Kontrat ve başlangıç zamanı kayıtlı karardan alınır; bu seçim geçmiş kararı değiştirmez.</p>
-    </form>
-    <details class="theta-manual">
-      <summary>Kontrat ve zamanı kendim gireceğim</summary>
-      <form id="theta-manual-form">
-        <div class="theta-form-grid">
+  <section class="theta-panel" aria-labelledby="theta-automatic-title">
+    <div class="theta-section-heading"><div><h2 id="theta-automatic-title">Otomatik kayıtlar</h2><p class="theta-help" id="theta-automatic-detail">Otomatik izleme durumu yükleniyor…</p></div><div class="theta-day-picker"><label for="theta-day">Seans günü</label><input id="theta-day" type="date"><button class="theta-secondary" id="theta-today" type="button">Bugün</button></div></div>
+    <dl id="theta-automatic-counts" class="theta-counts" aria-label="Gözlenen kayıtların kapsamı"><div><dt>Kapsam</dt><dd>Bilinmiyor</dd></div></dl>
+    <p class="theta-help">Bekleyen ve ölçülemeyen kayıtlar kapsamda kalır; eksik fiyat sıfır getiri sayılmaz. Geçmişten eklenen kayıtlar ayrı gösterilir.</p>
+    <div id="theta-automatic-results" class="theta-automatic-results" aria-live="polite"><p class="theta-empty">Kayıtlar yükleniyor…</p></div>
+  </section>
+
+  <section class="theta-results" aria-labelledby="theta-report-title">
+    <div class="theta-section-heading"><h2 id="theta-report-title">Ölçüm özeti</h2><span>Birer kontrat · varsayımsal sonuç</span></div>
+    <div id="theta-automatic-report" aria-live="polite"><p class="theta-empty">Henüz okunabilir ölçüm raporu yok.</p></div>
+    <details class="theta-research-tools"><summary>Kayıtlı veriyi indir veya yeniden hesapla</summary><p class="theta-help">Seçili günün tam kapsamını ve kaynak kayıtlarını indir. Yeniden hesaplama yalnızca kaydedilmiş veriyi kullanır; strateji kurallarını değiştirmez ve yeni veri satın almaz.</p><div class="theta-research-actions"><a class="theta-secondary" id="theta-cohort-download" href="/api/theta/automatic/cohort">Tam gün kaydını indir</a><button class="theta-secondary" id="theta-rerun" type="button" disabled>Kayıtlı veriden yeniden hesapla</button></div><p id="theta-rerun-message" class="theta-message" role="status" aria-live="polite"></p></details>
+  </section>
+
+  <details class="theta-history-tools">
+    <summary>Geçmiş bir kontratı ayrıca incele</summary>
+    <p class="theta-help">Bu alan geriye dönük araştırmadır. Otomatik giriş kayıtlarından ve sonuçlarından ayrı tutulur.</p>
+    <section class="theta-panel" aria-labelledby="theta-create-title">
+      <div class="theta-section-heading"><h2 id="theta-create-title">İncelenecek kontratı seç</h2><span>Geriye dönük inceleme</span></div>
+      <form id="theta-source-form" class="theta-source-form">
+        <label for="theta-source">UOA karar defterinden</label>
+        <div class="theta-inline-form"><select id="theta-source" name="source_id" disabled><option value="">Kayıtlar yükleniyor…</option></select><button class="theta-primary" id="theta-source-submit" type="submit" disabled>İncelemeye ekle</button></div>
+        <p class="theta-help" id="theta-source-help">Kontrat ve başlangıç zamanı kayıtlı karardan alınır; bu seçim geçmiş kararı değiştirmez.</p>
+      </form>
+      <details class="theta-manual"><summary>Kontrat ve zamanı kendim gireceğim</summary>
+        <form id="theta-manual-form"><div class="theta-form-grid">
           <div><label for="theta-symbol">Opsiyon kontratı (OCC)</label><input id="theta-symbol" name="option_symbol" type="text" required maxlength="21" pattern="[A-Z]{1,6}[0-9]{6}[CP][0-9]{8}" placeholder="AAPL261218C00250000" autocomplete="off" autocapitalize="characters" spellcheck="false"><p class="theta-help">Hisse kodu, vade, CALL / PUT ve kullanım fiyatını içeren tam kontrat kodu.</p></div>
           <div><label for="theta-entry">İnceleme başlangıcı — UTC</label><input id="theta-entry" name="planned_entry_at" type="datetime-local" required step="1"><p class="theta-help">Saat UTC olarak kaydedilir; bilgisayarının saat dilimine göre çevrilmez.</p></div>
-        </div>
-        <button class="theta-primary" id="theta-manual-submit" type="submit">Geriye dönük inceleme ekle</button>
-      </form>
-    </details>
-    <p id="theta-form-message" class="theta-message" role="status" aria-live="polite"></p>
-  </section>
+        </div><button class="theta-primary" id="theta-manual-submit" type="submit">Geriye dönük inceleme ekle</button></form>
+      </details>
+      <p id="theta-form-message" class="theta-message" role="status" aria-live="polite"></p>
+    </section>
+    <section class="theta-results" aria-labelledby="theta-results-title"><div class="theta-section-heading"><h2 id="theta-results-title">Geçmiş incelemeler</h2><p id="theta-count"></p></div><div id="theta-results" aria-live="polite"><p class="theta-empty">İncelemeler yükleniyor…</p></div></section>
+    <details class="theta-legacy"><summary>Eski tek seferlik bağlantı</summary><p class="theta-help">Yalnızca mevcut olgunlaşmış incelemeler için kullanılır. Yeni kayıtları izlemek için üstteki sürekli Mac bağlantısını kur.</p><button class="theta-secondary" id="theta-pairing-create" type="button">Şifresiz Mac bağlantısı hazırla</button><p id="theta-pairing-message" role="status" aria-live="polite"></p><p class="theta-help">Eski bağlantı dosyası 7 gün geçerlidir. Açılan sayfadaki yeni dosyana özel komutu çalıştır. UOA şifresi veya ThetaData anahtarı sorulmaz.</p></details>
+  </details>
 
-  <section class="theta-results" aria-labelledby="theta-results-title">
-    <div class="theta-section-heading"><h2 id="theta-results-title">İncelemeler</h2><p id="theta-count"></p></div>
-    <p class="theta-help">Alışta ask, satışta bid kullanılır; kayma ve komisyon düşülür. Eksik kotasyon kâr veya sıfır getiri sayılmaz.</p>
-    <div id="theta-results" aria-live="polite"><p class="theta-empty">İncelemeler yükleniyor…</p></div>
-  </section>
-
-  <aside class="theta-method">
-    <strong>Bu sonuç neyi gösterir?</strong>
-    <p>Sonradan alınan kotasyonlarla yapılan bir kontratlık varsayımsal ölçümü gösterir. Gerçek emir veya gerçekleşmiş işlem değildir. +15 ve +60 dakika alternatif tutma süreleridir; toplanmaz. Geçmiş bir kontratı şimdi seçmek, o gün verilmiş opsiyon sinyali sayılmaz.</p>
-    <details><summary>Mac bağlantısını kur</summary><p>Mac’te ThetaData Terminal açıkken, bekleyen incelemeler için şifre girmeden çalışan bir bağlantı dosyası hazırlayabilirsin.</p><p><button class="theta-primary" id="theta-pairing-create" type="button">Şifresiz Mac bağlantısı hazırla</button></p><p id="theta-pairing-message" role="status" aria-live="polite"></p><p>Açılan sayfadan dosyayı indir. İndirme sayfasında gösterilen, yeni dosyana özel komutu Mac Terminal’de çalıştır.</p><p>İndirdiğin bağlantı dosyası 7 gün geçerlidir ve yalnızca bağlantı hazırlanırken bekleyen incelemeleri kapsar. Süre dolduğunda veya yeni inceleme eklediğinde yeni bağlantı hazırla. UOA kullanıcı adı, UOA şifresi veya ThetaData anahtarı sorulmaz. ThetaData Terminal’de oturumun açık olmalı; Mac kapalıysa veri aktarılmaz.</p></details>
-  </aside>
-  <noscript><p class="theta-message">İnceleme kaydetmek ve kayıtlı sonuçları görmek için JavaScript etkin olmalı.</p></noscript>
+  <aside class="theta-method"><strong>Bu sonuç neyi gösterir?</strong><p>Alışta ask, satışta bid kullanılır; kayma ve komisyon düşülür. Gerçek emir veya gerçekleşmiş işlem değildir. +15 ve +60 dakika alternatif tutma süreleridir; toplanmaz. Ölçülen bölümün sonucu, eksik kayıtların sonucunu veya stratejinin kârlılığını kanıtlamaz. Mac ve ThetaData Terminal veri aktarımı sırasında açık olmalı.</p></aside>
+  <noscript><p class="theta-message">Otomatik durumu ve kayıtlı sonuçları görmek için JavaScript etkin olmalı.</p></noscript>
 </div>
 {% endblock %}
