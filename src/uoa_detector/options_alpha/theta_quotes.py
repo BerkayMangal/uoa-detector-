@@ -158,6 +158,19 @@ class ThetaQuoteBatch:
         return result
 
 
+def terminal_clock(moment: datetime, *, round_up: bool) -> str:
+    """Format an ET query time for Theta Terminal v3, which rejects microseconds (Phase 5.70.2).
+
+    Quote timestamps are millisecond-resolution, so rounding the start up and the end down keeps exactly the
+    quotes inside the original window and never admits one earlier than the start.
+    """
+    local = moment.astimezone(_ET)
+    extra = local.microsecond % 1000
+    if extra:
+        local += timedelta(microseconds=1000 - extra if round_up else -extra)
+    return local.time().isoformat(timespec="milliseconds")
+
+
 def _window_failure(contract: ThetaContract, session: date,
                     start: datetime, end: datetime, received_at: datetime) -> str | None:
     if not all(_aware(value) for value in (start, end, received_at)):
@@ -345,8 +358,8 @@ class ThetaQuoteClient:
             "symbol": contract.underlying, "expiration": contract.expiry.strftime("%Y%m%d"),
             "strike": format(contract.strike, "f"), "right": contract.right,
             "date": session.strftime("%Y%m%d"), "interval": "tick",
-            "start_time": window_start.astimezone(_ET).time().isoformat(timespec="microseconds"),
-            "end_time": window_end.astimezone(_ET).time().isoformat(timespec="microseconds"),
+            "start_time": terminal_clock(window_start, round_up=True),
+            "end_time": terminal_clock(window_end, round_up=False),
             "format": "json",
         }
         try:

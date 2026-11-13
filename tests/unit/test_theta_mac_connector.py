@@ -166,7 +166,7 @@ def test_http_credentials_only_go_to_uoa_and_terminal_request_has_exact_contract
     assert params == {
         "symbol": ["AAPL"], "expiration": ["20261120"], "strike": ["300"], "right": ["call"],
         "date": ["20261109"], "interval": ["tick"], "format": ["json"],
-        "start_time": ["10:00:00.000000"], "end_time": ["10:02:00.000000"],
+        "start_time": ["10:00:00.000"], "end_time": ["10:02:00.000"],
     }
     assert result["payload"] == payload()
     client.upload("job_123", {"request_hash": "a" * 64, "packets": []})
