@@ -67,6 +67,19 @@ class NoRedirect(HTTPRedirectHandler):
         raise ConnectorError("request_failed")
 
 
+def terminal_clock(moment: datetime, *, round_up: bool) -> str:
+    """Theta Terminal v3 accepts at most milliseconds (six digits give HTTP 400; Phase 5.70.2).
+
+    Quote timestamps are millisecond-resolution, so rounding the start up and the end down keeps exactly the
+    quotes inside the original window and never admits one earlier than the start.
+    """
+    local = moment.astimezone(ET)
+    extra = local.microsecond % 1000
+    if extra:
+        local += timedelta(microseconds=1000 - extra if round_up else -extra)
+    return local.time().isoformat(timespec="milliseconds")
+
+
 @contextmanager
 def request_timeout(status: str):
     """Mac/POSIX main-thread deadline includes connect, headers, and body reads."""
@@ -350,8 +363,8 @@ class Transport:
             "symbol": contract.symbol, "expiration": contract.expiration.strftime("%Y%m%d"),
             "strike": format(contract.strike, "f"), "right": contract.right,
             "date": local.strftime("%Y%m%d"), "interval": "tick", "format": "json",
-            "start_time": local.time().isoformat(timespec="microseconds"),
-            "end_time": end.astimezone(ET).time().isoformat(timespec="microseconds"),
+            "start_time": terminal_clock(start, round_up=True),
+            "end_time": terminal_clock(end, round_up=False),
         }
         code, payload = self._request(self.terminal + "/v3/option/history/quote?" + urlencode(params), terminal=True)
         return {

@@ -213,7 +213,7 @@ async def test_client_sends_exact_bounded_tick_request_without_credentials() -> 
         assert dict(request.url.params) == {
             "symbol": "AAPL", "expiration": "20261120", "strike": "300", "right": "call",
             "date": "20261109", "interval": "tick", "format": "json",
-            "start_time": "10:00:00.000000", "end_time": "10:02:00.000000",
+            "start_time": "10:00:00.000", "end_time": "10:02:00.000",
         }
         assert "x-api-key" not in request.headers
         assert "x-username" not in request.headers
