@@ -1,0 +1,9 @@
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Bilinen zararsız eşleşmeler (hash çıktıları, test fixture). Yeni yol eklerken dikkat."
+paths = [
+  '''^artifacts/''',
+  '''^tests/unit/test_check_no_secrets_hook\.py$''',
+]
