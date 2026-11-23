@@ -74,6 +74,9 @@ _KNOWN_EXCEPTIONS: Final = {
 # recorded, a telemetry branch that was taken, the OI that confirmed an
 # opening — nobody can re-derive these from the vendor tomorrow.
 _APPEND_ONLY_TABLES: Final = {
+    "alfa_paper_calibration_clock",  # Phase 5.71: durable forward-only scan watermark
+    "alfa_paper_calibration_case",   # frozen first plan; position states advance transactionally
+    "alfa_paper_calibration_event",  # immutable observed scans and per-arm decisions
     "alfa_theta_validation_request",  # Phase5.68: immutable exact-contract measurement requests
     "alfa_theta_validation_receipt",  # native packet receipts and server-recomputed outcomes
     "alfa_theta_pairing_grant",  # Phase5.68.2: immutable hashed one-use download grants

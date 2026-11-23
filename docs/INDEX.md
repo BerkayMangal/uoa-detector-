@@ -305,6 +305,7 @@ A new study needs a fresh, non-overlapping window (`docs/next_studies.md`,
 | 5.70 | **Automatic Theta measurement** — owner requests automatic collection, signal measurement and repeatable research after the first Mac workflow failed. Contract: `docs/phase-5.70-automatic-theta-acceptance.md`. Separate persistent device enrollment preserves v1 scopes; no strategy tuning or execution. |
 | 5.70.1 | **ATM receipt clock repair** — per-response acquisition time replaces the prematurely sampled batch clock in the production refresher. Contract: `docs/phase-5.70.1-atm-receipt-clock-acceptance.md`. Provider observation times and freshness thresholds remain unchanged. |
 | 5.70.2 | **Theta Terminal time-format hotfix** — window `start_time`/`end_time` sent with millisecond precision (start rounded up, end rounded down); Terminal v3 returns HTTP 400 on microseconds, which the automatic connector reported as `terminal_unreachable`. Contract: `docs/phase-5.70.2-theta-time-format-acceptance.md`. Packet fields, validation, costs and attempt rules unchanged. |
+| 5.71 | **Forward PAPER calibration** — same-opportunity entry confirmation, risk-sized ATR alternatives and a private observation journal. Contract: `docs/phase-5.71-paper-calibration-acceptance.md`. Delivery: `docs/phase-5.71-paper-calibration-closeout.md`. |
 
 Detail for the 5.10–5.19 candidates:
 - **Falsification gates (D8).** `src/uoa_detector/backtest/falsification.py:79-81`

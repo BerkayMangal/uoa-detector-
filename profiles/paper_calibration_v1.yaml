@@ -1,0 +1,32 @@
+# Frozen prospective stock PAPER experiment, Phase 5.71.
+version: paper_calibration_v1
+source_policy: live_alpha_v1
+source_profile_sha256: e3e425cfc5e5cac07a35ec7e8b12ca970eb57fb405ea8f3e73680a962ea14e6e
+risk_usd: 100
+max_notional_usd: 2500
+slippage_bps: 5
+max_quote_age_seconds: 900
+horizon_sessions: 5
+benchmark: SPY
+markout_minutes: [15, 60]
+markout_grace_seconds: 300
+markout_pair_skew_seconds: 60
+cycle_timeout_seconds: 12
+recovery_batch: 12
+arms:
+  - key: original_15
+    label: İlk AL · 1,5 ATR
+    confirm_entry: false
+    stop_atr: 1.5
+  - key: confirmed_15
+    label: Güncel AL · 1,5 ATR
+    confirm_entry: true
+    stop_atr: 1.5
+  - key: confirmed_20
+    label: Güncel AL · 2 ATR
+    confirm_entry: true
+    stop_atr: 2
+  - key: confirmed_25
+    label: Güncel AL · 2,5 ATR
+    confirm_entry: true
+    stop_atr: 2.5

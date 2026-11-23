@@ -73,6 +73,7 @@ from webapp.news_research.transport import RecordingClient
 from webapp.opening.model import next_wait as opening_wait
 from webapp.opening.observer import STATE as OPENING_STATE
 from webapp.opening.observer import run as run_opening
+from webapp.paper_calibration.observer import run as run_paper_calibration
 from webapp.research_readiness import run as run_readiness
 from webapp.storage_diagnostics import native_hint
 from webapp.tournament.monitor import STATE as TOURNAMENT_STATE
@@ -774,6 +775,7 @@ async def live_alpha_loop(
         try:
             row = await run_cycle(engine, reader, client, settings, board, costs, now,
                                   gamma_source=gamma_repo.latest)
+            await run_paper_calibration(engine, row, settings)
             stage = "shadow"
             await run_shadow(engine, row, now_fn())
             stage = "desk"

@@ -1,0 +1,291 @@
+"""Read-only dashboard projections for the stock PAPER experiment."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from statistics import mean
+from typing import TYPE_CHECKING
+from zoneinfo import ZoneInfo
+
+from webapp.paper_calibration import store
+from webapp.paper_calibration.model import Arm, Position, State
+from webapp.paper_calibration.observer import Case, Markout, Observation
+from webapp.paper_calibration.settings import Settings, settings
+
+if TYPE_CHECKING:
+    from datetime import datetime
+
+    from sqlalchemy.engine import Engine
+
+PAGE_SIZE = 20
+_PAGE_EVENTS = 100
+_LONDON = ZoneInfo("Europe/London")
+_STATE = {
+    State.PENDING: "Giriş bekliyor",
+    State.OPEN: "Açık",
+    State.EXIT_PENDING: "Çıkış fiyatı bekliyor",
+    State.CLOSED: "Kapandı",
+    State.UNFILLED: "Dolmadı",
+    State.UNKNOWN: "Sonuç belirsiz",
+}
+_ENTRY = {
+    "ready": "AL / Hazır · hisse", "watch": "İZLE",
+    "other": "Başka karar / araç", "missing": "Güncel kart yok",
+}
+_ACTION = {
+    "waiting": "Bekliyor", "filled": "Giriş", "marked": "Fiyat gözlendi", "exit_pending": "Çıkış bekliyor",
+    "closed": "Çıkış", "unfilled": "Dolmadı", "unknown": "Belirsiz",
+}
+_REASON = {
+    "first_plan": "İlk uygun AL planı kaydedildi",
+    "entry_watch": "Güncel sinyal İZLE",
+    "entry_other": "Güncel AL / Hazır hisse koşulu eksik",
+    "entry_missing": "Güncel AL kartı yok",
+    "entry_confirmed": "Aynı taramada AL teyidi",
+    "entry_legacy": "İlk AL planının giriş aralığı",
+    "entry_price_outside_plan": "Fiyat ilk planın giriş sınırları dışında",
+    "quote_prepublication": "Fiyat ilk plan yayınlanmadan önce gözlendi",
+    "quote_unavailable": "Geçerli seans fiyatı gözlenmedi",
+    "quote_observed": "Taze fiyat",
+    "quote_unchanged": "Yeni fiyat gözlemi gelmedi",
+    "exit_quote_unavailable": "Çıkış seansında geçerli fiyat gözlenmedi",
+    "stop": "Stop",
+    "target": "Hedef",
+    "opposite_flow": "Ters opsiyon akışı",
+    "horizon": "İzleme süresi doldu",
+    "horizon_session_unobserved": "Süre dolum seansı gözlenemedi",
+    "risk_blocked": "Bir hisse planlanan riske sığmadı",
+    "market_closed": "Normal seans kapalı",
+    "session_expired": "İlk seans sona erdi",
+    "reference_missing": "Sinyal anında eşleşen hisse ve SPY fiyatı eksik",
+    "outside_session": "Ölçüm saati normal seansın dışında",
+    "paired_quote_missing": "Ölçüm penceresinde eşleşen hisse ve SPY fiyatı eksik",
+}
+_FLOW = {"up": "Yukarı", "down": "Aşağı", "below_threshold": "Eşik altında", "unavailable": "Akış verisi yok"}
+
+
+@dataclass(frozen=True)
+class ArmView:
+    key: str
+    label: str
+    stop_atr: float
+    control: str | None
+    filled: int
+    closed: int
+    wins: int
+    pending: int
+    open: int
+    exit_pending: int
+    unfilled: int
+    unknown: int
+    net: float | None
+    mean_r: float | None
+    mean_mae_r: float | None
+    mean_mfe_r: float | None
+    paired: int
+    paired_delta_r: float | None
+
+
+@dataclass(frozen=True)
+class MarkSummary:
+    label: str
+    priced: int
+    total: int
+    positive: int
+    mean_pp: float | None
+
+
+@dataclass(frozen=True)
+class MarkView:
+    label: str
+    state: str
+    state_label: str
+    at: str | None
+    price: float | None
+    spy: float | None
+    relative_pp: float | None
+    reason: str | None
+
+
+@dataclass(frozen=True)
+class PositionView:
+    arm: str
+    label: str
+    state: str
+    state_label: str
+    stop: float
+    target: float
+    quantity: int
+    planned_risk: float
+    fill_risk: float | None
+    entry_at: str | None
+    entry_price: float | None
+    exit_at: str | None
+    exit_price: float | None
+    exit_reason: str | None
+    pnl: float | None
+    net_r: float | None
+    mae_r: float | None
+    mfe_r: float | None
+    last_price: float | None
+
+
+@dataclass(frozen=True)
+class CaseView:
+    id: str
+    ticker: str
+    published_at: str | None
+    source_path: str
+    headline: str
+    reference: float
+    original_stop: float
+    target: float
+    chase: float
+    atr: float
+    state: str
+    state_label: str
+    positions: tuple[PositionView, ...]
+    markouts: tuple[MarkView, ...]
+
+
+@dataclass(frozen=True)
+class ActionView:
+    arm: str
+    label: str
+    action: str
+    reason: str
+
+
+@dataclass(frozen=True)
+class EventView:
+    at: str | None
+    scan_id: str
+    entry_check: str
+    quote_at: str | None
+    quote_price: float | None
+    spy_price: float | None
+    opposite_flow: bool
+    flow: str
+    recovered: bool
+    actions: tuple[ActionView, ...]
+
+
+@dataclass(frozen=True)
+class Report:
+    ready: bool
+    latest_at: str | None
+    version: str
+    total: int
+    cohort_total: int
+    sessions: int
+    ticker: str
+    page: int
+    has_prev: bool
+    has_next: bool
+    arms: tuple[ArmView, ...]
+    markouts: tuple[MarkSummary, ...]
+    cases: tuple[CaseView, ...]
+    detail: CaseView | None
+    events: tuple[EventView, ...]
+    events_truncated: bool
+    detail_missing: bool
+
+
+def _clock(value: datetime | None) -> str | None:
+    return value.astimezone(_LONDON).strftime("%d.%m.%Y %H:%M:%S") if value else None
+
+
+def _mean(values: list[float]) -> float | None:
+    return mean(values) if values else None
+
+
+def _resolved(position: Position) -> float | None:
+    return 0.0 if position.state is State.UNFILLED else position.pnl_usd
+
+
+def _arm_view(arm: Arm, control: Arm | None, cases: tuple[Case, ...], cfg: Settings) -> ArmView:
+    per_case = [{row.arm_key: row for row in case.positions} for case in cases]
+    rows = [case[arm.key] for case in per_case]
+    closed = [row for row in rows if row.state is State.CLOSED]
+    pnls = [row.pnl_usd for row in closed if row.pnl_usd is not None]
+    paired_delta = []
+    if control is not None:
+        for case in per_case:
+            newer, older = _resolved(case[arm.key]), _resolved(case[control.key])
+            if newer is not None and older is not None:
+                paired_delta.append((newer - older) / cfg.risk_usd)
+    return ArmView(
+        arm.key, arm.label, arm.stop_atr, control.label if control else None,
+        sum(row.entry_fill is not None for row in rows), len(closed), sum(pnl > 0 for pnl in pnls),
+        sum(row.state is State.PENDING for row in rows), sum(row.state is State.OPEN for row in rows),
+        sum(row.state is State.EXIT_PENDING for row in rows),
+        sum(row.state is State.UNFILLED for row in rows), sum(row.state is State.UNKNOWN for row in rows),
+        round(sum(pnls), 2) if pnls else None, _mean([row.net_r for row in closed if row.net_r is not None]),
+        _mean([row.mae_r for row in closed if row.mae_r is not None]),
+        _mean([row.mfe_r for row in closed if row.mfe_r is not None]),
+        len(paired_delta), _mean(paired_delta),
+    )
+
+
+def _mark_view(m: Markout) -> MarkView:
+    return MarkView(
+        f"+{m.minutes} dk", m.state, {"pending": "Bekliyor", "priced": "Ölçüldü", "unknown": "Bilinmiyor"}[m.state],
+        _clock(m.at), m.pair.stock.price if m.pair else None, m.pair.spy.price if m.pair else None,
+        m.relative_pp, _REASON.get(m.reason),
+    )
+
+
+def _case_view(case: Case, arms: dict[str, Arm]) -> CaseView:
+    seed = case.seed
+    status = ("open" if any(row.state is State.OPEN for row in case.positions)
+              else "pending" if case.active else "resolved")
+    return CaseView(
+        seed.opportunity_id, seed.ticker, _clock(seed.published_at), seed.source_path, seed.headline,
+        seed.reference, seed.stop, seed.target, seed.chase, seed.atr, status,
+        {"open": "Açık", "pending": "İzleniyor", "resolved": "Tamamlandı"}[status],
+        tuple(PositionView(
+            p.arm_key, arms[p.arm_key].label, p.state, _STATE[p.state], p.stop, p.target, p.quantity,
+            p.planned_risk, p.fill_risk, _clock(p.entry_at), p.entry_fill, _clock(p.exit_at), p.exit_fill,
+            _REASON.get(p.exit_reason or ""), p.pnl_usd, p.net_r, p.mae_r, p.mfe_r,
+            p.last_quote.price if p.last_quote else None,
+        ) for p in case.positions),
+        tuple(_mark_view(mark) for mark in case.markouts),
+    )
+
+
+def _event_view(record: store.EventRecord, arms: dict[str, Arm]) -> EventView:
+    e = Observation.model_validate_json(record.document)
+    return EventView(
+        _clock(e.at), e.scan_id, _ENTRY[e.entry_check], _clock(e.quote.at if e.quote else None),
+        e.quote.price if e.quote else None, e.spy.price if e.spy else None, e.opposite_flow, _FLOW[e.flow_state], e.recovered,
+        tuple(ActionView(a.arm, arms[a.arm].label, _ACTION[a.action], _REASON[a.reason]) for a in e.actions),
+    )
+
+
+def build(engine: Engine, ticker: str, page: int, opportunity: str) -> Report:
+    cfg = settings()
+    ticker = ticker.strip().upper()
+    data = store.report_inputs(engine, cfg.study_key, ticker or None, page, PAGE_SIZE)
+    cases = tuple(Case.model_validate_json(row.document) for row in data.all_cases)
+    by_id = {case.seed.opportunity_id: case for case in cases}
+    arms = {arm.key: arm for arm in cfg.arms}
+    original = next(arm for arm in cfg.arms if not arm.confirm_entry)
+    confirmed = next(arm for arm in cfg.arms if arm.confirm_entry and arm.stop_atr == original.stop_atr)
+    arm_views = tuple(_arm_view(arm, None if arm == original else original if arm == confirmed else confirmed,
+                               cases, cfg) for arm in cfg.arms)
+    summaries = []
+    for horizon in cfg.markout_minutes:
+        pp = [item.relative_pp for case in cases for item in case.markouts
+              if item.minutes == horizon and item.relative_pp is not None]
+        summaries.append(MarkSummary(f"+{horizon} dk", len(pp), len(cases), sum(p > 0 for p in pp), _mean(pp)))
+    record, events = store.detail_inputs(engine, cfg.study_key, opportunity) if opportunity else (None, ())
+    detail = _case_view(Case.model_validate_json(record.document), arms) if record is not None else None
+    return Report(
+        ready=data.ready, latest_at=_clock(data.latest_at), version=cfg.version,
+        total=data.total, cohort_total=len(cases), sessions=len({c.seed.session for c in cases}),
+        ticker=ticker, page=page, has_prev=page > 1, has_next=page * PAGE_SIZE < data.total,
+        arms=arm_views, markouts=tuple(summaries),
+        cases=tuple(_case_view(by_id[row.opportunity_id], arms) for row in data.cases),
+        detail=detail, events=tuple(_event_view(e, arms) for e in events[-_PAGE_EVENTS:]),
+        events_truncated=len(events) > _PAGE_EVENTS, detail_missing=bool(opportunity and detail is None),
+    )

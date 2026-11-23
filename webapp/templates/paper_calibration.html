@@ -1,0 +1,200 @@
+{% extends "base.html" %}
+
+{% macro number(value, places=2, signed=false) -%}
+  {%- if value is number -%}
+    {{ ('%+.*f' if signed else '%.*f') | format(places, value) | replace('.', ',') | replace('-', '−') }}
+  {%- else -%}—{%- endif -%}
+{%- endmacro %}
+
+{% macro usd(value, places=2, signed=false) -%}
+  {%- if value is number -%}
+    {{ '−' if value < 0 else '+' if signed and value > 0 else '' }}${{ number(value | abs, places) }}
+  {%- else -%}—{%- endif -%}
+{%- endmacro %}
+
+{% macro metric(value, unit) -%}
+  {{ number(value, signed=true) }}{% if value is number %} {{ unit }}{% endif %}
+{%- endmacro %}
+
+{% macro case_url(id, v) -%}
+  /paper-kalibrasyon?ticker={{ v.ticker | urlencode }}&amp;page={{ v.page }}&amp;opportunity={{ id | urlencode }}#paper-detail
+{%- endmacro %}
+
+{% set paths = {'P1_news_continuation': 'Haber ve akış', 'P2_market_relative_flow': 'SPY gücü ve akış', 'P3_pullback_entry': 'Geri çekilme'} %}
+
+{% macro plans(case) %}
+  <dl class="price-rail">
+    <div><dt>Giriş referansı</dt><dd>{{ usd(case.reference) }}</dd></div>
+    <div><dt>İlk plan stopu</dt><dd>{{ usd(case.original_stop) }}</dd></div>
+    <div><dt>Ortak hedef</dt><dd>{{ usd(case.target) }}</dd></div>
+    <div><dt>ATR · 14 seans</dt><dd>{{ usd(case.atr) }}</dd></div>
+  </dl>
+  <p class="quiet-copy">Giriş fiyatı üst sınırı {{ usd(case.chase) }}.</p>
+  <div class="overflow-x-auto mt-3" role="region" aria-label="{{ case.ticker }} PAPER girişleri ve çıkışları" tabindex="0">
+    <table class="w-full text-sm">
+      <thead><tr><th scope="col">Kol / durum</th><th scope="col">Stop / hedef</th><th scope="col">Adet / plan riski</th><th scope="col">Giriş</th><th scope="col">Çıkış</th><th scope="col">Net</th><th scope="col">Hareket aralığı</th></tr></thead>
+      <tbody>
+      {% for p in case.positions %}
+        <tr class="border-t" data-paper-arm="{{ p.arm }}" data-paper-state="{{ p.state }}">
+          <td class="whitespace-nowrap"><b>{{ p.label }}</b><small class="block quiet-copy">{{ p.state_label }}</small></td>
+          <td class="whitespace-nowrap">{{ usd(p.stop) }} / {{ usd(p.target) }}</td>
+          <td class="whitespace-nowrap">{{ p.quantity if p.quantity is number else '—' }} / {{ usd(p.planned_risk) }}{% if p.fill_risk is number %}<small class="block quiet-copy">Dolumdan stopa {{ usd(p.fill_risk) }}</small>{% endif %}</td>
+          <td>{{ usd(p.entry_price, 4) }}{% if p.entry_at %}<small class="block quiet-copy">{{ p.entry_at }}</small>{% endif %}</td>
+          <td>{{ usd(p.exit_price, 4) }}{% if p.exit_at %}<small class="block quiet-copy">{{ p.exit_at }}</small>{% endif %}{% if p.exit_reason %}<small class="block quiet-copy">{{ p.exit_reason }}</small>{% endif %}</td>
+          <td><b>{{ usd(p.pnl, signed=true) }}</b><small class="block quiet-copy">{{ metric(p.net_r, 'R') }}</small></td>
+          <td>
+            <span class="block">Ters {{ metric(p.mae_r, 'R') }}</span>
+            <span class="block">Lehte {{ metric(p.mfe_r, 'R') }}</span>
+            {% if p.last_price is number %}<small class="block quiet-copy">Son gözlem {{ usd(p.last_price, 4) }}</small>{% endif %}
+          </td>
+        </tr>
+      {% else %}
+        <tr><td colspan="7" class="empty-row">Henüz kol kaydı yok.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if case.markouts %}
+  <h3 class="mt-4 font-semibold">Sinyal sonrası fiyat ölçümleri</h3>
+  <div class="overflow-x-auto mt-2" role="region" aria-label="{{ case.ticker }} hisse ve SPY gözlemleri" tabindex="0">
+    <table class="w-full text-sm">
+      <thead><tr><th scope="col">Ufuk / durum</th><th scope="col">Gözlem</th><th scope="col">{{ case.ticker }}</th><th scope="col">SPY</th><th scope="col">SPY üstü</th></tr></thead>
+      <tbody>{% for m in case.markouts %}
+        <tr class="border-t" data-paper-markout-state="{{ m.state }}">
+          <td><b>{{ m.label }}</b><small class="block quiet-copy">{{ m.state_label }}</small></td>
+          <td>{{ m.at or '—' }}{% if m.reason %}<small class="block quiet-copy">{{ m.reason }}</small>{% endif %}</td>
+          <td>{{ usd(m.price, 4) }}</td><td>{{ usd(m.spy, 4) }}</td><td>{{ metric(m.relative_pp, 'yp') }}</td>
+        </tr>
+      {% endfor %}</tbody>
+    </table>
+  </div>
+  {% endif %}
+{% endmacro %}
+
+{% block content %}
+<section id="paper-calibration" aria-labelledby="paper-title" data-paper-ready="{{ 'true' if v.ready else 'false' }}">
+  <div class="desk-heading">
+    <h1 id="paper-title">PAPER kalibrasyonu</h1>
+    <a href="/sonuclar">Live Alpha geçmişi →</a>
+  </div>
+  <p class="quiet-copy">Aynı hisse sinyalinin dört PAPER kolundaki giriş teyidi ve stop sonuçları. Saatler Londra.</p>
+
+  <div class="desk-overview" aria-label="PAPER ölçüm kapsamı">
+    <div class="overview-item"><span>Sinyal</span><b>{{ v.cohort_total }}</b></div>
+    <div class="overview-item"><span>Sinyal seansı</span><b>{{ v.sessions }}</b></div>
+    <div class="overview-item"><span>Son kaydedilen tarama</span><b>{{ v.latest_at or '—' }}</b></div>
+    {% if not v.ready %}<p class="overview-note">Ölçüm deposu henüz hazır değil.</p>{% endif %}
+  </div>
+
+  <nav class="desk-jump-nav" aria-label="PAPER ekranı bölümleri">
+    <a href="#paper-performance">Kol sonuçları</a>
+    <a href="#paper-signal-results">SPY ölçümleri</a>
+    <a href="#paper-records">İşlem kayıtları</a>
+    <a href="#paper-method">Ölçüm kuralları</a>
+  </nav>
+
+  <section id="paper-performance" aria-labelledby="paper-performance-title">
+    <div class="section-heading"><h2 id="paper-performance-title">Kol sonuçları</h2></div>
+    <div class="overflow-x-auto" role="region" aria-label="Dört PAPER kolunun sonuçları" tabindex="0">
+      <table class="w-full text-sm">
+        <thead><tr><th scope="col">Giriş kuralı / stop</th><th scope="col">İşlemler</th><th scope="col">Toplam net</th><th scope="col">Ortalama net R</th><th scope="col">Ortalama ters / lehte</th><th scope="col">Kontrole göre fark</th></tr></thead>
+        <tbody>
+          {% for a in v.arms %}
+          <tr class="border-t" data-paper-summary-arm="{{ a.key }}" data-stop-atr="{{ a.stop_atr }}">
+            <td class="whitespace-nowrap"><b>{{ a.label }}</b>{% if not a.control %}<small class="block quiet-copy">İlk AL kontrolü</small>{% endif %}</td>
+            <td class="whitespace-nowrap">{{ a.closed }} kapanan · {{ a.wins }} kazanan<small class="block quiet-copy">{{ a.open }} açık · {{ a.pending }} giriş bekleyen</small><small class="block quiet-copy">{{ a.exit_pending }} çıkış bekleyen · {{ a.unfilled }} dolmayan · {{ a.unknown }} belirsiz</small></td>
+            <td class="whitespace-nowrap"><b>{{ usd(a.net, signed=true) }}</b></td>
+            <td class="whitespace-nowrap">{{ metric(a.mean_r, 'R') }}</td>
+            <td class="whitespace-nowrap">{{ metric(a.mean_mae_r, 'R') }} / {{ metric(a.mean_mfe_r, 'R') }}</td>
+            <td>{% if a.control %}{{ metric(a.paired_delta_r, 'R') }}<small class="block quiet-copy">{{ a.paired }} eşleşen sinyal · {{ a.control }}</small>{% else %}—{% endif %}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="6" class="empty-row">Kol ölçümleri bekleniyor.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <p class="quiet-copy mt-2">Net getiri kayma sonrasıdır. Ortalama net R, kapanan işlemin sonucu ile planlanan dolar riski arasındaki orandır. Kontrol farkında aynı sinyal eşlenir ve her $100 bütçe 1 R sayılır. Girişsiz kolda nakitte kalmanın getirisi sıfır, fiyatı eksik sonuç ise belirsizdir.</p>
+  </section>
+
+  <section id="paper-signal-results" aria-labelledby="paper-signal-title">
+    <div class="section-heading"><h2 id="paper-signal-title">Sinyalden sonra SPY farkı</h2></div>
+    <div class="overflow-x-auto" role="region" aria-label="Sinyal bazında SPY ölçüm kapsamı" tabindex="0">
+      <table class="w-full text-sm">
+        <thead><tr><th scope="col">Ölçüm ufku</th><th scope="col">Fiyatı eşleşen / toplam</th><th scope="col">SPY üstünde</th><th scope="col">Ortalama fark</th></tr></thead>
+        <tbody>
+        {% for m in v.markouts %}<tr class="border-t"><td><b>{{ m.label }}</b></td><td>{{ m.priced }} / {{ m.total }}</td><td>{{ m.positive }}</td><td>{{ metric(m.mean_pp, 'yp') }}</td></tr>
+        {% else %}<tr><td colspan="4" class="empty-row">Eşleşmiş hisse ve SPY fiyatı bekleniyor.</td></tr>{% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <p class="quiet-copy mt-2">Hisse getirisi eksi aynı aralıktaki SPY getirisi, yüzde puan (yp). Ölçüm sinyalden başlar ve PAPER dolumu beklemez.</p>
+  </section>
+
+  <section id="paper-records" aria-labelledby="paper-records-title">
+    <div class="section-heading"><h2 id="paper-records-title">İşlem kayıtları</h2><span>{{ v.total }} sinyal</span></div>
+    <form method="get" action="/paper-kalibrasyon" class="table-tools">
+      <div class="flex flex-wrap items-center gap-2"><label for="paper-ticker">Hisse</label><input id="paper-ticker" name="ticker" value="{{ v.ticker }}" placeholder="Örn. NVDA" maxlength="12" autocomplete="off"><button class="button-primary" type="submit">Filtrele</button></div>
+      {% if v.ticker %}<a class="underline" href="/paper-kalibrasyon#paper-records">Tüm hisseler</a>{% endif %}
+    </form>
+
+    {% if v.detail_missing %}<p class="desk-notice" role="status">Bu sinyalin PAPER kaydı bulunamadı.</p>{% endif %}
+    {% if v.detail %}
+    {% set case = v.detail %}
+    <article class="fold-panel" id="paper-detail" aria-labelledby="paper-detail-title">
+      <div class="section-heading"><h3 id="paper-detail-title" class="font-semibold">{{ case.ticker }} · Olay günlüğü</h3><span>{{ case.published_at }}</span></div>
+      {% if case.headline %}<p class="quiet-copy">{{ case.headline }}</p>{% endif %}
+      {{ plans(case) }}
+      <div class="section-heading"><h3 class="font-semibold">Tarama ve işlem olayları</h3><a href="/api/paper-kalibrasyon/{{ case.id | urlencode }}">JSON kaydını aç →</a></div>
+      {% if v.events_truncated %}<p class="quiet-copy mb-2">Ekran, olay günlüğünün yalnızca son bölümünü gösteriyor.</p>{% endif %}
+      <div class="overflow-x-auto" role="region" aria-label="{{ case.ticker }} tarama ve işlem olayları" tabindex="0">
+        <table class="w-full text-sm">
+          <thead><tr><th scope="col">Tarama</th><th scope="col">Giriş ve akış</th><th scope="col">Gözlenen fiyatlar</th><th scope="col">Kol / olay</th></tr></thead>
+          <tbody>
+          {% for e in v.events %}
+          <tr class="border-t" data-paper-event="{{ e.scan_id }}">
+            <td><b>{{ e.at }}</b>{% if e.recovered %}<small class="block quiet-copy">Arşivden tamamlandı</small>{% endif %}<small class="block break-all quiet-copy">{{ e.scan_id }}</small></td>
+            <td>{{ e.entry_check }}<small class="block quiet-copy">Akış {{ e.flow }}</small></td>
+            <td>Hisse {{ usd(e.quote_price, 4) }}<br>SPY {{ usd(e.spy_price, 4) }}{% if e.quote_at %}<small class="block quiet-copy">{{ e.quote_at }}</small>{% endif %}</td>
+            <td><ul>{% for a in e.actions %}<li><b>{{ a.label }} · {{ a.action }}</b>{% if a.reason %}<small class="block quiet-copy">{{ a.reason }}</small>{% endif %}</li>{% else %}<li class="quiet-copy">Karar değişikliği yok.</li>{% endfor %}</ul></td>
+          </tr>
+          {% else %}<tr><td colspan="4" class="empty-row">Bu sinyalin tarama olayları bekleniyor.</td></tr>{% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </article>
+    {% endif %}
+
+    {% for case in v.cases %}
+    <details class="fold-panel" data-paper-case="{{ case.id }}">
+      <summary><b>{{ case.ticker }}</b> · {{ case.published_at }} · {{ case.state_label }}{% if case.source_path %} · {{ paths.get(case.source_path, case.source_path) }}{% endif %}</summary>
+      {% if case.headline %}<p class="quiet-copy">{{ case.headline }}</p>{% endif %}
+      {{ plans(case) }}
+      <p class="mt-3 text-sm"><a class="underline" href="{{ case_url(case.id, v) }}">{{ case.ticker }} tarama ve işlem günlüğünü aç →</a></p>
+    </details>
+    {% else %}
+    <p class="desk-notice" role="status">{% if v.ticker %}{{ v.ticker }} için bu sayfada kayıt yok.{% else %}İlk uygun sinyal kaydedildiğinde burada görünecek.{% endif %}</p>
+    {% endfor %}
+
+    {% if v.has_prev or v.has_next %}
+    <nav class="desk-jump-nav" aria-label="PAPER kayıt sayfaları">
+      {% if v.has_prev %}<a rel="prev" href="/paper-kalibrasyon?ticker={{ v.ticker | urlencode }}&amp;page={{ v.page - 1 }}#paper-records">← Daha yeni</a>{% endif %}
+      <span>Sayfa {{ v.page }}</span>
+      {% if v.has_next %}<a rel="next" href="/paper-kalibrasyon?ticker={{ v.ticker | urlencode }}&amp;page={{ v.page + 1 }}#paper-records">Daha eski →</a>{% endif %}
+    </nav>
+    {% endif %}
+  </section>
+
+  <details id="paper-method" class="fold-panel">
+    <summary>Ölçüm kuralları</summary>
+    <div class="quiet-copy">
+      <p>Kontrol ilk AL planını sonraki uygun fiyatla doldurur. Diğer üç kol dolum taramasında güncel AL ve hazır fiyat ister. Giriş aynı seansla sınırlıdır.</p>
+      <p>Stop ilk planın giriş referansından 1,5 / 2 / 2,5 ATR aşağıdadır. İşlem başına planlanan risk en çok $100 ve pozisyon en çok $2.500. Hedef dört kolda ortaktır. Stop, hedef, ters akış veya takip eden beşinci seans süre sınırı çıkışı tetikler.</p>
+      {% if v.target_note is defined and v.target_note %}<p>{{ v.target_note }}</p>{% endif %}
+      <p>Dolumlar gözlenen dayanak fiyatına göre hesaplanır. Maliyet modeli girişte ve çıkışta 5 baz puan olumsuz fiyat kayması uygular. Plan riski giriş referansından hesaplanır. Dolum fiyatına göre stop mesafesi değişebilir.</p>
+      <p>Hareket aralığı girişten sonra kaydedilen gözlemlerden hesaplanır. Çizgi (—), ilgili ölçümün bulunmadığını gösterir. Kollar aynı sinyalleri paylaşır. Sonuçlar sinyal bazlı ölçümlerdir.</p>
+      <p>Sürüm <code>{{ v.version }}</code>.</p>
+    </div>
+  </details>
+</section>
+{% endblock %}
