@@ -6,9 +6,12 @@ alternatives. Each records both clocks, the cash risk at the reference
 and at the modeled fill, sampled adverse and favorable moves, simulated
 slippage, outcome status, and each applied decision.
 
-The authenticated PAPER screen is linked from Results. It includes a ticker
-filter, paginated cases, matched deltas, +15/+60-minute SPY markouts, and
-per-case observation JSON. The screen and export read stored measurements.
+The authenticated PAPER screen is linked from Results. Its overview shows
+open cases, pending entries and exits, and incomplete observations. The
+journal supports ticker, session date and status filters. Matched comparisons
+include both signal and session counts, and +15/+60-minute SPY coverage stays
+visible on the same page. Each case exposes a chronological audit through the
+read-only JSON export.
 The experiment has its own version, schema and cursor. Observations are
 transactional. After interruption, the bounded recovery loop resumes
 after the activation cursor from completed source snapshots and labels

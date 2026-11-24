@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
+from enum import StrEnum
 from statistics import mean
 from typing import TYPE_CHECKING
 from zoneinfo import ZoneInfo
@@ -13,7 +14,7 @@ from webapp.paper_calibration.observer import Case, Markout, Observation
 from webapp.paper_calibration.settings import Settings, settings
 
 if TYPE_CHECKING:
-    from datetime import datetime
+    from datetime import date, datetime
 
     from sqlalchemy.engine import Engine
 
@@ -64,6 +65,39 @@ _REASON = {
 _FLOW = {"up": "Yukarı", "down": "Aşağı", "below_threshold": "Eşik altında", "unavailable": "Akış verisi yok"}
 
 
+class CaseFilter(StrEnum):
+    ALL = "all"
+    OPEN = "open"
+    PENDING = "pending"
+    EXIT_PENDING = "exit_pending"
+    CLOSED = "closed"
+    UNKNOWN = "unknown"
+
+
+_FILTER_LABELS = {
+    CaseFilter.ALL: "Tümü", CaseFilter.OPEN: "Açık", CaseFilter.PENDING: "Giriş bekliyor",
+    CaseFilter.EXIT_PENDING: "Çıkış fiyatı bekliyor", CaseFilter.CLOSED: "Tamamlandı",
+    CaseFilter.UNKNOWN: "Eksik ölçüm",
+}
+
+
+_POSITION_FILTERS = {
+    State.OPEN: CaseFilter.OPEN,
+    State.PENDING: CaseFilter.PENDING,
+    State.EXIT_PENDING: CaseFilter.EXIT_PENDING,
+    State.UNKNOWN: CaseFilter.UNKNOWN,
+}
+
+
+def _states(case: Case) -> frozenset[CaseFilter]:
+    states = {_POSITION_FILTERS[row.state] for row in case.positions if row.state in _POSITION_FILTERS}
+    if not case.active:
+        states.add(CaseFilter.CLOSED)
+    if any(item.state == "unknown" for item in case.markouts):
+        states.add(CaseFilter.UNKNOWN)
+    return frozenset(states)
+
+
 @dataclass(frozen=True)
 class ArmView:
     key: str
@@ -83,7 +117,9 @@ class ArmView:
     mean_mae_r: float | None
     mean_mfe_r: float | None
     paired: int
+    paired_sessions: int
     paired_delta_r: float | None
+    delta_bar_pct: float | None = None
 
 
 @dataclass(frozen=True)
@@ -178,7 +214,15 @@ class Report:
     total: int
     cohort_total: int
     sessions: int
+    open_cases: int
+    pending_cases: int
+    exit_quote_cases: int
+    unknown_cases: int
     ticker: str
+    filter_state: str
+    state_options: tuple[tuple[str, str], ...]
+    filter_day: str
+    filtered: bool
     page: int
     has_prev: bool
     has_next: bool
@@ -209,11 +253,13 @@ def _arm_view(arm: Arm, control: Arm | None, cases: tuple[Case, ...], cfg: Setti
     closed = [row for row in rows if row.state is State.CLOSED]
     pnls = [row.pnl_usd for row in closed if row.pnl_usd is not None]
     paired_delta = []
+    paired_days = set()
     if control is not None:
-        for case in per_case:
+        for source, case in zip(cases, per_case, strict=True):
             newer, older = _resolved(case[arm.key]), _resolved(case[control.key])
             if newer is not None and older is not None:
                 paired_delta.append((newer - older) / cfg.risk_usd)
+                paired_days.add(source.seed.session)
     return ArmView(
         arm.key, arm.label, arm.stop_atr, control.label if control else None,
         sum(row.entry_fill is not None for row in rows), len(closed), sum(pnl > 0 for pnl in pnls),
@@ -223,7 +269,7 @@ def _arm_view(arm: Arm, control: Arm | None, cases: tuple[Case, ...], cfg: Setti
         round(sum(pnls), 2) if pnls else None, _mean([row.net_r for row in closed if row.net_r is not None]),
         _mean([row.mae_r for row in closed if row.mae_r is not None]),
         _mean([row.mfe_r for row in closed if row.mfe_r is not None]),
-        len(paired_delta), _mean(paired_delta),
+        len(paired_delta), len(paired_days), _mean(paired_delta),
     )
 
 
@@ -237,12 +283,13 @@ def _mark_view(m: Markout) -> MarkView:
 
 def _case_view(case: Case, arms: dict[str, Arm]) -> CaseView:
     seed = case.seed
-    status = ("open" if any(row.state is State.OPEN for row in case.positions)
-              else "pending" if case.active else "resolved")
+    active_states = _states(case)
+    priority = (CaseFilter.OPEN, CaseFilter.EXIT_PENDING, CaseFilter.PENDING, CaseFilter.UNKNOWN, CaseFilter.CLOSED)
+    status = next((state for state in priority if state in active_states), None)
     return CaseView(
         seed.opportunity_id, seed.ticker, _clock(seed.published_at), seed.source_path, seed.headline,
-        seed.reference, seed.stop, seed.target, seed.chase, seed.atr, status,
-        {"open": "Açık", "pending": "İzleniyor", "resolved": "Tamamlandı"}[status],
+        seed.reference, seed.stop, seed.target, seed.chase, seed.atr, status.value if status else "tracking",
+        _FILTER_LABELS[status] if status else "Ölçüm bekliyor",
         tuple(PositionView(
             p.arm_key, arms[p.arm_key].label, p.state, _STATE[p.state], p.stop, p.target, p.quantity,
             p.planned_risk, p.fill_risk, _clock(p.entry_at), p.entry_fill, _clock(p.exit_at), p.exit_fill,
@@ -262,17 +309,37 @@ def _event_view(record: store.EventRecord, arms: dict[str, Arm]) -> EventView:
     )
 
 
-def build(engine: Engine, ticker: str, page: int, opportunity: str) -> Report:
+def build(
+    engine: Engine, ticker: str, page: int, opportunity: str,
+    *, state: CaseFilter = CaseFilter.ALL, day: date | None = None,
+) -> Report:
     cfg = settings()
     ticker = ticker.strip().upper()
     data = store.report_inputs(engine, cfg.study_key, ticker or None, page, PAGE_SIZE)
     cases = tuple(Case.model_validate_json(row.document) for row in data.all_cases)
     by_id = {case.seed.opportunity_id: case for case in cases}
+    statuses = {case.seed.opportunity_id: _states(case) for case in cases}
+    if state is CaseFilter.ALL and day is None:
+        page_rows = tuple(by_id[row.opportunity_id] for row in data.cases)
+        total = data.total
+    else:
+        filtered = tuple(case for case in cases if
+                         (not ticker or case.seed.ticker == ticker) and
+                         (day is None or case.seed.session == day) and
+                         (state is CaseFilter.ALL or state in statuses[case.seed.opportunity_id]))
+        offset = (page - 1) * PAGE_SIZE
+        page_rows, total = filtered[offset:offset + PAGE_SIZE], len(filtered)
     arms = {arm.key: arm for arm in cfg.arms}
     original = next(arm for arm in cfg.arms if not arm.confirm_entry)
     confirmed = next(arm for arm in cfg.arms if arm.confirm_entry and arm.stop_atr == original.stop_atr)
     arm_views = tuple(_arm_view(arm, None if arm == original else original if arm == confirmed else confirmed,
                                cases, cfg) for arm in cfg.arms)
+    max_delta = max((abs(a.paired_delta_r) for a in arm_views if a.paired_delta_r is not None), default=0.0)
+    arm_views = tuple(
+        replace(a, delta_bar_pct=(100 * abs(a.paired_delta_r) / max_delta if max_delta else 0.0))
+        if a.paired_delta_r is not None else a
+        for a in arm_views
+    )
     summaries = []
     for horizon in cfg.markout_minutes:
         pp = [item.relative_pp for case in cases for item in case.markouts
@@ -282,10 +349,17 @@ def build(engine: Engine, ticker: str, page: int, opportunity: str) -> Report:
     detail = _case_view(Case.model_validate_json(record.document), arms) if record is not None else None
     return Report(
         ready=data.ready, latest_at=_clock(data.latest_at), version=cfg.version,
-        total=data.total, cohort_total=len(cases), sessions=len({c.seed.session for c in cases}),
-        ticker=ticker, page=page, has_prev=page > 1, has_next=page * PAGE_SIZE < data.total,
+        total=total, cohort_total=len(cases), sessions=len({c.seed.session for c in cases}),
+        open_cases=sum(CaseFilter.OPEN in s for s in statuses.values()),
+        pending_cases=sum(CaseFilter.PENDING in s for s in statuses.values()),
+        exit_quote_cases=sum(CaseFilter.EXIT_PENDING in s for s in statuses.values()),
+        unknown_cases=sum(CaseFilter.UNKNOWN in s for s in statuses.values()),
+        ticker=ticker, filter_state=state.value,
+        state_options=tuple((key.value, label) for key, label in _FILTER_LABELS.items()),
+        filter_day=day.isoformat() if day else "", filtered=bool(ticker or day or state is not CaseFilter.ALL),
+        page=page, has_prev=page > 1, has_next=page * PAGE_SIZE < total,
         arms=arm_views, markouts=tuple(summaries),
-        cases=tuple(_case_view(by_id[row.opportunity_id], arms) for row in data.cases),
+        cases=tuple(_case_view(row, arms) for row in page_rows),
         detail=detail, events=tuple(_event_view(e, arms) for e in events[-_PAGE_EVENTS:]),
         events_truncated=len(events) > _PAGE_EVENTS, detail_missing=bool(opportunity and detail is None),
     )

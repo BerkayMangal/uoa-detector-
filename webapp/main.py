@@ -32,7 +32,7 @@ from dataclasses import asdict
 from datetime import UTC, date, datetime
 from pathlib import Path
 from time import perf_counter
-from typing import TYPE_CHECKING, Any, ParamSpec, TypeVar, cast
+from typing import TYPE_CHECKING, Any, Literal, ParamSpec, TypeVar, cast
 from urllib.parse import urlencode, urlsplit
 from zoneinfo import ZoneInfo
 
@@ -1134,10 +1134,14 @@ def live_results_page(request: Request) -> HTMLResponse:
 @app.get("/paper-kalibrasyon", response_class=HTMLResponse)
 def paper_calibration_page(
     request: Request, ticker: str = "", page: int = 1, opportunity: str = "",
+    state: paper_calibration_report.CaseFilter = paper_calibration_report.CaseFilter.ALL,
+    day: date | Literal[""] = "",
 ) -> HTMLResponse:
     if page < 1 or len(ticker) > 12 or len(opportunity) > 80:
         raise HTTPException(status_code=422, detail="Geçersiz PAPER filtresi")
-    view = paper_calibration_report.build(_board_reader().engine, ticker, page, opportunity)
+    view = paper_calibration_report.build(
+        _board_reader().engine, ticker, page, opportunity, state=state, day=day if isinstance(day, date) else None,
+    )
     return templates.TemplateResponse(request, "paper_calibration.html", {"v": view})
 
 

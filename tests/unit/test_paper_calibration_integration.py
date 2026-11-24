@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -102,7 +102,9 @@ def test_physical_scan_clock_watch_fill_paired_spy_and_stop_comparison(tmp_path:
         assert page.detail is not None and page.detail.id == OPPORTUNITY
         assert len(page.events) == 5
         assert page.arms[0].closed == 1
-        assert page.arms[1].paired == 1
+        assert page.arms[1].paired == page.arms[1].paired_sessions == 1
+        assert page.arms[0].delta_bar_pct is None
+        assert max(a.delta_bar_pct for a in page.arms if a.delta_bar_pct is not None) == pytest.approx(100)
         assert page.arms[1].paired_delta_r == pytest.approx((guard.pnl_usd - legacy.pnl_usd) / CFG.risk_usd)
         assert page.arms[2].paired_delta_r == pytest.approx((middle.pnl_usd - guard.pnl_usd) / CFG.risk_usd)
     finally:
@@ -180,6 +182,12 @@ def test_private_html_and_json_are_select_only(
         assert "Güncel AL" in detail.text
         assert detail.headers["cache-control"] == "private, no-store"
         assert client.get("/paper-kalibrasyon?page=0", headers=headers).status_code == 422
+        assert client.get("/paper-kalibrasyon?state=invalid", headers=headers).status_code == 422
+        assert client.get("/paper-kalibrasyon?day=24.11.2026", headers=headers).status_code == 422
+        assert client.get("/paper-kalibrasyon?day=&state=all", headers=headers).status_code == 200
+        filtered = client.get("/paper-kalibrasyon", params={"day": START.date(), "state": "pending"},
+                              headers=headers)
+        assert filtered.status_code == 200 and f'data-paper-case="{OPPORTUNITY}"' in filtered.text
 
         response = client.get(export, headers=headers)
         assert response.status_code == 200
@@ -233,5 +241,26 @@ def test_worker_recovers_missed_scans_after_activation_using_only_archived_obser
         ]
         assert len(spot_reads) == 3
         assert case.positions[0].fill_risk == pytest.approx(76.25)
+    finally:
+        engine.dispose()
+
+
+
+def test_dashboard_filters_case_list_and_counts_simultaneous_arm_states(tmp_path: Path) -> None:
+    engine = make_engine(f"sqlite:///{tmp_path / 'paper.db'}")
+    try:
+        observer.observe(engine, _scan(START, 100.0, spy=None), LIVE, CFG)
+        observer.observe(engine, _scan(START + timedelta(minutes=6), 100.0, signal="WATCH"), LIVE, CFG)
+        for state in (report.CaseFilter.OPEN, report.CaseFilter.PENDING, report.CaseFilter.UNKNOWN):
+            result = report.build(engine, "nvda", 1, "", state=state, day=START.date())
+            assert result.total == result.cohort_total == 1
+            assert result.open_cases == result.pending_cases == result.unknown_cases == 1
+            assert result.exit_quote_cases == 0
+            assert result.filtered and result.filter_state == state.value
+            assert result.cases[0].id == OPPORTUNITY
+        mismatch = report.build(engine, "", 1, "", state=report.CaseFilter.OPEN, day=date(2026, 11, 23))
+        assert mismatch.total == 0 and mismatch.cohort_total == 1
+        assert mismatch.cases == ()
+        assert report.build(engine, "", 1, "", state=report.CaseFilter.CLOSED).total == 0
     finally:
         engine.dispose()

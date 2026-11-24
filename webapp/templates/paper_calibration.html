@@ -1,8 +1,106 @@
 {% extends "base.html" %}
 
+{% block head %}
+<style>
+  #paper-calibration { --paper-warm:#8d4837; --paper-soft:#eef1eb; --paper-seam:#cdd6ce; }
+  #paper-calibration h2 { font-size:20px; font-weight:700; line-height:1.35; }
+  #paper-calibration .paper-masthead { align-items:flex-end; margin-bottom:14px; }
+  #paper-calibration .paper-masthead p { margin-top:8px; }
+  #paper-calibration .paper-back { font-size:13px; color:var(--accent); white-space:nowrap; }
+  #paper-calibration .paper-brief { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:16px; margin:18px 0; }
+  #paper-calibration .paper-panel { min-width:0; border:1px solid var(--line); background:var(--panel); border-radius:5px; padding:16px 18px; }
+  #paper-calibration .paper-panel-heading { display:flex; align-items:baseline; flex-wrap:wrap; justify-content:space-between; gap:4px 14px; margin-bottom:12px; }
+  #paper-calibration .paper-topline { font-size:12px; color:var(--muted); }
+  #paper-calibration .paper-states { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:6px; }
+  #paper-calibration .paper-state { min-width:0; display:block; border-radius:4px; background:var(--paper-soft); border:1px solid transparent; padding:8px 9px; font-size:12px; line-height:1.35; }
+  #paper-calibration .paper-state:hover { border-color:var(--accent); }
+  #paper-calibration .paper-state strong { display:block; font-size:23px; line-height:1.24; margin-bottom:3px; font-variant-numeric:tabular-nums; }
+  #paper-calibration .paper-state[data-status="exit_pending"], #paper-calibration .paper-state[data-status="unknown"] { background:#f5ede6; }
+  #paper-calibration .paper-state-note { margin-top:9px; font-size:12px; color:var(--muted); }
+  #paper-calibration .paper-coverage { display:grid; grid-template-columns:minmax(0,1fr) auto auto; gap:8px 12px; align-items:center; font-size:13px; }
+  #paper-calibration .paper-coverage + .paper-coverage { padding-top:8px; margin-top:8px; border-top:1px solid var(--line); }
+  #paper-calibration .paper-coverage-meter { width:min(100%,200px); display:flex; gap:7px; align-items:center; }
+  #paper-calibration .paper-coverage progress { appearance:none; flex:1 1 56px; min-width:12px; width:56px; height:5px; border:0; background:var(--paper-soft); border-radius:2px; }
+  #paper-calibration .paper-coverage progress::-webkit-progress-bar { background:var(--paper-soft); }
+  #paper-calibration .paper-coverage progress::-webkit-progress-value { background:var(--accent); }
+  #paper-calibration .paper-coverage progress::-moz-progress-bar { background:var(--accent); }
+  #paper-calibration .paper-coverage-delta { min-width:85px; text-align:right; white-space:nowrap; }
+  #paper-calibration .paper-deltas { margin:0 0 16px; }
+  #paper-calibration .paper-delta-row { display:grid; grid-template-columns:minmax(170px,1fr) minmax(120px,1.2fr) minmax(125px,.55fr); align-items:center; gap:8px 16px; padding:9px 0; border-top:1px solid var(--line); font-size:13px; }
+  #paper-calibration .paper-delta-track { position:relative; height:12px; border-radius:3px; background:var(--paper-soft); }
+  #paper-calibration .paper-delta-track::after { content:""; position:absolute; top:-2px; bottom:-2px; width:1px; left:50%; background:#66736c; }
+  #paper-calibration .paper-delta-bar { position:absolute; top:1px; bottom:1px; width:var(--delta-size); border-radius:2px; }
+  #paper-calibration .paper-delta-bar[data-sign="plus"] { left:50%; background:var(--green); }
+  #paper-calibration .paper-delta-bar[data-sign="minus"] { right:50%; background:var(--paper-warm); }
+  #paper-calibration .paper-delta-bar[data-sign="zero"] { left:50%; transform:translateX(-50%); top:1px; width:10px; height:10px; z-index:1; border-radius:50%; background:#46564e; }
+  #paper-calibration .paper-delta-empty { color:var(--muted); font-size:12px; }
+  #paper-calibration .paper-delta-value { text-align:right; }
+  #paper-calibration .paper-delta-value[data-sign="minus"] strong { color:var(--paper-warm); }
+  #paper-calibration .paper-delta-value[data-sign="plus"] strong { color:var(--green); }
+  #paper-calibration .paper-delta-value small { display:block; color:var(--muted); font-size:11px; }
+  #paper-calibration .paper-arm-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; }
+  #paper-calibration .paper-arm-card { min-width:0; border:1px solid var(--line); background:var(--panel); border-radius:5px; padding:12px 14px; }
+  #paper-calibration .paper-arm-card h3 { font-size:14px; font-weight:700; margin-bottom:7px; }
+  #paper-calibration .paper-arm-main { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:6px; margin-bottom:8px; }
+  #paper-calibration .paper-arm-main strong { display:block; font-size:18px; line-height:1.4; overflow-wrap:anywhere; font-variant-numeric:tabular-nums; }
+  #paper-calibration .paper-arm-card p { font-size:12px; }
+  #paper-calibration .paper-arm-card p + p { margin-top:4px; }
+  #paper-calibration .paper-filters { display:flex; align-items:flex-end; gap:10px; flex-wrap:wrap; margin:10px 0 14px; }
+  #paper-calibration .paper-filter-field { min-width:0; display:grid; gap:3px; font-size:12px; color:var(--muted); }
+  #paper-calibration .paper-filters input[name=ticker] { width:126px; }
+  #paper-calibration .paper-filters input, #paper-calibration .paper-filters select { font-size:14px; }
+  #paper-calibration .paper-filters .button-primary { min-height:38px; }
+  #paper-calibration .paper-filters > a { align-self:center; font-size:13px; }
+  #paper-calibration .paper-record-list { display:grid; grid-template-columns:minmax(0,1fr); gap:5px; }
+  #paper-calibration .paper-record { min-width:0; margin:0; padding:0 12px; }
+  #paper-calibration .paper-record > summary { padding:10px 0; display:grid; grid-template-columns:minmax(0,.65fr) minmax(0,1fr) minmax(0,1.1fr) minmax(0,1fr) 12px; align-items:center; gap:4px 10px; list-style:none; font-size:13px; font-weight:400; }
+  #paper-calibration .paper-record > summary::-webkit-details-marker, #paper-calibration .paper-event > summary::-webkit-details-marker { display:none; }
+  #paper-calibration .paper-record > summary strong, #paper-calibration .paper-event > summary strong { font-weight:700; color:var(--ink); }
+  #paper-calibration .paper-time { color:var(--muted); font-variant-numeric:tabular-nums; }
+  #paper-calibration .paper-chevron { justify-self:end; width:7px; height:7px; border-right:1px solid var(--accent); border-bottom:1px solid var(--accent); transform:rotate(45deg); margin-right:2px; }
+  #paper-calibration details[open] > summary .paper-chevron { transform:rotate(225deg); }
+  #paper-calibration .paper-record-body { padding-bottom:13px; }
+  #paper-calibration .paper-positions { min-width:0; }
+  #paper-calibration .paper-cell-label { display:none; }
+  #paper-calibration .paper-events { display:grid; gap:4px; }
+  #paper-calibration .paper-event { border:1px solid var(--line); background:var(--panel); border-radius:4px; }
+  #paper-calibration .paper-event > summary { display:grid; align-items:center; grid-template-columns:minmax(0,1.1fr) minmax(0,1fr) minmax(0,.55fr) minmax(0,1.1fr) 12px; gap:4px 10px; list-style:none; padding:8px 11px; }
+  #paper-calibration .paper-event[data-changed="true"] { border-left:2px solid var(--accent); }
+  #paper-calibration .paper-event-body { padding:10px 11px; border-top:1px solid var(--line); display:grid; grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr); gap:12px; }
+  #paper-calibration .paper-event-body li + li { margin-top:7px; }
+  #paper-calibration .paper-event-body b { font-size:13px; }
+  #paper-calibration .paper-event-body dt, #paper-calibration .paper-event-body dd { display:inline; }
+  @media (max-width:980px) {
+    #paper-calibration .paper-arm-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  }
+  @media (max-width:720px) {
+    #paper-calibration .paper-brief { grid-template-columns:1fr; gap:8px; }
+    #paper-calibration .paper-panel { padding:11px 12px; }
+    #paper-calibration .paper-delta-row { grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:7px 10px; }
+    #paper-calibration .paper-delta-track, #paper-calibration .paper-delta-empty { grid-column:2; grid-row:2; }
+    #paper-calibration .paper-delta-value { grid-row:1; grid-column:2; }
+    #paper-calibration .paper-record > summary, #paper-calibration .paper-event > summary { grid-template-columns:minmax(0,1fr) minmax(0,1fr) 12px; }
+    #paper-calibration .paper-record > summary .paper-chevron, #paper-calibration .paper-event > summary .paper-chevron { grid-column:3; grid-row:1/span 2; align-self:center; }
+    #paper-calibration .paper-event-body { grid-template-columns:1fr; }
+    #paper-calibration .paper-positions table, #paper-calibration .paper-positions tbody { display:block; }
+    #paper-calibration .paper-positions thead { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
+    #paper-calibration .paper-positions tr { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); padding:8px 9px; gap:6px 9px; }
+    #paper-calibration .paper-positions td { display:block; padding:0; min-width:0; white-space:normal; overflow-wrap:anywhere; }
+    #paper-calibration .paper-positions td:first-child, #paper-calibration .paper-positions td:last-child { grid-column:1/-1; }
+    #paper-calibration .paper-cell-label { display:block; font-size:11px; color:var(--muted); }
+  }
+  @media (max-width:400px) {
+    #paper-calibration .paper-state { padding-inline:6px; }
+    #paper-calibration .paper-arm-card { padding-inline:9px; }
+    #paper-calibration .paper-arm-main { grid-template-columns:minmax(0,1fr); }
+    #paper-calibration .paper-events summary { font-size:12px; }
+  }
+</style>
+{% endblock %}
+
 {% macro number(value, places=2, signed=false) -%}
   {%- if value is number -%}
-    {{ ('%+.*f' if signed else '%.*f') | format(places, value) | replace('.', ',') | replace('-', '−') }}
+    {{ ('%+.*f' if signed and value != 0 else '%.*f') | format(places, value) | replace('.', ',') | replace('-', '−') }}
   {%- else -%}—{%- endif -%}
 {%- endmacro %}
 
@@ -13,11 +111,15 @@
 {%- endmacro %}
 
 {% macro metric(value, unit) -%}
-  {{ number(value, signed=true) }}{% if value is number %} {{ unit }}{% endif %}
+  {%- if value is number and 0 < value | abs < 0.005 -%}
+    {{ '−' if value < 0 else '+' }}‹0,01 {{ unit }}
+  {%- else -%}
+    {{ number(value, signed=true) }}{% if value is number %} {{ unit }}{% endif %}
+  {%- endif -%}
 {%- endmacro %}
 
-{% macro case_url(id, v) -%}
-  /paper-kalibrasyon?ticker={{ v.ticker | urlencode }}&amp;page={{ v.page }}&amp;opportunity={{ id | urlencode }}#paper-detail
+{% macro records_url(v, page, id=none) -%}
+  /paper-kalibrasyon?ticker={{ v.ticker | urlencode }}&amp;state={{ v.filter_state | urlencode }}&amp;day={{ v.filter_day | urlencode }}&amp;page={{ page }}{% if id %}&amp;opportunity={{ id | urlencode }}#paper-detail{% else %}#paper-records{% endif %}
 {%- endmacro %}
 
 {% set paths = {'P1_news_continuation': 'Haber ve akış', 'P2_market_relative_flow': 'SPY gücü ve akış', 'P3_pullback_entry': 'Geri çekilme'} %}
@@ -30,22 +132,22 @@
     <div><dt>ATR · 14 seans</dt><dd>{{ usd(case.atr) }}</dd></div>
   </dl>
   <p class="quiet-copy">Giriş fiyatı üst sınırı {{ usd(case.chase) }}.</p>
-  <div class="overflow-x-auto mt-3" role="region" aria-label="{{ case.ticker }} PAPER girişleri ve çıkışları" tabindex="0">
-    <table class="w-full text-sm">
-      <thead><tr><th scope="col">Kol / durum</th><th scope="col">Stop / hedef</th><th scope="col">Adet / plan riski</th><th scope="col">Giriş</th><th scope="col">Çıkış</th><th scope="col">Net</th><th scope="col">Hareket aralığı</th></tr></thead>
-      <tbody>
+  <div class="paper-positions overflow-x-auto mt-3" role="region" aria-label="{{ case.ticker }} PAPER girişleri ve çıkışları" tabindex="0">
+    <table class="w-full text-sm" role="table">
+      <thead role="rowgroup"><tr role="row"><th role="columnheader" scope="col">Kol / durum</th><th role="columnheader" scope="col">Stop / hedef</th><th role="columnheader" scope="col">Adet / plan riski</th><th role="columnheader" scope="col">Giriş</th><th role="columnheader" scope="col">Çıkış</th><th role="columnheader" scope="col">Net</th><th role="columnheader" scope="col">Hareket aralığı</th></tr></thead>
+      <tbody role="rowgroup">
       {% for p in case.positions %}
-        <tr class="border-t" data-paper-arm="{{ p.arm }}" data-paper-state="{{ p.state }}">
-          <td class="whitespace-nowrap"><b>{{ p.label }}</b><small class="block quiet-copy">{{ p.state_label }}</small></td>
-          <td class="whitespace-nowrap">{{ usd(p.stop) }} / {{ usd(p.target) }}</td>
-          <td class="whitespace-nowrap">{{ p.quantity if p.quantity is number else '—' }} / {{ usd(p.planned_risk) }}{% if p.fill_risk is number %}<small class="block quiet-copy">Dolumdan stopa {{ usd(p.fill_risk) }}</small>{% endif %}</td>
-          <td>{{ usd(p.entry_price, 4) }}{% if p.entry_at %}<small class="block quiet-copy">{{ p.entry_at }}</small>{% endif %}</td>
-          <td>{{ usd(p.exit_price, 4) }}{% if p.exit_at %}<small class="block quiet-copy">{{ p.exit_at }}</small>{% endif %}{% if p.exit_reason %}<small class="block quiet-copy">{{ p.exit_reason }}</small>{% endif %}</td>
-          <td><b>{{ usd(p.pnl, signed=true) }}</b><small class="block quiet-copy">{{ metric(p.net_r, 'R') }}</small></td>
-          <td>
-            <span class="block">Ters {{ metric(p.mae_r, 'R') }}</span>
-            <span class="block">Lehte {{ metric(p.mfe_r, 'R') }}</span>
-            {% if p.last_price is number %}<small class="block quiet-copy">Son gözlem {{ usd(p.last_price, 4) }}</small>{% endif %}
+        <tr class="border-t" role="row" data-paper-arm="{{ p.arm }}" data-paper-state="{{ p.state }}">
+          <td role="cell" class="whitespace-nowrap"><b>{{ p.label }}</b><small class="block quiet-copy">{{ p.state_label }}</small></td>
+          <td role="cell" class="whitespace-nowrap"><span class="paper-cell-label" aria-hidden="true">Stop / hedef</span>{{ usd(p.stop) }} / {{ usd(p.target) }}</td>
+          <td role="cell" class="whitespace-nowrap"><span class="paper-cell-label" aria-hidden="true">Adet / plan riski</span>{{ p.quantity if p.quantity is number else '—' }} / {{ usd(p.planned_risk) }}{% if p.fill_risk is number %}<small class="block quiet-copy">Dolumdan stopa {{ usd(p.fill_risk) }}</small>{% endif %}</td>
+          <td role="cell"><span class="paper-cell-label" aria-hidden="true">Giriş</span>{{ usd(p.entry_price, 4) }}{% if p.entry_at %}<small class="block quiet-copy">{{ p.entry_at }}</small>{% endif %}</td>
+          <td role="cell"><span class="paper-cell-label" aria-hidden="true">Çıkış</span>{{ usd(p.exit_price, 4) }}{% if p.exit_at %}<small class="block quiet-copy">{{ p.exit_at }}</small>{% endif %}{% if p.exit_reason %}<small class="block quiet-copy">{{ p.exit_reason }}</small>{% endif %}</td>
+          <td role="cell"><span class="paper-cell-label" aria-hidden="true">Net</span><b>{{ usd(p.pnl, signed=true) }}</b>{% if p.net_r is number %}<small class="block quiet-copy">{{ metric(p.net_r, 'R') }}</small>{% endif %}</td>
+          <td role="cell">
+            <span class="paper-cell-label" aria-hidden="true">Hareket aralığı</span>
+            <span>Ters {{ metric(p.mae_r, 'R') }} · Lehte {{ metric(p.mfe_r, 'R') }}</span>
+            {% if p.last_price is number %}<small class="block quiet-copy">Son gözlem {{ usd(p.last_price, 4) }}{% if p.last_at is defined and p.last_at %} · {{ p.last_at }}{% endif %}</small>{% endif %}
           </td>
         </tr>
       {% else %}
@@ -73,69 +175,95 @@
 
 {% block content %}
 <section id="paper-calibration" aria-labelledby="paper-title" data-paper-ready="{{ 'true' if v.ready else 'false' }}">
-  <div class="desk-heading">
-    <h1 id="paper-title">PAPER kalibrasyonu</h1>
-    <a href="/sonuclar">Live Alpha geçmişi →</a>
+  <div class="desk-heading paper-masthead">
+    <div>
+      <h1 id="paper-title">PAPER kalibrasyonu</h1>
+      <p class="quiet-copy">Hisse simülasyonu · Giriş teyidi ve stop karşılaştırması</p>
+    </div>
+    <a class="paper-back" href="/sonuclar">Live Alpha geçmişi →</a>
   </div>
-  <p class="quiet-copy">Aynı hisse sinyalinin dört PAPER kolundaki giriş teyidi ve stop sonuçları. Saatler Londra.</p>
 
-  <div class="desk-overview" aria-label="PAPER ölçüm kapsamı">
-    <div class="overview-item"><span>Sinyal</span><b>{{ v.cohort_total }}</b></div>
-    <div class="overview-item"><span>Sinyal seansı</span><b>{{ v.sessions }}</b></div>
-    <div class="overview-item"><span>Son kaydedilen tarama</span><b>{{ v.latest_at or '—' }}</b></div>
-    {% if not v.ready %}<p class="overview-note">Ölçüm deposu henüz hazır değil.</p>{% endif %}
+  <div class="paper-brief">
+    <section class="paper-panel" aria-labelledby="paper-ops-title">
+      <div class="paper-panel-heading"><h2 id="paper-ops-title">İşlem durumu</h2><span class="paper-topline">{{ v.cohort_total }} sinyal · {{ v.sessions }} seans</span></div>
+      <div class="paper-states" aria-label="Durumlara göre sinyal kayıtları">
+        {% for state, label, count in [('open', 'Açık', v.open_cases), ('pending', 'Giriş bekliyor', v.pending_cases), ('exit_pending', 'Çıkış fiyatı bekliyor', v.exit_quote_cases), ('unknown', 'Eksik ölçüm', v.unknown_cases)] %}
+        <a class="paper-state" data-status="{{ state }}" href="/paper-kalibrasyon?state={{ state }}#paper-records"><strong>{{ count }}</strong>{{ label }}</a>
+        {% endfor %}
+      </div>
+      <p class="paper-state-note">
+        {% if not v.ready %}Ölçüm deposu hazırlanıyor.{% elif v.latest_at %}Son tarama {{ v.latest_at }} (Londra).{% else %}İlk tarama kaydı bekleniyor.{% endif %}
+        {% if v.cohort_total %}Bir sinyal birden fazla durumda olabilir.{% endif %}
+      </p>
+    </section>
+    <section id="paper-signal-results" class="paper-panel" aria-labelledby="paper-signal-title">
+      <div class="paper-panel-heading"><h2 id="paper-signal-title">Sinyalden sonra SPY farkı</h2><span class="paper-topline">Ölçülen / toplam</span></div>
+      {% for m in v.markouts %}
+      <div class="paper-coverage">
+        <b>{{ m.label }}</b>
+        <span class="paper-coverage-meter">
+          {% if m.total %}<progress value="{{ m.priced }}" max="{{ m.total }}" aria-label="{{ m.label }} eşleşen fiyat kapsamı"></progress>{% endif %}
+          <span class="whitespace-nowrap">{{ m.priced }} / {{ m.total }}</span>
+        </span>
+        <span class="paper-coverage-delta"><b>{{ metric(m.mean_pp, 'yp') }}</b>{% if m.priced %}<small class="block">{{ m.positive }} SPY üstü</small>{% endif %}</span>
+      </div>
+      {% else %}<p class="quiet-copy">Hisse ve SPY fiyat eşleşmesi bekleniyor.</p>{% endfor %}
+      <p class="paper-state-note">Hisse getirisi eksi SPY getirisi. Ölçüm sinyal anından başlar.</p>
+    </section>
   </div>
 
   <nav class="desk-jump-nav" aria-label="PAPER ekranı bölümleri">
-    <a href="#paper-performance">Kol sonuçları</a>
-    <a href="#paper-signal-results">SPY ölçümleri</a>
+    <a href="#paper-performance">Karşılaştırma</a>
     <a href="#paper-records">İşlem kayıtları</a>
     <a href="#paper-method">Ölçüm kuralları</a>
   </nav>
 
   <section id="paper-performance" aria-labelledby="paper-performance-title">
     <div class="section-heading"><h2 id="paper-performance-title">Kol sonuçları</h2></div>
-    <div class="overflow-x-auto" role="region" aria-label="Dört PAPER kolunun sonuçları" tabindex="0">
-      <table class="w-full text-sm">
-        <thead><tr><th scope="col">Giriş kuralı / stop</th><th scope="col">İşlemler</th><th scope="col">Toplam net</th><th scope="col">Ortalama net R</th><th scope="col">Ortalama ters / lehte</th><th scope="col">Kontrole göre fark</th></tr></thead>
-        <tbody>
-          {% for a in v.arms %}
-          <tr class="border-t" data-paper-summary-arm="{{ a.key }}" data-stop-atr="{{ a.stop_atr }}">
-            <td class="whitespace-nowrap"><b>{{ a.label }}</b>{% if not a.control %}<small class="block quiet-copy">İlk AL kontrolü</small>{% endif %}</td>
-            <td class="whitespace-nowrap">{{ a.closed }} kapanan · {{ a.wins }} kazanan<small class="block quiet-copy">{{ a.open }} açık · {{ a.pending }} giriş bekleyen</small><small class="block quiet-copy">{{ a.exit_pending }} çıkış bekleyen · {{ a.unfilled }} dolmayan · {{ a.unknown }} belirsiz</small></td>
-            <td class="whitespace-nowrap"><b>{{ usd(a.net, signed=true) }}</b></td>
-            <td class="whitespace-nowrap">{{ metric(a.mean_r, 'R') }}</td>
-            <td class="whitespace-nowrap">{{ metric(a.mean_mae_r, 'R') }} / {{ metric(a.mean_mfe_r, 'R') }}</td>
-            <td>{% if a.control %}{{ metric(a.paired_delta_r, 'R') }}<small class="block quiet-copy">{{ a.paired }} eşleşen sinyal · {{ a.control }}</small>{% else %}—{% endif %}</td>
-          </tr>
-          {% else %}
-          <tr><td colspan="6" class="empty-row">Kol ölçümleri bekleniyor.</td></tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-    <p class="quiet-copy mt-2">Net getiri kayma sonrasıdır. Ortalama net R, kapanan işlemin sonucu ile planlanan dolar riski arasındaki orandır. Kontrol farkında aynı sinyal eşlenir ve her $100 bütçe 1 R sayılır. Girişsiz kolda nakitte kalmanın getirisi sıfır, fiyatı eksik sonuç ise belirsizdir.</p>
-  </section>
+    <section class="paper-panel paper-deltas" aria-labelledby="paper-deltas-title">
+      <div class="paper-panel-heading"><h3 id="paper-deltas-title" class="font-semibold">Eşleşen sinyal başına net fark</h3><span class="paper-topline">$100 risk bütçesi = 1 R</span></div>
+      {% for a in v.arms if a.control %}
+      {% set delta = a.paired_delta_r %}
+      {% set sign = 'plus' if delta is number and delta > 0 else 'minus' if delta is number and delta < 0 else 'zero' if delta is number else 'missing' %}
+      <div class="paper-delta-row" data-paper-delta="{{ a.key }}" data-sign="{{ sign }}">
+        <div><b>{{ a.label }}</b><small class="block paper-topline">Referans {{ a.control }}</small></div>
+        {% if delta is number %}
+        <div class="paper-delta-track" aria-hidden="true"><span class="paper-delta-bar" data-sign="{{ sign }}"{% if a.delta_bar_pct is number %} style="--delta-size:{{ '%.3f' | format(a.delta_bar_pct / 2) }}%"{% endif %}></span></div>
+        {% else %}<span class="paper-delta-empty">Eşleşme bekliyor</span>{% endif %}
+        <div class="paper-delta-value" data-sign="{{ sign }}"><strong>{{ metric(delta, 'R') }}</strong><small>{{ a.paired }} sinyal · {{ a.paired_sessions }} seans</small></div>
+      </div>
+      {% endfor %}
+      <p class="paper-state-note">Çubuklar sıfırdan başlar ve en büyük mutlak farka göre ölçeklenir. Eşleşen iki sonucun da tamamlanması gerekir. Dolmayan kolda sonuç nakitte kalınan sıfır getiridir.</p>
+    </section>
 
-  <section id="paper-signal-results" aria-labelledby="paper-signal-title">
-    <div class="section-heading"><h2 id="paper-signal-title">Sinyalden sonra SPY farkı</h2></div>
-    <div class="overflow-x-auto" role="region" aria-label="Sinyal bazında SPY ölçüm kapsamı" tabindex="0">
-      <table class="w-full text-sm">
-        <thead><tr><th scope="col">Ölçüm ufku</th><th scope="col">Fiyatı eşleşen / toplam</th><th scope="col">SPY üstünde</th><th scope="col">Ortalama fark</th></tr></thead>
-        <tbody>
-        {% for m in v.markouts %}<tr class="border-t"><td><b>{{ m.label }}</b></td><td>{{ m.priced }} / {{ m.total }}</td><td>{{ m.positive }}</td><td>{{ metric(m.mean_pp, 'yp') }}</td></tr>
-        {% else %}<tr><td colspan="4" class="empty-row">Eşleşmiş hisse ve SPY fiyatı bekleniyor.</td></tr>{% endfor %}
-        </tbody>
-      </table>
+    <div class="paper-arm-grid" aria-label="Dört PAPER kolunun sonuçları">
+      {% for a in v.arms %}
+      <article class="paper-arm-card" data-paper-summary-arm="{{ a.key }}" data-stop-atr="{{ a.stop_atr }}">
+        <h3>{{ a.label }}</h3>
+        <div class="paper-arm-main">
+          <div><span class="paper-topline">Toplam net</span><strong>{{ usd(a.net, signed=true) }}</strong></div>
+          <div><span class="paper-topline">Ortalama net R</span><strong>{{ metric(a.mean_r, 'R') }}</strong></div>
+        </div>
+        <p>{{ a.closed }} kapanan · {{ a.wins }} kazanan · {{ a.open }} açık</p>
+        <p class="paper-topline">{{ a.pending }} giriş bekliyor · {{ a.exit_pending }} çıkış bekliyor</p>
+        <p class="paper-topline">{{ a.filled }} dolan · {{ a.unfilled }} dolmayan · {{ a.unknown }} belirsiz</p>
+        <p class="paper-topline">Ortalama ters {{ metric(a.mean_mae_r, 'R') }} · lehte {{ metric(a.mean_mfe_r, 'R') }}</p>
+      </article>
+      {% else %}<p class="quiet-copy">Kol ölçümleri bekleniyor.</p>{% endfor %}
     </div>
-    <p class="quiet-copy mt-2">Hisse getirisi eksi aynı aralıktaki SPY getirisi, yüzde puan (yp). Ölçüm sinyalden başlar ve PAPER dolumu beklemez.</p>
+    <p class="quiet-copy mt-2">Toplam ve ortalama net sonuç kayma sonrasıdır. İşlem başına net R, o işlemin plan riskiyle hesaplanır.</p>
   </section>
 
   <section id="paper-records" aria-labelledby="paper-records-title">
     <div class="section-heading"><h2 id="paper-records-title">İşlem kayıtları</h2><span>{{ v.total }} sinyal</span></div>
-    <form method="get" action="/paper-kalibrasyon" class="table-tools">
-      <div class="flex flex-wrap items-center gap-2"><label for="paper-ticker">Hisse</label><input id="paper-ticker" name="ticker" value="{{ v.ticker }}" placeholder="Örn. NVDA" maxlength="12" autocomplete="off"><button class="button-primary" type="submit">Filtrele</button></div>
-      {% if v.ticker %}<a class="underline" href="/paper-kalibrasyon#paper-records">Tüm hisseler</a>{% endif %}
+    <form method="get" action="/paper-kalibrasyon#paper-records" class="paper-filters">
+      <div class="paper-filter-field"><label for="paper-ticker">Hisse</label><input id="paper-ticker" name="ticker" value="{{ v.ticker }}" placeholder="Örn. NVDA" maxlength="12" autocomplete="off"></div>
+      <div class="paper-filter-field"><label for="paper-state">Durum</label><select id="paper-state" name="state">
+        {% for value, label in v.state_options %}<option value="{{ value }}"{% if value == v.filter_state %} selected{% endif %}>{{ label }}</option>{% endfor %}
+      </select></div>
+      <div class="paper-filter-field"><label for="paper-day">Seans tarihi</label><input id="paper-day" type="date" name="day" value="{{ v.filter_day }}"></div>
+      <button class="button-primary" type="submit">Filtrele</button>
+      {% if v.filtered %}<a class="underline" href="/paper-kalibrasyon#paper-records">Filtreyi kaldır</a>{% endif %}
     </form>
 
     {% if v.detail_missing %}<p class="desk-notice" role="status">Bu sinyalin PAPER kaydı bulunamadı.</p>{% endif %}
@@ -146,41 +274,52 @@
       {% if case.headline %}<p class="quiet-copy">{{ case.headline }}</p>{% endif %}
       {{ plans(case) }}
       <div class="section-heading"><h3 class="font-semibold">Tarama ve işlem olayları</h3><a href="/api/paper-kalibrasyon/{{ case.id | urlencode }}">JSON kaydını aç →</a></div>
-      {% if v.events_truncated %}<p class="quiet-copy mb-2">Ekran, olay günlüğünün yalnızca son bölümünü gösteriyor.</p>{% endif %}
-      <div class="overflow-x-auto" role="region" aria-label="{{ case.ticker }} tarama ve işlem olayları" tabindex="0">
-        <table class="w-full text-sm">
-          <thead><tr><th scope="col">Tarama</th><th scope="col">Giriş ve akış</th><th scope="col">Gözlenen fiyatlar</th><th scope="col">Kol / olay</th></tr></thead>
-          <tbody>
-          {% for e in v.events %}
-          <tr class="border-t" data-paper-event="{{ e.scan_id }}">
-            <td><b>{{ e.at }}</b>{% if e.recovered %}<small class="block quiet-copy">Arşivden tamamlandı</small>{% endif %}<small class="block break-all quiet-copy">{{ e.scan_id }}</small></td>
-            <td>{{ e.entry_check }}<small class="block quiet-copy">Akış {{ e.flow }}</small></td>
-            <td>Hisse {{ usd(e.quote_price, 4) }}<br>SPY {{ usd(e.spy_price, 4) }}{% if e.quote_at %}<small class="block quiet-copy">{{ e.quote_at }}</small>{% endif %}</td>
-            <td><ul>{% for a in e.actions %}<li><b>{{ a.label }} · {{ a.action }}</b>{% if a.reason %}<small class="block quiet-copy">{{ a.reason }}</small>{% endif %}</li>{% else %}<li class="quiet-copy">Karar değişikliği yok.</li>{% endfor %}</ul></td>
-          </tr>
-          {% else %}<tr><td colspan="4" class="empty-row">Bu sinyalin tarama olayları bekleniyor.</td></tr>{% endfor %}
-          </tbody>
-        </table>
-      </div>
+      {% if v.events_truncated %}<p class="quiet-copy mb-2">Son {{ v.events | length }} tarama görüntüleniyor.</p>{% endif %}
+      <ol class="paper-events" aria-label="{{ case.ticker }} tarama ve işlem olayları, yeniden eskiye">
+        {% for e in v.events | reverse %}
+        {% set changes = e.actions | map(attribute='action') | select('in', ['Giriş', 'Çıkış', 'Çıkış bekliyor', 'Dolmadı', 'Belirsiz']) | unique | list %}
+        <li>
+          <details class="paper-event" data-paper-event="{{ e.scan_id }}" data-changed="{{ 'true' if changes else 'false' }}">
+            <summary>
+              <span class="paper-time">{{ e.at or '—' }}</span><strong>{{ changes | join(' · ') if changes else 'Tarama' }}</strong><span>{{ usd(e.quote_price) }}</span><span>{{ e.entry_check }}</span><span class="paper-chevron" aria-hidden="true"></span>
+            </summary>
+            <div class="paper-event-body">
+              <dl class="quiet-copy">
+                <div><dt class="font-semibold">Akış</dt> <dd>{{ e.flow }}</dd></div>
+                <div><dt class="font-semibold">Hisse</dt> <dd>{{ usd(e.quote_price, 4) }}{% if e.quote_at %} · {{ e.quote_at }}{% endif %}</dd></div>
+                <div><dt class="font-semibold">SPY</dt> <dd>{{ usd(e.spy_price, 4) }}</dd></div>
+                {% if e.recovered %}<div>Arşivden tamamlandı</div>{% endif %}
+                <div><dt class="font-semibold">Tarama kimliği</dt> <dd class="break-all">{{ e.scan_id }}</dd></div>
+              </dl>
+              <ul>{% for a in e.actions %}<li><b>{{ a.label }} · {{ a.action }}</b>{% if a.reason %}<small class="block quiet-copy">{{ a.reason }}</small>{% endif %}</li>{% else %}<li class="quiet-copy">Bu taramada yeni kol olayı yok.</li>{% endfor %}</ul>
+            </div>
+          </details>
+        </li>
+        {% else %}<li class="quiet-copy">Bu sinyalin tarama olayları bekleniyor.</li>{% endfor %}
+      </ol>
     </article>
     {% endif %}
 
-    {% for case in v.cases %}
-    <details class="fold-panel" data-paper-case="{{ case.id }}">
-      <summary><b>{{ case.ticker }}</b> · {{ case.published_at }} · {{ case.state_label }}{% if case.source_path %} · {{ paths.get(case.source_path, case.source_path) }}{% endif %}</summary>
-      {% if case.headline %}<p class="quiet-copy">{{ case.headline }}</p>{% endif %}
-      {{ plans(case) }}
-      <p class="mt-3 text-sm"><a class="underline" href="{{ case_url(case.id, v) }}">{{ case.ticker }} tarama ve işlem günlüğünü aç →</a></p>
-    </details>
-    {% else %}
-    <p class="desk-notice" role="status">{% if v.ticker %}{{ v.ticker }} için bu sayfada kayıt yok.{% else %}İlk uygun sinyal kaydedildiğinde burada görünecek.{% endif %}</p>
-    {% endfor %}
+    <div class="paper-record-list" aria-label="{{ v.total }} PAPER sinyali">
+      {% for case in v.cases %}
+      <details class="fold-panel paper-record" data-paper-case="{{ case.id }}">
+        <summary><strong>{{ case.ticker }}</strong><span>{{ case.state_label }}</span><span class="paper-time">{{ case.published_at }}</span><span>{{ paths.get(case.source_path, case.source_path) }}</span><span class="paper-chevron" aria-hidden="true"></span></summary>
+        <div class="paper-record-body">
+          {% if case.headline %}<p class="quiet-copy">{{ case.headline }}</p>{% endif %}
+          {{ plans(case) }}
+          <p class="mt-3 text-sm"><a class="underline" href="{{ records_url(v, v.page, case.id) }}">{{ case.ticker }} tarama ve işlem günlüğünü aç →</a></p>
+        </div>
+      </details>
+      {% else %}
+      <p class="desk-notice" role="status">{% if v.filtered %}Bu filtreye uyan kayıt yok.{% else %}İlk uygun sinyal kaydedildiğinde burada görünecek.{% endif %}</p>
+      {% endfor %}
+    </div>
 
     {% if v.has_prev or v.has_next %}
     <nav class="desk-jump-nav" aria-label="PAPER kayıt sayfaları">
-      {% if v.has_prev %}<a rel="prev" href="/paper-kalibrasyon?ticker={{ v.ticker | urlencode }}&amp;page={{ v.page - 1 }}#paper-records">← Daha yeni</a>{% endif %}
+      {% if v.has_prev %}<a rel="prev" href="{{ records_url(v, v.page - 1) }}">← Daha yeni</a>{% endif %}
       <span>Sayfa {{ v.page }}</span>
-      {% if v.has_next %}<a rel="next" href="/paper-kalibrasyon?ticker={{ v.ticker | urlencode }}&amp;page={{ v.page + 1 }}#paper-records">Daha eski →</a>{% endif %}
+      {% if v.has_next %}<a rel="next" href="{{ records_url(v, v.page + 1) }}">Daha eski →</a>{% endif %}
     </nav>
     {% endif %}
   </section>
