@@ -23,6 +23,7 @@ from webapp.live_alpha import inputs
 from webapp.live_alpha.store import LiveScan, ScanRow
 from webapp.paper_calibration import store
 from webapp.paper_calibration.model import Position, Quote, Seed, State, Tick, advance, start
+from webapp.paper_calibration.reference import Mark, Pair, Reference, advance_reference
 from webapp.paper_calibration.settings import Settings, settings
 
 if TYPE_CHECKING:
@@ -88,11 +89,6 @@ class SourcePrice(BaseModel):
     session: date | None
 
 
-class Pair(_Frozen):
-    stock: Quote
-    spy: Quote
-
-
 class Markout(_Frozen):
     minutes: int
     state: Literal["pending", "priced", "unknown"] = "pending"
@@ -109,10 +105,15 @@ class Case(_Frozen):
     initial_pair: Pair | None
     positions: tuple[Position, ...]
     markouts: tuple[Markout, ...]
+    reference: Reference | None = None
 
     @property
     def active(self) -> bool:
-        return any(p.state in _ACTIVE for p in self.positions) or any(m.state == "pending" for m in self.markouts)
+        return (
+            any(p.state in _ACTIVE for p in self.positions)
+            or any(m.state == "pending" for m in self.markouts)
+            or (self.reference is not None and self.reference.pending)
+        )
 
     def record(self) -> store.CaseRecord:
         return store.CaseRecord(
@@ -144,6 +145,7 @@ class Observation(_Frozen):
     opposite_flow: bool
     actions: tuple[Action, ...]
     markouts: tuple[Markout, ...]
+    reference: Reference | None = None
 
 
 def _pair(stock: Quote | None, spy: Quote | None, cfg: Settings) -> Pair | None:
@@ -291,6 +293,7 @@ def _event(scan: SourceScan, case: Case, quote: Quote | None, spy: Quote | None,
         quote_source=(("source_scan" if case.seed.ticker in scan.row.snapshot.get("price_observations", {})
                        else "stored_spot") if quote is not None else None),
         flow_state=flow, opposite_flow=flow == "down", actions=actions, markouts=case.markouts,
+        reference=case.reference,
     )
     return store.EventRecord(
         opportunity_id=case.seed.opportunity_id, scan_id=scan.row.scan_id, at=scan.at,
@@ -319,7 +322,13 @@ def _advance(scan: SourceScan, case: Case, session: Session, quote: Quote | None
             actions.append(Action(arm=arm.key, action=step.action, reason=step.reason))
     pair = _pair(quote, spy, cfg)
     markouts = tuple(_markout(m, case, pair, cfg, scan.at, scan.live) for m in case.markouts)
-    updated = case.model_copy(update={"positions": tuple(positions), "markouts": markouts})
+    reference = case.reference
+    if reference is not None and reference.pending:
+        mark = Mark(pair=pair, scan_id=scan.row.scan_id, observed_at=scan.at,
+                    recovered=scan.recovered) if pair is not None and scan.market_open else None
+        reference = advance_reference(reference, case.seed, cfg, scan.live.calendar, scan.at, mark)
+    updated = case.model_copy(update={"positions": tuple(positions), "markouts": markouts,
+                                      "reference": reference})
     return updated, _event(scan, updated, quote, spy, flow, tuple(actions))
 
 
@@ -363,8 +372,12 @@ def observe(
             pair = _pair(quote, spy, cfg)
             positions = tuple(start(seed, arm, cfg) for arm in cfg.arms)
             markouts = tuple(Markout(minutes=minutes) for minutes in cfg.markout_minutes)
+            reference = None
+            if seed.ticker != cfg.benchmark:
+                reference = (Reference(state="unknown", reason="reference_late_enrollment") if scan.recovered
+                             else advance_reference(Reference(), seed, cfg, live.calendar, scan.at, None))
             case = Case(seed=seed, source=card, source_started_at=row.started_at,
-                        initial_pair=pair, positions=positions, markouts=markouts)
+                        initial_pair=pair, positions=positions, markouts=markouts, reference=reference)
             if pair is None:
                 case = case.model_copy(update={"markouts": tuple(
                     m.model_copy(update={"state": "unknown", "reason": "reference_missing"}) for m in markouts

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+from dataclasses import replace
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
@@ -14,6 +16,7 @@ from webapp.board.db import make_engine
 from webapp.live_alpha.store import ScanRow
 from webapp.paper_calibration import observer, report, store
 from webapp.paper_calibration.model import State
+from webapp.paper_calibration.reference import Mark, Pair, Reference, advance_reference
 from webapp.paper_calibration.settings import settings
 
 from tests.unit._webapp_auth import set_web_auth
@@ -34,6 +37,7 @@ def _scan(
     profile_sha: str = LIVE.profile_sha256,
     flow_current: bool = True,
     source_shift: timedelta = timedelta(seconds=-1),
+    path: str = "P1_news_continuation",
 ) -> ScanRow:
     when = (started + source_shift).isoformat()
     ready = signal == "BUY"
@@ -44,7 +48,7 @@ def _scan(
         "cards": [{
             "opportunity_id": OPPORTUNITY, "ticker": "NVDA", "direction": "up", "recommendation": signal,
             "readiness": "READY" if ready else "INVALID", "rec_id": "r1" if ready else "r2",
-            "path": "P1_news_continuation", "headline": "NVDA fiyat teyidi",
+            "path": path, "headline": "NVDA fiyat teyidi",
             "decision_as_of": started.isoformat(), "policy_version": LIVE.policy_version,
             "profile_sha256": profile_sha, "instrument": {"preferred": "stock" if ready else "none"},
             "stock_plan": {"entry_ref": 100, "stop": 97, "target": 106, "chase_limit": 103, "shares": 25},
@@ -262,5 +266,120 @@ def test_dashboard_filters_case_list_and_counts_simultaneous_arm_states(tmp_path
         assert mismatch.total == 0 and mismatch.cohort_total == 1
         assert mismatch.cases == ()
         assert report.build(engine, "", 1, "", state=report.CaseFilter.CLOSED).total == 0
+    finally:
+        engine.dispose()
+
+
+P2 = "P2_market_relative_flow"
+
+
+def _two_stocks(at: datetime, nvda: float, aapl: float, *, spy: float = 500) -> ScanRow:
+    row = _scan(at, nvda, spy=spy, path=P2)
+    cards = row.snapshot["cards"]
+    prices = row.snapshot["price_observations"]
+    control = cards[0] | {
+        "opportunity_id": f"{at.date()}:AAPL:up", "ticker": "AAPL",
+        "rec_id": "control", "path": "P1_news_continuation",
+    }
+    return replace(row, snapshot=row.snapshot | {
+        "cards": [*cards, control],
+        "price_observations": prices | {"AAPL": prices["NVDA"] | {"spot": aapl}},
+        "news_research_context": {"prices": {"NVDA": {"atr": 2}, "AAPL": {"atr": 2}}},
+    })
+
+
+def test_baseline_keeps_observing_after_other_arms_close(tmp_path: Path) -> None:
+    engine = make_engine(f"sqlite:///{tmp_path / 'p2.db'}")
+    try:
+        first = _two_stocks(START, 99, 99)
+        entry = _two_stocks(START + timedelta(minutes=5), 100, 100)
+        stops = _two_stocks(START + timedelta(minutes=15), 107, 90)
+        signal_60 = _two_stocks(START + timedelta(minutes=61), 105, 95)
+        exit_60 = _two_stocks(START + timedelta(minutes=66), 104, 98, spy=501)
+        for scan in (first, entry, stops, signal_60):
+            observer.observe(engine, scan, LIVE, CFG)
+        record, _ = store.detail_inputs(engine, CFG.study_key, OPPORTUNITY)
+        assert record is not None and record.active
+        case = observer.Case.model_validate_json(record.document)
+        assert all(arm.state is State.CLOSED for arm in case.positions)
+        assert case.reference is not None and case.reference.entry is not None
+        assert case.reference.state == "exit_pending"
+        assert case.reference.entry.observed_at == entry.finished_at
+        assert case.reference.entry.pair.stock.price == 100
+        assert case.reference.exit is None
+        assert case.markouts[1].state == "priced"
+        assert case.markouts[1].at == signal_60.finished_at
+
+        for scan in (exit_60, exit_60):
+            observer.observe(engine, scan, LIVE, CFG)
+        before_close = report.build(engine, "", 1, "").p2
+        assert (before_close.p2_candidates, before_close.p2_entries, before_close.p2_priced) == (1, 1, 1)
+        assert before_close.costs == ()
+        close = _scan(START.replace(hour=21, minute=1), None, signal="WATCH")
+        observer.observe(engine, close, LIVE, CFG)
+
+        view = report.build(engine, "nvda", 1, OPPORTUNITY, day=START.date())
+        assert (view.p2.candidates, view.p2.complete_sessions, view.p2.paired_p2) == (2, 1, 1)
+        tax = next(row for row in view.p2.costs if row.cost_bps == 10)
+        assert tax.p2_usd == pytest.approx(91.104)
+        assert tax.random_usd == pytest.approx((91.104 - 52.752) / 2)
+        assert tax.spy_usd == pytest.approx(4 * (501 * .999 - 500 * 1.001))
+        assert view.detail is not None and view.detail.hold_reference is not None
+        assert view.detail.hold_reference.exit is not None and view.detail.hold_reference.exit.stock == 104
+        record, events = store.detail_inputs(engine, CFG.study_key, OPPORTUNITY)
+        assert record is not None and not record.active
+        assert len(events) == 5
+        stored = observer.Observation.model_validate_json(events[-1].document)
+        assert stored.reference is not None and stored.reference.exit is not None
+        assert stored.reference.exit.scan_id == exit_60.scan_id
+        old = json.loads(record.document)
+        del old["reference"]
+        assert observer.Case.model_validate(old).reference is None
+    finally:
+        engine.dispose()
+
+
+def test_missing_control_keeps_daily_comparison_out(tmp_path: Path) -> None:
+    engine = make_engine(f"sqlite:///{tmp_path / 'partial.db'}")
+    try:
+        for scan in (
+            _two_stocks(START, 100, 100),
+            _two_stocks(START + timedelta(minutes=5), 100, 100),
+            _scan(START + timedelta(minutes=66), 104, path=P2),
+            _scan(START.replace(hour=21, minute=1), None, signal="WATCH"),
+        ):
+            observer.observe(engine, scan, LIVE, CFG, recovered=scan.started_at.minute == 41)
+        observed = report.build(engine, "", 1, "")
+        assert observed.p2.p2_priced == 1
+        assert observed.p2.complete_sessions == 0
+        assert observed.p2.costs == ()
+        control, events = store.detail_inputs(engine, CFG.study_key, f"{START.date()}:AAPL:up")
+        assert control is not None and events
+        reference = observer.Case.model_validate_json(control.document).reference
+        assert reference is not None and reference.reason == "reference_exit_missing"
+    finally:
+        engine.dispose()
+
+
+def test_recovered_enrollment_and_early_close_do_not_invent_pairs(tmp_path: Path) -> None:
+    engine = make_engine(f"sqlite:///{tmp_path / 'early.db'}")
+    try:
+        observer.observe(engine, _scan(START, 100, path=P2), LIVE, CFG, recovered=True)
+        stored, _ = store.detail_inputs(engine, CFG.study_key, OPPORTUNITY)
+        assert stored is not None
+        case = observer.Case.model_validate_json(stored.document)
+        assert case.reference == Reference(state="unknown", reason="reference_late_enrollment")
+
+        # The Friday after Thanksgiving closes at 18:00 London.
+        published = datetime(2026, 11, 27, 16, 59, tzinfo=UTC)
+        seed = case.seed.model_copy(update={"published_at": published, "session": published.date()})
+        pair = Pair(
+            stock=observer.Quote(at=published + timedelta(seconds=61), price=100.0),
+            spy=observer.Quote(at=published + timedelta(seconds=62), price=500.0),
+        )
+        sample = Mark(pair=pair, scan_id="entry", observed_at=published + timedelta(seconds=65), recovered=False)
+        outcome = advance_reference(Reference(), seed, CFG, LIVE.calendar, sample.observed_at, sample)
+        assert outcome.entry == sample
+        assert outcome.state == "unknown" and outcome.reason == "reference_outside_session"
     finally:
         engine.dispose()

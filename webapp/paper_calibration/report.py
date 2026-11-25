@@ -2,19 +2,26 @@
 
 from __future__ import annotations
 
+from collections import defaultdict
 from dataclasses import dataclass, replace
+from datetime import datetime
 from enum import StrEnum
+from math import fsum
 from statistics import mean
 from typing import TYPE_CHECKING
 from zoneinfo import ZoneInfo
 
+from uoa_detector.live_alpha.calendar import close_time
+from uoa_detector.live_alpha.model import Path as SignalPath
+from uoa_detector.live_alpha.settings import load_live_alpha_settings
 from webapp.paper_calibration import store
 from webapp.paper_calibration.model import Arm, Position, State
 from webapp.paper_calibration.observer import Case, Markout, Observation
+from webapp.paper_calibration.reference import COSTS_BPS, Mark, Reference, net_usd
 from webapp.paper_calibration.settings import Settings, settings
 
 if TYPE_CHECKING:
-    from datetime import date, datetime
+    from datetime import date
 
     from sqlalchemy.engine import Engine
 
@@ -61,8 +68,18 @@ _REASON = {
     "reference_missing": "Sinyal anında eşleşen hisse ve SPY fiyatı eksik",
     "outside_session": "Ölçüm saati normal seansın dışında",
     "paired_quote_missing": "Ölçüm penceresinde eşleşen hisse ve SPY fiyatı eksik",
+    "reference_late_enrollment": "İlk kayıt kurtarma sırasında görüldü",
+    "reference_outside_session": "60 dakika ölçümü normal seansa sığmadı",
+    "reference_entry_missing": "Giriş penceresinde eşleşen hisse ve SPY fiyatı eksik",
+    "reference_exit_missing": "60 dakika penceresinde eşleşen hisse ve SPY fiyatı eksik",
+    "reference_notional": "Ayrılan bütçeye bir hisse sığmadı",
+    "reference_invalid_return": "Getiri hesabı doğrulanamadı",
 }
 _FLOW = {"up": "Yukarı", "down": "Aşağı", "below_threshold": "Eşik altında", "unavailable": "Akış verisi yok"}
+_REFERENCE_STATES = {
+    "entry_pending": "Giriş fiyatı bekleniyor", "exit_pending": "60 dakika fiyatı bekleniyor",
+    "priced": "Fiyat çifti tamam", "unknown": "Eksik ölçüm",
+}
 
 
 class CaseFilter(StrEnum):
@@ -93,7 +110,9 @@ def _states(case: Case) -> frozenset[CaseFilter]:
     states = {_POSITION_FILTERS[row.state] for row in case.positions if row.state in _POSITION_FILTERS}
     if not case.active:
         states.add(CaseFilter.CLOSED)
-    if any(item.state == "unknown" for item in case.markouts):
+    if any(item.state == "unknown" for item in case.markouts) or (
+        case.reference is not None and case.reference.state == "unknown"
+    ):
         states.add(CaseFilter.UNKNOWN)
     return frozenset(states)
 
@@ -144,6 +163,48 @@ class MarkView:
 
 
 @dataclass(frozen=True)
+class ReferenceMarkView:
+    at: str | None
+    stock_at: str | None
+    spy_at: str | None
+    stock: float
+    spy: float
+
+
+@dataclass(frozen=True)
+class ReferenceView:
+    state: str
+    label: str
+    reason: str | None
+    entry: ReferenceMarkView | None
+    exit: ReferenceMarkView | None
+
+
+@dataclass(frozen=True)
+class BaselineCost:
+    cost_bps: int
+    p2_usd: float
+    random_usd: float
+    spy_usd: float
+
+
+@dataclass(frozen=True)
+class BaselineView:
+    sessions: int
+    complete_sessions: int
+    candidates: int
+    priced_candidates: int
+    p2_candidates: int
+    p2_entries: int
+    p2_priced: int
+    p2_pending: int
+    p2_missing: int
+    paired_p2: int
+    notional: float
+    costs: tuple[BaselineCost, ...]
+
+
+@dataclass(frozen=True)
 class PositionView:
     arm: str
     label: str
@@ -182,6 +243,7 @@ class CaseView:
     state_label: str
     positions: tuple[PositionView, ...]
     markouts: tuple[MarkView, ...]
+    hold_reference: ReferenceView | None
 
 
 @dataclass(frozen=True)
@@ -228,6 +290,7 @@ class Report:
     has_next: bool
     arms: tuple[ArmView, ...]
     markouts: tuple[MarkSummary, ...]
+    p2: BaselineView
     cases: tuple[CaseView, ...]
     detail: CaseView | None
     events: tuple[EventView, ...]
@@ -281,6 +344,75 @@ def _mark_view(m: Markout) -> MarkView:
     )
 
 
+def _reference_mark(mark: Mark | None) -> ReferenceMarkView | None:
+    if mark is None:
+        return None
+    return ReferenceMarkView(
+        _clock(mark.observed_at), _clock(mark.pair.stock.at), _clock(mark.pair.spy.at),
+        mark.pair.stock.price, mark.pair.spy.price,
+    )
+
+
+def _reference_view(ref: Reference | None) -> ReferenceView | None:
+    if ref is None:
+        return None
+    return ReferenceView(ref.state, _REFERENCE_STATES[ref.state], _REASON.get(ref.reason or ""),
+                         _reference_mark(ref.entry), _reference_mark(ref.exit))
+
+
+def _p2(case: Case) -> bool:
+    return case.seed.source_path == SignalPath.P2_MARKET_RELATIVE.value
+
+
+def _priced(case: Case) -> bool:
+    return case.reference is not None and case.reference.state == "priced"
+
+
+def _reference_nets(case: Case, notional: float, cost: int) -> tuple[float, float]:
+    ref = case.reference
+    assert ref is not None and ref.entry is not None and ref.exit is not None
+    left, right = ref.entry.pair, ref.exit.pair
+    return net_usd(left.stock, right.stock, notional, cost), net_usd(left.spy, right.spy, notional, cost)
+
+
+def _baseline(cases: tuple[Case, ...], cfg: Settings, at: datetime | None, day: date | None) -> BaselineView:
+    grouped: dict[date, list[Case]] = defaultdict(list)
+    for case in cases:
+        if case.seed.ticker != cfg.benchmark and (day is None or case.seed.session == day):
+            grouped[case.seed.session].append(case)
+    cohorts = {session: roster for session, roster in grouped.items()
+               if any(case.reference is not None for case in roster)}
+    p2 = [case.reference for roster in cohorts.values() for case in roster if _p2(case)]
+    calendar = load_live_alpha_settings().calendar
+    zone = ZoneInfo(calendar.timezone)
+    complete = [roster for session, roster in cohorts.items() if at is not None
+                and at >= datetime.combine(session, close_time(session, calendar), zone)
+                and all(_priced(case) for case in roster)]
+    costs = []
+    for cost in COSTS_BPS if complete else ():
+        p2_nets: list[float] = []
+        random_nets: list[float] = []
+        spy_nets: list[float] = []
+        for roster in complete:
+            records = [(case, *_reference_nets(case, cfg.max_notional_usd, cost)) for case in roster]
+            eligible = [(stock, spy) for case, stock, spy in records if _p2(case)]
+            p2_nets.extend(stock for stock, _ in eligible)
+            spy_nets.extend(spy for _, spy in eligible)
+            random_nets.append(len(eligible) * mean(stock for _, stock, _ in records))
+        costs.append(BaselineCost(cost, fsum(p2_nets), fsum(random_nets), fsum(spy_nets)))
+    return BaselineView(
+        sessions=len(cohorts), complete_sessions=len(complete),
+        candidates=sum(map(len, cohorts.values())), p2_candidates=len(p2),
+        priced_candidates=sum(_priced(case) for roster in cohorts.values() for case in roster),
+        p2_entries=sum(ref is not None and ref.entry is not None for ref in p2),
+        p2_priced=sum(ref is not None and ref.state == "priced" for ref in p2),
+        p2_pending=sum(ref is not None and ref.pending for ref in p2),
+        p2_missing=sum(ref is None or ref.state == "unknown" for ref in p2),
+        paired_p2=sum(_p2(case) for roster in complete for case in roster),
+        notional=cfg.max_notional_usd, costs=tuple(costs),
+    )
+
+
 def _case_view(case: Case, arms: dict[str, Arm]) -> CaseView:
     seed = case.seed
     active_states = _states(case)
@@ -297,6 +429,7 @@ def _case_view(case: Case, arms: dict[str, Arm]) -> CaseView:
             p.last_quote.price if p.last_quote else None,
         ) for p in case.positions),
         tuple(_mark_view(mark) for mark in case.markouts),
+        _reference_view(case.reference),
     )
 
 
@@ -359,6 +492,7 @@ def build(
         filter_day=day.isoformat() if day else "", filtered=bool(ticker or day or state is not CaseFilter.ALL),
         page=page, has_prev=page > 1, has_next=page * PAGE_SIZE < total,
         arms=arm_views, markouts=tuple(summaries),
+        p2=_baseline(cases, cfg, data.latest_at, day),
         cases=tuple(_case_view(row, arms) for row in page_rows),
         detail=detail, events=tuple(_event_view(e, arms) for e in events[-_PAGE_EVENTS:]),
         events_truncated=len(events) > _PAGE_EVENTS, detail_missing=bool(opportunity and detail is None),

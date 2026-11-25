@@ -25,6 +25,8 @@
   #paper-calibration .paper-coverage progress::-webkit-progress-value { background:var(--accent); }
   #paper-calibration .paper-coverage progress::-moz-progress-bar { background:var(--accent); }
   #paper-calibration .paper-coverage-delta { min-width:85px; text-align:right; white-space:nowrap; }
+  #paper-calibration .paper-p2-counts { display:flex; flex-wrap:wrap; gap:5px 16px; font-size:13px; }
+  #paper-calibration .paper-reference-times { display:block; font-size:11px; color:var(--muted); white-space:nowrap; }
   #paper-calibration .paper-deltas { margin:0 0 16px; }
   #paper-calibration .paper-delta-row { display:grid; grid-template-columns:minmax(170px,1fr) minmax(120px,1.2fr) minmax(125px,.55fr); align-items:center; gap:8px 16px; padding:9px 0; border-top:1px solid var(--line); font-size:13px; }
   #paper-calibration .paper-delta-track { position:relative; height:12px; border-radius:3px; background:var(--paper-soft); }
@@ -171,6 +173,27 @@
     </table>
   </div>
   {% endif %}
+  {% if case.hold_reference %}
+  {% set ref = case.hold_reference %}
+  <h3 class="mt-4 font-semibold">Girişten 60 dakika sonra</h3>
+  <p class="paper-state-note" data-paper-reference-state="{{ ref.state }}">{{ ref.reason or ref.label }}</p>
+  {% if ref.entry %}
+  <div class="overflow-x-auto mt-2" role="region" aria-label="{{ case.ticker }} 60 dakika fiyat çifti" tabindex="0">
+    <table class="w-full text-sm">
+      <thead><tr><th scope="col">Ölçüm</th><th scope="col">Kayıt saati</th><th scope="col">{{ case.ticker }}</th><th scope="col">SPY</th></tr></thead>
+      <tbody>
+      {% for label, mark in [('Giriş', ref.entry), ('+60 dk', ref.exit)] if mark %}
+        <tr class="border-t">
+          <th scope="row">{{ label }}</th><td class="whitespace-nowrap">{{ mark.at }}</td>
+          <td>{{ usd(mark.stock, 4) }}<small class="paper-reference-times">{{ mark.stock_at }}</small></td>
+          <td>{{ usd(mark.spy, 4) }}<small class="paper-reference-times">{{ mark.spy_at }}</small></td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+  {% endif %}
 {% endmacro %}
 
 {% block content %}
@@ -178,7 +201,7 @@
   <div class="desk-heading paper-masthead">
     <div>
       <h1 id="paper-title">PAPER kalibrasyonu</h1>
-      <p class="quiet-copy">Hisse simülasyonu · Giriş teyidi ve stop karşılaştırması</p>
+      <p class="quiet-copy">Hisse simülasyonu · P2, giriş teyidi ve stop karşılaştırması</p>
     </div>
     <a class="paper-back" href="/sonuclar">Live Alpha geçmişi →</a>
   </div>
@@ -213,10 +236,42 @@
   </div>
 
   <nav class="desk-jump-nav" aria-label="PAPER ekranı bölümleri">
+    <a href="#paper-p2">P2 · 60 dakika</a>
     <a href="#paper-performance">Karşılaştırma</a>
     <a href="#paper-records">İşlem kayıtları</a>
     <a href="#paper-method">Ölçüm kuralları</a>
   </nav>
+
+  <section id="paper-p2" class="paper-panel mb-4" aria-labelledby="paper-p2-title">
+    <div class="paper-panel-heading">
+      <h2 id="paper-p2-title">P2 · 60 dakika</h2>
+      <span class="paper-topline">{% if v.filter_day %}{{ v.filter_day }} · {% endif %}{{ v.p2.complete_sessions }} / {{ v.p2.sessions }} tam seans</span>
+    </div>
+    <div class="paper-p2-counts">
+      <span><b>{{ v.p2.p2_candidates }}</b> P2 adayı</span>
+      <span><b>{{ v.p2.p2_entries }}</b> giriş çifti</span>
+      <span><b>{{ v.p2.p2_priced }}</b> 60 dakika çifti</span>
+      <span><b>{{ v.p2.p2_pending }}</b> bekleyen</span>
+      <span><b>{{ v.p2.p2_missing }}</b> eksik</span>
+    </div>
+    {% if v.p2.candidates %}<p class="paper-state-note">{{ v.p2.priced_candidates }} / {{ v.p2.candidates }} hisse adayında fiyat çifti tamam.</p>{% endif %}
+    {% if v.p2.costs %}
+    <div class="overflow-x-auto mt-3" role="region" aria-label="Maliyete göre P2 ve kontrol getirileri" tabindex="0">
+      <table class="w-full text-sm">
+        <thead><tr><th scope="col">Taraf başına</th><th scope="col">P2 net</th><th scope="col">Nakitte</th><th scope="col">Rastgele net</th><th scope="col">SPY üstü</th></tr></thead>
+        <tbody>{% for cost in v.p2.costs %}
+          <tr class="border-t" data-paper-p2-cost="{{ cost.cost_bps }}">
+            <th scope="row">{{ cost.cost_bps }} bp</th><td><b>{{ usd(cost.p2_usd, signed=true) }}</b></td><td>{{ usd(0) }}</td>
+            <td>{{ usd(cost.random_usd, signed=true) }}</td><td>{{ usd(cost.p2_usd - cost.spy_usd, signed=true) }}</td>
+          </tr>
+        {% endfor %}</tbody>
+      </table>
+    </div>
+    <p class="paper-state-note">{{ v.p2.paired_p2 }} P2 ölçümü · {{ usd(v.p2.notional, 0) }} ayrılan bütçe · Rastgele net, seans başına aynı işlem sayısının beklenen sonucu.</p>
+    {% else %}
+    <p class="paper-state-note">{% if v.p2.candidates %}Net karşılaştırma için tüm adayları ölçülmüş, kapanmış bir seans bekleniyor.{% else %}İlk uygun hisse kaydı bekleniyor.{% endif %}</p>
+    {% endif %}
+  </section>
 
   <section id="paper-performance" aria-labelledby="paper-performance-title">
     <div class="section-heading"><h2 id="paper-performance-title">Kol sonuçları</h2></div>
