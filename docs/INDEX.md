@@ -307,6 +307,7 @@ A new study needs a fresh, non-overlapping window (`docs/next_studies.md`,
 | 5.70.2 | **Theta Terminal time-format hotfix** — window `start_time`/`end_time` sent with millisecond precision (start rounded up, end rounded down); Terminal v3 returns HTTP 400 on microseconds, which the automatic connector reported as `terminal_unreachable`. Contract: `docs/phase-5.70.2-theta-time-format-acceptance.md`. Packet fields, validation, costs and attempt rules unchanged. |
 | 5.71 | **Forward PAPER calibration** — same-opportunity entry confirmation, risk-sized ATR alternatives and a private observation journal. Contract: `docs/phase-5.71-paper-calibration-acceptance.md`. Delivery: `docs/phase-5.71-paper-calibration-closeout.md`. |
 | 5.71.3 | **P2 sixty-minute PAPER baseline** — fixed entry-to-exit stock/SPY pairs in the original scan journal, complete-session costs and equal-count cash/random controls. Contract: `docs/phase-5.71.3-p2-baseline-acceptance.md`. Delivery: `docs/phase-5.71.3-p2-baseline-closeout.md`. |
+| 5.71.4 | **Find and read the PAPER journal** — header and results links, simple first view, and source timestamps per record. Contract: `docs/phase-5.71.4-paper-navigation.md`. Delivery: `docs/phase-5.71.4-paper-navigation-closeout.md`. |
 
 Detail for the 5.10–5.19 candidates:
 - **Falsification gates (D8).** `src/uoa_detector/backtest/falsification.py:79-81`

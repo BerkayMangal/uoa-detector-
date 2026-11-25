@@ -2,18 +2,31 @@
 {% from "instrument_comparison.html" import money %}
 {% block tagline %}<span class="text-sm text-gray-400">PAPER sonuçları · simülasyon, gerçek para değil</span>{% endblock %}
 {% block content %}
-<h2 class="text-xl font-bold text-white mb-3">Sonuçlar</h2>
-<p class="mb-4"><a class="underline" href="/paper-kalibrasyon">PAPER kalibrasyonunu aç</a></p>
-<p class="text-sm text-gray-400 mb-4">Live Alpha PAPER kayıtlarının tüm geçmişi. Manuel işlemler ve ayrı Opsiyon PAPER motoru bu toplama dahil değil.
-  Yalnız fiyatlanmış kapanışların model maliyetleri sonrası sonucu gösterilir. Açık ve belirsiz sonuçlar sıfır kâr sayılmaz.
-  Bu sayfa deneysel kuralların kazandırdığını kanıtlamaz.</p>
+<div class="desk-heading">
+  <div><h1>Sonuçlar</h1><p class="quiet-copy">Otomatik simülasyonların işlem geçmişi.</p></div>
+  <a class="button-primary" href="/paper-kalibrasyon">PAPER defterini aç →</a>
+</div>
 {% set s = v.summary %}
 <div class="grid gap-3 sm:grid-cols-3 mb-4" data-paper-summary>
-  <div class="border border-gray-700 rounded p-3">Kapanmış net sonuç<br><b class="text-xl text-white">{{ money(s.pnl_usd) }}</b><br><span class="text-xs text-gray-400">{{ s.closed }} fiyatlanmış kapanış / {{ s.total }} kayıt</span></div>
-  <div class="border border-gray-700 rounded p-3">Kapanış başına ortalama<br><b class="text-xl text-white">{{ money(s.average_usd) }}</b><br><span class="text-xs text-gray-400">{{ s.wins }} kazanç · {{ s.losses }} kayıp · {{ s.flats }} başabaş</span></div>
-  <div class="border border-gray-700 rounded p-3">Gerçekleşmiş toplamda en büyük düşüş<br><b class="text-xl text-white">{{ money(s.realised_decline_usd) }}</b><br><span class="text-xs text-gray-400">Portföy düşüşü değil; açık pozisyon değerleri yok</span></div>
+  <div class="border border-gray-700 rounded p-3">Net toplam<br><b class="text-xl text-white">{{ money(s.pnl_usd) }}</b><br><span class="text-xs text-gray-400">{{ s.closed }} fiyatlanmış kapanış / {{ s.total }} kayıt</span></div>
+  <div class="border border-gray-700 rounded p-3">Kapanan işlem başına<br><b class="text-xl text-white">{{ money(s.average_usd) }}</b><br><span class="text-xs text-gray-400">{{ s.wins }} kazanç · {{ s.losses }} kayıp · {{ s.flats }} başabaş</span></div>
+  <div class="border border-gray-700 rounded p-3">En büyük düşüş<br><b class="text-xl text-white">{{ money(s.realised_decline_usd) }}</b><br><span class="text-xs text-gray-400">Kapanmış işlemlerin toplamından</span></div>
 </div>
 <p class="text-sm mb-4" data-paper-coverage>Giriş bekleyen {{ s.pending }} · açık {{ s.open }} · çıkış fiyatı bekleyen {{ s.exit_pending }} · dolmayan {{ s.unfilled }} · sonucu belirsiz {{ s.unknown }}.</p>
+<h3 class="text-lg font-semibold text-white">İşlem geçmişi</h3>
+<p class="text-xs text-gray-400 mb-2">En yeni {{ v.shown }} / {{ s.total }} kayıt gösteriliyor. Yukarıdaki toplamlar tüm geçmişi kapsar.
+  Eksik ileri kapanışlar; henüz dolmayan süre veya veri eksikliği olabilir.</p>
+<div class="overflow-x-auto" role="region" aria-label="PAPER kayıtları" tabindex="0"><table class="w-full text-sm text-left" data-paper-records>
+<thead class="text-gray-400"><tr><th>Hisse / araç</th><th>Politika</th><th>Oluşma / çıkış (UTC)</th><th>Durum</th><th>Net sonuç</th><th>Çıkış nedeni</th></tr></thead><tbody>
+{% set states = {'pending':'Giriş bekliyor','open':'Açık','exit_pending':'Çıkış fiyatı bekliyor','closed':'Fiyatlanmış kapanış','unfilled':'Dolmadı','unknown':'Sonuç belirsiz'} %}
+{% for r in v.rows %}<tr class="border-t border-gray-800"><td class="py-2"><a class="underline" href="/canli/{{ r.opportunity_id | urlencode }}">{{ r.ticker }}</a> / {{ r.instrument }}</td><td>{{ r.policy }}</td><td>{{ r.created_at.strftime('%Y-%m-%d %H:%M') }}<br>{{ r.exit_at.strftime('%Y-%m-%d %H:%M') if r.exit_at else '—' }}</td><td>{{ states[r.category] }}</td><td>{{ money(r.pnl_usd) }}</td><td>{{ r.exit_reason }}</td></tr>
+{% else %}<tr><td colspan="6" class="py-3 text-gray-400">Henüz PAPER kaydı yok.</td></tr>{% endfor %}
+</tbody></table></div>
+<details class="fold-panel" id="results-research">
+<summary>Sonuç ayrıntıları ve araştırma</summary>
+<p class="quiet-copy">Live Alpha PAPER kayıtlarının tüm geçmişi. Manuel işlemler ve ayrı Opsiyon PAPER motoru bu toplama dahil değil.
+  Yalnız fiyatlanmış kapanışların model maliyetleri sonrası sonucu gösterilir. Açık ve belirsiz sonuçlar sıfır kâr sayılmaz.
+  Bu sayfa deneysel kuralların kazandırdığını kanıtlamaz.</p>
 <h3 class="text-lg font-semibold text-white">Politika ve araç bazında</h3>
 <div class="overflow-x-auto mb-6" role="region" aria-label="Politika sonuçları" tabindex="0"><table class="w-full text-sm text-left" data-policy-results>
 <thead class="text-gray-400"><tr><th>Politika / araç</th><th>Kayıt / kapanmış</th><th>Net sonuç</th><th>Ortalama</th><th>Dolmayan / belirsiz</th></tr></thead><tbody>
@@ -33,13 +46,5 @@
 <thead class="text-gray-400"><tr><th>Profil / grup</th><th>İleri seans</th><th>Sonucu olan / ölçüm</th><th>Ortalama akran üstü getiri (yp)</th></tr></thead><tbody>
 {% for r in v.lags %}<tr class="border-t border-gray-800"><td class="py-1">{{ r.version }} / {{ r.group }}</td><td>{{ r.sessions }}</td><td>{{ r.priced }} / {{ r.total }}</td><td>{% if r.mean_pp is not none %}{{ '%+.3f' | format(r.mean_pp) }}{% else %}bilinmiyor{% endif %}</td></tr>{% endfor %}
 </tbody></table></div>{% endif %}
-<h3 class="text-lg font-semibold text-white">Kayıtlar</h3>
-<p class="text-xs text-gray-400 mb-2">En yeni {{ v.shown }} / {{ s.total }} kayıt gösteriliyor. Yukarıdaki toplamlar tüm geçmişi kapsar.
-  Eksik ileri kapanışlar; henüz dolmayan süre veya veri eksikliği olabilir.</p>
-<div class="overflow-x-auto" role="region" aria-label="PAPER kayıtları" tabindex="0"><table class="w-full text-sm text-left" data-paper-records>
-<thead class="text-gray-400"><tr><th>Hisse / araç</th><th>Politika</th><th>Oluşma / çıkış (UTC)</th><th>Durum</th><th>Net sonuç</th><th>Çıkış nedeni</th></tr></thead><tbody>
-{% set states = {'pending':'Giriş bekliyor','open':'Açık','exit_pending':'Çıkış fiyatı bekliyor','closed':'Fiyatlanmış kapanış','unfilled':'Dolmadı','unknown':'Sonuç belirsiz'} %}
-{% for r in v.rows %}<tr class="border-t border-gray-800"><td class="py-2"><a class="underline" href="/canli/{{ r.opportunity_id | urlencode }}">{{ r.ticker }}</a> / {{ r.instrument }}</td><td>{{ r.policy }}</td><td>{{ r.created_at.strftime('%Y-%m-%d %H:%M') }}<br>{{ r.exit_at.strftime('%Y-%m-%d %H:%M') if r.exit_at else '—' }}</td><td>{{ states[r.category] }}</td><td>{{ money(r.pnl_usd) }}</td><td>{{ r.exit_reason }}</td></tr>
-{% else %}<tr><td colspan="6" class="py-3 text-gray-400">Henüz PAPER kaydı yok.</td></tr>{% endfor %}
-</tbody></table></div>
+</details>
 {% endblock %}

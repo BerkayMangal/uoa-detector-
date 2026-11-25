@@ -80,6 +80,7 @@ _REFERENCE_STATES = {
     "entry_pending": "Giriş fiyatı bekleniyor", "exit_pending": "60 dakika fiyatı bekleniyor",
     "priced": "Fiyat çifti tamam", "unknown": "Eksik ölçüm",
 }
+PRIMARY_COST_BPS = 10
 
 
 class CaseFilter(StrEnum):
@@ -178,6 +179,7 @@ class ReferenceView:
     reason: str | None
     entry: ReferenceMarkView | None
     exit: ReferenceMarkView | None
+    net: float | None
 
 
 @dataclass(frozen=True)
@@ -202,6 +204,10 @@ class BaselineView:
     paired_p2: int
     notional: float
     costs: tuple[BaselineCost, ...]
+
+    @property
+    def primary_cost(self) -> BaselineCost | None:
+        return next((cost for cost in self.costs if cost.cost_bps == PRIMARY_COST_BPS), None)
 
 
 @dataclass(frozen=True)
@@ -353,11 +359,14 @@ def _reference_mark(mark: Mark | None) -> ReferenceMarkView | None:
     )
 
 
-def _reference_view(ref: Reference | None) -> ReferenceView | None:
+def _reference_view(ref: Reference | None, notional: float) -> ReferenceView | None:
     if ref is None:
         return None
+    net = None
+    if ref.entry is not None and ref.exit is not None:
+        net = net_usd(ref.entry.pair.stock, ref.exit.pair.stock, notional, PRIMARY_COST_BPS)
     return ReferenceView(ref.state, _REFERENCE_STATES[ref.state], _REASON.get(ref.reason or ""),
-                         _reference_mark(ref.entry), _reference_mark(ref.exit))
+                         _reference_mark(ref.entry), _reference_mark(ref.exit), net)
 
 
 def _p2(case: Case) -> bool:
@@ -413,7 +422,7 @@ def _baseline(cases: tuple[Case, ...], cfg: Settings, at: datetime | None, day: 
     )
 
 
-def _case_view(case: Case, arms: dict[str, Arm]) -> CaseView:
+def _case_view(case: Case, arms: dict[str, Arm], notional: float) -> CaseView:
     seed = case.seed
     active_states = _states(case)
     priority = (CaseFilter.OPEN, CaseFilter.EXIT_PENDING, CaseFilter.PENDING, CaseFilter.UNKNOWN, CaseFilter.CLOSED)
@@ -429,7 +438,7 @@ def _case_view(case: Case, arms: dict[str, Arm]) -> CaseView:
             p.last_quote.price if p.last_quote else None,
         ) for p in case.positions),
         tuple(_mark_view(mark) for mark in case.markouts),
-        _reference_view(case.reference),
+        _reference_view(case.reference, notional),
     )
 
 
@@ -479,7 +488,8 @@ def build(
               if item.minutes == horizon and item.relative_pp is not None]
         summaries.append(MarkSummary(f"+{horizon} dk", len(pp), len(cases), sum(p > 0 for p in pp), _mean(pp)))
     record, events = store.detail_inputs(engine, cfg.study_key, opportunity) if opportunity else (None, ())
-    detail = _case_view(Case.model_validate_json(record.document), arms) if record is not None else None
+    detail = (_case_view(Case.model_validate_json(record.document), arms, cfg.max_notional_usd)
+              if record is not None else None)
     return Report(
         ready=data.ready, latest_at=_clock(data.latest_at), version=cfg.version,
         total=total, cohort_total=len(cases), sessions=len({c.seed.session for c in cases}),
@@ -493,7 +503,7 @@ def build(
         page=page, has_prev=page > 1, has_next=page * PAGE_SIZE < total,
         arms=arm_views, markouts=tuple(summaries),
         p2=_baseline(cases, cfg, data.latest_at, day),
-        cases=tuple(_case_view(row, arms) for row in page_rows),
+        cases=tuple(_case_view(row, arms, cfg.max_notional_usd) for row in page_rows),
         detail=detail, events=tuple(_event_view(e, arms) for e in events[-_PAGE_EVENTS:]),
         events_truncated=len(events) > _PAGE_EVENTS, detail_missing=bool(opportunity and detail is None),
     )

@@ -33,7 +33,7 @@
     {% if path != '/hakkinda' %}
     <nav class="desk-nav" aria-label="Ana gezinme">
       <div class="desk-nav-primary">
-      {% for href, label, active in [('/', 'Bugün', path == '/' or path.startswith('/canli')), ('/opsiyon-dogrulama', 'Otomatik takip', path == '/opsiyon-dogrulama'), ('/acilis', 'Açılış masası', path == '/acilis'), ('/pozisyonlar', 'Pozisyonlarım', path == '/pozisyonlar'), ('/sonuclar', 'Sonuçlar', path == '/sonuclar')] %}
+      {% for href, label, active in [('/', 'Bugün', path == '/' or path.startswith('/canli')), ('/paper-kalibrasyon', 'PAPER', path == '/paper-kalibrasyon'), ('/opsiyon-dogrulama', 'Otomatik takip', path == '/opsiyon-dogrulama'), ('/acilis', 'Açılış masası', path == '/acilis'), ('/pozisyonlar', 'Pozisyonlarım', path == '/pozisyonlar'), ('/sonuclar', 'Sonuçlar', path == '/sonuclar')] %}
       <a href="{{ href }}" {% if active %}aria-current="page"{% endif %}>{{ label }}</a>
       {% endfor %}
       </div>

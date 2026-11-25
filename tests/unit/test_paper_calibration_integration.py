@@ -182,6 +182,9 @@ def test_private_html_and_json_are_select_only(
                             headers=headers)
         assert detail.status_code == 200
         assert 'data-paper-ready="true"' in detail.text
+        assert '<a href="/paper-kalibrasyon" aria-current="page">PAPER</a>' in detail.text
+        assert "PAPER defteri</h1>" in detail.text
+        assert 'data-paper-p2-primary' in detail.text
         assert "Olay günlüğü" in detail.text
         assert "Güncel AL" in detail.text
         assert detail.headers["cache-control"] == "private, no-store"
@@ -326,6 +329,8 @@ def test_baseline_keeps_observing_after_other_arms_close(tmp_path: Path) -> None
         assert tax.spy_usd == pytest.approx(4 * (501 * .999 - 500 * 1.001))
         assert view.detail is not None and view.detail.hold_reference is not None
         assert view.detail.hold_reference.exit is not None and view.detail.hold_reference.exit.stock == 104
+        assert view.p2.primary_cost == tax
+        assert view.detail.hold_reference.net == pytest.approx(tax.p2_usd)
         record, events = store.detail_inputs(engine, CFG.study_key, OPPORTUNITY)
         assert record is not None and not record.active
         assert len(events) == 5
