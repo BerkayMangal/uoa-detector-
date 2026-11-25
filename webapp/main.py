@@ -32,7 +32,7 @@ from dataclasses import asdict
 from datetime import UTC, date, datetime
 from pathlib import Path
 from time import perf_counter
-from typing import TYPE_CHECKING, Any, ParamSpec, TypeVar, cast
+from typing import TYPE_CHECKING, Any, Literal, ParamSpec, TypeVar, cast
 from urllib.parse import urlencode, urlsplit
 from zoneinfo import ZoneInfo
 
@@ -113,6 +113,11 @@ from webapp.opening import alerts as opening_alerts
 from webapp.opening import measurement as opening_measurement
 from webapp.opening import view as opening_view
 from webapp.opening.model import clock as opening_clock
+from webapp.paper_calibration import report as paper_calibration_report
+from webapp.paper_calibration import store as paper_calibration_store
+from webapp.paper_calibration.observer import Case as CalibrationCase
+from webapp.paper_calibration.observer import Observation as CalibrationObservation
+from webapp.paper_calibration.settings import settings as paper_calibration_settings
 from webapp.repo import RunInfo, SignalRepo
 from webapp.semantic_news import service as semantic_service
 from webapp.semantic_news import view as semantic_view
@@ -1124,6 +1129,36 @@ def live_results_page(request: Request) -> HTMLResponse:
         request, "results.html", {"v": live_results.build_results(engine),
         "benchmarks": _safe(lambda: desk_benchmarks.build(engine, _now()), None)},
     )
+
+
+@app.get("/paper-kalibrasyon", response_class=HTMLResponse)
+def paper_calibration_page(
+    request: Request, ticker: str = "", page: int = 1, opportunity: str = "",
+    state: paper_calibration_report.CaseFilter = paper_calibration_report.CaseFilter.ALL,
+    day: date | Literal[""] = "",
+) -> HTMLResponse:
+    if page < 1 or len(ticker) > 12 or len(opportunity) > 80:
+        raise HTTPException(status_code=422, detail="Geçersiz PAPER filtresi")
+    view = paper_calibration_report.build(
+        _board_reader().engine, ticker, page, opportunity, state=state, day=day if isinstance(day, date) else None,
+    )
+    return templates.TemplateResponse(request, "paper_calibration.html", {"v": view})
+
+
+@app.get("/api/paper-kalibrasyon/{opportunity_id}", response_class=JSONResponse)
+def export_paper_calibration_case(opportunity_id: str) -> JSONResponse:
+    cfg = paper_calibration_settings()
+    record, events = paper_calibration_store.detail_inputs(_board_reader().engine, cfg.study_key, opportunity_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="PAPER kaydı bulunamadı")
+    return JSONResponse({
+        "configuration": cfg.model_dump(mode="json"),
+        "case": CalibrationCase.model_validate_json(record.document).model_dump(mode="json"),
+        "observations": [CalibrationObservation.model_validate_json(event.document).model_dump(mode="json")
+                         for event in events],
+        "observation_limit": paper_calibration_store.DETAIL_EVENT_LIMIT,
+        "observations_may_be_truncated": len(events) == paper_calibration_store.DETAIL_EVENT_LIMIT,
+    })
 
 
 @app.get("/pozisyonlar", response_class=HTMLResponse)

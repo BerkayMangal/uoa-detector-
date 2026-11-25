@@ -182,13 +182,13 @@ def test_measurement_page_preserves_prior_navigation_and_adds_automatic_tracking
     assert response.status_code == 200
     nav = Navigation()
     nav.feed(response.text)
-    # Phase5.70 adds automatic tracking while preserving all fifteen existing
-    # destinations, including the separate stock-measurement and option pages.
-    assert len(nav.links) == 16
+    # The PAPER journal joins the existing automatic tracking, stock
+    # measurement, option, and research destinations.
+    assert len(nav.links) == 17
     assert set(nav.links) == {
         "/", "/acilis", "/pozisyonlar", "/sonuclar", "/olcum", "/karne", "/haberler",
         "/arastirma", "/laboratuvar", "/stratejiler", "/journal", "/defter", "/alfa", "/gamma", "/opsiyon",
-        "/opsiyon-dogrulama",
+        "/opsiyon-dogrulama", "/paper-kalibrasyon",
     }
     assert writes == []
 

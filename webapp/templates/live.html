@@ -158,6 +158,7 @@
   </details>
   <details open class="fold-panel" id="paper-tracking"><summary>PAPER takibi <span class="text-gray-400">· simülasyon</span></summary>
   <h3 class="sr-only">Önerilerin sonucu (PAPER: simülasyon, gerçek para değil)</h3>
+  <p class="mb-3"><a class="button-primary" href="/paper-kalibrasyon">PAPER defterini aç</a></p>
   <p class="quiet-copy" data-paper-all-history><b>Tüm geçmiş · {{ v.paper_stats.total }} kayıt:</b> {{ v.paper_stats.closed }} fiyatlanmış kapanış · {{ v.paper_stats.wins }} kazanç · {{ v.paper_stats.losses }} kayıp · {{ v.paper_stats.flats }} başabaş. Model maliyetleri sonrası kapanış toplamı {% if v.paper_stats.pnl_usd is not none %}${{ '%.2f' | format(v.paper_stats.pnl_usd) }}{% else %}bilinmiyor{% endif %}. Açık/bekleyen {{ v.paper_stats.open }} · dolmayan {{ v.paper_stats.unfilled }} · belirsiz {{ v.paper_stats.unknown }}. <a class="underline" href="/sonuclar">Tüm geçmişi ve araç ayrımını aç →</a></p>
   <p class="quiet-copy" data-paper-recent>Aşağıda tüm açık/bekleyen kayıtlar ve oluşturulma sırasına göre son {{ v.paper_stats.recent_total }} sonuçlanan kayıt gösterilir (üst sınır {{ v.paper_stats.recent_limit }}). Bu son grupta {{ v.paper_stats.recent_closed }} fiyatlanmış kapanış: {{ v.paper_stats.recent_wins }} kazanç · {{ v.paper_stats.recent_losses }} kayıp · {{ v.paper_stats.recent_flats }} başabaş; {{ v.paper_stats.recent_unfilled }} dolmayan · {{ v.paper_stats.recent_unknown }} belirsiz. Eksik fiyatlar kayıp veya sıfır getiri sayılmaz.</p>
   {% if v.papers_open or v.papers_closed %}
@@ -165,10 +166,26 @@
   {% for p in v.papers_open + v.papers_closed %}
   <tr class="border-t border-gray-800" data-paper="{{ p.ticker }}">
     <td>{{ p.ticker }}</td><td>{{ p.instrument }}</td><td>{{ p.state_text }}</td>
-    <td>{{ p.entry_price if p.entry_price is not none else '—' }}{% if p.quantity %} × {{ p.quantity }}{% endif %}<small class="block quiet-copy">{{ p.entry_time if p.entry_at else 'Giriş saati kayıtsız' }}</small></td>
-    <td>{{ p.stop }} / {{ p.target }}</td>
-    <td data-paper-mark-state="{{ p.mark_status }}">{% if p.current_mark is not none %}<span data-paper-current-mark>{{ p.current_mark }}</span><small class="block quiet-copy">{{ p.mark_text }} · {{ p.last_mark_time }}</small>{% else %}<span class="quiet-copy">{{ p.mark_text }}</span>{% if p.recorded_mark is not none %}<small class="block quiet-copy">Kayıtlı fiyat {{ p.recorded_mark }} · {{ p.last_mark_time }}</small>{% endif %}{% endif %}</td>
-    <td>{{ p.exit_price if p.exit_price is not none else '—' }} {{ p.exit_reason or '' }}{% if p.exit_at %}<small class="block quiet-copy">{{ 'Çıkış' if p.category == 'closed' else 'Sinyal / kayıt' }} · {{ p.exit_time }}</small>{% endif %}</td>
+    <td>
+      <strong>{{ p.entry_price if p.entry_price is not none else '—' }}</strong>
+      {% if p.quantity %}<span> · {{ p.quantity }} adet</span>{% endif %}
+      <small class="block quiet-copy">{{ p.entry_time if p.entry_at else 'Giriş saati kayıtsız' }}</small>
+    </td>
+    <td><span class="block">Stop {{ p.stop }}</span><span class="block">Hedef {{ p.target }}</span></td>
+    <td data-paper-mark-state="{{ p.mark_status }}">
+      {% if p.current_mark is not none %}
+        <strong data-paper-current-mark>{{ p.current_mark }}</strong>
+        <small class="block quiet-copy">{{ p.mark_text }} · {{ p.last_mark_time }}</small>
+      {% else %}
+        {% if p.recorded_mark is not none %}<strong>{{ p.recorded_mark }}</strong>{% endif %}
+        <small class="block quiet-copy">{{ p.mark_text }}{% if p.recorded_mark is not none %} · {{ p.last_mark_time }}{% endif %}</small>
+      {% endif %}
+    </td>
+    <td>
+      <strong>{{ p.exit_price if p.exit_price is not none else '—' }}</strong>
+      {% if p.exit_reason %}<span> · {{ p.exit_reason }}</span>{% endif %}
+      {% if p.exit_at %}<small class="block quiet-copy">{{ 'Çıkış' if p.category == 'closed' else 'Sinyal / kayıt' }} · {{ p.exit_time }}</small>{% endif %}
+    </td>
     <td>{{ p.pnl_usd if p.category == 'closed' and p.pnl_usd is not none else 'bilinmiyor' }}</td>
   </tr>
   {% endfor %}</tbody></table></div>

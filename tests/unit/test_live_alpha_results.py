@@ -134,6 +134,8 @@ def test_results_route_auth_empty_state_and_escaping(engine: Engine, monkeypatch
     assert "Henüz PAPER kaydı yok" in response.text
     assert "Akran ölçümü tablosu henüz yok" in response.text
     assert 'data-paper-summary' in response.text
+    assert '<a class="button-primary" href="/paper-kalibrasyon">PAPER defterini aç' in response.text
+    assert response.text.index("İşlem geçmişi</h3>") < response.text.index('id="results-research"')
     store.create_paper(engine, _paper(1, None, state="UNRESOLVED", exit_reason="<script>bad()</script>"))
     response = client.get("/sonuclar", headers=headers)
     assert "Sonuç belirsiz" in response.text

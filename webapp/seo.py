@@ -18,6 +18,7 @@ TITLES = {
     "/acilis": "Açılış masası",
     "/stratejiler": "Strateji masası",
     "/kalibrasyon": "Kalibrasyon",
+    "/paper-kalibrasyon": "PAPER kalibrasyon",
     "/pozisyonlar": "Pozisyonlarım",
     "/laboratuvar": "Alfa laboratuvarı",
     "/": "Bugün", "/alfa": "Alfa Board", "/gamma": "Gamma ve volatilite",
